@@ -85,8 +85,8 @@ export function Navbar() {
             <span className="text-lg font-black tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-clip-text text-transparent leading-none">
               CBOT
             </span>
-            <span className="text-[8px] font-bold text-amber-500/90 tracking-widest uppercase mt-0.5">
-              Carrom Balu Online
+            <span className="text-[7.5px] sm:text-[8px] font-bold text-amber-500/90 tracking-widest uppercase mt-0.5 whitespace-nowrap">
+              Carrom Balu Online Tournament
             </span>
           </div>
         </Link>
