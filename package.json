@@ -1,0 +1,39 @@
+{
+  "name": "cbot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "node --import tsx/esm prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.4.2",
+    "lucide-react": "^0.474.0",
+    "next": "15.1.7",
+    "next-auth": "^4.24.11",
+    "next-themes": "^0.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.17",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "prisma": "^6.3.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.11",
+    "typescript": "^5.7.3"
+  }
+}

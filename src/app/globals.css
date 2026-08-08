@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 30% 98%;
+    --foreground: 224 71.4% 4.1%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 45 40% 92%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 45 20% 94%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 38 92% 95%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 45 20% 88%;
+    --input: 45 20% 88%;
+    --ring: 38 92% 50%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 210 40% 98%;
+
+    --card: 224 71% 7%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 224 71% 7%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 224 71% 4%;
+
+    --secondary: 220 30% 14%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 38 92% 16%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 20% 16%;
+    --input: 220 20% 16%;
+    --ring: 38 92% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-amber-500 selection:text-black;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Glassmorphism utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Carrom Board Decorative Accent */
+.carrom-grid-pattern {
+  background-image: radial-gradient(rgba(245, 158, 11, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
