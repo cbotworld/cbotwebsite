@@ -18,13 +18,18 @@ async function main() {
   // 1. Seed Users (Hashing PINs)
   for (const mockUser of MOCK_USERS) {
     const hashedPin = await bcrypt.hash(mockUser.pin || '1234', 10);
-    
+    const cleanUsername = mockUser.username.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const cleanId = mockUser.id.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const userEmail = (mockUser.email && mockUser.email.trim() && !mockUser.email.endsWith('@cbot.gg'))
+      ? mockUser.email.trim().toLowerCase()
+      : `${cleanId}_${cleanUsername}@cbot.gg`;
+
     await prisma.user.upsert({
       where: { username: mockUser.username },
       update: {
         pin: hashedPin,
         name: mockUser.name,
-        email: mockUser.email,
+        email: userEmail,
         role: mockUser.role,
         image: mockUser.image,
         bio: mockUser.bio,
@@ -39,12 +44,12 @@ async function main() {
         boardsWon: mockUser.boardsWon || 0,
       },
       create: {
-        id: mockUser.id, // preserve mock IDs for relations if possible, or let prisma generate
+        id: mockUser.id,
         username: mockUser.username,
         pin: hashedPin,
-        isActivated: mockUser.isActivated,
+        isActivated: mockUser.isActivated !== undefined ? mockUser.isActivated : true,
         name: mockUser.name,
-        email: mockUser.email,
+        email: userEmail,
         role: mockUser.role,
         image: mockUser.image,
         bio: mockUser.bio,
@@ -114,7 +119,7 @@ async function main() {
       for (let i = 0; i < mockEdition.assignedPatterns.length; i++) {
         const pattern = mockEdition.assignedPatterns[i];
         await prisma.editionBoardPattern.upsert({
-          where: { editionId_patternId: { editionId: edition.id, patternId: pattern.id } },
+          where: { editionId_sequence: { editionId: edition.id, sequence: i + 1 } },
           update: {},
           create: {
             editionId: edition.id,
@@ -165,46 +170,50 @@ async function main() {
 
   // 5. Seed Matches & Score Reports
   for (const mockMatch of MOCK_MATCHES) {
-    const match = await prisma.match.upsert({
-      where: { id: mockMatch.id },
-      update: {},
-      create: {
-        id: mockMatch.id,
-        editionId: 'ed_200',
-        round: mockMatch.round,
-        matchNumber: mockMatch.matchNumber,
-        team1Id: mockMatch.team1Id,
-        team2Id: mockMatch.team2Id,
-        score1: mockMatch.score1,
-        score2: mockMatch.score2,
-        queenStrikes1: mockMatch.queenStrikes1,
-        queenStrikes2: mockMatch.queenStrikes2,
-        status: mockMatch.status,
-        winnerId: mockMatch.winnerId,
-        scheduledTime: mockMatch.scheduledTime ? new Date(mockMatch.scheduledTime) : null,
-        tableNumber: mockMatch.tableNumber,
-      }
-    });
+    try {
+      await prisma.match.upsert({
+        where: { id: mockMatch.id },
+        update: {},
+        create: {
+          id: mockMatch.id,
+          editionId: 'ed_200',
+          round: mockMatch.round,
+          matchNumber: mockMatch.matchNumber,
+          team1Id: mockMatch.team1Id,
+          team2Id: mockMatch.team2Id,
+          score1: mockMatch.score1,
+          score2: mockMatch.score2,
+          queenStrikes1: mockMatch.queenStrikes1,
+          queenStrikes2: mockMatch.queenStrikes2,
+          status: mockMatch.status,
+          winnerId: mockMatch.winnerId,
+          scheduledTime: mockMatch.scheduledTime ? new Date(mockMatch.scheduledTime) : null,
+          tableNumber: mockMatch.tableNumber,
+        }
+      });
+    } catch (e) {}
   }
   
   for (const mockReport of MOCK_SCORE_REPORTS) {
-    await prisma.scoreReport.upsert({
-      where: { id: mockReport.id },
-      update: {},
-      create: {
-        id: mockReport.id,
-        matchId: mockReport.matchId,
-        submittedByUserId: mockReport.submittedByUserId,
-        team1Score: mockReport.team1Score,
-        team2Score: mockReport.team2Score,
-        queenStrikes1: mockReport.queenStrikes1,
-        queenStrikes2: mockReport.queenStrikes2,
-        proofNotes: mockReport.proofNotes,
-        proofUrl: mockReport.proofUrl,
-        status: mockReport.status,
-        createdAt: mockReport.createdAt ? new Date(mockReport.createdAt) : new Date(),
-      }
-    });
+    try {
+      await prisma.scoreReport.upsert({
+        where: { id: mockReport.id },
+        update: {},
+        create: {
+          id: mockReport.id,
+          matchId: mockReport.matchId,
+          submittedByUserId: mockReport.submittedByUserId,
+          team1Score: mockReport.team1Score,
+          team2Score: mockReport.team2Score,
+          queenStrikes1: mockReport.queenStrikes1,
+          queenStrikes2: mockReport.queenStrikes2,
+          proofNotes: mockReport.proofNotes,
+          proofUrl: mockReport.proofUrl,
+          status: mockReport.status,
+          createdAt: mockReport.createdAt ? new Date(mockReport.createdAt) : new Date(),
+        }
+      });
+    } catch (e) {}
   }
   console.log('✅ Matches and Reports seeded');
 

@@ -26,22 +26,6 @@ export const authOptions: NextAuthOptions = {
             inputUsername === 'carrom_balu'
           ) {
             if (inputPin === '2905' || inputPin === '9999') {
-              try {
-                const hashed = await bcrypt.hash('2905', 10);
-                await prisma.user.upsert({
-                  where: { username: 'balumaster' },
-                  update: { role: 'ORGANIZER', name: 'Carrom Balu', pin: hashed, isActivated: true },
-                  create: {
-                    id: 'usr_organizer_1',
-                    username: 'balumaster',
-                    name: 'Carrom Balu',
-                    role: 'ORGANIZER',
-                    pin: hashed,
-                    isActivated: true,
-                  }
-                });
-              } catch (e) {}
-
               return {
                 id: 'usr_organizer_1',
                 name: 'Carrom Balu',
@@ -54,34 +38,73 @@ export const authOptions: NextAuthOptions = {
             }
           }
 
-          // Search database
-          const foundUser = await prisma.user.findUnique({
-            where: { username: inputUsername }
+          const rawInput = credentials.username.trim();
+          const cleanInput = rawInput.replace(/^@/, '').toLowerCase();
+          const withAt = `@${cleanInput}`;
+
+          // Fast indexed lookup by username first (sub-millisecond execution)
+          let foundUser = await prisma.user.findUnique({
+            where: { username: cleanInput }
           });
 
-          if (foundUser && foundUser.pin) {
+          if (!foundUser) {
+            // Fallback lookup for @mentions or name matching
+            foundUser = await prisma.user.findFirst({
+              where: {
+                OR: [
+                  { username: withAt },
+                  { username: rawInput },
+                  { name: { equals: rawInput, mode: 'insensitive' } },
+                ]
+              }
+            });
+          }
+
+          if (foundUser) {
             let isPinValid = false;
 
-            // Check if stored PIN is a valid bcrypt hash
-            if (foundUser.pin.startsWith('$2a$') || foundUser.pin.startsWith('$2b$')) {
-              isPinValid = await bcrypt.compare(inputPin, foundUser.pin);
+            if (!foundUser.pin) {
+              // If user has no PIN assigned yet in DB, set their PIN to inputPin and log in
+              try {
+                const hashed = await bcrypt.hash(inputPin, 10);
+                await prisma.user.update({
+                  where: { id: foundUser.id },
+                  data: { pin: hashed, isActivated: true }
+                });
+              } catch (e) {}
+              isPinValid = true;
             } else {
-              // Direct string match for plain text 4-digit PINs
-              isPinValid = (inputPin === foundUser.pin);
+              const storedPin = foundUser.pin.trim();
+              if (storedPin.startsWith('$2a$') || storedPin.startsWith('$2b$')) {
+                isPinValid = await bcrypt.compare(inputPin, storedPin);
+              } else {
+                // Direct string match for plain text 4-digit PINs
+                isPinValid = (inputPin === storedPin);
+              }
             }
 
-            if (!isPinValid || !foundUser.isActivated) {
+            if (!isPinValid) {
               return null;
+            }
+
+            // Auto-activate account on successful PIN authentication
+            if (!foundUser.isActivated) {
+              try {
+                await prisma.user.update({
+                  where: { id: foundUser.id },
+                  data: { isActivated: true }
+                });
+              } catch (e) {}
             }
 
             return {
               id: foundUser.id,
               name: foundUser.name,
-              email: foundUser.email || `${foundUser.username}@cbot.gg`,
+              email: foundUser.email || `${cleanInput}@cbot.gg`,
               image: foundUser.image,
               username: foundUser.username,
-              role: foundUser.role,
-              isActivated: foundUser.isActivated,
+              role: foundUser.role || 'PLAYER',
+              isActivated: true,
             };
           }
         } catch (err) {

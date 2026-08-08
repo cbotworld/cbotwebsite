@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS } from '@/lib/mock-data';
 import { createEdition, addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam } from '@/lib/actions/tournamentActions';
+import { sendFinalDailyLineupSummaryAction } from '@/lib/actions/lineupActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { finalizeEditionRankings } from '@/lib/actions/rankingActions';
 import { generateUserCredentials, resetUserPin, updatePlayerProfileDetails, deletePlayer } from '@/lib/actions/userActions';
@@ -176,72 +177,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Tournament Stage Schedule Dates & Round Robin Matrix State
-  const [stageSchedule, setStageSchedule] = React.useState({
-    roundRobin: '2026-08-12T10:00',
-    qualifier1: '2026-08-14T14:00',
-    qualifier2: '2026-08-15T14:00',
-    finals: '2026-08-16T18:00',
-  });
-  const [activeModalTab, setActiveModalTab] = React.useState<'RULES' | 'SCHEDULE'>('SCHEDULE');
-  const [scheduleViewMode, setScheduleViewMode] = React.useState<'STAGES' | 'FIXTURES'>('STAGES');
-  const [generatedSchedule, setGeneratedSchedule] = React.useState<any[]>([]);
-
-  // Function to generate standard Round Robin pairings for current edition teams (Online Event: Per-Day Date Selection & 9:30 PM IST Deadline)
-  const handleGenerateRoundRobin = () => {
-    if (selectedEditionTeams.length < 2) {
-      alert('You need at least 2 teams created in this edition to generate a round-robin schedule.');
-      return;
-    }
-
-    let list = [...selectedEditionTeams];
-    const isOdd = list.length % 2 !== 0;
-    if (isOdd) {
-      list.push({ id: 'bye', name: 'BYE / REST' });
-    }
-
-    const numTeams = list.length;
-    const numRounds = numTeams - 1;
-    const matchesPerRound = numTeams / 2;
-    const schedule = [];
-
-    const baseDate = new Date(stageSchedule.roundRobin || Date.now());
-
-    for (let r = 0; r < numRounds; r++) {
-      const roundMatches = [];
-      const roundDay = new Date(baseDate.getTime() + r * 24 * 60 * 60 * 1000);
-      const dateStr = roundDay.toISOString().slice(0, 10);
-
-      for (let i = 0; i < matchesPerRound; i++) {
-        const home = list[i];
-        const away = list[numTeams - 1 - i];
-
-        if (home.id !== 'bye' && away.id !== 'bye') {
-          roundMatches.push({
-            id: `rr_r${r + 1}_m${i + 1}`,
-            roundNumber: r + 1,
-            homeTeam: home,
-            awayTeam: away,
-          });
-        }
-      }
-
-      schedule.push({
-        roundNumber: r + 1,
-        roundTitle: `Day ${r + 1}`,
-        roundDate: dateStr,
-        deadlineTime: '21:30',
-        matches: roundMatches,
-      });
-
-      list = [list[0], list[list.length - 1], ...list.slice(1, list.length - 1)];
-    }
-
-    setGeneratedSchedule(schedule);
-    setScheduleViewMode('FIXTURES');
-  };
 
   // Multi-Format Round & Custom Rules State
+
   const [roundCount, setRoundCount] = React.useState<number>(4);
   const [roundFormats, setRoundFormats] = React.useState<string[]>([
     'SINGLES', // Round 1
@@ -275,7 +213,90 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setRoundRules(updatedRules);
   };
 
+  const [totalDays, setTotalDays] = React.useState<number>(15);
+  const [startDate, setStartDate] = React.useState<string>('2026-08-10');
+  const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
+
+  const generateDefaultDayDates = (startStr: string, numDays: number, existingMap: Record<number, string> = {}) => {
+    const map: Record<number, string> = { ...existingMap };
+    const baseDate = startStr && !isNaN(new Date(startStr).getTime()) ? new Date(startStr) : new Date('2026-08-10');
+    
+    for (let i = 1; i <= numDays; i++) {
+      if (!map[i]) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + (i - 1));
+        map[i] = d.toISOString().split('T')[0];
+      }
+    }
+    return map;
+  };
+
   const selectedEdition = editions.find((e) => e.id === selectedEditionId) || editions[0];
+
+  React.useEffect(() => {
+    if (selectedEdition) {
+      const savedFormats = selectedEdition.patterns?.map((p: any) => p.matchFormat) || [];
+      if (savedFormats.length > 0) {
+        setRoundCount(savedFormats.length);
+        setRoundFormats(savedFormats);
+        setRoundRules(
+          savedFormats.map((fmt: string, idx: number) => {
+            return selectedEdition.patterns?.[idx]?.pattern?.objective || `Round ${idx + 1} specific match rules`;
+          })
+        );
+      } else {
+        setRoundCount(4);
+        setRoundFormats(['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES']);
+        setRoundRules([
+          'Standard Singles match (Direct pockets only)',
+          'Doubles partner alternate shots (Queen cover mandatory)',
+          'Triples 3-player rotation (Penalty -1 on foul)',
+          'Grand final singles rules (Best of 3 boards)',
+        ]);
+      }
+
+      const numDays = selectedEdition.totalDays || 15;
+      setTotalDays(numDays);
+
+      let loadedMap: Record<number, string> = {};
+      if (selectedEdition.dayDates) {
+        try {
+          loadedMap = JSON.parse(selectedEdition.dayDates);
+        } catch (e) {}
+      }
+      
+      const firstDate = loadedMap[1] || (selectedEdition.tournamentStartDate ? new Date(selectedEdition.tournamentStartDate).toISOString().split('T')[0] : '2026-08-10');
+      setStartDate(firstDate);
+      setDayDatesMap(generateDefaultDayDates(firstDate, numDays, loadedMap));
+    }
+  }, [selectedEditionId, editions]);
+
+  const handleSaveRoundsConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEditionId) return;
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    formData.append('title', selectedEdition?.title || selectedEdition?.name || '');
+    formData.append('theme', selectedEdition?.theme || 'Standard Theme');
+    formData.append('description', selectedEdition?.themeDescription || '');
+    formData.append('prizePool', selectedEdition?.prizePool || '₹1,00,000 INR');
+    formData.append('maxTeams', (selectedEdition?.maxTeams || 16).toString());
+    formData.append('roundFormats', JSON.stringify(roundFormats));
+    formData.append('roundRules', JSON.stringify(roundRules));
+    formData.append('totalDays', totalDays.toString());
+    formData.append('dayDates', JSON.stringify(dayDatesMap));
+
+    const res = await updateEdition(selectedEditionId, formData);
+    if (res.success && res.edition) {
+      setEditions(editions.map((ed) => (ed.id === res.edition!.id ? res.edition : ed)));
+      alert('🏆 Tournament schedule & rounds configuration saved successfully to the database!');
+    } else {
+      alert('⚠️ Failed to save configuration: ' + (res.error || 'Unknown error'));
+    }
+    setIsSubmitting(false);
+  };
+
   const selectedEditionTeams = teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id));
 
   const activeEditions = editions.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REGISTRATION_OPEN');
@@ -285,6 +306,12 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     e.preventDefault();
     if (!newTeamName.trim()) return;
     setIsSubmitting(true);
+    const updatedMembers = newTeamPlayerIds.map((pId) => {
+      const foundUser = usersList.find((u) => u.id === pId);
+      return { id: `m_${pId}`, userId: pId, user: foundUser };
+    });
+    const updatedCaptain = usersList.find((u) => u.id === newTeamCaptainId);
+
     const res = await addOrUpdateEditionTeam({
       editionId: selectedEditionId || editions[0]?.id,
       name: newTeamName.trim(),
@@ -294,7 +321,12 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       logo: newTeamLogo.trim() || undefined,
     });
     if (res.success && res.team) {
-      setTeamsList([res.team, ...teamsList]);
+      const teamWithMembers = {
+        ...res.team,
+        members: (res.team.members && res.team.members.length > 0) ? res.team.members : updatedMembers,
+        captain: res.team.captain || updatedCaptain,
+      };
+      setTeamsList([teamWithMembers, ...teamsList]);
       setAddTeamModalOpen(false);
       setNewTeamName('');
       setNewTeamTag('');
@@ -397,8 +429,18 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     });
 
     if (res.team) {
+      const savedTeam = res.team;
       setTeamsList((prev) =>
-        prev.map((t) => (t.id === editingTeamId || (res.team && t.name === res.team.name) ? { ...t, ...res.team } : t))
+        prev.map((t) =>
+          t.id === editingTeamId || t.name === savedTeam.name
+            ? {
+                ...t,
+                ...savedTeam,
+                members: (savedTeam.members && savedTeam.members.length > 0) ? savedTeam.members : updatedMembers,
+                captain: savedTeam.captain || updatedCaptain,
+              }
+            : t
+        )
       );
     }
     setIsSubmitting(false);
@@ -425,12 +467,28 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     const formData = new FormData(e.currentTarget);
     formData.append('roundFormats', JSON.stringify(roundFormats));
     formData.append('roundRules', JSON.stringify(roundRules));
+
+    // Optimistic update — close modal immediately
+    const optimisticTitle = (formData.get('title') as string) || selectedEdition?.title;
+    const optimisticTheme = (formData.get('theme') as string) || selectedEdition?.theme;
+    const optimisticDescription = (formData.get('description') as string) || selectedEdition?.themeDescription;
+    const optimisticPrizePool = (formData.get('prizePool') as string) || selectedEdition?.prizePool;
+    const optimisticMaxTeams = parseInt((formData.get('maxTeams') as string) || '16', 10);
+    setEditions(editions.map((ed) =>
+      ed.id === selectedEditionId
+        ? { ...ed, title: optimisticTitle, theme: optimisticTheme, themeDescription: optimisticDescription, prizePool: optimisticPrizePool, maxTeams: optimisticMaxTeams }
+        : ed
+    ));
+    setEditModalOpen(false);
+    setIsSubmitting(false);
+
+    // Persist in background
     const res = await updateEdition(selectedEditionId, formData);
     if (res.success && res.edition) {
-      setEditions(editions.map((ed) => (ed.id === res.edition.id ? res.edition : ed)));
-      setEditModalOpen(false);
+      setEditions(editions.map((ed) => (ed.id === res.edition!.id ? res.edition : ed)));
+    } else if (!res.success) {
+      alert('⚠️ Failed to save edition changes: ' + (res.error || 'Unknown error. Please try again.'));
     }
-    setIsSubmitting(false);
   };
 
   const handleGenerateCredentials = async (e: React.FormEvent) => {
@@ -705,119 +763,259 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <div className="text-xl font-black text-foreground mt-1 truncate">{selectedEdition?.title || 'Edition'}</div>
         </Card>
 
-        <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-xs font-bold text-emerald-500 uppercase">Theme Teams (In Edition)</div>
-          <div className="text-3xl font-black text-foreground mt-1">{selectedEditionTeams.length}</div>
+        <Card className="p-5 border-violet-500/30 bg-violet-500/5">
+          <div className="text-xs font-bold text-violet-400 uppercase">Teams</div>
+          <div className="text-3xl font-black text-foreground mt-1">{teamsList.length}</div>
         </Card>
 
-        <Card className="p-5 border-blue-500/30 bg-blue-500/5">
-          <div className="text-xs font-bold text-blue-500 uppercase">Registered Users</div>
+        <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
+          <div className="text-xs font-bold text-emerald-500 uppercase">Registered Players</div>
           <div className="text-3xl font-black text-foreground mt-1">{usersList.length}</div>
         </Card>
       </div>
 
-      {/* Organizer Theme-Based Teams Registry for Selected Edition */}
-      <Card className="border-amber-500/40">
+      {/* Rounds & Match Schedule Configuration Card */}
+      <Card className="border-amber-500/30">
+        <CardHeader className="border-b border-border pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Layers className="h-5 w-5 text-amber-500 animate-pulse" /> Tournament Days, Schedule &amp; Match Formats
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Set total event days, assign specific calendar dates for each day, and configure per-round match formats for <strong className="text-amber-500">{selectedEdition?.title || 'Active Edition'}</strong>.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="carrom" className="font-extrabold text-xs px-3 py-1">
+                {totalDays} Days Event
+              </Badge>
+              <Badge variant="carrom" className="font-extrabold text-xs px-3 py-1">
+                {roundCount} Rounds / Day
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          <form onSubmit={handleSaveRoundsConfig} className="space-y-6">
+            
+            {/* Control Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
+              <div>
+                <label className="text-xs font-bold block mb-1">Total Event Days</label>
+                <Select
+                  value={totalDays.toString()}
+                  onChange={(e: any) => {
+                    const newDays = parseInt(e.target.value, 10);
+                    setTotalDays(newDays);
+                    setDayDatesMap(generateDefaultDayDates(startDate, newDays, dayDatesMap));
+                  }}
+                  className="text-xs font-bold"
+                >
+                  <option value="3">3 Days Event</option>
+                  <option value="5">5 Days Event</option>
+                  <option value="7">7 Days Event</option>
+                  <option value="10">10 Days Event</option>
+                  <option value="12">12 Days Event</option>
+                  <option value="15">15 Days Event</option>
+                  <option value="20">20 Days Event</option>
+                  <option value="30">30 Days Event</option>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold block mb-1">Event Start Date (Day 1)</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e: any) => {
+                    const newStart = e.target.value;
+                    setStartDate(newStart);
+                    setDayDatesMap(generateDefaultDayDates(newStart, totalDays, {}));
+                  }}
+                  className="text-xs font-bold font-mono bg-background"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold block mb-1">Rounds per Day</label>
+                <Select value={roundCount.toString()} onChange={(e: any) => handleRoundCountChange(parseInt(e.target.value, 10))} className="text-xs font-bold">
+                  <option value="3">3 Rounds / Day</option>
+                  <option value="4">4 Rounds / Day</option>
+                  <option value="5">5 Rounds / Day</option>
+                  <option value="6">6 Rounds / Day</option>
+                  <option value="7">7 Rounds / Day</option>
+                  <option value="8">8 Rounds / Day</option>
+                  <option value="9">9 Rounds / Day</option>
+                  <option value="10">10 Rounds / Day</option>
+                </Select>
+              </div>
+            </div>
+
+            {/* Daily Calendar Dates Schedule */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-border/40">
+                <span className="text-xs font-black text-amber-500 flex items-center gap-1.5 uppercase tracking-wider">
+                  📅 Event Calendar Dates ({totalDays} Days Configured)
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Specific calendar dates assigned for each event day.
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2.5 max-h-[220px] overflow-y-auto pr-1 p-1">
+                {Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNum) => (
+                  <div key={dayNum} className="bg-card p-2.5 rounded-lg border border-border/70 space-y-1">
+                    <div className="text-[10px] font-bold text-amber-400">Day {dayNum} Date</div>
+                    <Input
+                      type="date"
+                      value={dayDatesMap[dayNum] || ''}
+                      onChange={(e) => setDayDatesMap({ ...dayDatesMap, [dayNum]: e.target.value })}
+                      className="text-xs h-7 px-2 font-mono bg-background"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Per-Round Formats */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-border/40">
+                <span className="text-xs font-black text-amber-500 flex items-center gap-1.5 uppercase tracking-wider">
+                  👑 Per-Round Match Formats ({roundCount} Rounds)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {roundFormats.map((format, idx) => (
+                  <div key={idx} className="bg-card p-4 rounded-xl border border-border shadow-md space-y-3">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
+                      <span className="text-xs font-black text-amber-500 flex items-center gap-1.5">
+                        👑 Round {idx + 1}
+                      </span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                        Stage {idx + 1}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-muted-foreground block mb-1">
+                        Match Format
+                      </label>
+                      <Select
+                        value={format}
+                        onChange={(e: any) => {
+                          const copy = [...roundFormats];
+                          copy[idx] = e.target.value;
+                          setRoundFormats(copy);
+                        }}
+                        className="text-xs h-9 font-bold bg-background animate-fade-in"
+                      >
+                        <option value="SINGLES">Singles (1v1)</option>
+                        <option value="DOUBLES">Doubles (2v2)</option>
+                        <option value="TRIPLES">Triples (3v3)</option>
+                        <option value="QUADRUPLES">Quadruples (4v4)</option>
+                      </Select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button type="submit" variant="carrom" className="font-bold text-xs" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving Configuration...' : 'Save Schedule & Rounds Configuration'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Teams Management */}
+      <Card className="border-amber-500/30">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-2">
           <div>
             <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Users className="h-5 w-5 text-amber-500" /> Theme Teams for {selectedEdition?.title || selectedEdition?.name || 'Selected Edition'}
+              <Users className="h-5 w-5 text-amber-500" /> Teams — {selectedEdition?.title || 'Active Edition'}
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Organizers decide team names according to Edition Theme: <strong className="text-amber-400">"{selectedEdition?.theme || 'Standard Theme'}"</strong>
+              Manage teams, assign captains and roster players for this edition.
             </p>
           </div>
           <Button variant="carrom" size="sm" onClick={() => setAddTeamModalOpen(true)} className="text-xs font-bold">
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Theme Team
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Team
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Theme Team Name</TableHead>
+                <TableHead>Team Name</TableHead>
                 <TableHead>Tag</TableHead>
-                <TableHead>Assigned Captain</TableHead>
-                <TableHead>Roster Players</TableHead>
-                <TableHead>Edition Theme</TableHead>
+                <TableHead>Captain</TableHead>
+                <TableHead>Roster</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {selectedEditionTeams.map((team) => (
-                <TableRow key={team.id}>
-                  <TableCell className="font-bold text-xs flex items-center gap-2.5">
-                    {team.logo ? (
-                      <img src={team.logo} alt={team.name} className="h-8 w-8 rounded-full object-cover border border-amber-500/40 shadow-sm" />
-                    ) : (
-                      <span className="h-8 w-8 rounded-full bg-amber-500/20 text-amber-500 font-black text-xs flex items-center justify-center border border-amber-500/30">
-                        {team.tag || 'CB'}
-                      </span>
-                    )}
-                    <span>{team.name}</span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-amber-500 font-bold">{team.tag || 'CB'}</TableCell>
-                  <TableCell className="text-xs font-semibold text-foreground">
-                    {(() => {
-                      const captainUser = usersList.find(
-                        (u) =>
-                          u.id === team.captainId ||
-                          (team.captain?.id && u.id === team.captain.id) ||
-                          (team.captain?.username && u.username?.toLowerCase() === team.captain.username?.toLowerCase()) ||
-                          (team.captain?.name && u.name?.toLowerCase() === team.captain.name?.toLowerCase())
-                      );
-
-                      if (captainUser) {
-                        return (
-                          <span className="font-bold text-amber-400 flex items-center gap-1">
-                            👑 {captainUser.name || captainUser.username}
-                          </span>
-                        );
-                      }
-                      return <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>;
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-xs font-medium text-muted-foreground">
-                    {(() => {
-                      const count = team.members ? team.members.length : 0;
-                      return <span className="font-bold text-amber-400">{count} Players</span>;
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-medium">
-                    {selectedEdition?.theme || 'Edition Theme'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="success">THEME DECIDED</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenEditTeamModal(team)}
-                        className="h-7 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
-                      >
-                        <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Team
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleOpenDeleteTeam(team)}
-                        className="h-7 px-2 text-xs font-bold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30"
-                        title="Delete Team"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {selectedEditionTeams.length === 0 && (
+              {teamsList.map((team) => {
+                const captain = usersList.find(
+                  (u) =>
+                    u.id === team.captainId ||
+                    (team.captain?.id && u.id === team.captain.id)
+                );
+                const memberCount = team.members ? team.members.length : 0;
+                return (
+                  <TableRow key={team.id}>
+                    <TableCell className="font-bold text-xs flex items-center gap-2.5">
+                      {team.logo ? (
+                        <img src={team.logo} alt={team.name} className="h-7 w-7 rounded-full object-cover border border-amber-500/40" />
+                      ) : (
+                        <span className="h-7 w-7 rounded-full bg-amber-500/20 text-amber-500 font-black text-[10px] flex items-center justify-center border border-amber-500/30">
+                          {(team.tag || 'CB').slice(0, 2)}
+                        </span>
+                      )}
+                      {team.name}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-amber-500 font-bold">{team.tag || '—'}</TableCell>
+                    <TableCell className="text-xs font-semibold">
+                      {captain ? (
+                        <span className="text-amber-400 font-bold flex items-center gap-1">
+                          <Crown className="h-3 w-3" /> {captain.name || captain.username}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs font-bold text-amber-400">{memberCount} Players</TableCell>
+                    <TableCell>
+                      <Badge variant="success" className="text-[10px]">ACTIVE</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenEditTeamModal(team)}
+                          className="h-7 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
+                        >
+                          <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleOpenDeleteTeam(team)}
+                          className="h-7 px-2 text-xs font-bold bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {teamsList.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-xs font-medium">
-                    No theme teams defined for {selectedEdition?.title || selectedEdition?.name || 'this edition'} yet. Click <strong className="text-amber-400">"+ Add Theme Team"</strong> to set team names matching the theme <em>"{selectedEdition?.theme}"</em>.
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-xs font-medium">
+                    No teams yet for this edition. Click <strong className="text-amber-400">"+ Add Team"</strong> to create the first team.
                   </TableCell>
                 </TableRow>
               )}
@@ -826,265 +1024,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </CardContent>
       </Card>
 
-      {/* Tournament Stage Schedule & Date Selection Card */}
-      <Card className="border-amber-500/40 bg-card">
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-3">
-          <div>
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-amber-500" /> Tournament Stage Schedule & Date Manager
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Set stage start dates and generate full Round-Robin match pairings for all <strong className="text-amber-400">{selectedEditionTeams.length} created teams</strong>.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={scheduleViewMode === 'STAGES' ? 'carrom' : 'outline'}
-              size="sm"
-              onClick={() => setScheduleViewMode('STAGES')}
-              className="text-xs font-bold"
-            >
-              📅 Stage Dates
-            </Button>
-            <Button
-              variant={scheduleViewMode === 'FIXTURES' ? 'carrom' : 'outline'}
-              size="sm"
-              onClick={() => {
-                if (generatedSchedule.length === 0) handleGenerateRoundRobin();
-                else setScheduleViewMode('FIXTURES');
-              }}
-              className="text-xs font-bold"
-            >
-              📋 Full Round-Robin Fixtures {generatedSchedule.length > 0 ? `(${generatedSchedule.length} Rounds)` : ''}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateRoundRobin}
-              className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/20"
-            >
-              ⚡ Auto-Generate Schedule
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-6">
-          {scheduleViewMode === 'STAGES' ? (
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Round Robin */}
-                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      🏆 Round Robin
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300 font-bold">Stage 1</Badge>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Scheduled Date & Time</label>
-                    <Input
-                      type="datetime-local"
-                      value={stageSchedule.roundRobin}
-                      onChange={(e) => setStageSchedule({ ...stageSchedule, roundRobin: e.target.value })}
-                      className="text-xs font-mono font-bold bg-background border-amber-500/40 focus:border-amber-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground italic">All teams compete in group matches</p>
-                </div>
-
-                {/* Qualifier 1 */}
-                <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                      ⚔️ Qualifier 1
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-blue-500/40 text-blue-300 font-bold">Stage 2</Badge>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Scheduled Date & Time</label>
-                    <Input
-                      type="datetime-local"
-                      value={stageSchedule.qualifier1}
-                      onChange={(e) => setStageSchedule({ ...stageSchedule, qualifier1: e.target.value })}
-                      className="text-xs font-mono font-bold bg-background border-blue-500/40 focus:border-blue-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground italic">Top seed playoff match</p>
-                </div>
-
-                {/* Qualifier 2 */}
-                <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
-                      🔥 Qualifier 2
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-300 font-bold">Stage 3</Badge>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Scheduled Date & Time</label>
-                    <Input
-                      type="datetime-local"
-                      value={stageSchedule.qualifier2}
-                      onChange={(e) => setStageSchedule({ ...stageSchedule, qualifier2: e.target.value })}
-                      className="text-xs font-mono font-bold bg-background border-purple-500/40 focus:border-purple-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground italic">Eliminator winner vs Q1 runner-up</p>
-                </div>
-
-                {/* Grand Finals */}
-                <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      👑 Grand Finals
-                    </span>
-                    <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-300 font-bold">Final Stage</Badge>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-muted-foreground block mb-1">Scheduled Date & Time</label>
-                    <Input
-                      type="datetime-local"
-                      value={stageSchedule.finals}
-                      onChange={(e) => setStageSchedule({ ...stageSchedule, finals: e.target.value })}
-                      className="text-xs font-mono font-bold bg-background border-emerald-500/40 focus:border-emerald-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground italic">Championship Decider Match</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-4 pt-4 border-t border-border gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateRoundRobin}
-                  className="text-xs font-bold border-amber-500/40 text-amber-400"
-                >
-                  ⚡ Generate Full Round-Robin Schedule
-                </Button>
-                <Button
-                  variant="carrom"
-                  size="sm"
-                  onClick={() => alert("Tournament stage dates updated and saved!")}
-                  className="text-xs font-bold flex items-center gap-1.5"
-                >
-                  <Check className="h-4 w-4" /> Save Schedule Dates
-                </Button>
-              </div>
-            </div>
-          ) : (
-            /* Full Round Robin Schedule Fixtures View (TournamentScheduler algorithm) */
-            <div>
-              {generatedSchedule.length === 0 ? (
-                <div className="p-8 text-center space-y-3 bg-muted/20 rounded-2xl border border-dashed border-amber-500/30">
-                  <Trophy className="h-10 w-10 text-amber-500 mx-auto opacity-80" />
-                  <h3 className="font-bold text-base">No Round-Robin Fixtures Generated Yet</h3>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                    Click below to generate an automatic Round-Robin tournament matrix for all <strong className="text-amber-400">{selectedEditionTeams.length} teams</strong> created in this edition.
-                  </p>
-                  <Button variant="carrom" onClick={handleGenerateRoundRobin} className="font-bold text-xs">
-                    ⚡ Auto-Generate Full Round-Robin Schedule
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 gap-2">
-                    <div className="text-xs font-bold">
-                      Generated <strong className="text-amber-400">{generatedSchedule.length} Rounds</strong> & <strong className="text-amber-400">{generatedSchedule.reduce((acc, r) => acc + r.matches.length, 0)} Total Matches</strong> for {selectedEditionTeams.length} teams.
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => alert("Full Round-Robin schedule saved successfully!")}
-                        className="text-xs font-bold border-amber-500/40 text-amber-400"
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" /> Save Schedule Matrix
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="carrom"
-                        onClick={() => window.print()}
-                        className="text-xs font-bold"
-                      >
-                        🖨️ Print / Export Schedule
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Captain & Player Daily Directives Banner */}
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-amber-400 flex items-center gap-2">
-                        <Trophy className="h-4 w-4" /> Captain Lineup & Score Submission Directives
-                      </span>
-                      <Badge variant="carrom" className="text-[10px] font-extrabold">DAILY 9:30 PM IST DEADLINE</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                      💡 <strong className="text-foreground">Captains:</strong> You can set and update player lineup combinations for Day 1, Day 2, Day 3, etc. anytime starting from the Tournament Start Day.<br />
-                      ⏰ <strong className="text-foreground">Daily Deadline:</strong> All match score submissions and team combinations for each scheduled day must be completed by <strong className="text-amber-400">9:30 PM IST</strong> on that day.
-                    </p>
-                  </div>
-
-                  <div className="space-y-5">
-                    {generatedSchedule.map((round, rIdx) => (
-                      <div key={round.roundNumber} className="p-4 rounded-2xl bg-muted/30 border border-amber-500/25 space-y-3">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b border-border/40 gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                              👑 Day {round.roundNumber}
-                            </span>
-                            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300 font-bold">
-                              {round.matches.length} Matches
-                            </Badge>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                            <div className="flex items-center gap-1.5">
-                              <label className="text-[11px] font-bold text-muted-foreground whitespace-nowrap">📅 Scheduled Date:</label>
-                              <Input
-                                type="date"
-                                value={round.roundDate}
-                                onChange={(e) => {
-                                  const copy = [...generatedSchedule];
-                                  copy[rIdx].roundDate = e.target.value;
-                                  setGeneratedSchedule(copy);
-                                }}
-                                className="text-xs h-8 font-mono font-bold bg-background border-amber-500/40 focus:border-amber-500 w-36"
-                              />
-                            </div>
-
-                            <Badge variant="carrom" className="text-[10px] font-bold px-2.5 py-1 text-emerald-400 border-emerald-500/30">
-                              🔴 Deadline: 9:30 PM IST
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-                          {round.matches.map((m: any) => (
-                            <div key={m.id} className="p-3.5 rounded-xl bg-card border border-border/80 space-y-2.5 shadow-sm hover:border-amber-500/40 transition-colors">
-                              <div className="flex items-center justify-between text-xs font-bold">
-                                <span className="text-amber-400 font-extrabold truncate max-w-[42%]">{m.homeTeam.name}</span>
-                                <span className="text-muted-foreground font-black text-[10px] px-2 py-0.5 bg-muted rounded border border-amber-500/20">VS</span>
-                                <span className="text-amber-400 font-extrabold truncate max-w-[42%] text-right">{m.awayTeam.name}</span>
-                              </div>
-
-                              <div className="flex items-center justify-end pt-1.5 border-t border-border/40">
-                                <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-400 font-bold">
-                                  OPEN
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* User Credentials Section */}
 
       {/* User Credentials & PIN Management Table */}
       <Card className="border-border">
@@ -1564,6 +1504,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 <option value="4">4 Rounds</option>
                 <option value="5">5 Rounds</option>
                 <option value="6">6 Rounds</option>
+                <option value="7">7 Rounds</option>
+                <option value="8">8 Rounds</option>
+                <option value="9">9 Rounds</option>
+                <option value="10">10 Rounds</option>
               </Select>
             </div>
           </div>
@@ -1573,9 +1517,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <div className="flex items-center justify-between pb-2 border-b border-border/40">
               <div className="space-y-0.5">
                 <label className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Directives & Match Rules
+                  <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Match Format
                 </label>
-                <p className="text-[11px] text-muted-foreground font-medium">Configure format and dedicated rule list for every tournament round.</p>
+                <p className="text-[11px] text-muted-foreground font-medium">Set the match format for each round.</p>
               </div>
               <Badge variant="carrom" className="text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wider">
                 {roundCount} Rounds Configured
@@ -1594,8 +1538,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-1">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
                       <label className="text-[11px] font-bold text-muted-foreground block mb-1">
                         Match Format
                       </label>
@@ -1613,22 +1557,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                         <option value="TRIPLES">Triples (3v3)</option>
                         <option value="QUADRUPLES">Quadruples (4v4)</option>
                       </Select>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <label className="text-[11px] font-bold text-muted-foreground block mb-1">
-                        Round Rule List / Directives
-                      </label>
-                      <Input
-                        value={roundRules[idx] || ''}
-                        onChange={(e) => {
-                          const copy = [...roundRules];
-                          copy[idx] = e.target.value;
-                          setRoundRules(copy);
-                        }}
-                        placeholder={`e.g. Round ${idx + 1} specific rules, foul penalties, board targets...`}
-                        className="text-xs h-9 font-medium bg-background border-border/80 focus:border-amber-500"
-                      />
                     </div>
                   </div>
                 </div>
@@ -1692,118 +1620,22 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 <option value="4">4 Rounds</option>
                 <option value="5">5 Rounds</option>
                 <option value="6">6 Rounds</option>
+                <option value="7">7 Rounds</option>
+                <option value="8">8 Rounds</option>
+                <option value="9">9 Rounds</option>
+                <option value="10">10 Rounds</option>
               </Select>
             </div>
           </div>
 
-          {/* Tab Switcher inside Edit Edition Modal */}
-          <div className="flex border-b border-border gap-2 pb-1">
-            <button
-              type="button"
-              onClick={() => setActiveModalTab('SCHEDULE')}
-              className={`py-2 px-3 text-xs font-bold rounded-t-lg flex items-center gap-1.5 transition-colors ${
-                activeModalTab === 'SCHEDULE'
-                  ? 'bg-amber-500/20 text-amber-400 border border-b-0 border-amber-500/40 font-black'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-              }`}
-            >
-              <Calendar className="h-3.5 w-3.5" /> 📅 Stage Schedule & Dates
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveModalTab('RULES')}
-              className={`py-2 px-3 text-xs font-bold rounded-t-lg flex items-center gap-1.5 transition-colors ${
-                activeModalTab === 'RULES'
-                  ? 'bg-amber-500/20 text-amber-400 border border-b-0 border-amber-500/40 font-black'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-              }`}
-            >
-              <Trophy className="h-3.5 w-3.5" /> 👑 Per-Round Rules
-            </button>
-          </div>
-
-          {activeModalTab === 'SCHEDULE' ? (
-            /* Stage Schedule Dates Section */
-            <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-amber-500/25">
+          {/* Per-Round Match Format — direct, no tabs */}
+          <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-amber-500/25">
               <div className="flex items-center justify-between pb-2 border-b border-border/40">
                 <div className="space-y-0.5">
                   <label className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-amber-400" /> Prepare Tournament Stage Schedule
+                    <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Match Format
                   </label>
-                  <p className="text-[11px] text-muted-foreground font-medium">Select or change scheduled dates & start times for each stage.</p>
-                </div>
-                <Badge variant="carrom" className="text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wider">
-                  4 Stages Configured
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="bg-card p-3 rounded-xl border border-amber-500/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1">🏆 Round Robin Stage</span>
-                    <span className="text-[9px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">Stage 1</span>
-                  </div>
-                  <Input
-                    type="datetime-local"
-                    value={stageSchedule.roundRobin}
-                    onChange={(e) => setStageSchedule({ ...stageSchedule, roundRobin: e.target.value })}
-                    className="text-xs font-mono font-bold bg-background h-9 border-amber-500/40 focus:border-amber-500"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">All teams compete in group matches</p>
-                </div>
-
-                <div className="bg-card p-3 rounded-xl border border-blue-500/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-400 flex items-center gap-1">⚔️ Qualifier 1 (Q1)</span>
-                    <span className="text-[9px] font-mono bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold">Stage 2</span>
-                  </div>
-                  <Input
-                    type="datetime-local"
-                    value={stageSchedule.qualifier1}
-                    onChange={(e) => setStageSchedule({ ...stageSchedule, qualifier1: e.target.value })}
-                    className="text-xs font-mono font-bold bg-background h-9 border-blue-500/40 focus:border-blue-500"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Top 4 seeded teams knockout match</p>
-                </div>
-
-                <div className="bg-card p-3 rounded-xl border border-purple-500/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-400 flex items-center gap-1">🔥 Qualifier 2 (Q2)</span>
-                    <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">Stage 3</span>
-                  </div>
-                  <Input
-                    type="datetime-local"
-                    value={stageSchedule.qualifier2}
-                    onChange={(e) => setStageSchedule({ ...stageSchedule, qualifier2: e.target.value })}
-                    className="text-xs font-mono font-bold bg-background h-9 border-purple-500/40 focus:border-purple-500"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Eliminator winner vs Q1 runner-up</p>
-                </div>
-
-                <div className="bg-card p-3 rounded-xl border border-emerald-500/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">👑 Grand Finals</span>
-                    <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">Final Stage</span>
-                  </div>
-                  <Input
-                    type="datetime-local"
-                    value={stageSchedule.finals}
-                    onChange={(e) => setStageSchedule({ ...stageSchedule, finals: e.target.value })}
-                    className="text-xs font-mono font-bold bg-background h-9 border-emerald-500/40 focus:border-emerald-500"
-                  />
-                  <p className="text-[10px] text-muted-foreground italic">Championship Decider Match</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Multi-Format Round & Rules Breakdown */
-            <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-amber-500/25">
-              <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                    <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Directives & Match Rules
-                  </label>
-                  <p className="text-[11px] text-muted-foreground font-medium">Configure format and dedicated rule list for every tournament round.</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">Set the match format for each round.</p>
                 </div>
                 <Badge variant="carrom" className="text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wider">
                   {roundCount} Rounds Configured
@@ -1822,8 +1654,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="md:col-span-1">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
                         <label className="text-[11px] font-bold text-muted-foreground block mb-1">
                           Match Format
                         </label>
@@ -1842,28 +1674,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                           <option value="QUADRUPLES">Quadruples (4v4)</option>
                         </Select>
                       </div>
-
-                      <div className="md:col-span-2">
-                        <label className="text-[11px] font-bold text-muted-foreground block mb-1">
-                          Round Rule List / Directives
-                        </label>
-                        <Input
-                          value={roundRules[idx] || ''}
-                          onChange={(e) => {
-                            const copy = [...roundRules];
-                            copy[idx] = e.target.value;
-                            setRoundRules(copy);
-                          }}
-                          placeholder={`e.g. Round ${idx + 1} specific rules, foul penalties, board targets...`}
-                          className="text-xs h-9 font-medium bg-background border-border/80 focus:border-amber-500"
-                        />
-                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
 
           <div>
             <label className="text-xs font-bold block mb-1">Description</label>

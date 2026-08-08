@@ -125,3 +125,288 @@ export async function overrideMatchLineup(lineupId: string, updatedSlots: MatchL
     return { success: false, error: 'Failed to override lineup' };
   }
 }
+
+export async function sendLineupEmailAction(data: {
+  teamName: string;
+  captainName: string;
+  captainEmail?: string;
+  dayNumber: number;
+  rounds: Array<{ name: string; players: string[] }>;
+}) {
+  try {
+    const nodemailer = require('nodemailer');
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || 'noreply@cbotworld.com';
+
+    let transporter;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+      console.log(`[SMTP] Sending lineup email using production host: ${smtpHost}`);
+    } else {
+      console.log('[SMTP] SMTP variables not set. Creating test SMTP account via Ethereal...');
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+    }
+
+    const roundListHtml = data.rounds
+      .map(
+        (r) => `
+      <div style="padding: 10px; margin-bottom: 8px; border-radius: 8px; background-color: #f8fafc; border: 1px solid #e2e8f0;">
+        <span style="font-weight: bold; color: #d97706; font-size: 14px;">${r.name}</span>
+        <div style="margin-top: 4px; color: #334155; font-size: 13px;">
+          <strong>Lineup:</strong> ${r.players.join(', ') || 'No players selected'}
+        </div>
+      </div>`
+      )
+      .join('');
+
+    const recipients = ['CBOTWORLD@GMAIL.COM'];
+    if (data.captainEmail && data.captainEmail.trim()) {
+      recipients.push(data.captainEmail.trim());
+    }
+
+    const mailOptions = {
+      from: `"CBOT Tournament" <${smtpFrom}>`,
+      to: recipients.join(', '),
+      subject: `🏆 Lineup Submission Update: Day ${data.dayNumber} - ${data.teamName}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+          <div style="background-color: #d97706; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 20px; font-weight: 800;">🏆 CBOT Lineup Confirmation</h1>
+            <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Day ${data.dayNumber} Match Lineup Update</p>
+          </div>
+          <div style="padding: 24px; color: #1e293b;">
+            <p style="margin-top: 0; font-size: 15px;">A lineup submission was recorded for <strong>Day ${data.dayNumber}</strong> before the 9:30 PM IST deadline.</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b; font-weight: bold; width: 35%;">Team Name</td>
+                <td style="padding: 8px 0; color: #0f172a; font-weight: bold;">${data.teamName}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Submitted By</td>
+                <td style="padding: 8px 0; color: #0f172a;">${data.captainName} (Team Captain)</td>
+              </tr>
+              ${data.captainEmail ? `
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Captain Email</td>
+                <td style="padding: 8px 0; color: #0f172a;">${data.captainEmail}</td>
+              </tr>
+              ` : ''}
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Submission Time</td>
+                <td style="padding: 8px 0; color: #475569; font-family: monospace;">${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</td>
+              </tr>
+            </table>
+
+            <h3 style="color: #0f172a; font-size: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 24px;">Rounds Configuration</h3>
+            ${roundListHtml}
+            
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
+              This is an official CBOT automated lineup receipt. Captains can modify their daily match lineups anytime up until 9:30 PM IST.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    if (!smtpHost) {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      console.log(`[SMTP Test] Lineup update email sent to Ethereal! Preview URL: ${previewUrl}`);
+      return { success: true, previewUrl };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[SMTP] Failed to send lineup email:', error);
+    return { success: false, error: error?.message || 'SMTP delivery failed' };
+  }
+}
+
+export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rounds: any[], submittedAt: string) {
+  try {
+    // Verify 9:30 PM IST cutoff deadline
+    const activeEdition = await prisma.edition.findFirst({
+      orderBy: { number: 'desc' },
+      select: { dayDates: true }
+    });
+
+    if (activeEdition?.dayDates) {
+      try {
+        const dayDatesMap = JSON.parse(activeEdition.dayDates);
+        const dateStr = dayDatesMap[dayNumber];
+        if (dateStr) {
+          const cutoffTime = new Date(`${dateStr}T21:30:00+05:30`).getTime();
+          if (Date.now() >= cutoffTime) {
+            return {
+              success: false,
+              error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`
+            };
+          }
+        }
+      } catch (e) {}
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId }
+    });
+
+    let lineupsObj: any = {};
+    if (team?.savedLineups) {
+      try {
+        lineupsObj = JSON.parse(team.savedLineups);
+      } catch (e) {
+        console.error('[saveTeamDailyLineup] Failed to parse existing savedLineups JSON:', e);
+      }
+    }
+
+    // Merge or update the lineup for the specified day
+    lineupsObj[dayNumber] = {
+      rounds,
+      submittedAt
+    };
+
+    await prisma.team.update({
+      where: { id: teamId },
+      data: {
+        savedLineups: JSON.stringify(lineupsObj)
+      }
+    });
+
+    revalidatePath('/dashboard/captain');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[saveTeamDailyLineup] Error:', error);
+    return { success: false, error: error?.message || 'Failed to save lineup to database' };
+  }
+}
+
+export async function sendFinalDailyLineupSummaryAction(dayNumber: number) {
+  try {
+    const activeEdition = await prisma.edition.findFirst({
+      orderBy: { number: 'desc' },
+      select: { id: true, title: true, dayDates: true }
+    });
+
+    if (!activeEdition) return { success: false, error: 'No active edition found' };
+
+    const teams = await prisma.team.findMany({
+      where: { editionId: activeEdition.id },
+      include: { captain: true }
+    });
+
+    let teamSummariesHtml = '';
+    const recipientEmails: string[] = ['CBOTWORLD@GMAIL.COM'];
+
+    for (const team of teams) {
+      if (team.captain?.email && !recipientEmails.includes(team.captain.email)) {
+        recipientEmails.push(team.captain.email);
+      }
+
+      let roundsHtml = '<p style="color: #94a3b8; font-style: italic;">No combi submitted before 9:30 PM IST cutoff.</p>';
+      if (team.savedLineups) {
+        try {
+          const parsed = JSON.parse(team.savedLineups);
+          const dayData = parsed[dayNumber];
+          if (dayData && dayData.rounds) {
+            roundsHtml = dayData.rounds.map((r: any) => `
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 6px;">
+                <strong style="color: #d97706; font-size: 12px;">${r.name}:</strong>
+                <span style="color: #334155; font-size: 12px;">${r.players?.join(', ') || 'N/A'}</span>
+              </div>
+            `).join('');
+          }
+        } catch (e) {}
+      }
+
+      teamSummariesHtml += `
+        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+          <h3 style="margin: 0 0 10px 0; color: #0f172a; font-size: 16px;">
+            🏆 Team: ${team.name} (${team.tag}) — <span style="font-size: 13px; color: #475569;">Captain: ${team.captain?.name || 'Assigned Captain'}</span>
+          </h3>
+          ${roundsHtml}
+        </div>
+      `;
+    }
+
+    const nodemailer = require('nodemailer');
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || 'noreply@cbotworld.com';
+
+    let transporter;
+    if (smtpHost && smtpUser && smtpPass) {
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else {
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+    }
+
+    const mailOptions = {
+      from: `"CBOT Official" <${smtpFrom}>`,
+      to: recipientEmails.join(', '),
+      subject: `🔒 Official Day ${dayNumber} Locked Combis Summary — ${activeEdition.title} (9:45 PM IST Receipt)`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #f8fafc;">
+          <div style="background: #0f172a; color: #ffffff; padding: 20px; text-align: center;">
+            <h2 style="margin: 0; color: #f59e0b; font-size: 20px;">🔒 Official Day ${dayNumber} Locked Combis Summary</h2>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #94a3b8;">9:45 PM IST Final Confirmation Receipt · ${activeEdition.title}</p>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 13px; color: #334155; margin-bottom: 20px;">
+              Submissions for <strong>Day ${dayNumber}</strong> closed at <strong>9:30 PM IST</strong>. Below is the final locked combi summary for all teams in ${activeEdition.title}:
+            </p>
+            ${teamSummariesHtml}
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+              This is an official automated 9:45 PM IST receipt generated by CBOT. All Day ${dayNumber} combis are locked and cannot be edited.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    if (!smtpHost) {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      return { success: true, previewUrl };
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('[sendFinalDailyLineupSummaryAction] Error:', error);
+    return { success: false, error: error?.message || 'Failed to send 9:45 PM IST summary email' };
+  }
+}

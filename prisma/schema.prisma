@@ -106,6 +106,9 @@ model Edition {
   tournamentStartDate   DateTime?
   tournamentEndDate     DateTime?
   
+  totalDays             Int       @default(15)
+  dayDates              String?   
+  
   format                String    @default("SINGLE_ELIMINATION")
   status                String    @default("DRAFT")
   
@@ -163,6 +166,8 @@ model Team {
   captainId   String?
   captain     User?    @relation("CaptainRelation", fields: [captainId], references: [id])
   
+  savedLineups String?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -208,7 +213,6 @@ model EditionBoardPattern {
   sequence        Int
   matchFormat     String       
   
-  @@unique([editionId, patternId])
   @@unique([editionId, sequence])
 }
 

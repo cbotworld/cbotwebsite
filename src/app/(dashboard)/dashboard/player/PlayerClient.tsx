@@ -21,10 +21,37 @@ import { Match, BoardPattern, User } from '@/types';
 export default function PlayerClient({ initialPlayer, initialTeam, initialTeammates, initialMatches, initialPatterns }: { initialPlayer: any, initialTeam: any, initialTeammates: any[], initialMatches: any[], initialPatterns: any[] }) {
   const { data: session } = useSession();
 
-  // Active Player Context
-  const currentPlayer = initialPlayer || (MOCK_USERS.find((u) => u.role === 'PLAYER') || MOCK_USERS[3]);
-  const currentTeam = initialTeam || MOCK_TEAMS[0]; // Striker Kings
-  const teammates = initialTeammates.length > 0 ? initialTeammates : (currentTeam.members?.map((m: any) => m.user) || [MOCK_USERS[1], MOCK_USERS[3]]);
+  // Always use the LOGGED-IN session user as primary identity source
+  // initialPlayer provides DB stats — session provides the real name/username
+  const sessionUser = (session?.user as any);
+  const currentPlayer = React.useMemo(() => {
+    if (!sessionUser) return initialPlayer;
+    // Merge: session has the correct name/username, initialPlayer has the DB stats
+    if (initialPlayer && (
+      initialPlayer.id === sessionUser.id ||
+      initialPlayer.username?.toLowerCase() === sessionUser.username?.toLowerCase()
+    )) {
+      return { ...initialPlayer, name: initialPlayer.name || sessionUser.name };
+    }
+    // If initialPlayer is from wrong user (race condition), use session as base
+    return {
+      id: sessionUser.id,
+      name: sessionUser.name,
+      username: sessionUser.username,
+      role: sessionUser.role || 'PLAYER',
+      rating: initialPlayer?.rating || 1200,
+      wins: initialPlayer?.wins || 0,
+      losses: initialPlayer?.losses || 0,
+      queenStrikes: initialPlayer?.queenStrikes || 0,
+      boardsWon: initialPlayer?.boardsWon || 0,
+      average: initialPlayer?.average || 0,
+      target: initialPlayer?.target || 0,
+      rankingSnapshots: initialPlayer?.rankingSnapshots || [],
+    };
+  }, [sessionUser, initialPlayer]);
+
+  const currentTeam = initialTeam || null;
+  const teammates = initialTeammates.length > 0 ? initialTeammates : (currentTeam?.members?.map((m: any) => m.user) || []);
   const personalSchedule = initialMatches.length > 0 ? initialMatches : MOCK_MATCHES;
   const assignedPatterns = initialPatterns.length > 0 ? initialPatterns : [];
 
@@ -95,7 +122,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         </div>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <Avatar src={currentPlayer.image} fallback={currentPlayer.name} size="lg" className="border-2 border-border" />
+            <Avatar fallback={currentPlayer.name} size="xl" className="border-2 border-amber-500/40 ring-4 ring-amber-500/20 shadow-xl" />
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="font-extrabold px-3 py-0.5">
@@ -105,41 +132,63 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
               </div>
               <h1 className="text-3xl font-black tracking-tight">{currentPlayer.name}</h1>
               <p className="text-muted-foreground text-xs font-mono">
-                @{currentPlayer.username} • PIN: {currentPlayer.pin || '••••'}
+                @{currentPlayer.username} • PIN: ••••
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lifetime Stats Breakdown */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Card className="p-5 border-border bg-card">
-          <div className="text-xs font-bold text-amber-500 uppercase flex items-center gap-1.5"><Target className="h-3.5 w-3.5" /> ELO Rating</div>
-          <div className="text-3xl font-black text-foreground mt-2">{currentPlayer.rating} ELO</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Category: {currentPlayer.rankingSnapshots?.[0]?.category || 'NEW'}</div>
-        </Card>
-
-        <Card className="p-5 border-border bg-card">
-          <div className="text-xs font-bold text-emerald-500 uppercase flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" /> Win / Loss Record</div>
-          <div className="text-3xl font-black text-foreground mt-2">{currentPlayer.wins}W / {currentPlayer.losses}L</div>
+      {/* KPI Cards — Matches Played · Average · Bonus Won · Slams */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* Matches Played */}
+        <Card className="p-5 border-border bg-gradient-to-br from-amber-500/10 to-amber-500/5 hover:shadow-amber-500/10 hover:shadow-md transition-shadow">
+          <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" /> Matches Played
+          </div>
+          <div className="text-4xl font-black text-foreground mt-2">
+            {(currentPlayer.wins || 0) + (currentPlayer.losses || 0)}
+          </div>
           <div className="text-[11px] text-muted-foreground mt-1">
-            {currentPlayer.wins + currentPlayer.losses > 0
-              ? `${Math.round((currentPlayer.wins / (currentPlayer.wins + currentPlayer.losses)) * 100)}% Win Rate`
-              : '100% Win Rate'}
+            {currentPlayer.wins || 0}W &nbsp;/&nbsp; {currentPlayer.losses || 0}L
           </div>
         </Card>
 
-        <Card className="p-5 border-border bg-card">
-          <div className="text-xs font-bold text-pink-500 uppercase flex items-center gap-1.5"><Crown className="h-3.5 w-3.5" /> Queens Pocketed</div>
-          <div className="text-3xl font-black text-foreground mt-2">{currentPlayer.queenStrikes} Queens</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Total Career Covers</div>
+        {/* Average */}
+        <Card className="p-5 border-border bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 hover:shadow-emerald-500/10 hover:shadow-md transition-shadow">
+          <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" /> Average
+          </div>
+          <div className="text-4xl font-black text-foreground mt-2">
+            {currentPlayer.average
+              ? Number(currentPlayer.average).toFixed(1)
+              : ((currentPlayer.wins || 0) + (currentPlayer.losses || 0)) > 0
+                ? ((currentPlayer.boardsWon || 0) / ((currentPlayer.wins || 0) + (currentPlayer.losses || 0))).toFixed(1)
+                : '0.0'}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">Boards per match</div>
         </Card>
 
-        <Card className="p-5 border-border bg-card">
-          <div className="text-xs font-bold text-blue-500 uppercase flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Boards Won</div>
-          <div className="text-3xl font-black text-foreground mt-2">{currentPlayer.boardsWon} Boards</div>
-          <div className="text-[11px] text-muted-foreground mt-1">Total Career Boards</div>
+        {/* Bonus Won */}
+        <Card className="p-5 border-border bg-gradient-to-br from-violet-500/10 to-violet-500/5 hover:shadow-violet-500/10 hover:shadow-md transition-shadow">
+          <div className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Trophy className="h-3.5 w-3.5" /> Bonus Won
+          </div>
+          <div className="text-4xl font-black text-foreground mt-2">
+            {currentPlayer.queenStrikes || 0}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">Queen covers (bonus pts)</div>
+        </Card>
+
+        {/* Slams */}
+        <Card className="p-5 border-border bg-gradient-to-br from-rose-500/10 to-rose-500/5 hover:shadow-rose-500/10 hover:shadow-md transition-shadow">
+          <div className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Crown className="h-3.5 w-3.5" /> Slams
+          </div>
+          <div className="text-4xl font-black text-foreground mt-2">
+            {currentPlayer.boardsWon || 0}
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">Total boards won</div>
         </Card>
       </div>
 

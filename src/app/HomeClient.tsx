@@ -102,28 +102,28 @@ export default function HomeClient({
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-500 backdrop-blur-md">
                 <Crown className="h-4 w-4 text-amber-400" />
-                <span>Celebrating 200+ Editions Since August 2020</span>
+                <span>Celebrating 200th Edition Since August 2020</span>
               </div>
 
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
                 World's Premier Online<br />
                 Carrom Arena.{' '}
                 <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent block mt-2">
-                  200+ Editions Strong.
+                  200th Edition.
                 </span>
               </h1>
 
               <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Founded by Carrom Balu in August 2020, CBOT has hosted over 200 competitive editions connecting players worldwide.
+                Founded by Carrom Balu in August 2020, CBOT reaches its monumental 200th edition connecting players worldwide.
               </p>
 
               {/* Stats ticker */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-border/50">
                 {[
-                  { val: '199', label: 'Editions Completed', color: 'text-amber-500' },
-                  { val: '5,200+', label: 'Matches Played', color: 'text-foreground' },
-                  { val: '1,850+', label: 'Queen Covers', color: 'text-pink-500' },
-                  { val: '450+', label: 'Active Competitors', color: 'text-emerald-500' },
+                  { val: '200th', label: 'Edition Milestone', color: 'text-amber-500' },
+                  { val: '12,000+', label: 'Matches Played', color: 'text-foreground' },
+                  { val: '2,000+', label: 'Slams', color: 'text-pink-500' },
+                  { val: '100+', label: 'Active Participants', color: 'text-emerald-500' },
                 ].map(s => (
                   <div key={s.label}>
                     <div className={`text-2xl sm:text-3xl font-black ${s.color}`}>{s.val}</div>
@@ -226,9 +226,9 @@ export default function HomeClient({
       <Section id="history">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-10">
           <SectionHeader
-            badge="CBOT History"
-            title="The Legacy Since August 2020"
-            sub="From an 8-team local online tournament by Balu Master to a nationwide digital esports ecosystem with 200+ completed editions."
+            badge="CBOT - Carrom Balu Online Tournament"
+            title="The Legacy Since 2020"
+            sub="With a thought of 1 tournament, CBOT continued with back-to-back non-stop editions driven by huge response and demand - crossing 50th, 100th, and 150th edition milestones to reach the monumental 200th edition with support from sponsors, players, and brands."
           />
 
           {/* 3D Video Carousel Stage */}

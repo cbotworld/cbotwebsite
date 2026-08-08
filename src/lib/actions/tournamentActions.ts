@@ -81,10 +81,17 @@ export async function createEdition(formData: FormData, organizerId: string) {
       }
     }
 
-    revalidatePath('/dashboard/organizer');
-    revalidatePath('/editions');
+    const fullNewEdition = await prisma.edition.findUnique({
+      where: { id: newEdition.id },
+      include: {
+        patterns: {
+          orderBy: { sequence: 'asc' },
+          include: { pattern: true },
+        },
+      },
+    });
 
-    return { success: true, edition: newEdition };
+    return { success: true, edition: fullNewEdition };
   } catch (error) {
     console.error('Failed to create edition:', error);
     return { success: false, error: 'Failed to create edition' };
@@ -97,9 +104,9 @@ export async function updateEdition(editionId: string, formData: FormData) {
     return { success: false, error: 'Unauthorized: Organizer access required.' };
   }
   try {
-    const title = formData.get('title') as string;
+    const title = (formData.get('title') as string)?.trim() || '';
     const theme = (formData.get('theme') as string) || 'Standard CBOT Theme';
-    const description = formData.get('description') as string;
+    const description = (formData.get('description') as string) || '';
     const prizePool = (formData.get('prizePool') as string) || '₹1,00,000 INR';
     const maxTeams = parseInt((formData.get('maxTeams') as string) || '16', 10);
     const rules = formData.get('rules') as string;
@@ -107,68 +114,118 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const roundFormatsRaw = formData.get('roundFormats') as string;
     let roundFormats: string[] = ['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES'];
     if (roundFormatsRaw) {
-      try {
-        roundFormats = JSON.parse(roundFormatsRaw);
-      } catch (e) {}
+      try { roundFormats = JSON.parse(roundFormatsRaw); } catch (e) {}
     }
 
     const roundRulesRaw = formData.get('roundRules') as string;
     let roundRules: string[] = [];
     if (roundRulesRaw) {
-      try {
-        roundRules = JSON.parse(roundRulesRaw);
-      } catch (e) {}
+      try { roundRules = JSON.parse(roundRulesRaw); } catch (e) {}
     }
 
     const perRoundBreakdown = roundFormats
-      .map((fmt, idx) => `• Round ${idx + 1} (${fmt}): ${roundRules[idx] || 'Standard rules apply'}`)
+      .map((fmt, idx) => `• Round ${idx + 1} (${fmt})`)
       .join('\n');
+    const rulesVal = `Multi-Format Round Schedule:\n${perRoundBreakdown}`;
 
-    const rulesVal = rules
-      ? `${rules}\n\nPer-Round Match Directives & Rules:\n${perRoundBreakdown}`
-      : `Multi-Format Round Schedule & Rules:\n${perRoundBreakdown}`;
-
-    const updatedEdition = await prisma.edition.update({
-      where: { id: editionId },
-      data: {
-        title,
-        slug: title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : undefined,
-        theme,
-        themeDescription: description,
-        prizePool,
-        maxTeams,
-        rules: rulesVal,
-      }
-    });
-
-    const defaultPatterns = await prisma.boardPattern.findMany({ take: roundFormats.length });
-    if (defaultPatterns.length > 0) {
-      await prisma.editionBoardPattern.deleteMany({ where: { editionId } });
-      for (let i = 0; i < roundFormats.length; i++) {
-        const pattern = defaultPatterns[i % defaultPatterns.length];
-        await prisma.editionBoardPattern.create({
-          data: {
-            editionId: updatedEdition.id,
-            patternId: pattern.id,
-            sequence: i + 1,
-            matchFormat: roundFormats[i],
-          }
-        });
+    // Build slug — but only update if it won't conflict with another edition
+    let slugData: { slug?: string } = {};
+    if (title) {
+      const candidateSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const conflict = await prisma.edition.findFirst({
+        where: { slug: candidateSlug, NOT: { id: editionId } },
+        select: { id: true },
+      });
+      if (!conflict) {
+        slugData = { slug: candidateSlug };
       }
     }
 
-    revalidatePath('/dashboard/organizer');
-    revalidatePath('/editions');
-    revalidatePath(`/editions/${updatedEdition.slug}`);
+    const totalDaysRaw = formData.get('totalDays') as string;
+    const totalDays = totalDaysRaw ? parseInt(totalDaysRaw, 10) : undefined;
+    const dayDates = formData.get('dayDates') as string;
 
-    return { success: true, edition: updatedEdition };
-  } catch (error) {
-    console.error('Failed to update edition:', error);
-    return { success: false, error: 'Failed to update edition' };
+    const existing = await prisma.edition.findUnique({ where: { id: editionId } });
+
+    let updatedEdition;
+    if (existing) {
+      updatedEdition = await prisma.edition.update({
+        where: { id: editionId },
+        data: {
+          ...(title ? { title } : {}),
+          ...slugData,
+          theme,
+          themeDescription: description,
+          prizePool,
+          maxTeams,
+          rules: rulesVal,
+          ...(totalDays !== undefined ? { totalDays } : {}),
+          ...(dayDates !== undefined ? { dayDates } : {}),
+        }
+      });
+    } else {
+      let organizerId = (session.user as any)?.id || 'usr_organizer_1';
+      const organizerUser = await prisma.user.findFirst({ where: { role: 'ORGANIZER' } });
+      if (organizerUser) organizerId = organizerUser.id;
+
+      updatedEdition = await prisma.edition.create({
+        data: {
+          id: editionId,
+          number: 200,
+          title: title || 'Cornerstones of Carrom',
+          slug: slugData.slug || `edition-${Date.now()}`,
+          theme,
+          themeDescription: description,
+          prizePool,
+          maxTeams,
+          rules: rulesVal,
+          totalDays: totalDays ?? 15,
+          dayDates: dayDates ?? undefined,
+          organizerId,
+        }
+      });
+    }
+
+    // Save per-round formats — wrapped separately so it doesn't block the main save
+    try {
+      const defaultPatterns = await prisma.boardPattern.findMany({ take: roundFormats.length });
+      if (defaultPatterns.length > 0) {
+        await prisma.editionBoardPattern.deleteMany({ where: { editionId } });
+        for (let i = 0; i < roundFormats.length; i++) {
+          const pattern = defaultPatterns[i % defaultPatterns.length];
+          await prisma.editionBoardPattern.create({
+            data: {
+              editionId: updatedEdition.id,
+              patternId: pattern.id,
+              sequence: i + 1,
+              matchFormat: roundFormats[i],
+            }
+          });
+        }
+      }
+    } catch (patternErr) {
+      console.warn('[updateEdition] Board pattern update skipped:', patternErr);
+    }
+
+    const fullUpdatedEdition = await prisma.edition.findUnique({
+      where: { id: updatedEdition.id },
+      include: {
+        patterns: {
+          orderBy: { sequence: 'asc' },
+          include: { pattern: true },
+        },
+      },
+    });
+
+    return { success: true, edition: fullUpdatedEdition };
+  } catch (error: any) {
+    console.error('[updateEdition] Failed:', error?.message || error);
+    return { success: false, error: 'Failed to update edition: ' + (error?.message || 'DB error') };
   }
 }
 
 // ── Branding-only update for the hero section ──────────────────────────────
+
 export async function updateEditionBranding(
   editionId: string,
   data: { title?: string; theme?: string; bannerImage?: string; posterUrl?: string }

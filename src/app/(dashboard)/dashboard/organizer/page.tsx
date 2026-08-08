@@ -10,24 +10,30 @@ export default async function OrganizerPage() {
   let dbTeams: any[] = [];
 
   try {
-    editions = await prisma.edition.findMany({
-      orderBy: { number: 'desc' }
-    });
-
-    users = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-
-    dbTeams = await prisma.team.findMany({
-      include: {
-        captain: true,
-        members: {
-          include: { user: true }
+    [editions, users, dbTeams] = await Promise.all([
+      prisma.edition.findMany({
+        orderBy: { number: 'desc' },
+        include: {
+          patterns: {
+            orderBy: { sequence: 'asc' },
+            include: { pattern: true },
+          },
         },
-        leagueStandings: true
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+      }),
+      prisma.user.findMany({
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.team.findMany({
+        include: {
+          captain: true,
+          members: {
+            include: { user: true }
+          },
+          leagueStandings: true
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+    ]);
   } catch (e) {
     console.error('Database connection error in OrganizerPage fallback to mocks', e);
   }
