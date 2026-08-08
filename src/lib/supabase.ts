@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -11,16 +11,24 @@ export const STORAGE_BUCKET = 'images';
  * Returns the public URL for a file in Supabase Storage (images bucket).
  */
 export function getPublicUrl(path: string): string {
-  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  try {
+    const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    return data?.publicUrl || `/teams/${path}`;
+  } catch (e) {
+    return `/teams/${path}`;
+  }
 }
 
 /**
  * Returns the public URL for a team poster image from the 'teams' bucket.
  */
 export function getTeamPosterUrl(filename: string): string {
-  const { data } = supabase.storage.from('teams').getPublicUrl(filename);
-  return data.publicUrl;
+  try {
+    const { data } = supabase.storage.from('teams').getPublicUrl(filename);
+    return data?.publicUrl || `/teams/${filename}`;
+  } catch (e) {
+    return `/teams/${filename}`;
+  }
 }
 
 /**

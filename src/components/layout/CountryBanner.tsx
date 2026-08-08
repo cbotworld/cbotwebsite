@@ -32,10 +32,7 @@ export function CountryBanner() {
         style={{ background: 'linear-gradient(to left, #000 0%, transparent 100%)' }}
       />
 
-      <div
-        className="flex items-center whitespace-nowrap"
-        style={{ animation: 'marquee 28s linear infinite', willChange: 'transform' }}
-      >
+      <div className="flex items-center whitespace-nowrap animate-marquee">
         {ITEMS.map((c, i) => (
           <span
             key={i}
@@ -55,13 +52,6 @@ export function CountryBanner() {
           </span>
         ))}
       </div>
-
-      <style>{`
-        @keyframes marquee {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-33.333%); }
-        }
-      `}</style>
     </div>
   );
 }
