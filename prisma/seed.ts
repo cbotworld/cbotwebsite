@@ -29,10 +29,14 @@ async function main() {
         image: mockUser.image,
         bio: mockUser.bio,
         rating: mockUser.rating,
+        average: mockUser.average || 0,
+        target: mockUser.target || 0,
+        age: mockUser.age || undefined,
+        gender: mockUser.gender || undefined,
         wins: mockUser.wins,
         losses: mockUser.losses,
         queenStrikes: mockUser.queenStrikes,
-        boardsWon: mockUser.boardsWon,
+        boardsWon: mockUser.boardsWon || 0,
       },
       create: {
         id: mockUser.id, // preserve mock IDs for relations if possible, or let prisma generate
@@ -45,10 +49,14 @@ async function main() {
         image: mockUser.image,
         bio: mockUser.bio,
         rating: mockUser.rating,
+        average: mockUser.average || 0,
+        target: mockUser.target || 0,
+        age: mockUser.age || undefined,
+        gender: mockUser.gender || undefined,
         wins: mockUser.wins,
         losses: mockUser.losses,
         queenStrikes: mockUser.queenStrikes,
-        boardsWon: mockUser.boardsWon,
+        boardsWon: mockUser.boardsWon || 0,
       },
     });
   }
@@ -91,7 +99,7 @@ async function main() {
         posterUrl: mockEdition.posterUrl,
         bannerImage: mockEdition.bannerImage || '',
         format: mockEdition.format,
-        status: mockEdition.number === 205 ? 'IN_PROGRESS' : 'COMPLETED',
+        status: mockEdition.number === 200 ? 'IN_PROGRESS' : 'COMPLETED',
         prizePool: mockEdition.prizePool,
         maxTeams: mockEdition.totalTeams,
         organizerId: 'usr_organizer_1', // Using balumaster
@@ -120,14 +128,14 @@ async function main() {
   }
   console.log('✅ Editions seeded');
 
-  // 4. Seed Teams (Edition #205)
+  // 4. Seed Teams (Edition #200)
   for (const mockTeam of MOCK_TEAMS) {
     const team = await prisma.team.upsert({
-      where: { editionId_tag: { editionId: 'ed_205', tag: mockTeam.tag } },
+      where: { editionId_tag: { editionId: 'ed_200', tag: mockTeam.tag } },
       update: {},
       create: {
         id: mockTeam.id,
-        editionId: 'ed_205',
+        editionId: 'ed_200',
         name: mockTeam.name,
         tag: mockTeam.tag,
         logo: mockTeam.logo,
@@ -140,10 +148,10 @@ async function main() {
     if (mockTeam.members) {
       for (const member of mockTeam.members) {
         await prisma.editionParticipant.upsert({
-          where: { editionId_userId: { editionId: 'ed_205', userId: member.userId } },
+          where: { editionId_userId: { editionId: 'ed_200', userId: member.userId } },
           update: { teamId: team.id },
           create: {
-            editionId: 'ed_205',
+            editionId: 'ed_200',
             userId: member.userId,
             teamId: team.id,
             category: 'A1', // Defaulting to A1 for mock
@@ -162,7 +170,7 @@ async function main() {
       update: {},
       create: {
         id: mockMatch.id,
-        editionId: mockMatch.tournamentId === 'tour_1' ? 'ed_205' : 'ed_205',
+        editionId: 'ed_200',
         round: mockMatch.round,
         matchNumber: mockMatch.matchNumber,
         team1Id: mockMatch.team1Id,

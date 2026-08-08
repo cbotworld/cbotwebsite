@@ -6,7 +6,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Trophy, Crown, Download, Globe } from 'lucide-react';
+import { Trophy, Crown, Download, Globe, Users, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { generateRankingReportCSV } from '@/lib/actions/reportActions';
 
@@ -115,7 +115,8 @@ export default function LeaderboardClient({ players, teams }: { players: any[], 
       <Tabs defaultValue="players" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="players">Player ELO Rankings</TabsTrigger>
-          <TabsTrigger value="teams">Team Win-Rate Standings</TabsTrigger>
+          <TabsTrigger value="teams">Team Standings</TabsTrigger>
+          <TabsTrigger value="rosters">Team Rosters</TabsTrigger>
         </TabsList>
 
         {/* Players Table */}
@@ -220,6 +221,106 @@ export default function LeaderboardClient({ players, teams }: { players: any[], 
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ══ TEAM ROSTERS TAB ══ */}
+        <TabsContent value="rosters">
+          {teams.length === 0 ? (
+            <Card className="border-border p-12 text-center">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-40" />
+              <p className="text-muted-foreground font-semibold">No team rosters available yet.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {teams.map((team) => {
+                const captainId = team.captainId;
+                const members = team.members || [];
+                // Sort: captain first, then by name
+                const sorted = [...members].sort((a, b) => {
+                  if (a.userId === captainId) return -1;
+                  if (b.userId === captainId) return 1;
+                  return (a.user?.name || '').localeCompare(b.user?.name || '');
+                });
+
+                return (
+                  <Card
+                    key={team.id}
+                    className="border border-amber-500/20 bg-card rounded-2xl overflow-hidden shadow-lg hover:shadow-amber-500/10 transition-shadow duration-300"
+                  >
+                    {/* Team Header */}
+                    <div className="relative h-20 bg-gradient-to-br from-amber-950 via-zinc-900 to-black flex items-center gap-4 px-4 border-b border-amber-500/20">
+                      <div className="h-12 w-12 rounded-full bg-amber-500/10 border-2 border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                        {team.logo ? (
+                          <img src={team.logo} alt={team.name} className="h-full w-full object-cover rounded-full" />
+                        ) : (
+                          <span className="text-amber-400 font-black text-sm">{team.tag}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-black text-white text-base leading-tight truncate">{team.name}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="carrom" className="text-[10px] px-2 py-0">{team.tag}</Badge>
+                          <span className="text-xs text-amber-400/70">{members.length} players</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Player List */}
+                    <CardContent className="p-0">
+                      {sorted.length === 0 ? (
+                        <p className="text-center text-xs text-muted-foreground py-6">No players assigned</p>
+                      ) : (
+                        <ul className="divide-y divide-border/50">
+                          {sorted.map((member) => {
+                            const isCaptain = member.userId === captainId;
+                            const user = member.user;
+                            return (
+                              <li
+                                key={member.id}
+                                className={`flex items-center gap-3 px-4 py-3 ${
+                                  isCaptain ? 'bg-amber-500/5' : 'hover:bg-muted/30'
+                                } transition-colors`}
+                              >
+                                {/* Avatar */}
+                                <div className="relative flex-shrink-0">
+                                  <Avatar src={user?.image} fallback={user?.name || '?'} size="sm" />
+                                  {isCaptain && (
+                                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-amber-500 flex items-center justify-center shadow">
+                                      <Crown className="h-2.5 w-2.5 text-black" />
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Name + username */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`font-bold text-sm truncate ${isCaptain ? 'text-amber-400' : 'text-foreground'}`}>
+                                      {user?.name || 'Unknown'}
+                                    </span>
+                                    {isCaptain && (
+                                      <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-400 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border border-amber-500/30">
+                                        <Star className="h-2 w-2" /> Captain
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-muted-foreground">{user?.username}</span>
+                                </div>
+
+                                {/* Category badge */}
+                                <Badge variant="outline" className="text-[10px] font-bold flex-shrink-0">
+                                  {member.category || user?.category || 'N/A'}
+                                </Badge>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

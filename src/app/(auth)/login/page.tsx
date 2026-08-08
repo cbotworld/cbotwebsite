@@ -15,7 +15,7 @@ import { UserRole } from '@/types';
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = React.useState('balumaster');
-  const [pin, setPin] = React.useState('9999');
+  const [pin, setPin] = React.useState('2905');
   const [role, setRole] = React.useState<UserRole>('ORGANIZER');
   const [errorMsg, setErrorMsg] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -113,11 +113,11 @@ export default function LoginPage() {
                 type="button"
                 variant={role === 'ORGANIZER' ? 'carrom' : 'outline'}
                 size="sm"
-                onClick={() => handleQuickDemoRole('ORGANIZER', 'balumaster', '9999')}
+                onClick={() => handleQuickDemoRole('ORGANIZER', 'balumaster', '2905')}
                 className="text-[11px] font-bold py-2 h-auto flex flex-col items-center"
               >
                 <span>Organizer</span>
-                <span className="text-[9px] font-mono opacity-80">PIN: 9999</span>
+                <span className="text-[9px] font-mono opacity-80">PIN: 2905</span>
               </Button>
               <Button
                 type="button"

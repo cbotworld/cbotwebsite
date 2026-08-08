@@ -84,8 +84,12 @@ export interface User {
   wins: number;
   losses: number;
   queenStrikes: number;
-  boardsWon: number;
+  boardsWon?: number;
   category?: PlayerCategory;
+  average?: number;
+  target?: number;
+  age?: number;
+  gender?: string;
   skillScore?: number;
   past3EditionsStats?: {
     editionsPlayed: number;
@@ -114,7 +118,7 @@ export interface Team {
   tag: string;
   logo?: string;
   description?: string;
-  captainId: string;
+  captainId?: string;
   captain?: User;
   members?: TeamMember[];
   stats?: {

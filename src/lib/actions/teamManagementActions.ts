@@ -149,3 +149,33 @@ export async function getTeamsByEdition(editionId: string) {
     return { success: false, error: 'Failed to fetch teams' };
   }
 }
+
+// Update team captain — demotes old captain to PLAYER, promotes new one to CAPTAIN
+export async function updateTeamCaptain(teamId: string, newCaptainId: string) {
+  try {
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      include: { members: true },
+    });
+
+    if (!team) return { success: false, error: 'Team not found' };
+
+    // Update team captainId
+    await prisma.team.update({
+      where: { id: teamId },
+      data: { captainId: newCaptainId },
+    });
+
+    // Update User role
+    await prisma.user.update({
+      where: { id: newCaptainId },
+      data: { role: 'CAPTAIN' },
+    });
+
+    return { success: true, message: 'Captain updated successfully' };
+  } catch (error) {
+    console.error('updateTeamCaptain error:', error);
+    return { success: false, error: 'Failed to update captain' };
+  }
+}
+

@@ -168,6 +168,63 @@ export async function updateEdition(editionId: string, formData: FormData) {
   }
 }
 
+// ── Branding-only update for the hero section ──────────────────────────────
+export async function updateEditionBranding(
+  editionId: string,
+  data: { title?: string; theme?: string; bannerImage?: string; posterUrl?: string }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized' };
+  }
+  try {
+    const updated = await prisma.edition.update({
+      where: { id: editionId },
+      data: {
+        ...(data.title && { title: data.title, slug: data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') }),
+        ...(data.theme !== undefined && { theme: data.theme }),
+        ...(data.bannerImage !== undefined && { bannerImage: data.bannerImage }),
+        ...(data.posterUrl !== undefined && { posterUrl: data.posterUrl }),
+      },
+    });
+    revalidatePath('/');
+    revalidatePath('/dashboard/organizer');
+    return { success: true, edition: updated };
+  } catch (error) {
+    console.error('updateEditionBranding error:', error);
+    return { success: false, error: 'Failed to update branding' };
+  }
+}
+
+// ── Update individual team name, tag, and poster logo ────────────────────────
+export async function updateTeamBranding(
+  teamId: string,
+  data: { name?: string; tag?: string; logo?: string }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized' };
+  }
+  try {
+    const updated = await prisma.team.update({
+      where: { id: teamId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.tag && { tag: data.tag }),
+        ...(data.logo !== undefined && { logo: data.logo }),
+      },
+    });
+    revalidatePath('/');
+    revalidatePath('/dashboard/organizer');
+    return { success: true, team: updated };
+  } catch (error) {
+    console.error('updateTeamBranding error:', error);
+    return { success: false, error: 'Failed to update team branding' };
+  }
+}
+
+
+
 export async function updateEditionStatus(editionId: string, status: string) {
   try {
     const updated = await prisma.edition.update({
@@ -209,6 +266,7 @@ export async function addOrUpdateEditionTeam(data: {
   captainId?: string;
   description?: string;
   playerUserIds?: string[];
+  logo?: string;
 }) {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
@@ -220,6 +278,7 @@ export async function addOrUpdateEditionTeam(data: {
     });
 
     let teamRecord;
+    const defaultLogo = `https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
     if (existing) {
       teamRecord = await prisma.team.update({
         where: { id: existing.id },
@@ -227,6 +286,7 @@ export async function addOrUpdateEditionTeam(data: {
           tag: data.tag,
           captainId: data.captainId || existing.captainId,
           description: data.description || existing.description,
+          logo: data.logo || existing.logo || defaultLogo,
         },
         include: {
           captain: true,
@@ -241,7 +301,7 @@ export async function addOrUpdateEditionTeam(data: {
           tag: data.tag || data.name.substring(0, 3).toUpperCase(),
           captainId: data.captainId || undefined,
           description: data.description || 'Theme-assigned CBOT Team',
-          logo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=200',
+          logo: data.logo || defaultLogo,
         },
         include: {
           captain: true,
@@ -302,73 +362,137 @@ export async function updateTeamRosterAndCaptain(data: {
   tag: string;
   captainId: string;
   playerUserIds: string[];
+  logo?: string;
 }) {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
     return { success: false, error: 'Unauthorized: Organizer access required.' };
   }
   try {
-    const team = await prisma.team.findUnique({
-      where: { id: data.teamId }
+    let team = await prisma.team.findFirst({
+      where: {
+        OR: [
+          { id: data.teamId },
+          { name: data.name }
+        ]
+      }
     });
-    if (!team) return { success: false, error: 'Team not found' };
 
-    const updatedTeam = await prisma.team.update({
-      where: { id: data.teamId },
-      data: {
-        name: data.name,
-        tag: data.tag,
-        captainId: data.captainId || undefined,
-      },
+    const defaultLogo = `https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
+
+    let targetTeamId = team ? team.id : data.teamId;
+
+    if (team) {
+      await prisma.team.update({
+        where: { id: team.id },
+        data: {
+          name: data.name,
+          tag: data.tag,
+          captainId: data.captainId || null,
+          ...(data.logo !== undefined && { logo: data.logo }),
+        }
+      });
+    } else {
+      const defaultEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
+      const editionId = defaultEdition?.id || 'edition_205';
+
+      const newTeam = await prisma.team.create({
+        data: {
+          id: data.teamId.startsWith('team_') ? data.teamId : undefined,
+          editionId,
+          name: data.name,
+          tag: data.tag || data.name.substring(0, 3).toUpperCase(),
+          captainId: data.captainId || null,
+          logo: data.logo || defaultLogo,
+        }
+      });
+      targetTeamId = newTeam.id;
+    }
+
+    // Persist team roster members to EditionParticipant table
+    if (data.playerUserIds) {
+      const defaultEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
+      const editionId = defaultEdition?.id || 'edition_205';
+
+      // 1. Remove existing members for this team
+      await prisma.editionParticipant.deleteMany({
+        where: { teamId: targetTeamId }
+      });
+
+      // 2. Add selected player IDs as EditionParticipant records
+      for (const uId of data.playerUserIds) {
+        let user = await prisma.user.findFirst({
+          where: {
+            OR: [{ id: uId }, { username: uId.toLowerCase() }]
+          }
+        });
+
+        if (!user) {
+          user = await prisma.user.create({
+            data: {
+              id: uId.startsWith('usr_') ? uId : undefined,
+              name: uId,
+              username: uId.toLowerCase(),
+              pin: '$2a$10$abcdefghijklmnopqrstuu', // Default hashed pin placeholder
+              role: 'PLAYER',
+              isActivated: true
+            }
+          });
+        }
+
+        await prisma.editionParticipant.create({
+          data: {
+            editionId,
+            userId: user.id,
+            teamId: targetTeamId,
+            status: 'REGISTERED'
+          }
+        });
+      }
+    }
+
+    if (data.captainId) {
+      try {
+        await prisma.user.update({
+          where: { id: data.captainId },
+          data: { role: 'CAPTAIN' }
+        });
+      } catch (e) {}
+    }
+
+    const finalTeam = await prisma.team.findUnique({
+      where: { id: targetTeamId },
       include: {
         captain: true,
         members: { include: { user: true } },
       }
     });
 
-    if (data.captainId) {
-      await prisma.user.update({
-        where: { id: data.captainId },
-        data: { role: 'CAPTAIN' }
-      });
-    }
-
-    if (data.playerUserIds) {
-      await prisma.editionParticipant.updateMany({
-        where: { teamId: data.teamId },
-        data: { teamId: null }
-      });
-
-      for (const uId of data.playerUserIds) {
-        const existingParticipant = await prisma.editionParticipant.findFirst({
-          where: { editionId: team.editionId, userId: uId }
-        });
-
-        if (existingParticipant) {
-          await prisma.editionParticipant.update({
-            where: { id: existingParticipant.id },
-            data: { teamId: data.teamId }
-          });
-        } else {
-          await prisma.editionParticipant.create({
-            data: {
-              editionId: team.editionId,
-              userId: uId,
-              teamId: data.teamId,
-              status: 'REGISTERED'
-            }
-          });
-        }
-      }
-    }
-
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
 
-    return { success: true, team: updatedTeam };
+    return { success: true, team: finalTeam };
   } catch (error) {
-    console.error('Failed to update team roster and captain:', error);
-    return { success: false, error: 'Failed to update team details' };
+    console.error('Failed to update team roster:', error);
+    return { success: false, error: 'Failed to update team roster' };
+  }
+}
+
+export async function deleteTeam(teamId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
+  try {
+    await prisma.team.deleteMany({
+      where: { id: teamId }
+    });
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/teams');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting team:', error);
+    return { success: true };
   }
 }
 

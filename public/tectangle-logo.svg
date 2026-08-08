@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 60" fill="none">
+  <!-- Slanted White Top Bar of T -->
+  <polygon points="12,30 52,10 60,18 20,38" fill="#FFFFFF" />
+  <!-- Tilted Yellow Stem of T -->
+  <polygon points="20,18 36,10 28,52 14,52" fill="#EAB308" />
+  
+  <!-- 'ect' -->
+  <text x="62" y="44" fill="#FFFFFF" font-size="36" font-weight="400" font-family="Century Gothic, Montserrat, 'Segoe UI', system-ui, sans-serif">ect</text>
+
+  <!-- Triangle '▲' for A -->
+  <polygon points="134,44 147,16 160,44" fill="#FFFFFF" />
+
+  <!-- 'ngle' -->
+  <text x="163" y="44" fill="#FFFFFF" font-size="36" font-weight="400" font-family="Century Gothic, Montserrat, 'Segoe UI', system-ui, sans-serif">ngle</text>
+</svg>

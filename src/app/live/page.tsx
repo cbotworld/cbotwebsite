@@ -36,7 +36,7 @@ export default function LiveMatchesPage() {
           
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
             <div className="flex items-center gap-3">
-              <Badge variant="carrom">CBOT Edition #205 • Board 1</Badge>
+              <Badge variant="carrom">CBOT Edition #200 • Board 1</Badge>
               <span className="text-xs text-amber-400 font-mono">1080p 60fps Live Stream</span>
             </div>
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">

@@ -204,7 +204,7 @@ export default function CaptainClient({ initialTeam, initialMembers }: { initial
         {/* Assigned Edition Board Patterns */}
         <Card className="lg:col-span-6 p-6 border-border space-y-4">
           <CardTitle className="text-lg font-bold flex items-center gap-2">
-            <Layers className="h-5 w-5 text-amber-500" /> Assigned Board Patterns (Edition #205)
+            <Layers className="h-5 w-5 text-amber-500" /> Assigned Board Patterns (Edition #200)
           </CardTitle>
           <div className="space-y-3">
             {boardPatterns.map((pat) => (

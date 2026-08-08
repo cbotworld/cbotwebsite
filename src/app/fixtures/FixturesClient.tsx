@@ -38,7 +38,7 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
                 <Calendar className="h-3.5 w-3.5 mr-1" /> Official Fixtures & Public Schedule
               </Badge>
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight">CBOT Edition #205 Live Schedule</h1>
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight">Cornerstones of Carrom (Edition #200) Schedule</h1>
             <p className="text-muted-foreground text-sm max-w-2xl">
               Inspect upcoming round-robin league matches, carrom table numbers, scheduled time slots, and playoff brackets.
             </p>

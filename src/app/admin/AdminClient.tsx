@@ -7,7 +7,7 @@ import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_US
 import { createEdition } from '@/lib/actions/tournamentActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { generateUserCredentials, resetUserPin, updatePlayer, togglePlayerActivation, deletePlayer } from '@/lib/actions/userActions';
-import { calculatePlayerCategoriesForDraft, autoGenerateBalancedTeams, publishFinalizedTeams } from '@/lib/actions/teamManagementActions';
+import { calculatePlayerCategoriesForDraft, autoGenerateBalancedTeams, publishFinalizedTeams, updateTeamCaptain } from '@/lib/actions/teamManagementActions';
 import { generateRoundRobinFixtures, calculateLeagueStandings, generatePlayoffFixtures, rescheduleFixture } from '@/lib/actions/schedulerActions';
 import { lockMatchLineup, overrideMatchLineup } from '@/lib/actions/lineupActions';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,12 @@ export default function AdminPortalPage() {
   const [createdCreds, setCreatedCreds] = React.useState<{ username: string; pin: string; name: string } | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Team captain management
+  const [teamsList, setTeamsList] = React.useState<any[]>(MOCK_TEAMS);
+  const [captainSelections, setCaptainSelections] = React.useState<Record<string, string>>({});
+  const [captainSaving, setCaptainSaving] = React.useState<Record<string, boolean>>({});
+  const [captainSaved, setCaptainSaved] = React.useState<Record<string, boolean>>({});
 
   if (currentRole !== 'ORGANIZER') {
     return (
@@ -163,6 +169,9 @@ export default function AdminPortalPage() {
           </TabsTrigger>
           <TabsTrigger value="scores" className="text-xs font-bold gap-1.5 px-3 py-2">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Scores Audit
+          </TabsTrigger>
+          <TabsTrigger value="captains" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Crown className="h-3.5 w-3.5 text-amber-400" /> Team Captains
           </TabsTrigger>
         </TabsList>
 
@@ -295,6 +304,144 @@ export default function AdminPortalPage() {
           <Card className="border-border p-6 space-y-4">
             <h3 className="text-lg font-bold">Score Audit Queue</h3>
           </Card>
+        </TabsContent>
+
+        {/* 7. TEAM CAPTAINS MODULE */}
+        <TabsContent value="captains" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black">Team Captain Management</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Reassign captains for any team. Changes take effect immediately.
+              </p>
+            </div>
+            <Badge variant="carrom" className="px-4 py-2 font-bold">
+              <Crown className="h-3.5 w-3.5 mr-1.5" /> Organizer Only
+            </Badge>
+          </div>
+
+          {teamsList.length === 0 ? (
+            <Card className="border-border p-12 text-center">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-40" />
+              <p className="text-muted-foreground font-semibold">No teams found.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {teamsList.map((team) => {
+                const members = team.members || [];
+                const currentCaptainId = team.captainId;
+                const selectedCaptainId = captainSelections[team.id] ?? currentCaptainId ?? '';
+                const isSaving = captainSaving[team.id];
+                const justSaved = captainSaved[team.id];
+
+                const handleSaveCaptain = async () => {
+                  if (!selectedCaptainId || selectedCaptainId === currentCaptainId) return;
+                  setCaptainSaving((p) => ({ ...p, [team.id]: true }));
+                  const res = await updateTeamCaptain(team.id, selectedCaptainId);
+                  if (res.success) {
+                    setTeamsList((prev) =>
+                      prev.map((t) =>
+                        t.id === team.id
+                          ? { ...t, captainId: selectedCaptainId, captain: members.find((m: any) => m.userId === selectedCaptainId)?.user }
+                          : t
+                      )
+                    );
+                    setCaptainSaved((p) => ({ ...p, [team.id]: true }));
+                    setTimeout(() => setCaptainSaved((p) => ({ ...p, [team.id]: false })), 2500);
+                  }
+                  setCaptainSaving((p) => ({ ...p, [team.id]: false }));
+                };
+
+                return (
+                  <Card
+                    key={team.id}
+                    className="border border-amber-500/20 bg-card rounded-2xl overflow-hidden shadow-lg"
+                  >
+                    {/* Team Header */}
+                    <div className="bg-gradient-to-br from-amber-950 via-zinc-900 to-black px-4 py-3 border-b border-amber-500/20 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-amber-500/10 border-2 border-amber-500/40 flex items-center justify-center flex-shrink-0">
+                        {team.logo ? (
+                          <img src={team.logo} alt={team.name} className="h-full w-full object-cover rounded-full" />
+                        ) : (
+                          <span className="text-amber-400 font-black text-xs">{team.tag}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-black text-white text-sm">{team.name}</p>
+                        <p className="text-amber-400/70 text-[11px]">{members.length} players</p>
+                      </div>
+                    </div>
+
+                    <CardContent className="p-4 space-y-4">
+                      {/* Player list */}
+                      <ul className="space-y-1.5">
+                        {members.map((member: any) => {
+                          const user = member.user || member;
+                          const uid = member.userId || member.id;
+                          const isCap = uid === currentCaptainId;
+                          return (
+                            <li key={uid} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl ${isCap ? 'bg-amber-500/10 border border-amber-500/25' : 'bg-muted/30'}`}>
+                              <Avatar src={user?.image} fallback={user?.name || '?'} size="sm" className="flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-bold truncate ${isCap ? 'text-amber-400' : ''}`}>{user?.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{user?.username}</p>
+                              </div>
+                              {isCap && (
+                                <span className="flex items-center gap-1 bg-amber-500/20 text-amber-400 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border border-amber-500/30 flex-shrink-0">
+                                  <Crown className="h-2.5 w-2.5" /> C
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+
+                      {/* Captain reassign */}
+                      {members.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-border/50">
+                          <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                            Reassign Captain
+                          </label>
+                          <div className="flex gap-2">
+                            <select
+                              value={selectedCaptainId}
+                              onChange={(e) => setCaptainSelections((p) => ({ ...p, [team.id]: e.target.value }))}
+                              className="flex-1 text-xs font-semibold bg-muted border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            >
+                              {members.map((member: any) => {
+                                const user = member.user || member;
+                                const uid = member.userId || member.id;
+                                return (
+                                  <option key={uid} value={uid}>
+                                    {user?.name}{uid === currentCaptainId ? ' (Current C)' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <Button
+                              size="sm"
+                              variant={justSaved ? 'outline' : 'carrom'}
+                              onClick={handleSaveCaptain}
+                              disabled={isSaving || selectedCaptainId === currentCaptainId}
+                              className="flex-shrink-0 font-bold text-xs px-3"
+                            >
+                              {isSaving ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : justSaved ? (
+                                <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mr-1" /> Saved</>
+                              ) : (
+                                'Save'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

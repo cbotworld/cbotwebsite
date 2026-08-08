@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
+import { CountryBanner } from '@/components/layout/CountryBanner';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans flex min-h-screen flex-col bg-background text-foreground`}>
         <Providers>
           <Navbar />
+          <CountryBanner />
           <main className="flex-1">{children}</main>
           <Footer />
         </Providers>

@@ -25,14 +25,18 @@ model User {
   state         String?   @default("Tamil Nadu")
   city          String?   @default("Chennai")
   whatsApp      String?
-  
-  // Player Lifetime Stats
+  age           Int?
+  gender        String?
+
+  // Player Stats
+  average       Float?    @default(0.0)
+  target        Int?      @default(0)
   rating        Int       @default(1200)
   wins          Int       @default(0)
   losses        Int       @default(0)
   queenStrikes  Int       @default(0)
   boardsWon     Int       @default(0)
-  
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

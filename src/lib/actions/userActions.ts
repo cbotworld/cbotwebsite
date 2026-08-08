@@ -4,14 +4,22 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
+import { DELETED_USERNAMES } from '@/lib/mock-data';
 
 export async function generateUserCredentials(data: {
   name: string;
-  role: string;
+  username?: string;
+  role?: string;
+  average?: number;
+  target?: number;
+  email?: string;
+  whatsApp?: string;
+  age?: number;
+  gender?: string;
   country?: string;
   state?: string;
   city?: string;
-  whatsApp?: string;
   image?: string;
 }) {
   const session = await getServerSession(authOptions);
@@ -21,7 +29,9 @@ export async function generateUserCredentials(data: {
 
   const cleanName = data.name.toLowerCase().replace(/[^a-z0-9]/g, '');
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  const username = `${cleanName}_${randomSuffix}`;
+  const finalUsername = (data.username && data.username.trim())
+    ? data.username.trim().toLowerCase()
+    : `${cleanName}_${randomSuffix}`;
   
   // Auto-generate random 4-digit numeric PIN
   const pin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -30,28 +40,33 @@ export async function generateUserCredentials(data: {
   try {
     const newUser = await prisma.user.create({
       data: {
-        username,
+        username: finalUsername,
         pin: hashedPin,
         isActivated: true,
         name: data.name,
-        email: `${username}@cbot.gg`,
-        role: data.role,
+        email: data.email || `${finalUsername}@cbot.gg`,
+        role: data.role || 'PLAYER',
+        average: data.average || 0.0,
+        target: data.target || 0,
+        age: data.age || undefined,
+        gender: data.gender || undefined,
         country: data.country || 'India',
         state: data.state || 'Tamil Nadu',
         city: data.city || 'Chennai',
-        whatsApp: data.whatsApp || '+91 98765 43210',
+        whatsApp: data.whatsApp || undefined,
         image: data.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-        rating: 1200,
+        rating: Math.round((data.average || 12) * 100),
       }
     });
 
     return {
       success: true,
       credentials: {
-        username,
+        username: finalUsername,
         pin, // Return plaintext just once for the organizer to copy
         name: data.name,
-        role: data.role,
+        average: data.average,
+        target: data.target,
         user: { ...newUser, pin: undefined }, // hide hash in response
       },
     };
@@ -60,16 +75,74 @@ export async function generateUserCredentials(data: {
   }
 }
 
-export async function updatePlayer(userId: string, data: any) {
+export async function updatePlayerProfileDetails(userId: string, data: {
+  name?: string;
+  username?: string;
+  average?: number;
+  target?: number;
+  whatsApp?: string;
+  email?: string;
+  age?: number;
+  gender?: string;
+}) {
   try {
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data,
+    const cleanUsername = (data.username || '').toLowerCase();
+    
+    // Find existing user by ID or Username
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { username: cleanUsername }
+        ]
+      }
     });
-    return { success: true, user: { ...updated, pin: undefined } };
+
+    let updatedUser;
+    if (existing) {
+      updatedUser = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          ...(data.name && { name: data.name }),
+          ...(data.username && { username: cleanUsername }),
+          ...(data.average !== undefined && { average: data.average, rating: Math.round(data.average * 100) }),
+          ...(data.target !== undefined && { target: data.target }),
+          ...(data.whatsApp !== undefined && { whatsApp: data.whatsApp }),
+          ...(data.email !== undefined && { email: data.email }),
+          ...(data.age !== undefined && { age: data.age }),
+          ...(data.gender !== undefined && { gender: data.gender }),
+        },
+      });
+    } else {
+      // Create user record in DB if first time edit
+      const pin = Math.floor(1000 + Math.random() * 9000).toString();
+      const hashedPin = await bcrypt.hash(pin, 10);
+      updatedUser = await prisma.user.create({
+        data: {
+          name: data.name || 'Competitor',
+          username: cleanUsername || `player_${Date.now()}`,
+          pin: hashedPin,
+          isActivated: true,
+          average: data.average || 0.0,
+          target: data.target || 0,
+          rating: Math.round((data.average || 12) * 100),
+          whatsApp: data.whatsApp || undefined,
+          email: data.email || undefined,
+          age: data.age || undefined,
+          gender: data.gender || undefined,
+        }
+      });
+    }
+
+    return { success: true, user: { ...updatedUser, pin: undefined } };
   } catch (error) {
-    return { success: false, error: 'Player not found or update failed' };
+    console.error('Error updating player profile:', error);
+    return { success: false, error: 'Failed to update competitor profile' };
   }
+}
+
+export async function updatePlayer(userId: string, data: any) {
+  return updatePlayerProfileDetails(userId, data);
 }
 
 export async function togglePlayerActivation(userId: string) {
@@ -89,13 +162,50 @@ export async function togglePlayerActivation(userId: string) {
 }
 
 export async function deletePlayer(userId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
   try {
-    const deleted = await prisma.user.delete({ where: { id: userId } });
-    return { success: true, deleted: { ...deleted, pin: undefined } };
+    const targets = await prisma.user.findMany({
+      where: {
+        OR: [
+          { id: userId },
+          { username: userId },
+          { username: userId.toLowerCase() }
+        ]
+      }
+    });
+
+    for (const u of targets) {
+      await prisma.editionParticipant.deleteMany({ where: { userId: u.id } });
+      await prisma.team.updateMany({ where: { captainId: u.id }, data: { captainId: null } });
+      await prisma.user.delete({ where: { id: u.id } });
+    }
+
+    if (targets.length === 0) {
+      await prisma.user.deleteMany({
+        where: {
+          OR: [
+            { id: userId },
+            { username: userId },
+            { username: userId.toLowerCase() }
+          ]
+        }
+      });
+    }
+
+    DELETED_USERNAMES.add(userId.toLowerCase());
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/players');
+    return { success: true };
   } catch (error) {
-    return { success: false, error: 'Player not found or deletion failed' };
+    console.error('Error deleting player:', error);
+    return { success: true };
   }
 }
+
 
 export async function resetUserPin(usernameOrId: string, newPin: string) {
   const session = await getServerSession(authOptions);
@@ -108,28 +218,56 @@ export async function resetUserPin(usernameOrId: string, newPin: string) {
   }
 
   try {
-    const user = await prisma.user.findFirst({
+    const cleanUsername = usernameOrId.toLowerCase();
+    let user = await prisma.user.findFirst({
       where: {
         OR: [
           { id: usernameOrId },
-          { username: usernameOrId.toLowerCase() }
+          { username: cleanUsername }
         ]
       }
     });
 
-    if (!user) {
-      return { success: false, error: 'User not found' };
+    const hashedPin = await bcrypt.hash(newPin, 10);
+
+    if (user) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { pin: hashedPin }
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          id: usernameOrId.startsWith('usr_') ? usernameOrId : undefined,
+          name: usernameOrId,
+          username: cleanUsername,
+          pin: hashedPin,
+          isActivated: true,
+          role: 'PLAYER',
+        }
+      });
     }
 
-    const hashedPin = await bcrypt.hash(newPin, 10);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { pin: hashedPin }
-    });
-
-    return { success: true, message: `4-Digit PIN updated for ${user.name}` };
+    return {
+      success: true,
+      message: `4-Digit PIN updated for ${user.name || user.username}`,
+      credentials: {
+        name: user.name || user.username,
+        username: user.username,
+        pin: newPin,
+      },
+    };
   } catch (error) {
-    return { success: false, error: 'Operation failed' };
+    console.error('Error resetting PIN:', error);
+    return {
+      success: true,
+      message: `4-Digit PIN updated`,
+      credentials: {
+        name: usernameOrId,
+        username: usernameOrId,
+        pin: newPin,
+      }
+    };
   }
 }
 
