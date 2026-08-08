@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans flex min-h-screen flex-col bg-background text-foreground`}>
         <Providers>
           <Navbar />
