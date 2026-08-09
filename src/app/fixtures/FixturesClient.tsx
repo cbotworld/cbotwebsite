@@ -18,10 +18,10 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
 
   const filteredMatches = matchesList.filter((m) => {
     const matchesStage = stageFilter === 'ALL' || m.stage === stageFilter;
-    const matchesSearch =
-      m.team1?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.team2?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.matchNumber.toString().includes(searchQuery);
+    const matchesSearch = !searchQuery.trim() ||
+      (m.team1?.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+      (m.team2?.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+      m.matchNumber.toString().includes(searchQuery.trim());
     return matchesStage && matchesSearch;
   });
 

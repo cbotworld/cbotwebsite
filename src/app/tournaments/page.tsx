@@ -17,8 +17,8 @@ export default function TournamentsPage() {
   const [formatFilter, setFormatFilter] = React.useState('ALL');
 
   const filteredTournaments = MOCK_TOURNAMENTS.filter((tour) => {
-    const matchesSearch = tour.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tour.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = !searchTerm.trim() || tour.title.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+      tour.description.toLowerCase().includes(searchTerm.toLowerCase().trim());
     const matchesStatus = statusFilter === 'ALL' || tour.status === statusFilter;
     const matchesFormat = formatFilter === 'ALL' || tour.format === formatFilter;
     return matchesSearch && matchesStatus && matchesFormat;

@@ -11,10 +11,17 @@ import { Search, Crown, Trophy, Flame } from 'lucide-react';
 export default function PlayersPage() {
   const [search, setSearch] = React.useState('');
 
-  const players = MOCK_USERS.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.role.toLowerCase().includes(search.toLowerCase())
-  );
+  const players = MOCK_USERS.filter((u) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    const qClean = q.startsWith('@') ? q.substring(1) : q;
+    return (
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q) ||
+      (u.username || '').toLowerCase().includes(qClean) ||
+      (u.rating !== undefined && u.rating !== null && String(u.rating).includes(q))
+    );
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">

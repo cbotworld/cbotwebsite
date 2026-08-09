@@ -1168,10 +1168,16 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               {usersList
                 .filter((usr) => {
                   if (!userSearchQuery.trim()) return true;
-                  const q = userSearchQuery.toLowerCase();
+                  const q = userSearchQuery.toLowerCase().trim();
+                  const qClean = q.startsWith('@') ? q.substring(1) : q;
+                  const displayPin = activePinMap[usr.username?.toLowerCase() || ''] || (usr.pin && usr.pin.length === 4 ? usr.pin : '••••');
                   return (
-                    usr.name?.toLowerCase().includes(q) ||
-                    usr.username?.toLowerCase().includes(q)
+                    (usr.name || '').toLowerCase().includes(q) ||
+                    (usr.username || '').toLowerCase().includes(qClean) ||
+                    displayPin.includes(q) ||
+                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q)) ||
+                    (usr.role || '').toLowerCase().includes(q)
                   );
                 })
                 .map((usr) => {
@@ -2041,10 +2047,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               {sortedUsersForNewTeam
                 .filter((usr) => {
                   if (!rosterSearchQuery.trim()) return true;
-                  const q = rosterSearchQuery.toLowerCase();
+                  const q = rosterSearchQuery.toLowerCase().trim();
+                  const qClean = q.startsWith('@') ? q.substring(1) : q;
                   return (
-                    usr.name?.toLowerCase().includes(q) ||
-                    usr.username?.toLowerCase().includes(q)
+                    (usr.name || '').toLowerCase().includes(q) ||
+                    (usr.username || '').toLowerCase().includes(qClean) ||
+                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
                 })
                 .map((usr) => {
@@ -2215,10 +2224,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               {sortedUsersForEditTeam
                 .filter((usr) => {
                   if (!rosterSearchQuery.trim()) return true;
-                  const q = rosterSearchQuery.toLowerCase();
+                  const q = rosterSearchQuery.toLowerCase().trim();
+                  const qClean = q.startsWith('@') ? q.substring(1) : q;
                   return (
-                    usr.name?.toLowerCase().includes(q) ||
-                    usr.username?.toLowerCase().includes(q)
+                    (usr.name || '').toLowerCase().includes(q) ||
+                    (usr.username || '').toLowerCase().includes(qClean) ||
+                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
                 })
                 .map((usr) => {

@@ -12,8 +12,9 @@ export default function EditionsClient({ editions }: { editions: any[] }) {
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const filteredEditions = editions.filter((ed) => {
+    if (!searchTerm.trim()) return true;
     const titleText = ed.title || ed.name || '';
-    return titleText.toLowerCase().includes(searchTerm.toLowerCase());
+    return titleText.toLowerCase().includes(searchTerm.toLowerCase().trim());
   });
 
   return (
