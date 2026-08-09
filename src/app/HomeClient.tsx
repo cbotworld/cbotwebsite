@@ -324,6 +324,44 @@ export default function HomeClient({
         </div>
       </section>
 
+      {/* SPECIAL SPONSOR SECTION */}
+      <section id="special-sponsors" className="py-16 relative overflow-hidden bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent border-y border-emerald-500/10">
+        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center space-y-10">
+          <div className="space-y-3">
+            <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
+              🌟 Special Sponsor
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent">
+              360° Support to CBOT
+            </h2>
+          </div>
+
+          <div className="flex flex-col items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center gap-4 group"
+            >
+              <div className="relative">
+                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-emerald-600/20 flex items-center justify-center shadow-2xl shadow-emerald-500/20 group-hover:scale-110 group-hover:border-emerald-400 group-hover:shadow-emerald-400/30 transition-all duration-500">
+                  <span className="text-4xl sm:text-5xl font-black bg-gradient-to-br from-emerald-300 via-teal-400 to-emerald-500 bg-clip-text text-transparent select-none tracking-wide">
+                    SK
+                  </span>
+                </div>
+                <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-emerald-400/20 via-teal-400/15 to-emerald-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+              </div>
+              <div className="text-center space-y-1.5 mt-2">
+                <h3 className="text-xl sm:text-2xl font-black text-emerald-400 leading-tight group-hover:text-emerald-300 transition-colors">Srikranthi</h3>
+                <p className="text-sm font-semibold text-emerald-400/70 max-w-sm mx-auto">Thank you for your incredible 360-degree support to the CBOT community.</p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+
       {/* GOLD SPONSORS SECTION */}
       <section id="gold-sponsors" className="py-16 relative overflow-hidden">
         {/* Background glow */}
