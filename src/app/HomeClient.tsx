@@ -224,62 +224,204 @@ export default function HomeClient({
         );
       })()}
 
-      {/* OFFICIAL ELITE SPONSOR SECTION */}
+      {/* OFFICIAL ELITE SPONSORS SECTION */}
       <section id="sponsors" className="py-16 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent relative border-y border-emerald-500/20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center space-y-8">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 text-center space-y-10">
+
+          {/* Section Header */}
           <div className="space-y-3">
             <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
-              💎 Official Elite Sponsor
+              💎 Official Elite Sponsors
             </Badge>
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-500 bg-clip-text text-transparent">
-              Neelamani Foundation
+              Powering CBOT 200th Edition
             </h2>
             <p className="text-muted-foreground text-sm max-w-2xl mx-auto font-medium">
-              Supporting communities through healthcare, education, &amp; cultural empowerment. Official Title Sponsor of CBOT 200th Edition.
+              Our elite sponsors make this milestone tournament possible — supporting communities, sports talent, &amp; cultural empowerment.
             </p>
           </div>
 
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setSponsorModalOpen(true)}
-            className="group relative max-w-2xl mx-auto rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
-          >
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-amber-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
+          {/* Shared Thank You Banner */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10">
+              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+              <span className="text-sm font-black text-amber-300 tracking-wide">
+                Special Thank you to Muthu Kumar Sir
+              </span>
+              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+            </div>
+            <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10">
+              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+              <span className="text-sm font-black text-amber-300 tracking-wide">
+                Special Thank you to Lalit
+              </span>
+              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+            </div>
+          </div>
 
-            <div className="relative flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left z-10">
-              <div className="relative shrink-0">
-                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform">
+          {/* Two-sponsor grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* ── Neelamani Foundation ── */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setSponsorModalOpen(true)}
+              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-amber-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
+
+              <div className="relative flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left z-10">
+                <div className="relative shrink-0">
+                  <div className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform">
+                    <img
+                      src="/sponsors/neelamani-logo.jpg"
+                      alt="Neelamani Foundation Official Logo"
+                      className="w-full h-full object-contain rounded-full drop-shadow-md"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 flex-1">
+                  <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-amber-400 transition-colors">
+                    Neelamani Foundation
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">
+                    "Preserving our spiritual heritage, nurturing sports talent, healthcare, &amp; education for a better tomorrow."
+                  </p>
+                  <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-amber-400 group-hover:text-amber-300">
+                    <span>📜 Click to View Official Poster</span>
+                    <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* ── SISCAA ── */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => window.open('https://siscaasports.com/', '_blank', 'noopener,noreferrer')}
+              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-sky-500/40 hover:border-sky-400 shadow-2xl shadow-sky-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-sky-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
+
+              <div className="relative flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left z-10">
+                <div className="relative shrink-0">
+                  <div className="h-20 w-36 sm:h-24 sm:w-44 rounded-xl border-2 border-sky-400/50 p-3 bg-black shadow-xl shadow-sky-500/20 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
+                    <img
+                      src="/sponsors/siscaa-logo.png"
+                      alt="SISCAA Official Logo"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 flex-1">
+                  <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-sky-400 transition-colors">
+                    SISCAA
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">
+                    "Championing carrom excellence — a proud partner in growing the sport at every level."
+                  </p>
+                  <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-sky-400 group-hover:text-sky-300">
+                    <span>🌐 Click here to redirect to website</span>
+                    <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+          </div>{/* /grid */}
+        </div>
+      </section>
+
+      {/* GOLD SPONSORS SECTION */}
+      <section id="gold-sponsors" className="py-16 relative overflow-hidden">
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/8 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-yellow-500/6 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 text-center space-y-10">
+          {/* Header */}
+          <div className="space-y-3">
+            <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-amber-500/20 text-amber-400 border-amber-500/40">
+              🥇 Gold Sponsors
+            </Badge>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              Our Gold Sponsors
+            </h2>
+            <p className="text-muted-foreground text-sm max-w-xl mx-auto font-medium">
+              Proud supporters powering CBOT 200th Edition. Thank you for your generous contributions!
+            </p>
+          </div>
+
+          {/* Sponsor Grid */}
+          <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-8">
+
+            {/* Scrapplique Galore — Logo sponsor */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center gap-2 group"
+            >
+              <div className="relative">
+                <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/70 p-1 bg-white shadow-xl shadow-amber-500/20 group-hover:scale-110 group-hover:border-amber-400 transition-all duration-300">
                   <img
-                    src="/sponsors/neelamani-logo.jpg"
-                    alt="Neelamani Foundation Official Logo"
-                    className="w-full h-full object-contain rounded-full drop-shadow-md"
+                    src="/sponsors/scrapplique-galore-logo.png"
+                    alt="Scrapplique Galore"
+                    className="w-full h-full object-contain rounded-full"
                   />
                 </div>
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/30 via-yellow-400/20 to-amber-400/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
               </div>
+              <span className="text-xs font-bold text-amber-300 max-w-[90px] text-center leading-tight">Scrapplique Galore</span>
+            </motion.div>
 
-              <div className="space-y-2.5 flex-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                    Serve With Love · Chennai
-                  </span>
-                  <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-3 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
-                    <Heart className="h-3 w-3 text-amber-400 fill-amber-400 inline" /> Special thank you to Muthu Kumar sir
-                  </span>
+            {/* Individual sponsors with initials */}
+            {[
+              { name: 'Packiya',        initials: 'PK' },
+              { name: 'Abhijit',        initials: 'AB' },
+              { name: 'Manoj PS',       initials: 'MA' },
+              { name: 'Mahesh TN',      initials: 'MA' },
+              { name: 'Kumar A',        initials: 'KA' },
+              { name: 'Ramesh',         initials: 'RA' },
+              { name: 'Vinod',          initials: 'VI' },
+              { name: 'Din',            initials: 'DI' },
+              { name: 'Krishnamurthy',  initials: 'KR' },
+              { name: 'Rakesh',         initials: 'RA' },
+              { name: 'Srivishnu',      initials: 'SR' },
+              { name: 'Neela',          initials: 'NE' },
+              { name: 'Lalit',          initials: 'LA' },
+              { name: 'Lalit Friends',  initials: 'LF' },
+              { name: 'Umesh',          initials: 'UM' },
+              { name: 'Roopa',          initials: 'RO' },
+              { name: 'Praveen',        initials: 'PR' },
+            ].map((sponsor, idx) => (
+              <motion.div
+                key={sponsor.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: idx * 0.04 }}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="relative">
+                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
+                    <span className="text-xl sm:text-2xl font-black bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent select-none tracking-wide">
+                      {sponsor.initials}
+                    </span>
+                  </div>
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/20 via-yellow-400/15 to-amber-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-amber-400 transition-colors">
-                  Neelamani Foundation
-                </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed italic">
-                  "Preserving our spiritual heritage, nurturing sports talent, healthcare, &amp; education for a better tomorrow."
-                </p>
-                <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-amber-400 group-hover:text-amber-300">
-                  <span>📜 Click Logo to View Official Foundation Directives &amp; Poster</span>
-                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            </div>
-          </motion.div>
+                <span className="text-xs font-bold text-amber-300/80 max-w-[80px] text-center leading-tight group-hover:text-amber-300 transition-colors">
+                  {sponsor.name}
+                </span>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
