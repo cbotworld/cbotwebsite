@@ -55,6 +55,7 @@ export default function HomeClient({
   } | null;
 }) {
   const legacyVideos = [
+    { id: '_VRKmVVM-00', title: '200th Edition Launch Video', label: '200th Launch' },
     { id: 'mFV8W5HdJ3A', title: 'CBOT Intro', label: 'CBOT Intro' },
     { id: 'szimIRoO0jI', title: '25th Edition Closing Video', label: '25th Closing' },
     { id: '9i3_S7JpN74', title: '50th Edition Closing Video', label: '50th Closing' },
