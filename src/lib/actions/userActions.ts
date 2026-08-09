@@ -90,6 +90,10 @@ export async function generateUserCredentials(data: {
       }
     });
 
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/players');
+    revalidatePath('/leaderboard');
+
     return {
       success: true,
       credentials: {
@@ -184,6 +188,10 @@ export async function updatePlayerProfileDetails(userId: string, data: {
       });
     }
 
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/players');
+    revalidatePath('/leaderboard');
+
     return { success: true, user: { ...updatedUser, pin: undefined } };
   } catch (error) {
     console.error('Error updating player profile:', error);
@@ -249,6 +257,7 @@ export async function deletePlayer(userId: string) {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/players');
+    revalidatePath('/leaderboard');
     return { success: true };
   } catch (error) {
     console.error('Error deleting player:', error);

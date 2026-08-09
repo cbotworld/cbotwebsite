@@ -64,33 +64,7 @@ export default async function OrganizerPage() {
     return uname && !dummyUsernames.has(uname) && !DELETED_USERNAMES.has(uname) && !DELETED_USERNAMES.has(u.id?.toLowerCase());
   });
 
-  const dbUserMap = new Map(filteredDbUsers.map((u: any) => [u.username?.toLowerCase(), u]));
-  const mergedUsersMap = new Map<string, any>();
-
-  // Always include all 112 MOCK_USERS (except deleted ones), merged with any DB overrides
-  MOCK_USERS.filter((mu: any) => {
-    const key = mu.username.toLowerCase();
-    return !DELETED_USERNAMES.has(key) && !DELETED_USERNAMES.has(mu.id.toLowerCase());
-  }).forEach((mu: any) => {
-    const key = mu.username.toLowerCase();
-    const dbu = dbUserMap.get(key);
-    mergedUsersMap.set(key, {
-      ...mu,
-      ...(dbu || {}),
-      average: (dbu && dbu.average !== null && dbu.average !== undefined && dbu.average !== 0) ? dbu.average : mu.average,
-      target: (dbu && dbu.target !== null && dbu.target !== undefined && dbu.target !== 0) ? dbu.target : mu.target,
-    });
-  });
-
-  // Also append any extra DB users not in MOCK_USERS
-  filteredDbUsers.forEach((dbu: any) => {
-    const key = dbu.username?.toLowerCase();
-    if (key && !mergedUsersMap.has(key)) {
-      mergedUsersMap.set(key, dbu);
-    }
-  });
-
-  const usersList = Array.from(mergedUsersMap.values());
+  const usersList = filteredDbUsers;
 
   return (
     <OrganizerClient 

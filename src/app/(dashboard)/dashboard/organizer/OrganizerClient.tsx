@@ -24,6 +24,23 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [usersList, setUsersList] = React.useState(initialUsersList);
   const [teamsList, setTeamsList] = React.useState<any[]>(initialTeams);
 
+  // Sync state with server props to seamlessly reflect DB changes
+  React.useEffect(() => {
+    setEditions(initialEditions);
+  }, [initialEditions]);
+
+  React.useEffect(() => {
+    setScoreReports(initialScoreReports);
+  }, [initialScoreReports]);
+
+  React.useEffect(() => {
+    setUsersList(initialUsersList);
+  }, [initialUsersList]);
+
+  React.useEffect(() => {
+    setTeamsList(initialTeams);
+  }, [initialTeams]);
+
   // Edition Control Scope State
   const [selectedEditionId, setSelectedEditionId] = React.useState<string>(
     initialEditions[0]?.id || ''

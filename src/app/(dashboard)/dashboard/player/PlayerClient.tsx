@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { MOCK_USERS, MOCK_TEAMS, MOCK_MATCHES } from '@/lib/mock-data';
+import { MOCK_TEAMS, MOCK_MATCHES } from '@/lib/mock-data';
 import { submitScoreReport } from '@/lib/actions/matchActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
