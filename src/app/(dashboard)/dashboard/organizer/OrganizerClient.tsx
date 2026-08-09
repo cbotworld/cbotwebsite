@@ -2346,8 +2346,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Button type="button" variant="outline" onClick={() => setEditTeamModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="carrom" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving Team Roster...' : 'Save Team Changes'}
+            <Button type="submit" variant="carrom">
+              Save Team
             </Button>
           </div>
         </form>

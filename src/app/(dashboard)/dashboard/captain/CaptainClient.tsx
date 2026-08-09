@@ -155,23 +155,27 @@ export default function CaptainClient({
     setEmailPreviewUrl(null);
 
     const saved = savedDayLineups[dayNum];
-    if (saved && saved.rounds) {
-      const populated = saved.rounds.map((savedRound: any, ri: number) => {
-        if (savedRound.playerIds && Array.isArray(savedRound.playerIds)) {
-          return { playerIds: savedRound.playerIds };
-        }
-        // Fallback: look up player IDs by name
-        const format = editionRoundFormats[ri] || 'SINGLES';
-        const numPlayers = playersForFormat(format);
-        const playerIds = Array.from({ length: numPlayers }, (_, slotIdx) => {
-          const playerName = savedRound.players?.[slotIdx];
-          if (playerName) {
-            const matchedMember = teamMembers.find((m: any) => m.name === playerName);
-            return matchedMember ? matchedMember.id : '';
+    if (saved && saved.rounds && saved.rounds.length > 0) {
+      const populated = editionRoundFormats.map((fmt, ri) => {
+        const savedRound = saved.rounds[ri];
+        const numPlayers = playersForFormat(fmt);
+        if (savedRound) {
+          if (savedRound.playerIds && Array.isArray(savedRound.playerIds)) {
+            return { playerIds: Array.from({ length: numPlayers }, (_, i) => savedRound.playerIds[i] || '') };
           }
-          return '';
-        });
-        return { playerIds };
+          // Fallback: look up player IDs by name
+          return {
+            playerIds: Array.from({ length: numPlayers }, (_, slotIdx) => {
+              const playerName = savedRound.players?.[slotIdx];
+              if (playerName) {
+                const matchedMember = teamMembers.find((m: any) => m.name === playerName);
+                return matchedMember ? matchedMember.id : '';
+              }
+              return '';
+            })
+          };
+        }
+        return { playerIds: Array.from({ length: numPlayers }, () => '') };
       });
       setRoundLineups(populated);
     } else {
