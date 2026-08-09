@@ -117,7 +117,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-sm">
         <div className="absolute top-0 right-0 p-4">
             <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/40 bg-amber-500/10">
-                <Lock className="h-3 w-3 mr-1" /> Lineup & Schedule Read-Only
+                <Lock className="h-3 w-3 mr-1" /> Combi & Schedule Read-Only
             </Badge>
         </div>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

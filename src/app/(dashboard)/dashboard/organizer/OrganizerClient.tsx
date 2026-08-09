@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS } from '@/lib/mock-data';
-import { createEdition, addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam } from '@/lib/actions/tournamentActions';
+import { createEdition, addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction } from '@/lib/actions/tournamentActions';
 import { sendFinalDailyLineupSummaryAction } from '@/lib/actions/lineupActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { finalizeEditionRankings } from '@/lib/actions/rankingActions';
@@ -16,7 +16,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[] }) {
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
@@ -136,8 +136,12 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [genEmail, setGenEmail] = React.useState('');
   const [genAge, setGenAge] = React.useState('');
   const [genGender, setGenGender] = React.useState('Male');
-  const [createdCreds, setCreatedCreds] = React.useState<{ username: string; pin: string; name: string } | null>(null);
+  const [createdCreds, setCreatedCreds] = React.useState<{ username: string; pin: string; name: string; email?: string; user?: any } | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [emailSending, setEmailSending] = React.useState(false);
+  const [emailModalState, setEmailModalState] = React.useState<'IDLE' | 'SUCCESS' | 'NO_EMAIL'>('IDLE');
+  const [sentEmailAddress, setSentEmailAddress] = React.useState('');
+  const [genCredsError, setGenCredsError] = React.useState('');
 
   // Edit User Profile State
   const [editUserModalOpen, setEditUserModalOpen] = React.useState(false);
@@ -157,8 +161,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [targetUsername, setTargetUsername] = React.useState('');
   const [newPin, setNewPin] = React.useState('');
   const [resetStatus, setResetStatus] = React.useState('');
-  const [resetCredsResult, setResetCredsResult] = React.useState<{ name: string; username: string; pin: string } | null>(null);
+  const [resetCredsResult, setResetCredsResult] = React.useState<{ name: string; username: string; pin: string; email?: string } | null>(null);
   const [copiedResetCreds, setCopiedResetCreds] = React.useState(false);
+  const [resetEmailSending, setResetEmailSending] = React.useState(false);
+  const [resetEmailModalState, setResetEmailModalState] = React.useState<'IDLE' | 'SUCCESS' | 'NO_EMAIL'>('IDLE');
+  const [sentResetEmailAddress, setSentResetEmailAddress] = React.useState('');
 
   // Delete Player & Delete Team Confirmation State
   const [deletePlayerModalOpen, setDeletePlayerModalOpen] = React.useState(false);
@@ -494,6 +501,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const handleGenerateCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setEmailModalState('IDLE');
+    setGenCredsError('');
     const parsedAvg = genAverage ? parseFloat(genAverage) : 0;
     const parsedTgt = genTarget ? parseInt(genTarget, 10) : 0;
     const parsedAge = genAge ? parseInt(genAge, 10) : undefined;
@@ -510,12 +519,59 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       gender: genGender || undefined,
     });
     if (res.success && res.credentials) {
-      setCreatedCreds(res.credentials);
+      setCreatedCreds({
+        name: res.credentials.name || genName || 'Player',
+        username: res.credentials.username,
+        pin: res.credentials.pin,
+        email: genEmail.trim() || (res.credentials as any).email || res.credentials.user?.email || undefined,
+        user: res.credentials.user,
+      });
       if (res.credentials.user) {
-        setUsersList([res.credentials.user, ...usersList]);
+        const newUserObj = res.credentials.user;
+        setUsersList((prev) => {
+          const exists = prev.some((u) => u.id === newUserObj.id || u.username?.toLowerCase() === newUserObj.username?.toLowerCase());
+          if (exists) {
+            return prev.map((u) => (u.id === newUserObj.id || u.username?.toLowerCase() === newUserObj.username?.toLowerCase() ? { ...u, ...newUserObj } : u));
+          }
+          return [newUserObj, ...prev];
+        });
       }
+    } else {
+      setGenCredsError(res.error || 'Failed to generate credentials. Please try again.');
     }
     setIsSubmitting(false);
+  };
+
+  const handleSendToPlayerEmail = async () => {
+    if (!createdCreds) return;
+
+    const foundUser = usersList.find(
+      (u) =>
+        u.username?.toLowerCase() === createdCreds.username?.toLowerCase() ||
+        u.name?.toLowerCase() === createdCreds.name?.toLowerCase()
+    );
+    const targetEmail = createdCreds.email || genEmail.trim() || foundUser?.email;
+
+    if (!targetEmail || !targetEmail.trim()) {
+      setEmailModalState('NO_EMAIL');
+      return;
+    }
+
+    setEmailSending(true);
+    const res = await sendPlayerCredentialsEmailAction({
+      name: createdCreds.name,
+      username: createdCreds.username,
+      pin: createdCreds.pin,
+      email: targetEmail.trim(),
+    });
+    setEmailSending(false);
+
+    if (res.success) {
+      setSentEmailAddress(targetEmail.trim());
+      setEmailModalState('SUCCESS');
+    } else {
+      alert('⚠️ Failed to send credentials email: ' + (res.error || 'Unknown error'));
+    }
   };
 
   const handleOpenEditUser = (usr: any) => {
@@ -592,6 +648,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setResetStatus('');
     setResetCredsResult(null);
     setCopiedResetCreds(false);
+    setResetEmailModalState('IDLE');
     setResetPinModalOpen(true);
   };
 
@@ -637,6 +694,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     e.preventDefault();
     if (!targetUsername || !newPin) return;
     setIsSubmitting(true);
+    setResetEmailModalState('IDLE');
     const res = await resetUserPin(targetUsername, newPin);
     if (res.success) {
       const freshPin = newPin;
@@ -645,9 +703,36 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         name: targetUser?.name || targetUsername,
         username: targetUsername,
         pin: freshPin,
+        email: targetUser?.email || undefined,
       });
     }
     setIsSubmitting(false);
+  };
+
+  const handleSendResetToPlayerEmail = async () => {
+    if (!resetCredsResult) return;
+    const playerEmail = targetUser?.email || resetCredsResult.email;
+
+    if (!playerEmail || !playerEmail.trim()) {
+      setResetEmailModalState('NO_EMAIL');
+      return;
+    }
+
+    setResetEmailSending(true);
+    const res = await sendPlayerCredentialsEmailAction({
+      name: resetCredsResult.name,
+      username: resetCredsResult.username,
+      pin: resetCredsResult.pin,
+      email: playerEmail.trim(),
+    });
+    setResetEmailSending(false);
+
+    if (res.success) {
+      setSentResetEmailAddress(playerEmail.trim());
+      setResetEmailModalState('SUCCESS');
+    } else {
+      alert('⚠️ Failed to send credentials email: ' + (res.error || 'Unknown error'));
+    }
   };
 
   const handleVerifyReport = async (reportId: string, action: 'APPROVE' | 'REJECT') => {
@@ -1159,39 +1244,127 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </DialogHeader>
 
         {createdCreds ? (
-          <div className="p-6 space-y-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center">
-            <CheckCircle2 className="h-10 w-10 text-amber-500 mx-auto" />
-            <h3 className="font-bold text-base">Credentials Generated for {createdCreds.name}!</h3>
-            <div className="p-4 rounded-xl bg-card border font-mono text-left text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Unique Username:</span>
-                <span className="font-black text-amber-500">{createdCreds.username}</span>
+          emailModalState === 'SUCCESS' ? (
+            <div className="p-6 space-y-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center animate-in fade-in duration-200">
+              <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+              <h3 className="font-extrabold text-base text-emerald-300">Credentials Emailed Successfully!</h3>
+              <p className="text-xs text-muted-foreground">
+                Official tournament login credentials for <strong className="text-foreground">{createdCreds.name}</strong> have been sent to:
+              </p>
+              <div className="p-3 rounded-xl bg-card border border-emerald-500/30 font-mono text-center text-xs font-bold text-emerald-400">
+                ✉️ {sentEmailAddress}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Generated 4-Digit PIN:</span>
-                <span className="font-black text-emerald-500 text-base">{createdCreds.pin}</span>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setEmailModalState('IDLE')}
+                  className="text-xs font-bold gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back to Credentials
+                </Button>
               </div>
             </div>
+          ) : emailModalState === 'NO_EMAIL' ? (
+            <div className="p-6 space-y-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center animate-in fade-in duration-200">
+              <AlertCircle className="h-12 w-12 text-amber-400 mx-auto" />
+              <h3 className="font-extrabold text-base text-amber-400">Email Address Needed</h3>
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">{createdCreds.name}</strong> does not have an email address added to their profile. Please add an email address to send credentials via email.
+              </p>
+              <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-xs text-amber-300 font-medium">
+                ⚠️ Email ID is missing for player @{createdCreds.username}.
+              </div>
+              <div className="flex justify-center gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setEmailModalState('IDLE')}
+                  className="text-xs font-bold gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </Button>
+                {createdCreds.user && (
+                  <Button
+                    variant="carrom"
+                    onClick={() => {
+                      setEmailModalState('IDLE');
+                      setGenCredentialsModalOpen(false);
+                      handleOpenEditUser(createdCreds.user);
+                    }}
+                    className="text-xs font-bold gap-1.5"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Add Email Now
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 space-y-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center">
+              <CheckCircle2 className="h-10 w-10 text-amber-500 mx-auto" />
+              <h3 className="font-bold text-base">Credentials Generated for {createdCreds.name}!</h3>
+              <div className="p-4 rounded-xl bg-card border font-mono text-left text-xs space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Unique Username:</span>
+                  <span className="font-black text-amber-500">{createdCreds.username}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Generated 4-Digit PIN:</span>
+                  <span className="font-black text-emerald-500 text-base">{createdCreds.pin}</span>
+                </div>
+              </div>
 
-            <div className="flex justify-center gap-3">
-              <Button variant="carrom" onClick={copyCredentials} className="text-xs font-bold">
-                <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? 'Copied to Clipboard!' : 'Copy Username & PIN'}
-              </Button>
-              <Button variant="outline" onClick={() => setCreatedCreds(null)}>
-                Generate Another
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                <Button variant="carrom" onClick={copyCredentials} className="text-xs font-bold">
+                  <Copy className="h-3.5 w-3.5 mr-1" /> {copied ? 'Copied!' : 'Copy Username & PIN'}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={emailSending}
+                  onClick={handleSendToPlayerEmail}
+                  className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/20 gap-1.5"
+                >
+                  {emailSending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-3.5 w-3.5 text-amber-400" /> Send to Player Email
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={() => setCreatedCreds(null)} className="text-xs font-bold">
+                  Generate Another
+                </Button>
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <form onSubmit={handleGenerateCredentials} className="space-y-3 py-2">
+            {genCredsError && (
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/40 text-rose-400 text-xs font-bold flex items-start gap-2.5 animate-in fade-in duration-150 shadow-lg shadow-rose-950/20">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+                <span className="leading-relaxed">{genCredsError}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold block mb-1">Full Name</label>
-                <Input value={genName} onChange={(e) => setGenName(e.target.value)} required placeholder="e.g. ANAS AHMED" />
+                <Input value={genName} onChange={(e) => { setGenCredsError(''); setGenName(e.target.value); }} required placeholder="e.g. ANAS AHMED" />
               </div>
               <div>
                 <label className="text-xs font-bold block mb-1">Custom Username (Optional)</label>
-                <Input value={genUsername} onChange={(e) => setGenUsername(e.target.value)} placeholder="Auto-generated if empty" className="font-mono text-xs" />
+                <Input
+                  value={genUsername}
+                  onChange={(e) => { setGenCredsError(''); setGenUsername(e.target.value); }}
+                  placeholder="Auto-generated if empty"
+                  className={`font-mono text-xs ${genCredsError.toLowerCase().includes('username') ? 'border-rose-500/70 ring-2 ring-rose-500/20 bg-rose-500/5' : ''}`}
+                />
+                {genCredsError.toLowerCase().includes('username') && (
+                  <p className="text-[11px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0 text-rose-400" /> Username already taken
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1213,7 +1386,18 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               </div>
               <div>
                 <label className="text-xs font-bold block mb-1">Email Address (Optional)</label>
-                <Input type="email" value={genEmail} onChange={(e) => setGenEmail(e.target.value)} placeholder="e.g. competitor@cbot.gg" />
+                <Input
+                  type="email"
+                  value={genEmail}
+                  onChange={(e) => { setGenCredsError(''); setGenEmail(e.target.value); }}
+                  placeholder="e.g. competitor@cbot.gg"
+                  className={genCredsError.toLowerCase().includes('email') ? 'border-rose-500/70 ring-2 ring-rose-500/20 bg-rose-500/5' : ''}
+                />
+                {genCredsError.toLowerCase().includes('email') && (
+                  <p className="text-[11px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0 text-rose-400" /> Duplicate Email ID detected
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1256,57 +1440,132 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </DialogHeader>
 
         {resetCredsResult ? (
-          <div className="space-y-4 py-2">
-            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-3">
-              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                <span>4-Digit PIN Reset Successfully!</span>
+          resetEmailModalState === 'SUCCESS' ? (
+            <div className="p-6 space-y-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center animate-in fade-in duration-200">
+              <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+              <h3 className="font-extrabold text-base text-emerald-300">New Credentials Emailed!</h3>
+              <p className="text-xs text-muted-foreground">
+                Updated login credentials for <strong className="text-foreground">{resetCredsResult.name}</strong> have been sent to:
+              </p>
+              <div className="p-3 rounded-xl bg-card border border-emerald-500/30 font-mono text-center text-xs font-bold text-emerald-400">
+                ✉️ {sentResetEmailAddress}
               </div>
-              
-              <div className="space-y-1.5 font-mono text-xs bg-black/40 p-3 rounded-lg border border-emerald-500/20">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Player Name:</span>
-                  <span className="font-bold text-foreground">{resetCredsResult.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Username:</span>
-                  <span className="font-bold text-amber-400">@{resetCredsResult.username}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">4-Digit PIN:</span>
-                  <span className="font-bold text-emerald-400 text-sm">{resetCredsResult.pin}</span>
-                </div>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setResetEmailModalState('IDLE')}
+                  className="text-xs font-bold gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back to Reset Details
+                </Button>
               </div>
-
-              <Button
-                type="button"
-                variant="carrom"
-                className="w-full text-xs font-bold flex items-center justify-center gap-2"
-                onClick={() => {
-                  const shareText = `🏆 CBOT Player Login Credentials\nPlayer: ${resetCredsResult.name}\nUsername: ${resetCredsResult.username}\n4-Digit PIN: ${resetCredsResult.pin}\nLogin URL: www.cbotworld.com/login`;
-                  navigator.clipboard.writeText(shareText);
-                  setCopiedResetCreds(true);
-                  setTimeout(() => setCopiedResetCreds(false), 3000);
-                }}
-              >
-                {copiedResetCreds ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-emerald-950" /> Copied Credentials to Clipboard!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" /> Copy Credentials for Player Login
-                  </>
+            </div>
+          ) : resetEmailModalState === 'NO_EMAIL' ? (
+            <div className="p-6 space-y-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center animate-in fade-in duration-200">
+              <AlertCircle className="h-12 w-12 text-amber-400 mx-auto" />
+              <h3 className="font-extrabold text-base text-amber-400">Email Address Needed</h3>
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">{resetCredsResult.name}</strong> does not have an email address added to their profile. Please add an email address to send new PIN & credentials via email.
+              </p>
+              <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-xs text-amber-300 font-medium">
+                ⚠️ Email ID is missing for player @{resetCredsResult.username}.
+              </div>
+              <div className="flex justify-center gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setResetEmailModalState('IDLE')}
+                  className="text-xs font-bold gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                </Button>
+                {targetUser && (
+                  <Button
+                    variant="carrom"
+                    onClick={() => {
+                      setResetEmailModalState('IDLE');
+                      setResetPinModalOpen(false);
+                      handleOpenEditUser(targetUser);
+                    }}
+                    className="text-xs font-bold gap-1.5"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Add Email Now
+                  </Button>
                 )}
-              </Button>
+              </div>
             </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <span>4-Digit PIN Reset Successfully!</span>
+                </div>
+                
+                <div className="space-y-1.5 font-mono text-xs bg-black/40 p-3 rounded-lg border border-emerald-500/20">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Player Name:</span>
+                    <span className="font-bold text-foreground">{resetCredsResult.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Username:</span>
+                    <span className="font-bold text-amber-400">@{resetCredsResult.username}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">4-Digit PIN:</span>
+                    <span className="font-bold text-emerald-400 text-sm">{resetCredsResult.pin}</span>
+                  </div>
+                </div>
 
-            <div className="flex justify-end pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={() => setResetPinModalOpen(false)}>
-                Done
-              </Button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="carrom"
+                    className="w-full text-xs font-bold flex items-center justify-center gap-1.5"
+                    onClick={() => {
+                      const shareText = `🏆 CBOT Player Login Credentials\nPlayer: ${resetCredsResult.name}\nUsername: ${resetCredsResult.username}\n4-Digit PIN: ${resetCredsResult.pin}\nLogin URL: www.cbotworld.com/login`;
+                      navigator.clipboard.writeText(shareText);
+                      setCopiedResetCreds(true);
+                      setTimeout(() => setCopiedResetCreds(false), 3000);
+                    }}
+                  >
+                    {copiedResetCreds ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-950" /> Copied Credentials!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" /> Copy Credentials
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={resetEmailSending}
+                    onClick={handleSendResetToPlayerEmail}
+                    className="w-full text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/20 flex items-center justify-center gap-1.5"
+                  >
+                    {resetEmailSending ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-3.5 w-3.5 text-amber-400" /> Send to Player Email
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setResetPinModalOpen(false)}>
+                  Done
+                </Button>
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <form onSubmit={handleResetPinSubmit} className="space-y-4 py-2">
             <div>

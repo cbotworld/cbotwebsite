@@ -1,3 +1,6 @@
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import OrganizerClient from './OrganizerClient';
 import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@/lib/mock-data';
@@ -5,6 +8,19 @@ import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@
 export const revalidate = 0;
 
 export default async function OrganizerPage() {
+  const session = await getServerSession(authOptions);
+
+  // Require logged-in session for organizer dashboard access
+  if (!session?.user) {
+    redirect('/login?callbackUrl=/dashboard/organizer');
+  }
+
+  const role = (session.user as any)?.role;
+  if (role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+    if (role === 'CAPTAIN') redirect('/dashboard/captain');
+    redirect('/dashboard/player');
+  }
+
   let editions: any[] = [];
   let users: any[] = [];
   let dbTeams: any[] = [];

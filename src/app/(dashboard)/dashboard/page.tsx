@@ -11,6 +11,11 @@ export default function DashboardRedirectPage() {
   React.useEffect(() => {
     if (status === 'loading') return;
 
+    if (status === 'unauthenticated' || !session?.user) {
+      router.replace('/login');
+      return;
+    }
+
     const userRole = (session?.user as any)?.role || 'PLAYER';
 
     if (userRole === 'ORGANIZER' || (userRole as string) === 'SUPER_ADMIN') {

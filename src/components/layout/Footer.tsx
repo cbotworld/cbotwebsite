@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export function Footer() {
   const exploreLinks = [
     { label: 'Tournament Editions', href: '/editions', live: false },
@@ -41,14 +43,22 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* About */}
+          {/* Legal & Policy */}
           <div>
             <h4 className="font-bold text-foreground mb-3 text-xs uppercase tracking-wider text-amber-500">
-              About
+              Legal & Policies
             </h4>
-            <ul className="space-y-2 text-muted-foreground text-xs">
-              <li><a href="#about" className="hover:text-amber-500 transition-colors">About CBOT</a></li>
-              <li><a href="#history" className="hover:text-amber-500 transition-colors">History &amp; Videos</a></li>
+            <ul className="space-y-2 text-muted-foreground text-xs font-semibold">
+              <li>
+                <Link href="/privacy" className="hover:text-amber-400 transition-colors">
+                  🛡️ Privacy Policy & Data Protection
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-amber-400 transition-colors">
+                  📜 Terms & Conditions
+                </Link>
+              </li>
             </ul>
           </div>
 

@@ -10,10 +10,15 @@ export default async function CaptainPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
-    redirect('/login');
+    redirect('/login?callbackUrl=/dashboard/captain');
   }
 
   const sessionUser = session.user as any;
+  const role = sessionUser.role;
+  if (role !== 'CAPTAIN' && role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+    redirect('/dashboard/player');
+  }
+
   const userId = sessionUser.id;
   const username = sessionUser.username;
 

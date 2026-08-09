@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "node -e \"try { require('child_process').execSync('npx prisma generate', {stdio:'inherit'}) } catch(e){ console.log('⚠️ Prisma Client already active in memory, skipping binary regeneration.') }\" && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",

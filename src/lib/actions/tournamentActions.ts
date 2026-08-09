@@ -582,3 +582,74 @@ export async function getEditionBySlug(slug: string) {
     return { success: false, error: 'Failed to fetch edition' };
   }
 }
+
+export async function sendPlayerCredentialsEmailAction(data: {
+  name: string;
+  username: string;
+  pin: string;
+  email: string;
+}) {
+  try {
+    if (!data.email || !data.email.trim()) {
+      return { success: false, error: 'Email address is required.' };
+    }
+
+    const nodemailer = require('nodemailer');
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM || 'noreply@cbotworld.com';
+
+    let transporter;
+    if (smtpHost && smtpUser && smtpPass) {
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else {
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+    }
+
+    const mailOptions = {
+      from: `"CBOT Tournament Director" <${smtpFrom}>`,
+      to: data.email.trim(),
+      subject: `🏆 Your CBOT Tournament Login Credentials — ${data.name}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 550px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #ffffff;">
+          <div style="background: #0f172a; color: #ffffff; padding: 20px; text-align: center;">
+            <h2 style="margin: 0; color: #f59e0b; font-size: 20px;">🏆 CBOT Online Tournaments</h2>
+            <p style="margin: 5px 0 0 0; font-size: 12px; color: #94a3b8;">Official Player Login Credentials</p>
+          </div>
+          <div style="padding: 24px;">
+            <p style="font-size: 14px; color: #334155;">Hello <strong>${data.name}</strong>,</p>
+            <p style="font-size: 13px; color: #475569;">Here are your official login credentials for CBOT online tournaments:</p>
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 20px 0; font-family: monospace;">
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Unique Username:</strong> <span style="color: #d97706;">${data.username}</span></p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>4-Digit Security PIN:</strong> <span style="color: #059669; font-size: 16px; font-weight: bold;">${data.pin}</span></p>
+            </div>
+            <p style="font-size: 12px; color: #64748b;">You can use these credentials to log in at <a href="https://www.cbotworld.com/login" style="color: #f59e0b; font-weight: bold;">www.cbotworld.com/login</a>.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    if (!smtpHost) {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      return { success: true, previewUrl };
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('[sendPlayerCredentialsEmailAction] Error:', error);
+    return { success: false, error: error?.message || 'Failed to send credentials email' };
+  }
+}

@@ -188,15 +188,15 @@ export async function sendLineupEmailAction(data: {
     const mailOptions = {
       from: `"CBOT Tournament" <${smtpFrom}>`,
       to: recipients.join(', '),
-      subject: `🏆 Lineup Submission Update: Day ${data.dayNumber} - ${data.teamName}`,
+      subject: `🏆 Combi Submission Update: Day ${data.dayNumber} - ${data.teamName}`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
           <div style="background-color: #d97706; color: white; padding: 20px; text-align: center;">
-            <h1 style="margin: 0; font-size: 20px; font-weight: 800;">🏆 CBOT Lineup Confirmation</h1>
-            <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Day ${data.dayNumber} Match Lineup Update</p>
+            <h1 style="margin: 0; font-size: 20px; font-weight: 800;">🏆 CBOT Combi Confirmation</h1>
+            <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Day ${data.dayNumber} Match Combi Update</p>
           </div>
           <div style="padding: 24px; color: #1e293b;">
-            <p style="margin-top: 0; font-size: 15px;">A lineup submission was recorded for <strong>Day ${data.dayNumber}</strong> before the 9:30 PM IST deadline.</p>
+            <p style="margin-top: 0; font-size: 15px;">A combi submission was recorded for <strong>Day ${data.dayNumber}</strong> before the 9:30 PM IST deadline.</p>
             
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
               <tr style="border-bottom: 1px solid #f1f5f9;">
@@ -215,7 +215,7 @@ export async function sendLineupEmailAction(data: {
               ` : ''}
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Submission Time</td>
-                <td style="padding: 8px 0; color: #475569; font-family: monospace;">${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</td>
+                <td style="padding: 8px 0; color: #0f172a; font-family: monospace;">${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</td>
               </tr>
             </table>
 
@@ -223,7 +223,7 @@ export async function sendLineupEmailAction(data: {
             ${roundListHtml}
             
             <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
-              This is an official CBOT automated lineup receipt. Captains can modify their daily match lineups anytime up until 9:30 PM IST.
+              This is an official CBOT automated combi receipt. Captains can modify their daily match combis anytime up until 9:30 PM IST.
             </p>
           </div>
         </div>
@@ -234,20 +234,19 @@ export async function sendLineupEmailAction(data: {
     
     if (!smtpHost) {
       const previewUrl = nodemailer.getTestMessageUrl(info);
-      console.log(`[SMTP Test] Lineup update email sent to Ethereal! Preview URL: ${previewUrl}`);
+      console.log(`[SMTP Test] Combi update email sent to Ethereal! Preview URL: ${previewUrl}`);
       return { success: true, previewUrl };
     }
 
     return { success: true };
   } catch (error: any) {
-    console.error('[SMTP] Failed to send lineup email:', error);
+    console.error('[SMTP] Failed to send combi email:', error);
     return { success: false, error: error?.message || 'SMTP delivery failed' };
   }
 }
 
 export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rounds: any[], submittedAt: string) {
   try {
-    // Verify 9:30 PM IST cutoff deadline
     const activeEdition = await prisma.edition.findFirst({
       orderBy: { number: 'desc' },
       select: { dayDates: true }

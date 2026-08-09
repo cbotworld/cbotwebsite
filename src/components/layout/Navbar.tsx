@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { Shield, Users, UserCheck, Menu, X, LayoutDashboard, ChevronDown, LogOut } from 'lucide-react';
+import { Shield, Users, UserCheck, Menu, X, LayoutDashboard, ChevronDown, LogOut, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -12,10 +13,33 @@ import { UserRole } from '@/types';
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [isNavigating, setIsNavigating] = React.useState(false);
+  const [isNavigatingHome, setIsNavigatingHome] = React.useState(false);
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    setIsNavigating(false);
+    setIsNavigatingHome(false);
+    setIsSigningOut(false);
+  }, [pathname]);
+
+  React.useEffect(() => {
+    if (session?.user) {
+      router.prefetch('/dashboard/organizer');
+      router.prefetch('/dashboard/captain');
+      router.prefetch('/dashboard/player');
+    }
+  }, [session, router]);
 
   // Close dropdown on outside click
   React.useEffect(() => {
@@ -39,12 +63,53 @@ export function Navbar() {
     }
   };
 
+  const handleSignOut = async () => {
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
+    setIsSigningOut(true);
+    await signOut({ callbackUrl: '/login' });
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/90 backdrop-blur-md">
+      {/* Whole Screen Centered Loading Overlay via Portal */}
+      {mounted && (isNavigating || isNavigatingHome || isSigningOut) && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-background/90 backdrop-blur-xl flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-150">
+          <div className="relative flex items-center justify-center p-6">
+            <div className="h-44 w-44 sm:h-52 sm:w-52 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin shadow-[0_0_60px_rgba(245,158,11,0.35)]" />
+            <img
+              src="/logo.png"
+              alt="Carrom Balu Official Logo"
+              className="absolute h-32 w-32 sm:h-36 sm:w-36 object-contain drop-shadow-[0_0_35px_rgba(245,158,11,0.85)] animate-pulse"
+            />
+          </div>
+          <div className="space-y-1.5 text-center max-w-sm px-4">
+            <h3 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 bg-clip-text text-transparent tracking-wide">
+              {isSigningOut ? 'Signing Out…' : isNavigatingHome ? 'Loading Home Screen…' : 'Loading Dashboard…'}
+            </h3>
+            <p className="text-xs text-muted-foreground font-semibold">
+              {isSigningOut
+                ? 'Ending your secure CBOT session and redirecting to login'
+                : isNavigatingHome
+                ? 'Connecting to CBOT Arena Home & Active Tournaments'
+                : 'Fetching live tournament statistics, player data, and schedules'}
+            </p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 group shrink-0">
+        <Link
+          href="/"
+          onClick={() => {
+            if (pathname === '/') return;
+            setIsNavigatingHome(true);
+          }}
+          className="flex items-center gap-3 group shrink-0"
+        >
           <img
             src="/logo.png"
             alt="CBOT Logo"
@@ -63,14 +128,25 @@ export function Navbar() {
         {/* Desktop Right Actions */}
         <div className="hidden sm:flex items-center gap-2.5 shrink-0">
           {session?.user && (
-            <Link href={getDashboardHref(userRole)}>
+            <Link
+              href={getDashboardHref(userRole)}
+              onClick={() => {
+                const target = getDashboardHref(userRole);
+                if (pathname === target || pathname.startsWith('/dashboard')) return;
+                setIsNavigating(true);
+              }}
+            >
               <Button
                 variant="outline"
                 size="sm"
                 className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 rounded-full gap-1.5 text-xs font-bold px-3 h-8"
               >
-                <LayoutDashboard className="h-3.5 w-3.5 text-amber-500" />
-                Dashboard
+                {isNavigating ? (
+                  <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" />
+                ) : (
+                  <LayoutDashboard className="h-3.5 w-3.5 text-amber-500" />
+                )}
+                {isNavigating ? 'Loading…' : 'Dashboard'}
               </Button>
             </Link>
           )}
@@ -109,13 +185,19 @@ export function Navbar() {
                   </div>
                   <Link
                     href={getDashboardHref(userRole)}
-                    onClick={() => setUserMenuOpen(false)}
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      const target = getDashboardHref(userRole);
+                      if (pathname === target || pathname.startsWith('/dashboard')) return;
+                      setIsNavigating(true);
+                    }}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold hover:bg-muted transition-colors"
                   >
-                    <LayoutDashboard className="h-3.5 w-3.5 text-amber-500" /> My Dashboard
+                    {isNavigating ? <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" /> : <LayoutDashboard className="h-3.5 w-3.5 text-amber-500" />}
+                    {isNavigating ? 'Loading Dashboard…' : 'My Dashboard'}
                   </Link>
                   <button
-                    onClick={() => { setUserMenuOpen(false); signOut({ callbackUrl: '/' }); }}
+                    onClick={handleSignOut}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors"
                   >
                     <LogOut className="h-3.5 w-3.5" /> Sign Out
@@ -170,7 +252,7 @@ export function Navbar() {
             {session?.user ? (
               <Button
                 variant="outline"
-                onClick={() => { setMobileMenuOpen(false); signOut({ callbackUrl: '/' }); }}
+                onClick={handleSignOut}
                 className="col-span-2 justify-center text-xs font-semibold"
               >
                 Sign Out

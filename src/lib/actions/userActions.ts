@@ -38,13 +38,44 @@ export async function generateUserCredentials(data: {
   const hashedPin = await bcrypt.hash(pin, 10);
 
   try {
+    // 1. Check if email already exists for another player
+    if (data.email && data.email.trim()) {
+      const cleanEmail = data.email.trim().toLowerCase();
+      const existingEmailUser = await prisma.user.findFirst({
+        where: {
+          email: { equals: cleanEmail, mode: 'insensitive' }
+        }
+      });
+
+      if (existingEmailUser) {
+        return {
+          success: false,
+          error: `This email address (${data.email.trim()}) already exists for player @${existingEmailUser.username} (${existingEmailUser.name}). Please enter another email address.`
+        };
+      }
+    }
+
+    // 2. Check if username already exists for another player
+    const existingUsernameUser = await prisma.user.findFirst({
+      where: {
+        username: { equals: finalUsername, mode: 'insensitive' }
+      }
+    });
+
+    if (existingUsernameUser) {
+      return {
+        success: false,
+        error: `The username @${finalUsername} already exists for player ${existingUsernameUser.name}. Please enter a different custom username or leave it blank to auto-generate.`
+      };
+    }
+
     const newUser = await prisma.user.create({
       data: {
         username: finalUsername,
         pin: hashedPin,
         isActivated: true,
         name: data.name,
-        email: data.email || `${finalUsername}@cbot.gg`,
+        email: data.email ? data.email.trim() : `${finalUsername}@cbot.gg`,
         role: data.role || 'PLAYER',
         average: data.average || 0.0,
         target: data.target || 0,
@@ -64,14 +95,16 @@ export async function generateUserCredentials(data: {
       credentials: {
         username: finalUsername,
         pin, // Return plaintext just once for the organizer to copy
-        name: data.name,
+        name: newUser.name || data.name || 'Player',
         average: data.average,
         target: data.target,
+        email: newUser.email || undefined,
         user: { ...newUser, pin: undefined }, // hide hash in response
       },
     };
-  } catch (error) {
-    return { success: false, error: 'Failed to generate credentials' };
+  } catch (error: any) {
+    console.error('Error generating user credentials:', error);
+    return { success: false, error: error?.message || 'Failed to generate credentials in database' };
   }
 }
 
@@ -87,6 +120,23 @@ export async function updatePlayerProfileDetails(userId: string, data: {
 }) {
   try {
     const cleanUsername = (data.username || '').toLowerCase();
+    
+    // Check if email conflicts with another user
+    if (data.email && data.email.trim()) {
+      const cleanEmail = data.email.trim().toLowerCase();
+      const duplicateEmailUser = await prisma.user.findFirst({
+        where: {
+          email: { equals: cleanEmail, mode: 'insensitive' },
+          NOT: { id: userId }
+        }
+      });
+      if (duplicateEmailUser && duplicateEmailUser.username.toLowerCase() !== cleanUsername) {
+        return {
+          success: false,
+          error: `This email address (${data.email.trim()}) is already assigned to player @${duplicateEmailUser.username} (${duplicateEmailUser.name}). Please enter another email address.`
+        };
+      }
+    }
     
     // Find existing user by ID or Username
     const existing = await prisma.user.findFirst({

@@ -11,7 +11,7 @@ export default async function PlayerPage() {
 
   // If not logged in, redirect to login
   if (!session?.user) {
-    redirect('/login');
+    redirect('/login?callbackUrl=/dashboard/player');
   }
 
   const sessionUser = session.user as any;
