@@ -259,73 +259,62 @@ export default function HomeClient({
             </div>
           </div>
 
-          {/* Two-sponsor grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Three-sponsor grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* ── Neelamani Foundation ── */}
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setSponsorModalOpen(true)}
-              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
+              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
             >
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-amber-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
-
-              <div className="relative flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left z-10">
-                <div className="relative shrink-0">
-                  <div className="h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform">
-                    <img
-                      src="/sponsors/neelamani-logo.jpg"
-                      alt="Neelamani Foundation Official Logo"
-                      className="w-full h-full object-contain rounded-full drop-shadow-md"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2 flex-1">
-                  <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-amber-400 transition-colors">
-                    Neelamani Foundation
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed italic">
-                    "Preserving our spiritual heritage, nurturing sports talent, healthcare, &amp; education for a better tomorrow."
-                  </p>
-                  <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-amber-400 group-hover:text-amber-300">
-                    <span>📜 Click to View Official Poster</span>
-                    <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
+              <div className="relative z-10 flex items-center justify-center p-2">
+                <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform flex items-center justify-center">
+                  <img
+                    src="/sponsors/neelamani-logo.jpg"
+                    alt="Neelamani Foundation Logo"
+                    className="w-full h-full object-contain rounded-full drop-shadow-md"
+                  />
                 </div>
               </div>
             </motion.div>
 
             {/* ── SISCAA ── */}
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => window.open('https://siscaasports.com/', '_blank', 'noopener,noreferrer')}
-              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-sky-500/40 hover:border-sky-400 shadow-2xl shadow-sky-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
+              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-sky-500/40 hover:border-sky-400 shadow-2xl shadow-sky-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
             >
               <div className="absolute -inset-1 bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-sky-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
-
-              <div className="relative flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left z-10">
-                <div className="relative shrink-0">
-                  <div className="h-20 w-36 sm:h-24 sm:w-44 rounded-xl border-2 border-sky-400/50 p-3 bg-black shadow-xl shadow-sky-500/20 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
-                    <img
-                      src="/sponsors/siscaa-logo.png"
-                      alt="SISCAA Official Logo"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
+              <div className="relative z-10 flex items-center justify-center p-2">
+                <div className="h-24 w-44 sm:h-28 sm:w-52 rounded-2xl border-2 border-sky-400/50 p-3 bg-black shadow-xl shadow-sky-500/20 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
+                  <img
+                    src="/sponsors/siscaa-logo.png"
+                    alt="SISCAA Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
-                <div className="space-y-2 flex-1">
-                  <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-sky-400 transition-colors">
-                    SISCAA
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed italic">
-                    "Championing carrom excellence — a proud partner in growing the sport at every level."
-                  </p>
-                  <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-sky-400 group-hover:text-sky-300">
-                    <span>🌐 Click here to redirect to website</span>
-                    <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
+              </div>
+            </motion.div>
+
+            {/* ── SYNCO ── */}
+            <motion.div
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => window.open('https://syncoshop.com/', '_blank', 'noopener,noreferrer')}
+              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-rose-500/40 hover:border-rose-400 shadow-2xl shadow-rose-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-rose-500/20 via-amber-500/20 to-rose-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
+              <div className="relative z-10 flex items-center justify-center p-2">
+                <div className="h-24 w-44 sm:h-28 sm:w-52 rounded-2xl border-2 border-rose-400/50 p-3 bg-white shadow-xl shadow-rose-500/20 group-hover:scale-105 group-hover:border-rose-400 transition-all duration-300 flex items-center justify-center">
+                  <img
+                    src="/sponsors/synco-logo.png"
+                    alt="SYNCO Logo"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               </div>
             </motion.div>
