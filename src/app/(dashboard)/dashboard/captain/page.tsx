@@ -41,7 +41,10 @@ export default async function CaptainPage() {
         },
       },
     }),
-    prisma.user.findMany({ orderBy: { name: 'asc' } }),
+    prisma.user.findMany({ 
+      select: { id: true, name: true, username: true, role: true, rating: true, average: true, target: true },
+      orderBy: { name: 'asc' } 
+    }),
   ]);
 
   // Build ordered round format list

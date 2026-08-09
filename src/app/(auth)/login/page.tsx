@@ -20,11 +20,8 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     setMounted(true);
-    // Prefetch home screen & dashboards in background to eliminate route transit latency
+    // Only prefetch public routes. Prefetching protected routes before auth caches the redirect.
     router.prefetch('/');
-    router.prefetch('/dashboard/organizer');
-    router.prefetch('/dashboard/captain');
-    router.prefetch('/dashboard/player');
   }, [router]);
 
   const executeLogin = async (e: React.FormEvent) => {
