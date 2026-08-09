@@ -35,7 +35,7 @@ export default function LoginPage() {
     const cleanInput = username.trim().toLowerCase();
     
     // Pre-calculate target route for instant transit without extra fetch latency
-    let targetRoute = '/dashboard';
+    let targetRoute = '/dashboard/captain';
     if (['balumaster', 'carrombalu', 'balu', 'carrom_balu'].includes(cleanInput)) {
       targetRoute = '/dashboard/organizer';
     }
