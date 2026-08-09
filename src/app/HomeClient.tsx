@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Crown, Film, ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react';
+import { Crown, Film, ChevronLeft, ChevronRight, PlayCircle, Sparkles, Heart, ShieldCheck, Mail, X, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getTeamPosterUrl } from '@/lib/supabase';
 
 const fadeUp = {
@@ -61,6 +62,7 @@ export default function HomeClient({
   ];
 
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
+  const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
   const activeVideo = legacyVideos[activeVideoIndex];
 
   const prevIndex = (activeVideoIndex - 1 + legacyVideos.length) % legacyVideos.length;
@@ -102,7 +104,7 @@ export default function HomeClient({
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-500 backdrop-blur-md">
                 <Crown className="h-4 w-4 text-amber-400" />
-                <span>Celebrating 200th Edition Since August 2020</span>
+                <span>Celebrating 200th Edition</span>
               </div>
 
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
@@ -221,6 +223,65 @@ export default function HomeClient({
           </div>
         );
       })()}
+
+      {/* OFFICIAL ELITE SPONSOR SECTION */}
+      <section id="sponsors" className="py-16 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent relative border-y border-emerald-500/20">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center space-y-8">
+          <div className="space-y-3">
+            <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
+              💎 Official Elite Sponsor
+            </Badge>
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-500 bg-clip-text text-transparent">
+              Neelamani Foundation
+            </h2>
+            <p className="text-muted-foreground text-sm max-w-2xl mx-auto font-medium">
+              Supporting communities through healthcare, education, &amp; cultural empowerment. Official Title Sponsor of CBOT 200th Edition.
+            </p>
+          </div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setSponsorModalOpen(true)}
+            className="group relative max-w-2xl mx-auto rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden"
+          >
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-amber-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
+
+            <div className="relative flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left z-10">
+              <div className="relative shrink-0">
+                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform">
+                  <img
+                    src="/sponsors/neelamani-logo.jpg"
+                    alt="Neelamani Foundation Official Logo"
+                    className="w-full h-full object-contain rounded-full drop-shadow-md"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2.5 flex-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                    Serve With Love · Chennai
+                  </span>
+                  <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-3 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                    <Heart className="h-3 w-3 text-amber-400 fill-amber-400 inline" /> Special thank you to Muthu Kumar sir
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-foreground group-hover:text-amber-400 transition-colors">
+                  Neelamani Foundation
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed italic">
+                  "Preserving our spiritual heritage, nurturing sports talent, healthcare, &amp; education for a better tomorrow."
+                </p>
+                <div className="pt-1 flex items-center justify-center sm:justify-start gap-2 text-xs font-extrabold text-amber-400 group-hover:text-amber-300">
+                  <span>📜 Click Logo to View Official Foundation Directives &amp; Poster</span>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
       {/* HISTORY & 3D VIDEO CAROUSEL EMBED */}
       <Section id="history">
@@ -348,6 +409,29 @@ export default function HomeClient({
           </motion.div>
         </div>
       </Section>
+
+      {/* NEELAMANI FOUNDATION OFFICIAL POSTER POPUP MODAL */}
+      <Dialog open={sponsorModalOpen} onOpenChange={setSponsorModalOpen}>
+        <div className="relative flex flex-col max-h-[92vh] overflow-hidden -mx-6 -my-6 bg-black text-foreground rounded-2xl border border-border/40 shadow-2xl">
+          {/* Floating Close Button */}
+          <button
+            onClick={() => setSponsorModalOpen(false)}
+            className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/80 hover:bg-black text-white/80 hover:text-white border border-white/20 transition-all backdrop-blur-md cursor-pointer"
+            title="Close Poster"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          {/* Full poster image only */}
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4 flex items-center justify-center">
+            <img
+              src="/sponsors/neelamani-poster.jpg"
+              alt="Neelamani Foundation Official Sponsor Poster"
+              className="w-full max-w-2xl h-auto object-contain max-h-[85vh] rounded-xl shadow-2xl"
+            />
+          </div>
+        </div>
+      </Dialog>
 
     </div>
   );

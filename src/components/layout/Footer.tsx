@@ -43,23 +43,26 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Legal & Policy */}
-          <div>
-            <h4 className="font-bold text-foreground mb-3 text-xs uppercase tracking-wider text-amber-500">
-              Legal & Policies
+          {/* Founder & Tournament Governance */}
+          <div className="space-y-3">
+            <h4 className="font-bold text-foreground text-xs uppercase tracking-wider text-amber-500">
+              Tournament Governance
             </h4>
-            <ul className="space-y-2 text-muted-foreground text-xs font-semibold">
-              <li>
-                <Link href="/privacy" className="hover:text-amber-400 transition-colors">
-                  🛡️ Privacy Policy & Data Protection
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="hover:text-amber-400 transition-colors">
-                  📜 Terms & Conditions
-                </Link>
-              </li>
-            </ul>
+            <p className="text-muted-foreground text-xs leading-relaxed max-w-sm font-semibold">
+              Official CBOT tournaments are founded and governed by founder <strong>Carrom Balu</strong> under strict grounds of sportsmanship, transparency, and fair play.
+            </p>
+            <div className="pt-1">
+              <a
+                href="/#sponsors"
+                className="inline-flex items-center gap-2 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-400 transition-all text-xs font-bold text-emerald-400 group"
+              >
+                <img src="/sponsors/neelamani-logo.jpg" alt="Neelamani Foundation" className="h-7 w-7 rounded-full object-contain border border-emerald-500/50" />
+                <div>
+                  <div className="text-[10px] text-amber-400 font-extrabold uppercase leading-tight">Official Elite Sponsor</div>
+                  <div className="group-hover:underline">Neelamani Foundation</div>
+                </div>
+              </a>
+            </div>
           </div>
 
         </div>

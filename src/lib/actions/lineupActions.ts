@@ -180,9 +180,14 @@ export async function sendLineupEmailAction(data: {
       )
       .join('');
 
-    const recipients = ['CBOTWORLD@GMAIL.COM'];
+    const recipients: string[] = [];
     if (data.captainEmail && data.captainEmail.trim()) {
       recipients.push(data.captainEmail.trim());
+    }
+
+    if (recipients.length === 0) {
+      console.log('[SMTP] No captain email provided for individual receipt. Skipping pre-cutoff email.');
+      return { success: true, skipped: true };
     }
 
     const mailOptions = {
@@ -215,11 +220,11 @@ export async function sendLineupEmailAction(data: {
               ` : ''}
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Submission Time</td>
-                <td style="padding: 8px 0; color: #0f172a; font-family: monospace;">${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</td>
+                <td style="padding: 8px 0; color: #0f172a; font-family: monospace;">${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })} IST</td>
               </tr>
             </table>
 
-            <h3 style="color: #0f172a; font-size: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 24px;">Rounds Configuration</h3>
+            <h3 style="color: #0f172a; font-size: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-top: 24px;">Combi Configuration</h3>
             ${roundListHtml}
             
             <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 15px;">

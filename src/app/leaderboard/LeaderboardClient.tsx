@@ -60,9 +60,16 @@ export default function LeaderboardClient({ players, teams }: { players: any[], 
             >
               <option value="Global">Global Rankings</option>
               <option value="India">India</option>
-              <option value="USA">USA</option>
-              <option value="UK">UK</option>
               <option value="UAE">UAE</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Malaysia">Malaysia</option>
+              <option value="Sri Lanka">Sri Lanka</option>
+              <option value="USA">USA</option>
+              <option value="Maldives">Maldives</option>
+              <option value="Canada">Canada</option>
+              <option value="UK">UK</option>
+              <option value="Italy">Italy</option>
+              <option value="France">France</option>
             </select>
           </div>
           <Button onClick={handleDownload} disabled={isDownloading} variant="outline" className="font-bold border-amber-500/30 text-amber-500">

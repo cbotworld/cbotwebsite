@@ -2,6 +2,7 @@
 
 const COUNTRIES = [
   { name: 'India',     code: 'in' },
+  { name: 'UAE',       code: 'ae' },
   { name: 'Singapore', code: 'sg' },
   { name: 'Malaysia',  code: 'my' },
   { name: 'Sri Lanka', code: 'lk' },

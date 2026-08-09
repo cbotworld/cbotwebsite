@@ -279,7 +279,7 @@ export default function CaptainClient({
       {/* KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="p-4 border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-[10px] font-bold text-emerald-500 uppercase">Participants</div>
+          <div className="text-[10px] font-bold text-emerald-500 uppercase">Total Team Members</div>
           <div className="text-3xl font-black text-foreground mt-1">{teamMembers.length}</div>
         </Card>
         <Card className="p-4 border-blue-500/30 bg-blue-500/5">
@@ -291,72 +291,34 @@ export default function CaptainClient({
       {/* SECTION 1: PARTICIPANTS */}
       <Card className="border-amber-500/30">
         <CardHeader className="border-b border-border pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Crown className="h-5 w-5 text-amber-500" /> Participants &amp; Competitors Directory
-            </CardTitle>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setRosterViewMode('MY_TEAM')}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${rosterViewMode === 'MY_TEAM' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                My Team
-              </button>
-              <button
-                onClick={() => setRosterViewMode('ALL_TEAMS')}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${rosterViewMode === 'ALL_TEAMS' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                All Teams
-              </button>
-            </div>
-          </div>
+          <CardTitle className="text-xl font-bold flex items-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" /> My Team
+          </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">View your team members for this edition.</p>
         </CardHeader>
 
         <CardContent className="p-6">
-          {rosterViewMode === 'MY_TEAM' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teamMembers.map((member: any) => (
-                <div key={member.id} className="p-4 rounded-xl bg-card border border-amber-500/20 hover:border-amber-500/50 transition-all flex items-center gap-3 text-xs shadow-sm">
-                  <Avatar src={member.image} fallback={member.name} size="sm" />
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-foreground">{member.name}</span>
-                      {member.id === currentTeam?.captainId && (
-                        <Badge variant="carrom" className="text-[9px]">CAPTAIN</Badge>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">@{member.username}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {teamMembers.map((member: any) => (
+              <div key={member.id} className="p-4 rounded-xl bg-card border border-amber-500/20 hover:border-amber-500/50 transition-all flex items-center gap-3 text-xs shadow-sm">
+                <Avatar src={member.image} fallback={member.name} size="sm" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-foreground">{member.name}</span>
+                    {member.id === currentTeam?.captainId && (
+                      <Badge variant="carrom" className="text-[9px]">CAPTAIN</Badge>
+                    )}
                   </div>
+                  <span className="text-[10px] text-muted-foreground font-mono">@{member.username}</span>
                 </div>
-              ))}
-              {teamMembers.length === 0 && (
-                <div className="col-span-3 text-center py-8 text-muted-foreground text-xs">
-                  No team members found for this edition.
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {allTeams.map((team: any) => (
-                <div key={team.id} className="p-4 rounded-xl bg-card border border-border hover:border-amber-500/30 transition-all space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-8 w-8 rounded-full bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center border border-amber-500/30">
-                      {(team.tag || 'CB').slice(0, 2)}
-                    </span>
-                    <div>
-                      <div className="text-xs font-bold text-foreground">{team.name}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">{team.tag}</div>
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
-                    <Crown className="h-3 w-3" />
-                    {team.captain?.name || 'No captain assigned'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+            {teamMembers.length === 0 && (
+              <div className="col-span-3 text-center py-8 text-muted-foreground text-xs">
+                No team members found for this edition.
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -369,7 +331,7 @@ export default function CaptainClient({
                 <Calendar className="h-5 w-5 text-amber-500" /> Day 1 to Day {totalEventDays} Combi Submission
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Select your {roundsPerDay} player combis per day before <strong className="text-rose-400">9:30 PM IST</strong>.
+                Select your combi for {roundsPerDay} events per day before <strong className="text-rose-400">9:30 PM IST</strong>.
               </CardDescription>
             </div>
             <Badge variant="carrom" className="font-bold text-xs px-3 py-1 self-start sm:self-auto">
@@ -534,11 +496,10 @@ export default function CaptainClient({
           {/* STICKY HEADER */}
           <div className="px-6 pt-6 pb-4 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-20 flex flex-col space-y-1.5 text-left pr-12">
             <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
-              <Send className="h-5 w-5 text-amber-500" /> Day {selectedDayNumber} Combi {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime()) ? `(${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})` : ''} — {roundsPerDay} Rounds
+              <Send className="h-5 w-5 text-amber-500" /> Day {selectedDayNumber} Combi {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime()) ? `(${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})` : ''} — {roundsPerDay} events
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              <strong className="text-violet-400">{roundsPerDay} Rounds per Day</strong>
-              &nbsp;·&nbsp; Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
+              Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
             </p>
           </div>
 
@@ -546,14 +507,14 @@ export default function CaptainClient({
             <div className="p-8 text-center space-y-4 bg-emerald-500/10 border-b border-emerald-500/20">
               <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto animate-bounce" />
               <h3 className="font-extrabold text-base text-foreground">Day {selectedDayNumber} Combi Saved!</h3>
-              <p className="text-xs text-muted-foreground">{roundsPerDay} rounds recorded before the 9:30 PM IST deadline.</p>
+              <p className="text-xs text-muted-foreground">{roundsPerDay} combis recorded before the 9:30 PM IST deadline.</p>
               {captainEmail ? (
                 <p className="text-xs text-muted-foreground">
-                  A confirmation email with your submitted details has been sent to <span className="text-amber-400 font-semibold">{captainEmail}</span> and the CBOT organizers.
+                  A confirmation receipt with your submitted details has been sent to <span className="text-amber-400 font-semibold">{captainEmail}</span>.
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  A confirmation email has been sent to your inbox and the CBOT organizers.
+                  Your combi has been saved securely. All team combis remain confidential until the 9:30 PM IST cutoff.
                 </p>
               )}
               {emailPreviewUrl && (
@@ -573,15 +534,10 @@ export default function CaptainClient({
             <form onSubmit={handleSaveDayLineup} className="flex-1 flex flex-col overflow-hidden min-h-0">
               {/* SCROLLABLE INNER SECTION */}
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-amber-500/20 hover:scrollbar-thumb-amber-500/40 scrollbar-track-transparent">
-                {isDayLocked(selectedDayNumber, dayDatesMap) ? (
+                {isDayLocked(selectedDayNumber, dayDatesMap) && (
                   <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-500/10 text-xs font-bold text-rose-400 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>🔒 Submissions for Day {selectedDayNumber} closed at 9:30 PM IST. This combi is locked and read-only.</span>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs font-bold flex items-center justify-between">
-                    <span>{roundsPerDay} Rounds — Formats set by Organiser</span>
-                    <Badge variant="destructive" className="text-[10px]">Deadline: 9:30 PM IST</Badge>
                   </div>
                 )}
 
@@ -710,7 +666,7 @@ export default function CaptainClient({
                       return hasEmpty || hasDuplicates;
                     })()}
                   >
-                    {isSubmitting ? 'Saving...' : `Save Day ${selectedDayNumber} (${roundsPerDay} Rounds)`}
+                    {isSubmitting ? 'Saving...' : `Save Day ${selectedDayNumber} (${roundsPerDay} Combis)`}
                   </Button>
                 )}
               </div>
