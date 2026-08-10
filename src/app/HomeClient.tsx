@@ -261,61 +261,67 @@ export default function HomeClient({
           </div>
 
           {/* Three-sponsor grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-center">
 
-            {/* ── Neelamani Foundation ── */}
+            {/* 1. ── Neelamani Foundation (Left Corner) ── */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setSponsorModalOpen(true)}
-              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-emerald-500/40 hover:border-emerald-400 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
+              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
             >
-              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-amber-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
-              <div className="relative z-10 flex items-center justify-center p-2">
-                <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-xl group-hover:scale-105 transition-transform flex items-center justify-center">
+              <div className="flex flex-col items-center justify-center gap-4 w-full">
+                <div className="h-36 w-36 sm:h-40 sm:w-40 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-2xl shadow-emerald-500/30 group-hover:scale-105 group-hover:border-emerald-400 transition-all duration-300 flex items-center justify-center">
                   <img
                     src="/sponsors/neelamani-logo.jpg"
                     alt="Neelamani Foundation Logo"
                     className="w-full h-full object-contain rounded-full drop-shadow-md"
                   />
                 </div>
+                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-emerald-500/40 text-center shadow-lg group-hover:border-emerald-400 transition-colors">
+                  <span className="text-sm sm:text-base font-extrabold text-emerald-400 tracking-wide">Neelamani Foundation</span>
+                </div>
               </div>
             </motion.div>
 
-            {/* ── SISCAA ── */}
+            {/* 2. ── SYNCO (Center) ── */}
             <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => window.open('https://siscaasports.com/', '_blank', 'noopener,noreferrer')}
-              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-sky-500/40 hover:border-sky-400 shadow-2xl shadow-sky-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.open('https://syncoshop.com/', '_blank', 'noopener,noreferrer')}
+              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
             >
-              <div className="absolute -inset-1 bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-sky-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
-              <div className="relative z-10 flex items-center justify-center p-2">
-                <div className="h-24 w-44 sm:h-28 sm:w-52 rounded-2xl border-2 border-sky-400/50 p-3 bg-black shadow-xl shadow-sky-500/20 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
+              <div className="flex flex-col items-center justify-center gap-4 w-full">
+                <div className="h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 border-rose-400/50 p-3 bg-white shadow-2xl shadow-rose-500/30 group-hover:scale-105 group-hover:border-rose-400 transition-all duration-300 flex items-center justify-center">
+                  <img
+                    src="/sponsors/synco-logo.png"
+                    alt="SYNCO Logo"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-rose-500/40 text-center shadow-lg group-hover:border-rose-400 transition-colors">
+                  <span className="text-sm sm:text-base font-extrabold text-rose-400 tracking-wide">SYNCO Sports</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 3. ── SISCAA (Right Corner) ── */}
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.open('https://siscaasports.com/', '_blank', 'noopener,noreferrer')}
+              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
+            >
+              <div className="flex flex-col items-center justify-center gap-4 w-full">
+                <div className="h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 border-sky-400/50 p-3 bg-black shadow-2xl shadow-sky-500/30 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
                   <img
                     src="/sponsors/siscaa-logo.png"
                     alt="SISCAA Logo"
                     className="w-full h-full object-contain"
                   />
                 </div>
-              </div>
-            </motion.div>
-
-            {/* ── SYNCO ── */}
-            <motion.div
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => window.open('https://syncoshop.com/', '_blank', 'noopener,noreferrer')}
-              className="group relative rounded-3xl p-6 sm:p-8 bg-card/80 border-2 border-rose-500/40 hover:border-rose-400 shadow-2xl shadow-rose-500/20 backdrop-blur-xl cursor-pointer transition-all duration-300 overflow-hidden flex items-center justify-center min-h-[160px]"
-            >
-              <div className="absolute -inset-1 bg-gradient-to-r from-rose-500/20 via-amber-500/20 to-rose-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-60 transition-opacity" />
-              <div className="relative z-10 flex items-center justify-center p-2">
-                <div className="h-24 w-44 sm:h-28 sm:w-52 rounded-2xl border-2 border-rose-400/50 p-3 bg-white shadow-xl shadow-rose-500/20 group-hover:scale-105 group-hover:border-rose-400 transition-all duration-300 flex items-center justify-center">
-                  <img
-                    src="/sponsors/synco-logo.png"
-                    alt="SYNCO Logo"
-                    className="w-full h-full object-contain"
-                  />
+                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-sky-500/40 text-center shadow-lg group-hover:border-sky-400 transition-colors">
+                  <span className="text-sm sm:text-base font-extrabold text-sky-400 tracking-wide">SISCAA Carrom</span>
                 </div>
               </div>
             </motion.div>
@@ -334,9 +340,13 @@ export default function HomeClient({
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent">
               360° Support to CBOT
             </h2>
+            <p className="text-sm sm:text-base font-semibold text-emerald-400/80 max-w-lg mx-auto">
+              Thank you for your incredible 360-degree support to the CBOT community.
+            </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-10 sm:gap-20">
+            {/* Srikranthi */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -352,9 +362,29 @@ export default function HomeClient({
                 </div>
                 <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-emerald-400/20 via-teal-400/15 to-emerald-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
               </div>
-              <div className="text-center space-y-1.5 mt-2">
+              <div className="text-center mt-1">
                 <h3 className="text-xl sm:text-2xl font-black text-emerald-400 leading-tight group-hover:text-emerald-300 transition-colors">Srikranthi</h3>
-                <p className="text-sm font-semibold text-emerald-400/70 max-w-sm mx-auto">Thank you for your incredible 360-degree support to the CBOT community.</p>
+              </div>
+            </motion.div>
+
+            {/* AK Chari */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="flex flex-col items-center gap-4 group"
+            >
+              <div className="relative">
+                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-teal-500/50 bg-gradient-to-br from-teal-500/20 via-emerald-500/10 to-teal-600/20 flex items-center justify-center shadow-2xl shadow-teal-500/20 group-hover:scale-110 group-hover:border-teal-400 group-hover:shadow-teal-400/30 transition-all duration-500">
+                  <span className="text-4xl sm:text-5xl font-black bg-gradient-to-br from-teal-300 via-emerald-400 to-teal-500 bg-clip-text text-transparent select-none tracking-wide">
+                    AK
+                  </span>
+                </div>
+                <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-teal-400/20 via-emerald-400/15 to-teal-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
+              </div>
+              <div className="text-center mt-1">
+                <h3 className="text-xl sm:text-2xl font-black text-teal-400 leading-tight group-hover:text-teal-300 transition-colors">AK Chari</h3>
               </div>
             </motion.div>
           </div>

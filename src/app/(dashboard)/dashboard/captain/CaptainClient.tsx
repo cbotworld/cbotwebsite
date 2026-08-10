@@ -229,25 +229,14 @@ export default function CaptainClient({
       },
     }));
 
-    // Trigger email send
-    const res = await sendLineupEmailAction({
-      teamName,
-      captainName,
-      captainEmail,
-      dayNumber: selectedDayNumber,
-      rounds,
-    });
-
-    if (res && res.success && res.previewUrl) {
-      setEmailPreviewUrl(res.previewUrl);
-    }
-
+    // Individual email sending disabled per requirements.
+    // Consolidated email at 9:45 PM IST will cover all combis.
     setLineupSubmittedSuccess(true);
     setTimeout(() => {
       setDayLineupModalOpen(false);
       setLineupSubmittedSuccess(false);
       setEmailPreviewUrl(null);
-    }, 5000);
+    }, 3000);
     setIsSubmitting(false);
   };
 
