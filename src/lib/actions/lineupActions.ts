@@ -322,11 +322,14 @@ export async function sendFinalDailyLineupSummaryAction(dayNumber: number) {
     });
 
     let teamSummariesHtml = '';
-    const recipientEmails: string[] = ['CBOTWORLD@GMAIL.COM'];
+    const recipientEmails: string[] = ['cbotworld@gmail.com'];
 
     for (const team of teams) {
-      if (team.captain?.email && !recipientEmails.includes(team.captain.email)) {
-        recipientEmails.push(team.captain.email);
+      if (team.captain?.email) {
+        const cleanEmail = team.captain.email.trim().toLowerCase();
+        if (cleanEmail && !recipientEmails.includes(cleanEmail)) {
+          recipientEmails.push(cleanEmail);
+        }
       }
 
       let roundsHtml = '<p style="color: #94a3b8; font-style: italic;">No combi submitted before 9:30 PM IST cutoff.</p>';
