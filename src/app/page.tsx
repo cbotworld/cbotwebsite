@@ -79,6 +79,9 @@ export default async function HomePage() {
           bannerImage: currentEdition.bannerImage ?? null,
           posterUrl: currentEdition.posterUrl ?? null,
           number: currentEdition.number,
+          tournamentStartDate: currentEdition.tournamentStartDate ? currentEdition.tournamentStartDate.toISOString() : null,
+          dayDates: currentEdition.dayDates ?? null,
+          totalDays: currentEdition.totalDays ?? 15,
         } : null}
       />
     );

@@ -893,7 +893,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 {totalDays} Days Event
               </Badge>
               <Badge variant="carrom" className="font-extrabold text-xs px-3 py-1">
-                {roundCount} Combis / Day
+                {roundCount} Events / Day
               </Badge>
             </div>
           </div>
@@ -940,16 +940,16 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               </div>
 
               <div>
-                <label className="text-xs font-bold block mb-1">Combis per Day</label>
+                <label className="text-xs font-bold block mb-1">Events per Day</label>
                 <Select value={roundCount.toString()} onChange={(e: any) => handleRoundCountChange(parseInt(e.target.value, 10))} className="text-xs font-bold">
-                  <option value="3">3 Combis / Day</option>
-                  <option value="4">4 Combis / Day</option>
-                  <option value="5">5 Combis / Day</option>
-                  <option value="6">6 Combis / Day</option>
-                  <option value="7">7 Combis / Day</option>
-                  <option value="8">8 Combis / Day</option>
-                  <option value="9">9 Combis / Day</option>
-                  <option value="10">10 Combis / Day</option>
+                  <option value="3">3 Events / Day</option>
+                  <option value="4">4 Events / Day</option>
+                  <option value="5">5 Events / Day</option>
+                  <option value="6">6 Events / Day</option>
+                  <option value="7">7 Events / Day</option>
+                  <option value="8">8 Events / Day</option>
+                  <option value="9">9 Events / Day</option>
+                  <option value="10">10 Events / Day</option>
                 </Select>
               </div>
             </div>
@@ -969,7 +969,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-extrabold text-foreground">Day {dayNum}</span>
                       <span className="text-[9.5px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                        {roundCount} Combis
+                        {roundCount} Events
                       </span>
                     </div>
                     <Input
@@ -989,7 +989,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-1 border-b border-border/40">
                 <span className="text-xs font-black text-amber-500 flex items-center gap-1.5 uppercase tracking-wider">
-                  👑 Per-Combi Match Formats ({roundCount} Combis)
+                  👑 Per-Event Match Formats ({roundCount} Events)
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -997,7 +997,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   <div key={idx} className="bg-card p-4 rounded-xl border border-border shadow-md space-y-3">
                     <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
                       <span className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                        👑 Combi {idx + 1}
+                        👑 Event {idx + 1}
                       </span>
                       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
                         Stage {idx + 1}
@@ -1029,7 +1029,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
             <div className="flex justify-end pt-2">
               <Button type="submit" variant="carrom" className="font-bold text-xs" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving Configuration...' : 'Save Schedule & Combis Configuration'}
+                {isSubmitting ? 'Saving Configuration...' : 'Save Schedule & Events Configuration'}
               </Button>
             </div>
           </form>

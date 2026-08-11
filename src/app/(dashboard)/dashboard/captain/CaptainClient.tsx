@@ -516,27 +516,9 @@ export default function CaptainClient({
               <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto animate-bounce" />
               <h3 className="font-extrabold text-base text-foreground">Day {selectedDayNumber} Combi Saved!</h3>
               <p className="text-xs text-muted-foreground">{roundsPerDay} combis recorded before the 9:30 PM IST deadline.</p>
-              {captainEmail ? (
-                <p className="text-xs text-muted-foreground">
-                  A confirmation receipt with your submitted details has been sent to <span className="text-amber-400 font-semibold">{captainEmail}</span>.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Your combi has been saved securely. All team combis remain confidential until the 9:30 PM IST cutoff.
-                </p>
-              )}
-              {emailPreviewUrl && (
-                <div className="pt-2">
-                  <a
-                    href={emailPreviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/20 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <span>✉️ [Dev Mode] View Ethereal Email Preview</span>
-                  </a>
-                </div>
-              )}
+              <p className="text-xs text-muted-foreground font-semibold">
+                Your combi for Day {selectedDayNumber} has been saved successfully in the database and will auto-publish on the website at 9:30 PM IST.
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSaveDayLineup} className="flex-1 flex flex-col overflow-hidden min-h-0">

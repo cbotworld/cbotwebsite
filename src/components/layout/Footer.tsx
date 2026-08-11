@@ -3,6 +3,7 @@ import { VisitorCounter } from './VisitorCounter';
 
 export function Footer() {
   const exploreLinks = [
+    { label: '200th Edition Schedule', href: '/edition-200-schedule', live: true },
     { label: 'Tournament Editions', href: '/editions', live: false },
     { label: 'Match Fixtures', href: '/fixtures', live: false },
     { label: 'Player Rankings', href: '/rankings', live: false },
@@ -38,10 +39,16 @@ export function Footer() {
                 Soon
               </span>
             </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground/60">
-              {exploreLinks.map(({ label }) => (
-                <li key={label} className="cursor-default hover:text-muted-foreground/80 transition-colors">
-                  {label}
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              {exploreLinks.map(({ label, href, live }) => (
+                <li key={label}>
+                  {live ? (
+                    <Link href={href} className="text-amber-400 font-bold hover:text-amber-300 transition-colors flex items-center gap-1">
+                      <span>✨</span> {label}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground/60 cursor-default">{label}</span>
+                  )}
                 </li>
               ))}
             </ul>

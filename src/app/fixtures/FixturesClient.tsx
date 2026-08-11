@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Calendar, Clock, MapPin, Trophy, Shield, Filter, Search, ArrowRight, Video, Flame } from 'lucide-react';
+import { Calendar, Clock, MapPin, Trophy, Shield, Filter, Search, ArrowRight, Video, Flame, Sparkles } from 'lucide-react';
 import { Match, MatchStage } from '@/types';
 
 export default function FixturesClient({ initialMatches }: { initialMatches: any[] }) {
@@ -45,9 +45,14 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <Link href="/edition-200-schedule">
+              <Button variant="carrom" className="font-extrabold text-xs shadow-lg w-full sm:w-auto border border-amber-400 gap-1.5">
+                <Sparkles className="h-4 w-4 text-amber-300" /> View Bicentennial Monuments Schedule
+              </Button>
+            </Link>
             <Link href="/live">
-              <Button variant="carrom" className="font-bold text-xs shadow-lg w-full sm:w-auto">
-                <Video className="h-4 w-4 mr-1.5" /> Watch Live Streams
+              <Button variant="outline" className="font-bold text-xs shadow-lg w-full sm:w-auto border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
+                <Video className="h-4 w-4 mr-1.5 text-amber-500" /> Watch Live Streams
               </Button>
             </Link>
           </div>

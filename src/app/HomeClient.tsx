@@ -3,7 +3,9 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Crown, Film, ChevronLeft, ChevronRight, PlayCircle, Sparkles, Heart, ShieldCheck, Mail, X, ZoomIn } from 'lucide-react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getTeamPosterUrl } from '@/lib/supabase';
 
@@ -52,6 +54,9 @@ export default function HomeClient({
     bannerImage?: string | null;
     posterUrl?: string | null;
     number: number;
+    tournamentStartDate?: string | null;
+    dayDates?: string | null;
+    totalDays?: number;
   } | null;
 }) {
   const legacyVideos = [
@@ -61,6 +66,57 @@ export default function HomeClient({
     { id: '9i3_S7JpN74', title: '50th Edition Closing Video', label: '50th Closing' },
     { id: 'eMnF5vIAlPw', title: '100th Centenary Closing Video', label: '100th Centenary' },
   ];
+
+  const currentDayNumber = React.useMemo(() => {
+    const now = new Date();
+
+    if (currentEdition?.dayDates) {
+      try {
+        const map: Record<number, string> = typeof currentEdition.dayDates === 'string'
+          ? JSON.parse(currentEdition.dayDates)
+          : currentEdition.dayDates;
+
+        // Day N ends on date D_N at 8:00 PM IST (20:00).
+        // Day N starts on (D_N - 1 day) at 8:00 PM IST (20:00).
+        // For example:
+        // Day 1: ends 10-08-2026 20:00
+        // Day 2: 10-08-2026 20:00 to 11-08-2026 20:00
+        // Day 3: 11-08-2026 20:00 to 12-08-2026 20:00
+        const entries = Object.entries(map)
+          .map(([k, v]) => ({ dayNum: Number(k), dateStr: v }))
+          .sort((a, b) => a.dayNum - b.dayNum);
+
+        for (const { dayNum, dateStr } of entries) {
+          const endTime = new Date(`${dateStr}T20:00:00+05:30`).getTime();
+          const startTime = endTime - 24 * 60 * 60 * 1000;
+
+          if (now.getTime() >= startTime && now.getTime() < endTime) {
+            return Math.max(1, dayNum);
+          }
+        }
+
+        // If before Day 1 window
+        if (entries.length > 0) {
+          const firstEndTime = new Date(`${entries[0].dateStr}T20:00:00+05:30`).getTime();
+          if (now.getTime() < firstEndTime) return 1;
+        }
+      } catch (e) {
+        console.error('Error parsing dayDates:', e);
+      }
+    }
+
+    // Fallback: Day 1 ends on 10-08-2026 20:00:00+05:30. Day 2 = 10-08 20:00 to 11-08 20:00.
+    const day1EndDate = new Date('2026-08-10T20:00:00+05:30').getTime();
+    const nowMs = now.getTime();
+
+    if (nowMs < day1EndDate) {
+      return 1;
+    }
+
+    const diffMs = nowMs - day1EndDate;
+    const dayIndex = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 2;
+    return Math.min(Math.max(dayIndex, 1), currentEdition?.totalDays || 15);
+  }, [currentEdition]);
 
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
   const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
@@ -150,7 +206,7 @@ export default function HomeClient({
                   </Badge>
                   <div className="flex items-center gap-1.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full shadow-lg">
                     <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping inline-block" />
-                    IN PROGRESS
+                    DAY {currentDayNumber} — IN PROGRESS
                   </div>
                 </div>
 
@@ -165,6 +221,14 @@ export default function HomeClient({
                       style={{ display: 'block' }}
                     />
                   </div>
+                </div>
+
+                <div className="pt-1">
+                  <Link href="/edition-200-schedule">
+                    <Button variant="carrom" className="w-full font-black text-xs h-10 shadow-lg shadow-amber-500/20 gap-2 border border-amber-400">
+                      <span>📅</span> View Bicentennial Monuments Schedule (200th Edition)
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </motion.div>
@@ -355,10 +419,12 @@ export default function HomeClient({
               className="flex flex-col items-center gap-4 group"
             >
               <div className="relative">
-                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-emerald-600/20 flex items-center justify-center shadow-2xl shadow-emerald-500/20 group-hover:scale-110 group-hover:border-emerald-400 group-hover:shadow-emerald-400/30 transition-all duration-500">
-                  <span className="text-4xl sm:text-5xl font-black bg-gradient-to-br from-emerald-300 via-teal-400 to-emerald-500 bg-clip-text text-transparent select-none tracking-wide">
-                    SK
-                  </span>
+                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 overflow-hidden shadow-2xl shadow-emerald-500/20 group-hover:scale-110 group-hover:border-emerald-400 group-hover:shadow-emerald-400/30 transition-all duration-500">
+                  <img
+                    src="/sponsors/srikranthi.jpg"
+                    alt="Srikranthi - Special Sponsor"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-emerald-400/20 via-teal-400/15 to-emerald-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
               </div>
@@ -376,10 +442,12 @@ export default function HomeClient({
               className="flex flex-col items-center gap-4 group"
             >
               <div className="relative">
-                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-teal-500/50 bg-gradient-to-br from-teal-500/20 via-emerald-500/10 to-teal-600/20 flex items-center justify-center shadow-2xl shadow-teal-500/20 group-hover:scale-110 group-hover:border-teal-400 group-hover:shadow-teal-400/30 transition-all duration-500">
-                  <span className="text-4xl sm:text-5xl font-black bg-gradient-to-br from-teal-300 via-emerald-400 to-teal-500 bg-clip-text text-transparent select-none tracking-wide">
-                    AK
-                  </span>
+                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-teal-500/50 overflow-hidden shadow-2xl shadow-teal-500/20 group-hover:scale-110 group-hover:border-teal-400 group-hover:shadow-teal-400/30 transition-all duration-500">
+                  <img
+                    src="/sponsors/ak-chari.jpg"
+                    alt="AK Chari - Special Sponsor"
+                    className="h-full w-full object-cover object-top"
+                  />
                 </div>
                 <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-teal-400/20 via-emerald-400/15 to-teal-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
               </div>
@@ -454,7 +522,7 @@ export default function HomeClient({
               { name: 'Neela',          initials: 'NE' },
               { name: 'Lalit',          initials: 'LA' },
               { name: 'Lalit Friends',  initials: 'LF' },
-              { name: 'Umesh',          initials: 'UM' },
+              { name: 'UMESH N',         initials: 'UM' },
               { name: 'Roopa',          initials: 'RO' },
               { name: 'Praveen',        initials: 'PR' },
             ].map((sponsor, idx) => (
@@ -467,7 +535,7 @@ export default function HomeClient({
                 className="flex flex-col items-center gap-2 group"
               >
                 <div className="relative">
-                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
+                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 overflow-hidden bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
                     <span className="text-xl sm:text-2xl font-black bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent select-none tracking-wide">
                       {sponsor.initials}
                     </span>

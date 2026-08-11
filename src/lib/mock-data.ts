@@ -163,7 +163,7 @@ export const OFFICIAL_PLAYERS_RAW = [
   { name: 'RAKESH', average: 10.97, target: 55 },
   { name: 'JYOTI MURTY', average: 11.05, target: 55 },
   { name: 'S KRISHNAMURTHY', average: 11.37, target: 57 },
-  { name: 'UWESH N', average: 11.40, target: 57 },
+  { name: 'UMESH N', average: 11.40, target: 57 },
   { name: 'CHARI', average: 11.57, target: 58 },
   { name: 'YUVI', average: 11.43, target: 57 },
   { name: 'POORNIMA', average: 11.50, target: 58 },

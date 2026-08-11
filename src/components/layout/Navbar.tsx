@@ -9,6 +9,7 @@ import { Shield, Users, UserCheck, Menu, X, LayoutDashboard, ChevronDown, LogOut
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { VisitorCounter } from '@/components/layout/VisitorCounter';
 import { UserRole } from '@/types';
 
 export function Navbar() {
@@ -17,11 +18,13 @@ export function Navbar() {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [editionMenuOpen, setEditionMenuOpen] = React.useState(false);
   const [isNavigating, setIsNavigating] = React.useState(false);
   const [isNavigatingHome, setIsNavigatingHome] = React.useState(false);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
+  const editionMenuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -46,6 +49,9 @@ export function Navbar() {
     const handler = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
+      }
+      if (editionMenuRef.current && !editionMenuRef.current.contains(e.target as Node)) {
+        setEditionMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -127,6 +133,45 @@ export function Navbar() {
 
         {/* Desktop Right Actions */}
         <div className="hidden sm:flex items-center gap-2.5 shrink-0">
+          {/* 200th Edition Dropdown */}
+          <div className="relative" ref={editionMenuRef}>
+            <button
+              onClick={() => setEditionMenuOpen(!editionMenuOpen)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400 transition-all group shadow-sm"
+            >
+              <span className="text-amber-400">🏆</span>
+              <span>200th Edition</span>
+              <ChevronDown className={`h-3.5 w-3.5 text-amber-400 transition-transform duration-200 ${editionMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {editionMenuOpen && (
+              <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl border border-amber-500/40 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden z-50 animate-in slide-in-from-top-2 duration-150 p-1.5 space-y-1">
+                <div className="px-3 py-2 border-b border-border/40">
+                  <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest">CBOT 200th Edition</div>
+                  <div className="text-xs font-bold text-foreground">Bicentennial Monuments</div>
+                </div>
+
+                <Link
+                  href="/edition-200-schedule"
+                  onClick={() => setEditionMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all group"
+                >
+                  <span>📅</span> Match Schedule
+                </Link>
+
+                <Link
+                  href="/edition-200-combis"
+                  onClick={() => setEditionMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all group"
+                >
+                  <span>⚔️</span> Daily Team Combis
+                </Link>
+              </div>
+            )}
+          </div>
+
+          <VisitorCounter />
+
           {session?.user && (
             <Link
               href={getDashboardHref(userRole)}
@@ -212,13 +257,13 @@ export function Navbar() {
                   Log In
                 </Button>
               </Link>
-
             </div>
           )}
         </div>
 
         {/* Mobile Toggle */}
         <div className="flex items-center gap-2 sm:hidden">
+          <VisitorCounter />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -232,6 +277,26 @@ export function Navbar() {
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="sm:hidden border-b border-border bg-background/95 backdrop-blur-xl p-4 space-y-3 animate-in slide-in-from-top-4 shadow-xl">
+          <div className="space-y-1.5 border-b border-border/60 pb-3">
+            <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
+              🏆 200th Edition
+            </div>
+            <Link
+              href="/edition-200-schedule"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/30"
+            >
+              <span>📅</span> Match Schedule
+            </Link>
+
+            <Link
+              href="/edition-200-combis"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/30"
+            >
+              <span>⚔️</span> Daily Team Combis
+            </Link>
+          </div>
           {session?.user && (
             <div className="flex items-center gap-3 pb-2 border-b border-border">
               <Avatar fallback={session.user.name || 'U'} size="md" />
