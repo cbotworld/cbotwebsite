@@ -233,7 +233,7 @@ export default function BicentennialSchedulePage() {
         {/* SEARCH & DAY FILTER TABS */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-2 relative z-10">
           {/* Day Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <button
               onClick={() => setSelectedDay('ALL')}
               className={`px-3 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all ${
@@ -242,7 +242,7 @@ export default function BicentennialSchedulePage() {
                   : 'bg-card/80 text-muted-foreground hover:text-foreground border border-border/50'
               }`}
             >
-              All Monuments
+              All Days
             </button>
             {MONUMENTS_DATA.map((m) => {
               const isActive = activeMonumentNum === m.monumentNumber;

@@ -24,6 +24,8 @@
 Thumbs.db
 ehthumbs.db
 *.log
+/scratch/
+/CBOT/
 
 # debug logs
 npm-debug.log*

@@ -1,8 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { unstable_noStore as noStore } from 'next/cache';
 
 export async function get200thEditionCombisData() {
+  noStore();
   try {
     // 1. Fetch active Edition 200
     const edition = await prisma.edition.findFirst({

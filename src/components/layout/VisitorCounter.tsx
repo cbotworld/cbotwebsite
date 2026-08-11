@@ -80,16 +80,16 @@ export function VisitorCounter() {
 
   return (
     <div
-      className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-card/90 border border-amber-500/30 shadow-md text-xs font-bold text-foreground transition-all duration-500 group ${
+      title="Total Website Views"
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-card/95 border border-amber-500/30 shadow-md text-xs font-bold text-foreground transition-all duration-500 group shrink-0 ${
         isUpdating ? 'border-amber-400 ring-2 ring-amber-500/30 scale-105 bg-amber-500/10' : 'hover:border-amber-500/50'
       }`}
     >
-      <span className="relative flex h-2 w-2">
+      <span className="relative flex h-2 w-2 shrink-0">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
       </span>
-      <Eye className="h-3.5 w-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
-      <span className="text-muted-foreground font-semibold">Views Till Date:</span>
+      <Eye className="h-3.5 w-3.5 text-amber-500 group-hover:scale-110 transition-transform shrink-0" />
       <span
         className={`font-black text-amber-400 tracking-wide font-mono text-xs sm:text-sm transition-transform duration-300 ${
           isUpdating ? 'scale-110 text-amber-300' : ''

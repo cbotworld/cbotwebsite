@@ -5,11 +5,11 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { Shield, Users, UserCheck, Menu, X, LayoutDashboard, ChevronDown, LogOut, Loader2 } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ChevronDown, LogOut, Loader2, Home, Trophy, Calendar, Swords } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
-import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { VisitorCounter } from '@/components/layout/VisitorCounter';
+import { CountryBanner } from '@/components/layout/CountryBanner';
 import { UserRole } from '@/types';
 
 export function Navbar() {
@@ -18,13 +18,11 @@ export function Navbar() {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
-  const [editionMenuOpen, setEditionMenuOpen] = React.useState(false);
   const [isNavigating, setIsNavigating] = React.useState(false);
   const [isNavigatingHome, setIsNavigatingHome] = React.useState(false);
   const [isSigningOut, setIsSigningOut] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
-  const editionMenuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -34,6 +32,7 @@ export function Navbar() {
     setIsNavigating(false);
     setIsNavigatingHome(false);
     setIsSigningOut(false);
+    setMobileMenuOpen(false);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -49,9 +48,6 @@ export function Navbar() {
     const handler = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
-      }
-      if (editionMenuRef.current && !editionMenuRef.current.contains(e.target as Node)) {
-        setEditionMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -76,8 +72,13 @@ export function Navbar() {
     await signOut({ callbackUrl: '/login' });
   };
 
+  // Determine active sub-pages for Google-style secondary nav
+  const is200thPage = pathname.includes('200') || pathname.includes('combis') || pathname.includes('schedule');
+  const isCombisActive = pathname === '/edition-200-combis' || pathname === '/editions/200th-combis';
+  const isScheduleActive = pathname === '/edition-200-schedule' || pathname === '/editions/200th-schedule';
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
       {/* Whole Screen Centered Loading Overlay via Portal */}
       {mounted && (isNavigating || isNavigatingHome || isSigningOut) && createPortal(
         <div className="fixed inset-0 z-[99999] bg-background/90 backdrop-blur-xl flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-150">
@@ -105,7 +106,8 @@ export function Navbar() {
         document.body
       )}
 
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      {/* Main Top Header Navbar */}
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
 
         {/* Brand Logo */}
         <Link
@@ -114,87 +116,39 @@ export function Navbar() {
             if (pathname === '/') return;
             setIsNavigatingHome(true);
           }}
-          className="flex items-center gap-3 group shrink-0"
+          className="flex items-center gap-2.5 sm:gap-3 group shrink-0"
         >
           <img
             src="/logo.png"
             alt="CBOT Logo"
-            className="h-10 sm:h-11 w-10 sm:w-11 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+            className="h-9 sm:h-11 w-9 sm:w-11 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
           />
-          <div className="flex flex-col justify-center gap-1">
-            <span className="text-xl sm:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-clip-text text-transparent leading-none">
+          <div className="flex flex-col justify-center leading-tight">
+            <span className="text-lg sm:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-clip-text text-transparent leading-none">
               CBOT
             </span>
-            <span className="text-[9px] sm:text-[10.5px] font-extrabold text-amber-500/90 tracking-wider uppercase leading-none whitespace-nowrap">
+            <span className="hidden min-[420px]:block text-[8.5px] sm:text-[10.5px] font-extrabold text-amber-500/90 tracking-wider uppercase leading-none whitespace-nowrap mt-0.5">
               Connect Carrom Enthusiasts Worldwide
             </span>
           </div>
         </Link>
 
         {/* Desktop Right Actions */}
-        <div className="hidden sm:flex items-center gap-2.5 shrink-0">
-          {/* 200th Edition Dropdown */}
-          <div className="relative" ref={editionMenuRef}>
-            <button
-              onClick={() => setEditionMenuOpen(!editionMenuOpen)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400 transition-all group shadow-sm"
-            >
-              <span className="text-amber-400">🏆</span>
-              <span>200th Edition</span>
-              <ChevronDown className={`h-3.5 w-3.5 text-amber-400 transition-transform duration-200 ${editionMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {editionMenuOpen && (
-              <div className="absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl border border-amber-500/40 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden z-50 animate-in slide-in-from-top-2 duration-150 p-1.5 space-y-1">
-                <div className="px-3 py-2 border-b border-border/40">
-                  <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest">CBOT 200th Edition</div>
-                  <div className="text-xs font-bold text-foreground">Bicentennial Monuments</div>
-                </div>
-
-                <Link
-                  href="/edition-200-schedule"
-                  onClick={() => setEditionMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all group"
-                >
-                  <span>📅</span> Match Schedule
-                </Link>
-
-                <Link
-                  href="/edition-200-combis"
-                  onClick={() => setEditionMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-black bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all group"
-                >
-                  <span>⚔️</span> Daily Team Combis
-                </Link>
-              </div>
-            )}
-          </div>
+        <div className="hidden md:flex items-center gap-3 shrink-0">
+          {/* 200th Edition Page Direct Link */}
+          <Link
+            href="/edition-200-combis"
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black transition-all group shadow-sm ${
+              is200thPage
+                ? 'bg-amber-500 text-slate-950 border border-amber-400 shadow-amber-500/20'
+                : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400'
+            }`}
+          >
+            <span>🏆</span>
+            <span>200th Edition</span>
+          </Link>
 
           <VisitorCounter />
-
-          {session?.user && (
-            <Link
-              href={getDashboardHref(userRole)}
-              onClick={() => {
-                const target = getDashboardHref(userRole);
-                if (pathname === target || pathname.startsWith('/dashboard')) return;
-                setIsNavigating(true);
-              }}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20 rounded-full gap-1.5 text-xs font-bold px-3 h-8"
-              >
-                {isNavigating ? (
-                  <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" />
-                ) : (
-                  <LayoutDashboard className="h-3.5 w-3.5 text-amber-500" />
-                )}
-                {isNavigating ? 'Loading…' : 'Dashboard'}
-              </Button>
-            </Link>
-          )}
 
           {session?.user ? (
             <div className="relative" ref={userMenuRef}>
@@ -261,12 +215,12 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Mobile Toggle */}
-        <div className="flex items-center gap-2 sm:hidden">
+        {/* Mobile Toggle & Header Controls */}
+        <div className="flex items-center gap-2 md:hidden">
           <VisitorCounter />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all"
             aria-label="Toggle Menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -274,63 +228,146 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="sm:hidden border-b border-border bg-background/95 backdrop-blur-xl p-4 space-y-3 animate-in slide-in-from-top-4 shadow-xl">
-          <div className="space-y-1.5 border-b border-border/60 pb-3">
-            <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
-              🏆 200th Edition
-            </div>
-            <Link
-              href="/edition-200-schedule"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/30"
-            >
-              <span>📅</span> Match Schedule
-            </Link>
+      {/* Country Flag Ticker Scroll Banner */}
+      <CountryBanner />
 
+      {/* Google-Style Secondary Sub-Navbar Bar (BEHAVIOR: Appears BELOW country scroll) */}
+      {is200thPage && (
+        <div className="w-full border-t border-border/40 bg-card/90 backdrop-blur-xl px-4 sm:px-8 overflow-x-auto scrollbar-none shadow-md">
+          <div className="mx-auto flex max-w-7xl items-center gap-6 sm:gap-8 text-xs sm:text-sm font-bold text-muted-foreground whitespace-nowrap pt-1">
+            
+            {/* Sub-Tab 1: Daily Team Combis */}
             <Link
               href="/edition-200-combis"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold text-amber-400 bg-amber-500/10 border border-amber-500/30"
+              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+                isCombisActive
+                  ? 'text-amber-400 font-black'
+                  : 'hover:text-foreground'
+              }`}
             >
-              <span>⚔️</span> Daily Team Combis
+              <span>⚔️</span>
+              <span>Daily Team Combis</span>
+              {isCombisActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
             </Link>
+
+            {/* Sub-Tab 2: Match Schedule */}
+            <Link
+              href="/edition-200-schedule"
+              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+                isScheduleActive
+                  ? 'text-amber-400 font-black'
+                  : 'hover:text-foreground'
+              }`}
+            >
+              <span>📅</span>
+              <span>Match Schedule</span>
+              {isScheduleActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
+            </Link>
+
           </div>
+        </div>
+      )}
+
+      {/* Enhanced Mobile Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-b border-amber-500/30 bg-background/98 backdrop-blur-2xl p-4 space-y-4 animate-in slide-in-from-top-4 shadow-2xl z-50">
           {session?.user && (
-            <div className="flex items-center gap-3 pb-2 border-b border-border">
-              <Avatar fallback={session.user.name || 'U'} size="md" />
-              <div>
-                <div className="text-xs font-black text-foreground">{session.user.name}</div>
-                <div className="text-[10px] text-amber-500 font-bold uppercase">{(userRole as string) === 'ORGANIZER' ? '🛡️ Organizer' : (userRole as string) === 'CAPTAIN' ? '👑 Captain' : '👤 Player'}</div>
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
+              <Avatar fallback={session.user.name || 'U'} size="md" className="ring-2 ring-amber-500/50" />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-foreground truncate">{session.user.name}</div>
+                <div className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+                  {(userRole as string) === 'ORGANIZER' ? '🛡️ Organizer' : (userRole as string) === 'CAPTAIN' ? '👑 Captain' : '👤 Player'}
+                </div>
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 gap-1.5">
-            <Link href={getDashboardHref(userRole)} onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs hover:bg-muted text-amber-500 font-semibold bg-amber-500/5 border border-amber-500/20">
-              <LayoutDashboard className="h-4 w-4" /> My Dashboard
-            </Link>
+
+          {/* Quick Navigation Section */}
+          <div className="space-y-2 border-b border-border/50 pb-3">
+            <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
+              🏆 200th Bicentennial Edition
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/edition-200-combis"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all border ${
+                  isCombisActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <span>⚔️</span> Daily Combis
+              </Link>
+              <Link
+                href="/edition-200-schedule"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all border ${
+                  isScheduleActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <span>📅</span> Match Schedule
+              </Link>
+            </div>
           </div>
 
-          <div className="pt-1 grid grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">
+              Main Menu
+            </div>
+            <Link
+              href="/"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                pathname === '/' ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
+              }`}
+            >
+              <Home className="h-4 w-4 text-amber-400" /> CBOT Arena Home
+            </Link>
+
             {session?.user ? (
+              <Link
+                href={getDashboardHref(userRole)}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  const target = getDashboardHref(userRole);
+                  if (pathname === target || pathname.startsWith('/dashboard')) return;
+                  setIsNavigating(true);
+                }}
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 transition-all"
+              >
+                <LayoutDashboard className="h-4 w-4 text-amber-400" />
+                <span>My Dashboard</span>
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 justify-center"
+              >
+                <span>🔑</span> Log In to CBOT
+              </Link>
+            )}
+          </div>
+
+          {session?.user && (
+            <div className="pt-2 border-t border-border/50">
               <Button
                 variant="outline"
                 onClick={handleSignOut}
-                className="col-span-2 justify-center text-xs font-semibold"
+                className="w-full justify-center text-xs font-black border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 h-9 rounded-xl"
               >
-                Sign Out
+                <LogOut className="h-4 w-4 mr-2" /> Sign Out
               </Button>
-            ) : (
-              <>
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full justify-center text-xs font-semibold">Log In</Button>
-                </Link>
-
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </header>
