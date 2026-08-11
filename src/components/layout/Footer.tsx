@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { VisitorCounter } from './VisitorCounter';
 
 export function Footer() {
   const exploreLinks = [
@@ -24,6 +25,9 @@ export function Footer() {
             <p className="text-muted-foreground text-xs leading-relaxed max-w-sm">
               Founded by Carrom Balu in August 2020, CBOT reaches its monumental 200th edition connecting players worldwide.
             </p>
+            <div className="pt-2">
+              <VisitorCounter />
+            </div>
           </div>
 
           {/* Explore — Coming Soon */}

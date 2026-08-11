@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
-import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History } from 'lucide-react';
+import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
 
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
@@ -487,13 +487,28 @@ export default function CaptainClient({
       <Dialog open={dayLineupModalOpen} onOpenChange={setDayLineupModalOpen}>
         <div className="flex flex-col max-h-[85vh] overflow-hidden -mx-6 -my-6 bg-card text-foreground rounded-2xl">
           {/* STICKY HEADER */}
-          <div className="px-6 pt-6 pb-4 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-20 flex flex-col space-y-1.5 text-left pr-12">
-            <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
-              <Send className="h-5 w-5 text-amber-500" /> Day {selectedDayNumber} Combi {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime()) ? `(${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})` : ''} — {roundsPerDay} events
-            </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
-            </p>
+          <div className="px-6 pt-6 pb-4 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-20 flex items-start justify-between gap-4">
+            <div className="flex flex-col space-y-1.5 text-left pr-6">
+              <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
+                <Send className="h-5 w-5 text-amber-500" /> Day {selectedDayNumber} Combi {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime()) ? `(${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})` : ''} — {roundsPerDay} events
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
+              </p>
+            </div>
+            {!isDayLocked(selectedDayNumber, dayDatesMap) && !lineupSubmittedSuccess && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRoundLineups(initRoundLineups(selectedDayNumber))}
+                className="h-8 px-3 text-xs gap-1.5 border-rose-500/30 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 font-bold shrink-0 transition-colors"
+                title="Clear all player selections"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Reset All
+              </Button>
+            )}
           </div>
 
           {lineupSubmittedSuccess ? (
@@ -601,34 +616,46 @@ export default function CaptainClient({
                                 {isDuplicateInOtherRound && <span className="ml-1 text-rose-400 font-mono">⚠ {getRoundLabel(usedElsewhere[selectedId] - 1)}</span>}
                                 {isDuplicateInSameRound && <span className="ml-1 text-rose-400 font-mono">⚠ Duplicate</span>}
                               </label>
-                              <select
-                                value={selectedId}
-                                disabled={isLocked}
-                                onChange={(e) => updateRoundPlayer(ri, si, e.target.value)}
-                                className={`w-full bg-card border rounded-lg p-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50 ${
-                                  isDuplicate ? 'border-rose-500/60 bg-rose-500/10' : 'border-input hover:border-amber-500/30'
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              >
-                                <option value="">Select Player</option>
-                                {teamMembers.map((m: any) => {
-                                  const inOtherRound = usedElsewhere[m.id];
-                                  const inSameRound = selectedInThisRound.includes(m.id);
-                                  const shouldDisable = inOtherRound || inSameRound;
-                                  return (
-                                    <option
-                                      key={m.id}
-                                      value={m.id}
-                                      disabled={!!shouldDisable && m.id !== selectedId}
-                                    >
-                                      {inOtherRound && m.id !== selectedId
-                                        ? `🚫 ${m.name || m.username} (${getRoundLabel(inOtherRound - 1)})`
-                                        : inSameRound && m.id !== selectedId
-                                        ? `🚫 ${m.name || m.username} (Selected)`
-                                        : m.name || m.username}
-                                    </option>
-                                  );
-                                })}
-                              </select>
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  value={selectedId}
+                                  disabled={isLocked}
+                                  onChange={(e) => updateRoundPlayer(ri, si, e.target.value)}
+                                  className={`w-full bg-card border rounded-lg p-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50 ${
+                                    isDuplicate ? 'border-rose-500/60 bg-rose-500/10' : 'border-input hover:border-amber-500/30'
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  <option value="">Select Player</option>
+                                  {teamMembers.map((m: any) => {
+                                    const inOtherRound = usedElsewhere[m.id];
+                                    const inSameRound = selectedInThisRound.includes(m.id);
+                                    const shouldDisable = inOtherRound || inSameRound;
+                                    return (
+                                      <option
+                                        key={m.id}
+                                        value={m.id}
+                                        disabled={!!shouldDisable && m.id !== selectedId}
+                                      >
+                                        {inOtherRound && m.id !== selectedId
+                                          ? `🚫 ${m.name || m.username} (${getRoundLabel(inOtherRound - 1)})`
+                                          : inSameRound && m.id !== selectedId
+                                          ? `🚫 ${m.name || m.username} (Selected)`
+                                          : m.name || m.username}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                {selectedId && !isLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRoundPlayer(ri, si, '')}
+                                    className="p-1.5 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-lg border border-border/40 hover:border-rose-500/30 transition-colors shrink-0"
+                                    title="Clear selection"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -659,7 +686,7 @@ export default function CaptainClient({
                       return hasEmpty || hasDuplicates;
                     })()}
                   >
-                    {isSubmitting ? 'Saving...' : `Save Day ${selectedDayNumber} (${roundsPerDay} Combis)`}
+                    {isSubmitting ? 'Saving...' : `Save Day ${selectedDayNumber}`}
                   </Button>
                 )}
               </div>

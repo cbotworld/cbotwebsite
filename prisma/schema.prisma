@@ -372,3 +372,10 @@ model PlayerCategoryHistory {
   
   createdAt   DateTime @default(now())
 }
+
+model VisitorCount {
+  id        String   @id @default("global")
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
