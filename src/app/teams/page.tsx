@@ -49,8 +49,10 @@ export default async function TeamsPage() {
 
           return (
             <Card key={team.id} className="p-6 border-border hover:border-amber-500/50 hover:shadow-xl transition-all space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar src={team.logo || undefined} fallback={team.tag} size="xl" className="ring-4 ring-amber-500/30" />
+              <div className="flex items-center gap-5">
+                <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl overflow-hidden bg-slate-950 p-1.5 border-2 border-amber-500/40 shadow-xl flex items-center justify-center shrink-0">
+                  <img src={team.logo || '/logo.png'} alt={team.name} className="h-full w-full object-contain" />
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-2xl font-black">{team.name}</h2>

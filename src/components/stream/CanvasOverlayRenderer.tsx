@@ -1,0 +1,329 @@
+'use client';
+
+import * as React from 'react';
+import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+
+interface CanvasOverlayRendererProps {
+  playerName: string;
+  editionTitle: string;
+  matchId: string;
+  teamName: string;
+  opponentName: string;
+  isStreaming: boolean;
+  streamStartedAt?: Date | null;
+  onStreamReady?: (stream: MediaStream) => void;
+  onError?: (errMessage: string) => void;
+}
+
+function formatIST(date: Date): string {
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    };
+    const parts = new Intl.DateTimeFormat('en-GB', options).formatToParts(date);
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const day = get('day');
+    const month = get('month').toUpperCase();
+    const year = get('year');
+    const hour = get('hour');
+    const minute = get('minute');
+    const second = get('second');
+    return `${day} ${month} ${year} ${hour}:${minute}:${second} IST`;
+  } catch {
+    return date.toISOString().slice(0, 19).replace('T', ' ') + ' IST';
+  }
+}
+
+export default function CanvasOverlayRenderer({
+  playerName,
+  editionTitle,
+  matchId,
+  teamName,
+  opponentName,
+  isStreaming,
+  streamStartedAt,
+  onStreamReady,
+  onError,
+}: CanvasOverlayRendererProps) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const animFrameIdRef = React.useRef<number | null>(null);
+
+  const [cameraPermission, setCameraPermission] = React.useState<'pending' | 'granted' | 'denied'>('pending');
+  const [facingMode, setFacingMode] = React.useState<'environment' | 'user'>('environment');
+  const [currentTimeStr, setCurrentTimeStr] = React.useState<string>('');
+  const [elapsedTimerStr, setElapsedTimerStr] = React.useState<string>('00:00:00');
+
+  // Update live clock in IST every second
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTimeStr(formatIST(now));
+
+      if (isStreaming && streamStartedAt) {
+        const startMs = new Date(streamStartedAt).getTime();
+        const diffSecs = Math.max(0, Math.floor((now.getTime() - startMs) / 1000));
+        const h = String(Math.floor(diffSecs / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diffSecs % 3600) / 60)).padStart(2, '0');
+        const s = String(diffSecs % 60).padStart(2, '0');
+        setElapsedTimerStr(`${h}:${m}:${s}`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isStreaming, streamStartedAt]);
+
+  // Request Camera & Microphone Stream
+  const initCamera = React.useCallback(async (mode: 'environment' | 'user') => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: mode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: true,
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          await videoRef.current.play();
+        }
+
+        setCameraPermission('granted');
+
+        // Create Canvas Stream Pipeline
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          const canvasStream = canvas.captureStream(30);
+
+          // Add audio track to canvas stream
+          const audioTrack = mediaStream.getAudioTracks()[0];
+          if (audioTrack) {
+            canvasStream.addTrack(audioTrack);
+          }
+
+          if (onStreamReady) {
+            onStreamReady(canvasStream);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Camera initialization error:', err);
+      setCameraPermission('denied');
+      if (onError) {
+        onError(err.message || 'Camera permission denied or camera not found.');
+      }
+    }
+  }, [onStreamReady, onError]);
+
+  React.useEffect(() => {
+    initCamera(facingMode);
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [facingMode, initCamera]);
+
+  // Toggle Camera Facing Mode (Rear <-> Front)
+  const toggleCamera = () => {
+    const newMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(newMode);
+  };
+
+  // High-performance Canvas Rendering Loop
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let isMounted = true;
+
+    const renderFrame = () => {
+      if (!isMounted) return;
+
+      const width = 1280;
+      const height = 720;
+
+      // 1. Clear background
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, width, height);
+
+      // 2. Draw Camera Video Frame
+      if (video.readyState >= 2) {
+        ctx.drawImage(video, 0, 0, width, height);
+      }
+
+      // 3. Draw Framing Guidance Guidelines (if not live yet)
+      if (!isStreaming) {
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([12, 8]);
+        ctx.strokeRect(100, 80, width - 200, height - 160);
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fillRect(width / 2 - 250, height / 2 - 25, 500, 50);
+
+        ctx.font = '900 18px sans-serif';
+        ctx.fillStyle = '#fbbf24';
+        ctx.textAlign = 'center';
+        ctx.fillText('POSITION CAMERA SO THE FULL CARROM BOARD IS VISIBLE', width / 2, height / 2 + 6);
+      }
+
+      // 4. Draw Top Gradient Header Banner
+      const topGradient = ctx.createLinearGradient(0, 0, 0, 100);
+      topGradient.addColorStop(0, 'rgba(2, 6, 23, 0.95)');
+      topGradient.addColorStop(1, 'rgba(2, 6, 23, 0)');
+      ctx.fillStyle = topGradient;
+      ctx.fillRect(0, 0, width, 100);
+
+      // Top Header Title: CBOT WORLD
+      ctx.textAlign = 'left';
+      ctx.font = '900 28px sans-serif';
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText('CBOT WORLD', 30, 45);
+
+      ctx.font = '800 14px sans-serif';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(`OFFICIAL MATCH BROADCAST • ${editionTitle.toUpperCase()}`, 30, 68);
+
+      // Top Right: Match / Day Label (shifted left to clear Rear Camera button)
+      const matchLabel = (() => {
+        if (!matchId) return 'DAY 4';
+        const monMatch = matchId.match(/monument_(\d+)/i);
+        if (monMatch) return `DAY ${monMatch[1]}`;
+        if (matchId.startsWith('match_')) return `MATCH ${matchId.replace('match_', '#')}`;
+        return matchId.toUpperCase();
+      })();
+
+      ctx.textAlign = 'right';
+      ctx.font = '900 20px monospace';
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText(matchLabel, width - 200, 45);
+
+      // 5. Draw Bottom Gradient Footer Banner
+      const bottomGradient = ctx.createLinearGradient(0, height - 130, 0, height);
+      bottomGradient.addColorStop(0, 'rgba(2, 6, 23, 0)');
+      bottomGradient.addColorStop(1, 'rgba(2, 6, 23, 0.95)');
+      ctx.fillStyle = bottomGradient;
+      ctx.fillRect(0, height - 130, width, 130);
+
+      // Bottom Left: Player Name & Team Info
+      ctx.textAlign = 'left';
+      ctx.font = '900 24px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(playerName.toUpperCase(), 30, height - 60);
+
+      ctx.font = '700 15px sans-serif';
+      ctx.fillStyle = '#34d399';
+      ctx.fillText(`${teamName.toUpperCase()}  VS  ${opponentName.toUpperCase()}`, 30, height - 32);
+
+      // Bottom Right: Live Updating Timestamp & Timer
+      ctx.textAlign = 'right';
+      ctx.font = '900 18px monospace';
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText(currentTimeStr || '12 AUG 2026 21:30:00', width - 30, height - 60);
+
+      if (isStreaming) {
+        // Red LIVE Badge
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(width - 150, height - 35, 7, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.font = '900 16px monospace';
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText(`LIVE  ${elapsedTimerStr}`, width - 30, height - 30);
+      } else {
+        ctx.font = '800 14px monospace';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('STANDBY • READY TO STREAM', width - 30, height - 30);
+      }
+
+      animFrameIdRef.current = requestAnimationFrame(renderFrame);
+    };
+
+    renderFrame();
+
+    return () => {
+      isMounted = false;
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+    };
+  }, [playerName, editionTitle, matchId, teamName, opponentName, isStreaming, currentTimeStr, elapsedTimerStr]);
+
+  return (
+    <div className="space-y-4">
+      {/* Hidden Source Video Element */}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        autoPlay
+        className="hidden"
+      />
+
+      {/* Main Responsive Stream Canvas Box */}
+      <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/50 bg-slate-950 shadow-2xl aspect-video w-full">
+        <canvas
+          ref={canvasRef}
+          width={1280}
+          height={720}
+          className="h-full w-full object-contain"
+        />
+
+        {/* Camera Permission Overlay Warning */}
+        {cameraPermission === 'denied' && (
+          <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-rose-500/20 border-2 border-rose-500 flex items-center justify-center text-rose-400">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-rose-400">Camera Permission Required</h3>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Please allow browser camera and microphone permissions to stream your CBOT match.
+              </p>
+            </div>
+            <Button
+              onClick={() => initCamera(facingMode)}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl"
+            >
+              Retry Camera Permission
+            </Button>
+          </div>
+        )}
+
+        {/* Camera Switch Floating Button */}
+        {cameraPermission === 'granted' && (
+          <div className="absolute top-4 right-4 z-10">
+            <Button
+              onClick={toggleCamera}
+              variant="outline"
+              size="sm"
+              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 text-xs font-black rounded-xl gap-2 shadow-lg"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>{facingMode === 'environment' ? 'Rear Camera' : 'Front Camera'}</span>
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

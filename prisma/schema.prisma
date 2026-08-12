@@ -53,6 +53,7 @@ model User {
   rankingSnapshots    PlayerRankingSnapshot[]
   hallOfFameEntries   HallOfFame[]
   categoryHistory     PlayerCategoryHistory[]
+  liveStreams         LiveStream[]           @relation("PlayerLiveStreams")
 }
 
 model Account {
@@ -130,6 +131,7 @@ model Edition {
   rankingSnapshots      PlayerRankingSnapshot[]
   leagueStandings       LeagueStanding[]
   categoryHistory       PlayerCategoryHistory[]
+  liveStreams           LiveStream[]
 }
 
 model EditionParticipant {
@@ -177,6 +179,7 @@ model Team {
   wonMatches  Match[]  @relation("WonTeam")
   lineups     MatchLineup[]
   leagueStandings LeagueStanding[]
+  liveStreams LiveStream[]
   
   @@unique([editionId, name])
   @@unique([editionId, tag])
@@ -247,6 +250,7 @@ model Match {
 
   scoreReports  ScoreReport[]
   lineups       MatchLineup[]
+  liveStreams   LiveStream[]
 }
 
 model MatchLineup {
@@ -378,4 +382,50 @@ model VisitorCount {
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
 }
+
+model LiveStream {
+  id                 String    @id @default(cuid())
+  editionId          String
+  edition            Edition   @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  matchId            String
+  match              Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId           String
+  player             User      @relation("PlayerLiveStreams", fields: [playerId], references: [id], onDelete: Cascade)
+  teamId             String?
+  team               Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  youtubeBroadcastId String?   @unique
+  youtubeStreamId    String?
+  youtubeVideoId     String?
+  rtmpIngestionUrl   String?
+  streamKey          String?
+
+  youtubeUrl         String?
+  youtubeEmbedUrl    String?
+
+  status             String    @default("CREATED") // CREATED, READY, LIVE, ENDED, ARCHIVED, EXPIRED, FAILED
+  failureReason      String?
+
+  scheduledAt        DateTime?
+  streamStartedAt    DateTime?
+  streamEndedAt      DateTime?
+  recordedAt         DateTime?
+  expiresAt          DateTime?
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([editionId])
+  @@index([matchId])
+  @@index([playerId])
+  @@index([status])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+
 

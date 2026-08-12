@@ -39,11 +39,14 @@ export function Avatar({
         className
       )}
     >
-      {isSystemLogo && src && !error ? (
+      {src && !error ? (
         <img
           src={src}
           alt={alt || fallback}
-          className="aspect-square h-full w-full object-contain p-0.5"
+          className={cn(
+            "aspect-square h-full w-full",
+            isSystemLogo ? "object-contain p-0.5" : "object-cover"
+          )}
           onError={() => setError(true)}
         />
       ) : (

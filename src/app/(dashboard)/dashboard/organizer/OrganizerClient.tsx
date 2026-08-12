@@ -171,6 +171,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [editUserEmail, setEditUserEmail] = React.useState('');
   const [editUserAge, setEditUserAge] = React.useState('');
   const [editUserGender, setEditUserGender] = React.useState('Male');
+  const [editUserCity, setEditUserCity] = React.useState('');
+  const [editUserState, setEditUserState] = React.useState('');
+  const [editUserCountry, setEditUserCountry] = React.useState('');
 
   // PIN Reset State
   const [resetPinModalOpen, setResetPinModalOpen] = React.useState(false);
@@ -601,6 +604,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setEditUserEmail(usr.email || '');
     setEditUserAge(usr.age ? usr.age.toString() : '');
     setEditUserGender(usr.gender || 'Male');
+    setEditUserCity(usr.city || '');
+    setEditUserState(usr.state || '');
+    setEditUserCountry(usr.country || '');
     setEditUserModalOpen(true);
   };
 
@@ -628,6 +634,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               email: editUserEmail.trim() || undefined,
               age: parsedAge,
               gender: editUserGender || undefined,
+              city: editUserCity.trim() || undefined,
+              state: editUserState.trim() || undefined,
+              country: editUserCountry.trim() || undefined,
             }
           : u
       )
@@ -644,6 +653,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       email: editUserEmail.trim() || undefined,
       age: parsedAge,
       gender: editUserGender || undefined,
+      city: editUserCity.trim() || undefined,
+      state: editUserState.trim() || undefined,
+      country: editUserCountry.trim() || undefined,
     });
 
     if (res.user) {
@@ -1741,6 +1753,37 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>
               </Select>
+            </div>
+          </div>
+
+          {/* Location Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-bold block mb-1">City (Optional)</label>
+              <Input
+                value={editUserCity}
+                onChange={(e) => setEditUserCity(e.target.value)}
+                placeholder="e.g. Chennai"
+                className="text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1">State (Optional)</label>
+              <Input
+                value={editUserState}
+                onChange={(e) => setEditUserState(e.target.value)}
+                placeholder="e.g. Tamil Nadu"
+                className="text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1">Country (Optional)</label>
+              <Input
+                value={editUserCountry}
+                onChange={(e) => setEditUserCountry(e.target.value)}
+                placeholder="e.g. India"
+                className="text-xs"
+              />
             </div>
           </div>
 

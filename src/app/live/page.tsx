@@ -49,7 +49,9 @@ export default function LiveMatchesPage() {
             
             {/* Team 1 */}
             <div className="sm:col-span-5 text-center space-y-2">
-              <Avatar src={liveMatch.team1?.logo} fallback={liveMatch.team1?.tag || 'T1'} size="xl" className="mx-auto ring-4 ring-amber-500/50 h-20 w-20" />
+              <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden bg-slate-950 p-2 border-2 border-amber-500/50 shadow-2xl mx-auto flex items-center justify-center">
+                <img src={liveMatch.team1?.logo || '/logo.png'} alt={liveMatch.team1?.name} className="h-full w-full object-contain" />
+              </div>
               <h3 className="text-xl font-extrabold">{liveMatch.team1?.name}</h3>
               <div className="text-4xl font-black text-amber-400 font-mono">{liveMatch.score1}</div>
               <div className="text-xs text-pink-400 font-semibold flex items-center justify-center gap-1">
@@ -67,7 +69,9 @@ export default function LiveMatchesPage() {
 
             {/* Team 2 */}
             <div className="sm:col-span-5 text-center space-y-2">
-              <Avatar src={liveMatch.team2?.logo} fallback={liveMatch.team2?.tag || 'T2'} size="xl" className="mx-auto ring-4 ring-amber-500/50 h-20 w-20" />
+              <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-2xl overflow-hidden bg-slate-950 p-2 border-2 border-amber-500/50 shadow-2xl mx-auto flex items-center justify-center">
+                <img src={liveMatch.team2?.logo || '/logo.png'} alt={liveMatch.team2?.name} className="h-full w-full object-contain" />
+              </div>
               <h3 className="text-xl font-extrabold">{liveMatch.team2?.name}</h3>
               <div className="text-4xl font-black text-amber-400 font-mono">{liveMatch.score2}</div>
               <div className="text-xs text-pink-400 font-semibold flex items-center justify-center gap-1">

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/daily-summary?day=1",
       "schedule": "15 16 * * *"
+    },
+    {
+      "path": "/api/cron/expire-youtube-videos",
+      "schedule": "0 0 * * *"
     }
   ]
 }

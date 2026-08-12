@@ -14,9 +14,11 @@ import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin
+  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
+import { ProfileTab } from '@/components/player/ProfileTab';
+
 
 export default function PlayerClient({ initialPlayer, initialTeam, initialTeammates, initialMatches, initialPatterns }: { initialPlayer: any, initialTeam: any, initialTeammates: any[], initialMatches: any[], initialPatterns: any[] }) {
   const { data: session } = useSession();
@@ -52,7 +54,64 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   const currentTeam = initialTeam || null;
   const teammates = initialTeammates.length > 0 ? initialTeammates : (currentTeam?.members?.map((m: any) => m.user) || []);
-  const personalSchedule = initialMatches.length > 0 ? initialMatches : MOCK_MATCHES;
+  
+  // Build fallback 200th Edition Monument schedule for current player's team if DB matches are empty
+  const personalSchedule = React.useMemo(() => {
+    const dbMatches = (initialMatches || []).filter(
+      (m: any) =>
+        m.team1Id === currentTeam?.id ||
+        m.team2Id === currentTeam?.id ||
+        m.team1?.name?.toUpperCase() === currentTeam?.name?.toUpperCase() ||
+        m.team2?.name?.toUpperCase() === currentTeam?.name?.toUpperCase()
+    );
+    if (dbMatches.length > 0) return dbMatches;
+
+    if (!currentTeam?.name) return [];
+
+    const teamNameUpper = currentTeam.name.toUpperCase().trim();
+    const teamLogos: Record<string, string> = {
+      'PLYWOOD PIONEERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
+      'SUPERNOVA QUEEN': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
+      'POCKET DYNAMOS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
+      'LUMEN PILLAR': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
+      'VANILLA FALCONS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
+      'VINTAGE STRIKERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
+      'EBONY OVERLORDS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
+      'BORIC SPEEDSTERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
+    };
+
+    const monuments = [
+      { num: 1, startIso: '2026-08-09T21:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'POCKET DYNAMOS', t2: 'LUMEN PILLAR' }, { t1: 'VANILLA FALCONS', t2: 'VINTAGE STRIKERS' }, { t1: 'EBONY OVERLORDS', t2: 'BORIC SPEEDSTERS' }] },
+      { num: 2, startIso: '2026-08-10T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VINTAGE STRIKERS' }, { t1: 'LUMEN PILLAR', t2: 'BORIC SPEEDSTERS' }, { t1: 'SUPERNOVA QUEEN', t2: 'EBONY OVERLORDS' }, { t1: 'POCKET DYNAMOS', t2: 'VANILLA FALCONS' }] },
+      { num: 3, startIso: '2026-08-11T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'EBONY OVERLORDS' }, { t1: 'BORIC SPEEDSTERS', t2: 'VANILLA FALCONS' }, { t1: 'VINTAGE STRIKERS', t2: 'POCKET DYNAMOS' }, { t1: 'LUMEN PILLAR', t2: 'SUPERNOVA QUEEN' }] },
+      { num: 4, startIso: '2026-08-12T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VANILLA FALCONS' }, { t1: 'EBONY OVERLORDS', t2: 'POCKET DYNAMOS' }, { t1: 'BORIC SPEEDSTERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'VINTAGE STRIKERS', t2: 'LUMEN PILLAR' }] },
+      { num: 5, startIso: '2026-08-13T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'LUMEN PILLAR' }, { t1: 'SUPERNOVA QUEEN', t2: 'VINTAGE STRIKERS' }, { t1: 'POCKET DYNAMOS', t2: 'BORIC SPEEDSTERS' }, { t1: 'EBONY OVERLORDS', t2: 'VANILLA FALCONS' }] },
+      { num: 6, startIso: '2026-08-14T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'BORIC SPEEDSTERS' }, { t1: 'VANILLA FALCONS', t2: 'SUPERNOVA QUEEN' }, { t1: 'VINTAGE STRIKERS', t2: 'EBONY OVERLORDS' }, { t1: 'LUMEN PILLAR', t2: 'POCKET DYNAMOS' }] },
+      { num: 7, startIso: '2026-08-15T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'POCKET DYNAMOS' }, { t1: 'EBONY OVERLORDS', t2: 'LUMEN PILLAR' }, { t1: 'BORIC SPEEDSTERS', t2: 'VINTAGE STRIKERS' }, { t1: 'SUPERNOVA QUEEN', t2: 'VANILLA FALCONS' }] },
+    ];
+
+    return monuments.map((m) => {
+      const fix = m.matches.find(
+        (f) => f.t1.toUpperCase() === teamNameUpper || f.t2.toUpperCase() === teamNameUpper
+      );
+      if (!fix) return null;
+      const isCurrentActive = m.num === 4;
+      const isPast = m.num < 4;
+      const isT1 = fix.t1.toUpperCase() === teamNameUpper;
+      return {
+        id: `monument_${m.num}_${teamNameUpper.replace(/\s+/g, '_')}`,
+        matchNumber: m.num,
+        scheduledTime: m.startIso,
+        status: isCurrentActive ? 'LIVE' : isPast ? 'COMPLETED' : 'SCHEDULED',
+        tableNumber: 1,
+        team1Id: isT1 ? currentTeam.id : `t_${fix.t1.replace(/\s+/g, '_')}`,
+        team1: { id: isT1 ? currentTeam.id : `t_${fix.t1.replace(/\s+/g, '_')}`, name: fix.t1, logo: teamLogos[fix.t1] || currentTeam.logo },
+        team2Id: !isT1 ? currentTeam.id : `t_${fix.t2.replace(/\s+/g, '_')}`,
+        team2: { id: !isT1 ? currentTeam.id : `t_${fix.t2.replace(/\s+/g, '_')}`, name: fix.t2, logo: teamLogos[fix.t2] || '' },
+      };
+    }).filter(Boolean);
+  }, [initialMatches, currentTeam]);
+
   const assignedPatterns = initialPatterns.length > 0 ? initialPatterns : [];
 
   // Score & Live Stream Submission Modal State
@@ -166,7 +225,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 ? ((currentPlayer.boardsWon || 0) / ((currentPlayer.wins || 0) + (currentPlayer.losses || 0))).toFixed(1)
                 : '0.0'}
           </div>
-          <div className="text-[11px] text-muted-foreground mt-1">Boards per match</div>
+          <div className="text-[11px] text-muted-foreground mt-1">Player Average</div>
         </Card>
 
         {/* Bonus Won */}
@@ -192,6 +251,147 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         </Card>
       </div>
 
+      {/* ── TODAY'S MATCH — GO LIVE BANNER ────────────────────────────────────────── */}
+      {currentTeam?.id && (() => {
+        const today = new Date();
+        const todayStr = today.toDateString();
+
+        // Only matches that belong to this player's actual team (by team ID or team name)
+        const myMatches = personalSchedule.filter((m: any) =>
+          m.team1Id === currentTeam.id ||
+          m.team2Id === currentTeam.id ||
+          m.team1?.name?.toUpperCase() === currentTeam.name?.toUpperCase() ||
+          m.team2?.name?.toUpperCase() === currentTeam.name?.toUpperCase()
+        );
+
+        // Priority: today's non-completed → any LIVE → next SCHEDULED
+        const todayMatch =
+          myMatches.find((m: any) => new Date(m.scheduledTime).toDateString() === todayStr && m.status !== 'COMPLETED') ||
+          myMatches.find((m: any) => m.status === 'LIVE') ||
+          myMatches.find((m: any) => m.status === 'SCHEDULED');
+
+        // Match-specific details (only when a match is found)
+        const isMyTeam1   = todayMatch ? todayMatch.team1Id === currentTeam.id : true;
+        const myTeamName  = todayMatch ? (isMyTeam1 ? todayMatch.team1?.name : todayMatch.team2?.name) || currentTeam.name : currentTeam.name;
+        const oppTeamName = todayMatch ? (isMyTeam1 ? todayMatch.team2?.name : todayMatch.team1?.name) || 'TBD' : null;
+        const myTeamLogo  = todayMatch ? (isMyTeam1 ? todayMatch.team1?.logo : todayMatch.team2?.logo) : currentTeam?.logo;
+        const oppTeamLogo = todayMatch ? (isMyTeam1 ? todayMatch.team2?.logo : todayMatch.team1?.logo) : null;
+        const isLive      = todayMatch?.status === 'LIVE';
+
+        const firstMatchDate = myMatches.length > 0
+          ? new Date(myMatches.reduce((a: any, b: any) =>
+              new Date(a.scheduledTime) < new Date(b.scheduledTime) ? a : b).scheduledTime)
+          : today;
+        const dayDiff = Math.max(1, Math.ceil((today.getTime() - firstMatchDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+        return (
+          <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-rose-500/10 shadow-lg shadow-amber-500/10">
+            <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+
+            <div className="relative p-5 sm:p-7">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-500/30">
+                    <Video className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">CBOT 200th Edition</div>
+                    <div className="text-base font-black text-foreground leading-tight">
+                      {todayMatch
+                        ? `Tournament Day ${dayDiff} — Your Match Today`
+                        : `Welcome, ${currentTeam.name} — Go Live Anytime`}
+                    </div>
+                  </div>
+                </div>
+                {isLive && (
+                  <Badge variant="warning" className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-black">
+                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse inline-block" />
+                    MATCH IS LIVE
+                  </Badge>
+                )}
+              </div>
+
+              {/* Match card — when match exists */}
+              {todayMatch ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-background/50 border border-border backdrop-blur-sm">
+                  {/* My Team */}
+                  <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                    {myTeamLogo ? (
+                      <img src={myTeamLogo} alt={myTeamName} className="w-14 h-14 rounded-xl object-contain border border-border shadow-md bg-background" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-500 text-lg">
+                        {myTeamName?.[0] || 'M'}
+                      </div>
+                    )}
+                    <span className="text-xs font-black text-center leading-tight text-amber-400">{myTeamName}</span>
+                    <Badge variant="carrom" className="text-[9px] px-2">YOUR TEAM</Badge>
+                  </div>
+
+                  {/* VS */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="text-2xl font-black text-muted-foreground/50">VS</div>
+                    <div className="text-[10px] text-muted-foreground font-mono">
+                      {new Date(todayMatch.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground/60">
+                      Table #{(todayMatch as any).tableNumber || 1}
+                    </div>
+                  </div>
+
+                  {/* Opponent */}
+                  <div className="flex flex-col items-center gap-2 min-w-[100px]">
+                    {oppTeamLogo ? (
+                      <img src={oppTeamLogo} alt={oppTeamName!} className="w-14 h-14 rounded-xl object-contain border border-border shadow-md bg-background" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-lg">
+                        {oppTeamName?.[0] || 'O'}
+                      </div>
+                    )}
+                    <span className="text-xs font-black text-center leading-tight">{oppTeamName || 'TBD'}</span>
+                    <Badge variant="outline" className="text-[9px] px-2 text-muted-foreground">OPPONENT</Badge>
+                  </div>
+                </div>
+              ) : (
+                /* No match yet — show team card with pending state */
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-background/50 border border-border backdrop-blur-sm">
+                  {currentTeam?.logo ? (
+                    <img src={currentTeam.logo} alt={currentTeam.name} className="w-12 h-12 rounded-xl object-contain border border-border bg-background" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-500">
+                      {currentTeam.name?.[0]}
+                    </div>
+                  )}
+                  <div>
+                    <div className="font-black text-sm">{currentTeam.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      📅 No match scheduled yet for today — check back on your match day.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Go Live CTA — always visible */}
+              <div className="mt-5 flex flex-col sm:flex-row items-center gap-3">
+                <Link href={todayMatch ? `/player/matches/${todayMatch.id}/live` : `/player/matches/upcoming/live`} className="w-full sm:w-auto">
+                  <Button
+                    variant="carrom"
+                    size="lg"
+                    className="w-full sm:w-auto gap-2.5 font-black text-sm px-8 py-5 shadow-xl shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-200 hover:scale-[1.02]"
+                  >
+                    <Radio className="h-4 w-4 animate-pulse" />
+                    🔴 GO LIVE — CBOT YouTube
+                  </Button>
+                </Link>
+                <p className="text-[11px] text-muted-foreground text-center sm:text-left leading-relaxed">
+                  Opens the live streaming studio with CBOT overlay — your name, team, day &amp; timestamp displayed on stream.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="mb-4 flex flex-wrap h-auto gap-2 p-1">
           <TabsTrigger value="profile"><UserCheck className="h-4 w-4 mr-2" /> Profile</TabsTrigger>
@@ -202,49 +402,9 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         </TabsList>
 
         <TabsContent value="profile">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-amber-500" /> Player Profile
-              </CardTitle>
-              <CardDescription>Your personal details and edition history.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <div>
-                            <h3 className="text-sm font-bold text-muted-foreground">Bio</h3>
-                            <p className="text-sm">{currentPlayer.bio || 'No bio provided.'}</p>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-1.5"><MapPin className="h-4 w-4" /> Location</h3>
-                            <p className="text-sm">{currentPlayer.city || 'N/A'}, {currentPlayer.state || 'N/A'}, {currentPlayer.country || 'N/A'}</p>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-muted-foreground mb-2">Category History</h3>
-                        {currentPlayer.rankingSnapshots && currentPlayer.rankingSnapshots.length > 0 ? (
-                            <div className="space-y-2">
-                                {currentPlayer.rankingSnapshots?.map((snapshot: any, idx: any) => (
-                                    <div key={idx} className="flex justify-between items-center p-3 border border-border rounded-lg text-sm bg-muted/20">
-                                        <div>
-                                            <div className="font-bold">{new Date(snapshot.createdAt).toLocaleDateString()}</div>
-                                            <div className="text-xs text-muted-foreground">ELO: {snapshot.rating}</div>
-                                        </div>
-                                        <Badge variant="outline">{snapshot.category}</Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-sm text-muted-foreground p-3 border border-border rounded-lg bg-muted/20 text-center">
-                                No past ranking history available yet.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </CardContent>
-          </Card>
+          <ProfileTab currentPlayer={currentPlayer} currentTeam={currentTeam} />
         </TabsContent>
+
 
         <TabsContent value="team">
             <Card className="border-border">
@@ -276,9 +436,26 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                     <div>
                         <h3 className="text-base font-bold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground"/> Teammates</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {teammates.map((mate: any) => (
-                            <div key={mate.id} className="p-4 rounded-xl border border-border flex items-center gap-3">
-                                <Avatar src={mate.image} fallback={mate.name} size="md" />
+                            {teammates.map((mate: any) => {
+                              // First two letters of name for avatar
+                              const initials = (mate.name || '??')
+                                .split(' ')
+                                .map((w: string) => w[0])
+                                .join('')
+                                .slice(0, 2)
+                                .toUpperCase();
+                              // Average: boardsWon / total matches (wins+losses), fallback to mate.average
+                              const totalMatches = (mate.wins || 0) + (mate.losses || 0);
+                              const avg = mate.average
+                                ? Number(mate.average).toFixed(1)
+                                : totalMatches > 0
+                                  ? ((mate.boardsWon || 0) / totalMatches).toFixed(1)
+                                  : '—';
+                              return (
+                              <div key={mate.id} className="p-4 rounded-xl border border-border flex items-center gap-3 hover:bg-muted/20 transition-colors">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/30 to-orange-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm flex-shrink-0 shadow-inner">
+                                  {initials}
+                                </div>
                                 <div>
                                     <div className="flex items-center gap-1.5">
                                         <span className="font-bold text-sm">{mate.name}</span>
@@ -287,10 +464,11 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                                         )}
                                     </div>
                                     <span className="text-xs text-muted-foreground font-mono">@{mate.username}</span>
-                                    <div className="text-xs font-semibold text-amber-500 mt-0.5">{mate.rating} ELO</div>
+                                    <div className="text-xs font-semibold text-emerald-400 mt-0.5">Avg {avg}</div>
                                 </div>
-                            </div>
-                            ))}
+                              </div>
+                              );
+                            })}
                         </div>
                     </div>
                 </CardContent>
@@ -317,6 +495,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                             <TableHead>Match Format</TableHead>
                             <TableHead>Scheduled Time</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Live Stream Studio</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -339,6 +518,13 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                                 <Badge variant={match.status === 'COMPLETED' ? 'success' : match.status === 'LIVE' ? 'warning' : 'outline'} className="text-[10px]">
                                     {match.status}
                                 </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Link href={`/player/matches/${match.id}/live`}>
+                                <Button variant="carrom" size="sm" className="h-8 px-3 text-[11px] font-black gap-1.5 shadow-md">
+                                  <Radio className="h-3 w-3 animate-pulse" /> START LIVE STREAM
+                                </Button>
+                              </Link>
                             </TableCell>
                             </TableRow>
                         ))}

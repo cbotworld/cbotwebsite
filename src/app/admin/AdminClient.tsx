@@ -10,6 +10,7 @@ import { generateUserCredentials, resetUserPin, updatePlayer, togglePlayerActiva
 import { calculatePlayerCategoriesForDraft, autoGenerateBalancedTeams, publishFinalizedTeams, updateTeamCaptain } from '@/lib/actions/teamManagementActions';
 import { generateRoundRobinFixtures, calculateLeagueStandings, generatePlayoffFixtures, rescheduleFixture } from '@/lib/actions/schedulerActions';
 import { lockMatchLineup, overrideMatchLineup } from '@/lib/actions/lineupActions';
+import { getAdminLiveStreamsAction, expireLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -40,6 +41,22 @@ export default function AdminPortalPage() {
   const [matchesList, setMatchesList] = React.useState<Match[]>(MOCK_MATCHES);
   const [lineupsList, setLineupsList] = React.useState<MatchLineup[]>([]);
   const [standingsList, setStandingsList] = React.useState<StandingRow[]>([]);
+  const [adminStreams, setAdminStreams] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (activeTab === 'streams') {
+      getAdminLiveStreamsAction().then((res) => {
+        if (res.success && res.streams) setAdminStreams(res.streams);
+      });
+    }
+  }, [activeTab]);
+
+  const handleExpireStream = async (streamId: string) => {
+    const res = await expireLiveStreamAction(streamId);
+    if (res.success) {
+      setAdminStreams(adminStreams.map((s) => (s.id === streamId ? { ...s, status: 'EXPIRED' } : s)));
+    }
+  };
 
   // Modals
   const [rescheduleModalOpen, setRescheduleModalOpen] = React.useState(false);
@@ -172,6 +189,9 @@ export default function AdminPortalPage() {
           </TabsTrigger>
           <TabsTrigger value="captains" className="text-xs font-bold gap-1.5 px-3 py-2">
             <Crown className="h-3.5 w-3.5 text-amber-400" /> Team Captains
+          </TabsTrigger>
+          <TabsTrigger value="streams" className="text-xs font-bold gap-1.5 px-3 py-2 text-rose-400">
+            <Radio className="h-3.5 w-3.5 animate-pulse" /> Live Streams
           </TabsTrigger>
         </TabsList>
 
@@ -442,6 +462,112 @@ export default function AdminPortalPage() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* LIVE STREAMS AUDIT TAB */}
+        <TabsContent value="streams" className="space-y-6">
+          <Card className="border-border">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-rose-500 animate-pulse" /> Official CBOT Live Match Streams
+                </CardTitle>
+                <CardDescription>
+                  Monitor real-time player broadcasts, inspect YouTube streams, and manage 15-day retention expirations.
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  getAdminLiveStreamsAction().then((res) => {
+                    if (res.success && res.streams) setAdminStreams(res.streams);
+                  });
+                }}
+                className="text-xs font-bold gap-1.5 border-amber-500/40 text-amber-500"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh Streams
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Match / Edition</TableHead>
+                    <TableHead>Broadcasting Player</TableHead>
+                    <TableHead>Team</TableHead>
+                    <TableHead>Stream Status</TableHead>
+                    <TableHead>Started / Ended</TableHead>
+                    <TableHead>15-Day Expiry</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adminStreams.map((st) => (
+                    <TableRow key={st.id}>
+                      <TableCell className="font-mono text-xs font-bold">
+                        <div>Match #{st.match?.matchNumber || '1'}</div>
+                        <div className="text-[10px] text-muted-foreground">{st.edition?.title || 'Edition #200'}</div>
+                      </TableCell>
+                      <TableCell className="font-bold text-xs">
+                        {st.player?.name || st.player?.username || 'Player'}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-amber-500">
+                        {st.team?.name || 'Team'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            st.status === 'LIVE'
+                              ? 'destructive'
+                              : st.status === 'ARCHIVED'
+                              ? 'success'
+                              : st.status === 'EXPIRED'
+                              ? 'secondary'
+                              : 'outline'
+                          }
+                          className="text-[10px]"
+                        >
+                          {st.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        <div>Start: {st.streamStartedAt ? new Date(st.streamStartedAt).toLocaleTimeString() : 'N/A'}</div>
+                        <div>End: {st.streamEndedAt ? new Date(st.streamEndedAt).toLocaleTimeString() : 'N/A'}</div>
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px]">
+                        {st.expiresAt ? new Date(st.expiresAt).toLocaleDateString() : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Link href={`/matches/${st.matchId}`} target="_blank">
+                          <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold">
+                            <Eye className="h-3 w-3 mr-1" /> View Match Page
+                          </Button>
+                        </Link>
+                        {st.status !== 'EXPIRED' && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleExpireStream(st.id)}
+                            className="h-7 text-[10px] font-bold"
+                          >
+                            Expire Now
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {adminStreams.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
+                        No match live streams recorded in system yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

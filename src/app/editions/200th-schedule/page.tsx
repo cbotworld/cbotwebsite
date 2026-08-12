@@ -348,8 +348,10 @@ export default function BicentennialSchedulePage() {
               {/* MATCH FIXTURES LIST */}
               <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {m.matches.map((match, matchIdx) => {
-                  const t1 = TEAMS_INFO[match.team1] || { logo: '/logo.png', tag: 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
-                  const t2 = TEAMS_INFO[match.team2] || { logo: '/logo.png', tag: 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const t1KeyUpper = match.team1?.trim().toUpperCase();
+                  const t2KeyUpper = match.team2?.trim().toUpperCase();
+                  const t1 = TEAMS_INFO[t1KeyUpper] || { logo: '/logo.png', tag: 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const t2 = TEAMS_INFO[t2KeyUpper] || { logo: '/logo.png', tag: 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
 
                   const isMatchHighlighted = searchTerm.trim() && (
                     match.team1.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
@@ -359,41 +361,55 @@ export default function BicentennialSchedulePage() {
                   return (
                     <div
                       key={matchIdx}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                      className={`p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                         isMatchHighlighted
                           ? 'border-amber-400 bg-amber-500/15 shadow-md shadow-amber-500/20'
-                          : 'border-border/60 bg-background/50 hover:border-amber-500/40 hover:bg-card'
+                          : 'border-border/70 bg-card/90 hover:border-amber-500/40 hover:bg-card'
                       }`}
                     >
                       {/* Team 1 */}
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <img
-                          src={t1.logo}
-                          alt={match.team1}
-                          className={`h-9 w-9 rounded-full object-cover border ${t1.border} shrink-0 shadow-md`}
-                        />
-                        <span className={`text-xs font-black truncate ${t1.color}`} title={match.team1}>
-                          {match.team1}
-                        </span>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                          <img
+                            src={t1.logo}
+                            alt={match.team1}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <span className={`text-xs sm:text-sm font-black truncate block ${t1.color}`} title={match.team1}>
+                            {match.team1}
+                          </span>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                            {t1.tag}
+                          </span>
+                        </div>
                       </div>
 
                       {/* VS Divider */}
                       <div className="flex flex-col items-center justify-center shrink-0 px-2">
-                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
-                          WILL PLAY
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg shadow-sm">
+                          VS
                         </span>
                       </div>
 
                       {/* Team 2 */}
-                      <div className="flex items-center justify-end gap-2.5 flex-1 min-w-0 text-right">
-                        <span className={`text-xs font-black truncate ${t2.color}`} title={match.team2}>
-                          {match.team2}
-                        </span>
-                        <img
-                          src={t2.logo}
-                          alt={match.team2}
-                          className={`h-9 w-9 rounded-full object-cover border ${t2.border} shrink-0 shadow-md`}
-                        />
+                      <div className="flex items-center justify-end gap-3 flex-1 min-w-0 text-right">
+                        <div className="min-w-0">
+                          <span className={`text-xs sm:text-sm font-black truncate block ${t2.color}`} title={match.team2}>
+                            {match.team2}
+                          </span>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                            {t2.tag}
+                          </span>
+                        </div>
+                        <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                          <img
+                            src={t2.logo}
+                            alt={match.team2}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
                       </div>
                     </div>
                   );

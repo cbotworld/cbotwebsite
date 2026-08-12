@@ -163,15 +163,15 @@ const OFFICIAL_TEAM_COMBIS: Record<string, {
     triples2: 'V SHIVALKAR, MANOJ PS, KRUTIKA',
   },
   'PLYWOOD PIONEERS': {
-    singles1: 'BALACHANDRA HEGDE',
-    singles2: 'SRIKANTH VETSA',
-    singles3: 'JP JAYARAJ',
-    singles4: 'ABHIJIT',
-    doubles1: 'RAMESH, GURMIT SINGH',
-    doubles2: 'ALOK SINGH, MOKSHA P',
-    doubles3: 'SREERANJ RS, AJAY SINHA',
-    triples1: 'BALACHANDRA HEGDE, SRIKANTH VETSA, RAMESH',
-    triples2: 'JP JAYARAJ, ALOK SINGH, VISHAL SHERGAL',
+    singles1: 'ABHIJIT',
+    singles2: 'JP JAYARAJ',
+    singles3: 'JAYAKUMAR AP',
+    singles4: 'ADITYA SAREPALLI',
+    doubles1: 'IMTIYAZ AHAMED, SHASHIREKHA KK',
+    doubles2: 'TN MAHESH, SHRIKANT',
+    doubles3: 'SACHIN SURVE, PADMARAJ',
+    triples1: 'HARIPRASAD D, MATHAIS, JAINUDDIN SHEIKH',
+    triples2: 'ARUNASRI, BALWANT SINGH, ANIL BHATIA',
   },
   'VINTAGE STRIKERS': {
     singles1: 'SHYAM SUNDAR',
@@ -185,26 +185,26 @@ const OFFICIAL_TEAM_COMBIS: Record<string, {
     triples2: 'A KUMAR, RV SRINIVASA RAO, KANNAN',
   },
   'EBONY OVERLORDS': {
-    singles1: 'CHARI',
-    singles2: 'NEELA',
-    singles3: 'MANOJ PS',
-    singles4: 'PRASANNA KUMAR',
-    doubles1: 'CHARI, NEELA',
-    doubles2: 'MANOJ PS, PRASANNA KUMAR',
-    doubles3: 'ARUN VENKATESH, RK TOLETY',
-    triples1: 'CHARI, NEELA, MANOJ PS',
-    triples2: 'PRASANNA KUMAR, ARUN VENKATESH, RK TOLETY',
+    singles1: 'LALIT',
+    singles2: 'PIERRE DUBOIS',
+    singles3: 'CHANDRU',
+    singles4: 'SUBHO',
+    doubles1: 'KIRAN KUMAR REGI, NSK',
+    doubles2: 'ALOK SINGH, SREERANJ RS',
+    doubles3: 'PRATHAMESH GHARAT, TRIVIKRAM',
+    triples1: 'POORNIMA, VENKATESWARLU Y, VIVEK N',
+    triples2: 'SURENDER, NEELA, SRIDEVI',
   },
   'POCKET DYNAMOS': {
-    singles1: 'AMAR INGLE',
-    singles2: 'UDIPTA DEKA',
-    singles3: 'HEMANTH NS',
-    singles4: 'SIRAJ',
-    doubles1: 'AMAR INGLE, HEMANTH NS',
-    doubles2: 'UDIPTA DEKA, SIRAJ',
-    doubles3: 'KIRAN BHAT, SACHIN SURVE',
-    triples1: 'AMAR INGLE, UDIPTA DEKA, HEMANTH NS',
-    triples2: 'SIRAJ, KIRAN BHAT, SACHIN SURVE',
+    singles1: 'RAMESH',
+    singles2: 'BALACHANDRA HEGDE',
+    singles3: 'SRIKANTH VETSA',
+    singles4: 'UDIPTA DEKA',
+    doubles1: 'SWAPNIL DESHPANDE, SATISH DALVI',
+    doubles2: 'ISMAILNEAL AZMEEN, AJAY SINHA',
+    doubles3: 'VEERA SEKHAR, APEKSHA BANDARI',
+    triples1: 'VINEETH VIJAYAPURAM, KIRAN SOMAN, SHEKHAR DHARA',
+    triples2: 'SUMA NAVEEN, ROHIT PACKIYA, HEMACHANDRA KUMAR Y',
   },
 };
 
@@ -214,7 +214,8 @@ function getTeamCombiForDay(
   teamsList: any[]
 ): Record<string, string> {
   const isDay1 = Number(dayNum) === 1;
-  const defaultCombi: any = isDay1 ? (OFFICIAL_TEAM_COMBIS[teamKey] || {}) : {};
+  const keyUpper = teamKey.trim().toUpperCase();
+  const defaultCombi: any = isDay1 ? (OFFICIAL_TEAM_COMBIS[keyUpper] || {}) : {};
 
   const notSubmittedFallback = isDay1 ? 'Player' : 'Not Submitted Yet';
 
@@ -236,8 +237,7 @@ function getTeamCombiForDay(
     if (!t || !t.name) return false;
     const nameUpper = t.name.trim().toUpperCase();
     const tagUpper = t.tag?.trim().toUpperCase();
-    const keyUpper = teamKey.trim().toUpperCase();
-    const teamInfoName = TEAMS_INFO[teamKey]?.name?.trim().toUpperCase();
+    const teamInfoName = TEAMS_INFO[keyUpper]?.name?.trim().toUpperCase();
     return nameUpper === keyUpper || tagUpper === keyUpper || (teamInfoName && nameUpper === teamInfoName);
   });
 
@@ -378,10 +378,10 @@ const SAMPLE_COMBIS_DATA: DayCombiFixture[] = [
     startIso: '2026-08-14T20:00:00+05:30',
     cutoffIso: '2026-08-14T21:30:00+05:30',
     matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'POCKET DYNAMOS', events: [] },
-      { team1Key: 'VANILLA FALCONS', team2Key: 'SUPERNOVA QUEEN', events: [] },
-      { team1Key: 'EBONY OVERLORDS', team2Key: 'LUMEN PILLAR', events: [] },
-      { team1Key: 'BORIC SPEEDSTERS', team2Key: 'VINTAGE STRIKERS', events: [] },
+      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'LUMEN PILLAR', events: [] },
+      { team1Key: 'SUPERNOVA QUEEN', team2Key: 'VINTAGE STRIKERS', events: [] },
+      { team1Key: 'POCKET DYNAMOS', team2Key: 'BORIC SPEEDSTERS', events: [] },
+      { team1Key: 'VANILLA FALCONS', team2Key: 'EBONY OVERLORDS', events: [] },
     ],
   },
   {
@@ -392,10 +392,10 @@ const SAMPLE_COMBIS_DATA: DayCombiFixture[] = [
     startIso: '2026-08-15T20:00:00+05:30',
     cutoffIso: '2026-08-15T21:30:00+05:30',
     matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'LUMEN PILLAR', events: [] },
+      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'BORIC SPEEDSTERS', events: [] },
+      { team1Key: 'VINTAGE STRIKERS', team2Key: 'EBONY OVERLORDS', events: [] },
+      { team1Key: 'LUMEN PILLAR', team2Key: 'VANILLA FALCONS', events: [] },
       { team1Key: 'SUPERNOVA QUEEN', team2Key: 'POCKET DYNAMOS', events: [] },
-      { team1Key: 'VANILLA FALCONS', team2Key: 'BORIC SPEEDSTERS', events: [] },
-      { team1Key: 'EBONY OVERLORDS', team2Key: 'VINTAGE STRIKERS', events: [] },
     ],
   },
   {
@@ -406,10 +406,10 @@ const SAMPLE_COMBIS_DATA: DayCombiFixture[] = [
     startIso: '2026-08-16T20:00:00+05:30',
     cutoffIso: '2026-08-16T21:30:00+05:30',
     matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'BORIC SPEEDSTERS', events: [] },
-      { team1Key: 'VINTAGE STRIKERS', team2Key: 'SUPERNOVA QUEEN', events: [] },
-      { team1Key: 'LUMEN PILLAR', team2Key: 'VANILLA FALCONS', events: [] },
-      { team1Key: 'POCKET DYNAMOS', team2Key: 'EBONY OVERLORDS', events: [] },
+      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'POCKET DYNAMOS', events: [] },
+      { team1Key: 'VANILLA FALCONS', team2Key: 'SUPERNOVA QUEEN', events: [] },
+      { team1Key: 'EBONY OVERLORDS', team2Key: 'LUMEN PILLAR', events: [] },
+      { team1Key: 'BORIC SPEEDSTERS', team2Key: 'VINTAGE STRIKERS', events: [] },
     ],
   },
 ];
@@ -463,10 +463,12 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
   })).filter((m) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
-    const t1 = TEAMS_INFO[m.team1Key]?.name.toLowerCase() || '';
-    const t2 = TEAMS_INFO[m.team2Key]?.name.toLowerCase() || '';
-    const c1 = TEAMS_INFO[m.team1Key]?.captain.toLowerCase() || '';
-    const c2 = TEAMS_INFO[m.team2Key]?.captain.toLowerCase() || '';
+    const t1KeyUpper = m.team1Key?.trim().toUpperCase();
+    const t2KeyUpper = m.team2Key?.trim().toUpperCase();
+    const t1 = TEAMS_INFO[t1KeyUpper]?.name.toLowerCase() || '';
+    const t2 = TEAMS_INFO[t2KeyUpper]?.name.toLowerCase() || '';
+    const c1 = TEAMS_INFO[t1KeyUpper]?.captain.toLowerCase() || '';
+    const c2 = TEAMS_INFO[t2KeyUpper]?.captain.toLowerCase() || '';
     const inEvents = m.events.some((e) => e.leftPlayers.toLowerCase().includes(term) || e.rightPlayers.toLowerCase().includes(term));
     return t1.includes(term) || t2.includes(term) || c1.includes(term) || c2.includes(term) || inEvents;
   });
@@ -650,8 +652,10 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
           {/* MATCH CARDS GRID (2x2 LAYOUT TO FIT ALL 4 MATCHES IN FRAME) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {filteredMatches.map((match, mIdx) => {
-            const t1 = TEAMS_INFO[match.team1Key] || { name: match.team1Key, tag: 'T1', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
-            const t2 = TEAMS_INFO[match.team2Key] || { name: match.team2Key, tag: 'T2', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
+            const t1KeyUpper = match.team1Key?.trim().toUpperCase();
+            const t2KeyUpper = match.team2Key?.trim().toUpperCase();
+            const t1 = TEAMS_INFO[t1KeyUpper] || { name: match.team1Key, tag: 'T1', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
+            const t2 = TEAMS_INFO[t2KeyUpper] || { name: match.team2Key, tag: 'T2', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
 
             return (
               <div
@@ -661,17 +665,19 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
                 {/* REFINED MATCH HEADER */}
                 <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-3 border-b border-amber-500/20 grid grid-cols-12 gap-2 items-center relative">
                   {/* Left Team */}
-                  <div className="col-span-5 flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={t1.logo}
-                      alt={t1.name}
-                      className={`h-10 w-10 rounded-full object-cover border-2 ${t1.border} shadow-md shrink-0`}
-                    />
+                  <div className="col-span-5 flex items-center gap-3 min-w-0">
+                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                      <img
+                        src={t1.logo}
+                        alt={t1.name}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
                     <div className="leading-tight min-w-0">
                       <div className="text-xs sm:text-sm font-black text-foreground truncate">
                         <span className={t1.color}>{t1.name}</span> <span className="text-[10px] opacity-80">({t1.tag})</span>
                       </div>
-                      <div className="text-[10px] font-bold text-muted-foreground truncate">
+                      <div className="text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t1.captain}</span>
                       </div>
                     </div>
@@ -679,26 +685,28 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
 
                   {/* Center VS Badge */}
                   <div className="col-span-2 flex items-center justify-center">
-                    <div className="h-7 w-7 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-[10px] font-black text-amber-400 shadow-md">
+                    <div className="h-8 w-8 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-xs font-black text-amber-400 shadow-md">
                       VS
                     </div>
                   </div>
 
                   {/* Right Team */}
-                  <div className="col-span-5 flex items-center justify-end gap-2.5 text-right min-w-0">
+                  <div className="col-span-5 flex items-center justify-end gap-3 text-right min-w-0">
                     <div className="leading-tight min-w-0">
                       <div className="text-xs sm:text-sm font-black text-foreground truncate">
                         <span className={t2.color}>{t2.name}</span> <span className="text-[10px] opacity-80">({t2.tag})</span>
                       </div>
-                      <div className="text-[10px] font-bold text-muted-foreground truncate">
+                      <div className="text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t2.captain}</span>
                       </div>
                     </div>
-                    <img
-                      src={t2.logo}
-                      alt={t2.name}
-                      className={`h-10 w-10 rounded-full object-cover border-2 ${t2.border} shadow-md shrink-0`}
-                    />
+                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                      <img
+                        src={t2.logo}
+                        alt={t2.name}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
                   </div>
                 </div>
 

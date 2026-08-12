@@ -121,6 +121,9 @@ export async function updatePlayerProfileDetails(userId: string, data: {
   email?: string;
   age?: number;
   gender?: string;
+  city?: string;
+  state?: string;
+  country?: string;
 }) {
   try {
     const cleanUsername = (data.username || '').toLowerCase();
@@ -165,6 +168,9 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           ...(data.email !== undefined && { email: data.email }),
           ...(data.age !== undefined && { age: data.age }),
           ...(data.gender !== undefined && { gender: data.gender }),
+          ...(data.city !== undefined && { city: data.city }),
+          ...(data.state !== undefined && { state: data.state }),
+          ...(data.country !== undefined && { country: data.country }),
         },
       });
     } else {
@@ -184,6 +190,9 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           email: data.email || undefined,
           age: data.age || undefined,
           gender: data.gender || undefined,
+          city: data.city || undefined,
+          state: data.state || undefined,
+          country: data.country || undefined,
         }
       });
     }
@@ -219,6 +228,61 @@ export async function togglePlayerActivation(userId: string) {
   }
 }
 
+/**
+ * Self-service profile update for any logged-in player.
+ * BLOCKED fields (organiser-controlled): name, username, average, target, rating, wins, losses, boardsWon, queenStrikes
+ * EDITABLE fields: bio, city, state, country, whatsApp, email, age, gender
+ */
+export async function updateMyProfile(data: {
+  bio?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  whatsApp?: string;
+  email?: string;
+  age?: number | null;
+  gender?: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session || !(session.user as any)?.id) {
+    return { success: false, error: 'Unauthorized: Please log in.' };
+  }
+  const userId = (session.user as any).id;
+
+  // Email uniqueness check if email provided
+  if (data.email && data.email.trim()) {
+    const cleanEmail = data.email.trim().toLowerCase();
+    const duplicate = await prisma.user.findFirst({
+      where: { email: { equals: cleanEmail, mode: 'insensitive' }, NOT: { id: userId } }
+    });
+    if (duplicate) {
+      return { success: false, error: `Email is already in use by another account.` };
+    }
+  }
+
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.bio !== undefined && { bio: data.bio || null }),
+        ...(data.city !== undefined && { city: data.city || null }),
+        ...(data.state !== undefined && { state: data.state || null }),
+        ...(data.country !== undefined && { country: data.country || null }),
+        ...(data.whatsApp !== undefined && { whatsApp: data.whatsApp || null }),
+        ...(data.email !== undefined && { email: data.email?.trim() || null }),
+        ...(data.age !== undefined && { age: data.age }),
+        ...(data.gender !== undefined && { gender: data.gender || null }),
+      },
+    });
+
+    revalidatePath('/dashboard/player');
+
+    return { success: true, user: { ...updated, pin: undefined } };
+  } catch (error: any) {
+    console.error('updateMyProfile error:', error);
+    return { success: false, error: 'Failed to save profile changes.' };
+  }
+}
 export async function deletePlayer(userId: string) {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
