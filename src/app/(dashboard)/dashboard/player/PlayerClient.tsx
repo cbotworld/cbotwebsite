@@ -449,11 +449,12 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                   const myTeamLogo = isMyTeam1 ? (match.team1?.logo || currentTeam.logo) : (match.team2?.logo || currentTeam.logo);
                   const oppTeamLogo = isMyTeam1 ? match.team2?.logo : match.team1?.logo;
                   const dayNum = idx + 1;
+                  const matchStreams = (initialStreams || []).filter((s: any) => s.matchId === match.id);
 
                   return (
                     <div
                       key={match.id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border backdrop-blur-sm transition-all ${
+                      className={`p-4 rounded-2xl border backdrop-blur-sm transition-all space-y-3 ${
                         isCurrentlyLive
                           ? 'bg-red-500/5 border-red-500/30 shadow-md shadow-red-500/10'
                           : isCompleted
@@ -463,133 +464,154 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                           : 'bg-background/50 border-border hover:border-amber-500/30'
                       }`}
                     >
-                      {/* Day tag + status */}
-                      <div className="flex items-center gap-3 min-w-[70px]">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Day</span>
-                          <span className={`text-2xl font-black leading-none ${
-                            isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : !allowed ? 'text-muted-foreground/40' : 'text-amber-400'
-                          }`}>{dayNum}</span>
-                          {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                          {!allowed && !isCompleted && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
-                          {isCurrentlyLive && <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />}
+                      {/* Main Match Row */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        {/* Day tag + status */}
+                        <div className="flex items-center gap-3 min-w-[70px]">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Day</span>
+                            <span className={`text-2xl font-black leading-none ${
+                              isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : !allowed ? 'text-muted-foreground/40' : 'text-amber-400'
+                            }`}>{dayNum}</span>
+                            {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                            {!allowed && !isCompleted && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
+                            {isCurrentlyLive && <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* My Team */}
-                      <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
-                        {myTeamLogo ? (
-                          <img src={myTeamLogo} alt={myTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm">
-                            {myTeamName?.[0]}
-                          </div>
-                        )}
-                        <span className="text-[10px] font-black text-amber-400 text-center leading-tight truncate max-w-[80px]">{myTeamName}</span>
-                        <Badge variant="carrom" className="text-[8px] px-1.5 py-0">YOU</Badge>
-                      </div>
-
-                      {/* VS */}
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-lg font-black text-muted-foreground/40">VS</span>
-                        <span className="text-[9px] text-muted-foreground/50 font-mono">
-                          {new Date(match.scheduledTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground/40">Tbl #{match.tableNumber || 1}</span>
-                      </div>
-
-                      {/* Opponent */}
-                      <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
-                        {oppTeamLogo ? (
-                          <img src={oppTeamLogo} alt={oppTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-sm">
-                            {oppTeamName?.[0] || '?'}
-                          </div>
-                        )}
-                        <span className="text-[10px] font-bold text-foreground text-center leading-tight truncate max-w-[80px]">{oppTeamName}</span>
-                        <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">OPP</Badge>
-                      </div>
-
-                      {/* Status + Go Live button */}
-                      <div className="flex flex-col sm:items-end gap-2 ml-auto">
-                        {/* Status badge + Copy Link */}
-                        <div className="flex items-center gap-1.5">
-                          <Badge
-                            variant={isCompleted ? 'success' : isCurrentlyLive ? 'warning' : 'outline'}
-                            className="text-[9px]"
-                          >
-                            {match.status}
-                          </Badge>
-                          {isReplay && (
-                            <Badge className="text-[9px] bg-violet-500/20 text-violet-400 border-violet-500/20 border">
-                              📹 Streamed
-                            </Badge>
+                        {/* My Team */}
+                        <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
+                          {myTeamLogo ? (
+                            <img src={myTeamLogo} alt={myTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm">
+                              {myTeamName?.[0]}
+                            </div>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 rounded-md p-0 flex items-center justify-center shrink-0"
-                            title="Copy shareable live link"
-                            onClick={() => handleCopyLink(match.id)}
-                          >
-                            {copiedMatchId === match.id ? (
-                              <span className="text-[8px] font-black text-amber-400 animate-pulse">Copied!</span>
-                            ) : (
-                              <Share2 className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
+                          <span className="text-[10px] font-black text-amber-400 text-center leading-tight truncate max-w-[80px]">{myTeamName}</span>
+                          <Badge variant="carrom" className="text-[8px] px-1.5 py-0">YOU</Badge>
                         </div>
 
-                        {/* Go Live button — 4 states */}
-                        {isPastMatch(match) ? (
-                          <Button
-                            size="sm"
-                            disabled
-                            className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full sm:w-auto"
-                          >
-                            🔒 Closed
-                          </Button>
-                        ) : isCurrentlyLive ? (
-                          <Button
-                            size="sm"
-                            className="h-9 px-4 text-[11px] font-black gap-2 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 w-full sm:w-auto"
-                            onClick={() => handleGoLiveClick(match, idx)}
-                          >
-                            <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
-                            LIVE NOW
-                          </Button>
-                        ) : !allowed ? (
-                          <Button
-                            size="sm"
-                            disabled
-                            className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full sm:w-auto"
-                            title={`Complete Day ${blockedByDay} first`}
-                          >
-                            <Lock className="h-3.5 w-3.5" />
-                            Day {blockedByDay} First
-                          </Button>
-                        ) : isReplay ? (
-                          <Button
-                            size="sm"
-                            className="h-9 px-4 text-[11px] font-black gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20 w-full sm:w-auto"
-                            onClick={() => handleGoLiveClick(match, idx)}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            GO LIVE AGAIN
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="carrom"
-                            size="sm"
-                            className="h-9 px-4 text-[11px] font-black gap-2 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all w-full sm:w-auto"
-                            onClick={() => handleGoLiveClick(match, idx)}
-                          >
-                            <Radio className="h-3.5 w-3.5 animate-pulse" />
-                            🔴 GO LIVE
-                          </Button>
-                        )}
+                        {/* VS */}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-lg font-black text-muted-foreground/40">VS</span>
+                          <span className="text-[9px] text-muted-foreground/50 font-mono">
+                            {new Date(match.scheduledTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/40">Tbl #{match.tableNumber || 1}</span>
+                        </div>
+
+                        {/* Opponent */}
+                        <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
+                          {oppTeamLogo ? (
+                            <img src={oppTeamLogo} alt={oppTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-sm">
+                              {oppTeamName?.[0] || '?'}
+                            </div>
+                          )}
+                          <span className="text-[10px] font-bold text-foreground text-center leading-tight truncate max-w-[80px]">{oppTeamName}</span>
+                          <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">OPP</Badge>
+                        </div>
+
+                        {/* Status + Go Live button */}
+                        <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto sm:ml-auto">
+                          {/* Status badge + Copy Link */}
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant={isCompleted ? 'success' : isCurrentlyLive ? 'warning' : 'outline'}
+                              className="text-[9px]"
+                            >
+                              {match.status}
+                            </Badge>
+                            {isReplay && (
+                              <Badge className="text-[9px] bg-violet-500/20 text-violet-400 border-violet-500/20 border">
+                                📹 Streamed
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 rounded-md p-0 flex items-center justify-center shrink-0"
+                              title="Copy shareable live link"
+                              onClick={() => handleCopyLink(match.id)}
+                            >
+                              {copiedMatchId === match.id ? (
+                                <span className="text-[8px] font-black text-amber-400 animate-pulse">Copied!</span>
+                              ) : (
+                                <Share2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Go Live button — 4 states */}
+                          {isPastMatch(match) ? (
+                            <Button
+                              size="sm"
+                              disabled
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full sm:w-auto"
+                            >
+                              🔒 Closed
+                            </Button>
+                          ) : isCurrentlyLive ? (
+                            <Button
+                              size="sm"
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 w-full sm:w-auto"
+                              onClick={() => handleGoLiveClick(match, idx)}
+                            >
+                              <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+                              LIVE NOW
+                            </Button>
+                          ) : !allowed ? (
+                            <Button
+                              size="sm"
+                              disabled
+                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full sm:w-auto"
+                              title={`Complete Day ${blockedByDay} first`}
+                            >
+                              <Lock className="h-3.5 w-3.5" />
+                              Day {blockedByDay} First
+                            </Button>
+                          ) : isReplay ? (
+                            <Button
+                              size="sm"
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20 w-full sm:w-auto"
+                              onClick={() => handleGoLiveClick(match, idx)}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              GO LIVE AGAIN
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="carrom"
+                              size="sm"
+                              className="h-9 px-4 text-[11px] font-black gap-2 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all w-full sm:w-auto"
+                              onClick={() => handleGoLiveClick(match, idx)}
+                            >
+                              <Radio className="h-3.5 w-3.5 animate-pulse" />
+                              🔴 GO LIVE
+                            </Button>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Streams list (Watch Later) */}
+                      {matchStreams.length > 0 && (
+                        <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[10px]">
+                          <span className="text-muted-foreground font-semibold uppercase tracking-wider mr-1">🎥 Stream Recordings:</span>
+                          {matchStreams.map((stream: any, sIdx: number) => (
+                            <a
+                              key={stream.id}
+                              href={stream.youtubeUrl || `https://www.youtube.com/watch?v=${stream.youtubeVideoId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-border text-amber-400 font-bold hover:text-amber-300 transition-colors"
+                            >
+                              <PlayCircle className="h-3 w-3" /> Stream #{matchStreams.length - sIdx}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })

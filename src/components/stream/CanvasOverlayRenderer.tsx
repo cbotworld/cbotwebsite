@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -56,6 +56,7 @@ export default function CanvasOverlayRenderer({
 }: CanvasOverlayRendererProps) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
   const animFrameIdRef = React.useRef<number | null>(null);
 
   const [cameraPermission, setCameraPermission] = React.useState<'granted' | 'denied' | 'pending'>('pending');
@@ -63,6 +64,29 @@ export default function CanvasOverlayRenderer({
   const [currentTimeStr, setCurrentTimeStr] = React.useState<string>('');
   const [elapsedTimerStr, setElapsedTimerStr] = React.useState<string>('00:00:00');
   const [isPortrait, setIsPortrait] = React.useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = React.useState<boolean>(false);
+
+  // Handle Fullscreen Event Changes
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch((err) => {
+        console.error('Error entering fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen().catch((err) => {
+        console.error('Error exiting fullscreen:', err);
+      });
+    }
+  };
 
   // Monitor orientation/resize to detect portrait mode
   React.useEffect(() => {
@@ -306,7 +330,7 @@ export default function CanvasOverlayRenderer({
       />
 
       {/* Main Responsive Stream Canvas Box */}
-      <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/50 bg-slate-950 shadow-2xl aspect-video w-full">
+      <div ref={containerRef} className="relative rounded-3xl overflow-hidden border-2 border-amber-500/50 bg-slate-950 shadow-2xl aspect-video w-full">
         <canvas
           ref={canvasRef}
           width={1280}
@@ -350,17 +374,33 @@ export default function CanvasOverlayRenderer({
           </div>
         )}
 
-        {/* Camera Switch Floating Button */}
+        {/* Camera Control Action Bar */}
         {cameraPermission === 'granted' && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            {/* Fullscreen Button */}
+            <Button
+              onClick={toggleFullscreen}
+              variant="outline"
+              size="icon"
+              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 h-8 w-8 rounded-xl shadow-lg"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
+            </Button>
+
+            {/* Rear/Front Camera Toggle Button */}
             <Button
               onClick={toggleCamera}
               variant="outline"
               size="sm"
-              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 text-xs font-black rounded-xl gap-2 shadow-lg"
+              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 text-xs font-black rounded-xl gap-2 shadow-lg h-8"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>{facingMode === 'environment' ? 'Rear Camera' : 'Front Camera'}</span>
+              <span>{facingMode === 'environment' ? 'Rear' : 'Front'}</span>
             </Button>
           </div>
         )}
