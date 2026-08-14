@@ -332,58 +332,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         </div>
       </div>
 
-      {/* KPI Cards — Matches Played · Average · Bonus Won · Slams */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {/* Matches Played */}
-        <Card className="p-5 border-border bg-gradient-to-br from-amber-500/10 to-amber-500/5 hover:shadow-amber-500/10 hover:shadow-md transition-shadow">
-          <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" /> Matches Played
-          </div>
-          <div className="text-4xl font-black text-foreground mt-2">
-            {(currentPlayer.wins || 0) + (currentPlayer.losses || 0)}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            {currentPlayer.wins || 0}W &nbsp;/&nbsp; {currentPlayer.losses || 0}L
-          </div>
-        </Card>
 
-        {/* Average */}
-        <Card className="p-5 border-border bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 hover:shadow-emerald-500/10 hover:shadow-md transition-shadow">
-          <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
-            <Target className="h-3.5 w-3.5" /> Average
-          </div>
-          <div className="text-4xl font-black text-foreground mt-2">
-            {currentPlayer.average
-              ? Number(currentPlayer.average).toFixed(1)
-              : ((currentPlayer.wins || 0) + (currentPlayer.losses || 0)) > 0
-                ? ((currentPlayer.boardsWon || 0) / ((currentPlayer.wins || 0) + (currentPlayer.losses || 0))).toFixed(1)
-                : '0.0'}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">Player Average</div>
-        </Card>
-
-        {/* Bonus Won */}
-        <Card className="p-5 border-border bg-gradient-to-br from-violet-500/10 to-violet-500/5 hover:shadow-violet-500/10 hover:shadow-md transition-shadow">
-          <div className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Trophy className="h-3.5 w-3.5" /> Bonus Won
-          </div>
-          <div className="text-4xl font-black text-foreground mt-2">
-            {currentPlayer.queenStrikes || 0}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">Queen covers (bonus pts)</div>
-        </Card>
-
-        {/* Slams */}
-        <Card className="p-5 border-border bg-gradient-to-br from-rose-500/10 to-rose-500/5 hover:shadow-rose-500/10 hover:shadow-md transition-shadow">
-          <div className="text-[10px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
-            <Crown className="h-3.5 w-3.5" /> Slams
-          </div>
-          <div className="text-4xl font-black text-foreground mt-2">
-            {currentPlayer.boardsWon || 0}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">Total boards won</div>
-        </Card>
-      </div>
 
       {/* ── ALL MATCHES & GO LIVE LIST ────────────────────────────────────────── */}
       {currentTeam?.id && (
