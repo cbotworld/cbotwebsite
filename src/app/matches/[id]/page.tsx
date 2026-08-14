@@ -121,15 +121,33 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
           {/* 1. Live Stream or Archived Video Embed */}
           {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
-            <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
-              <iframe
-                src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
-                title={`CBOT ${matchId} Video`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                className="h-full w-full border-0"
-              />
-            </div>
+            (stream.youtubeVideoId?.startsWith('cbot_yt_') || stream.youtubeEmbedUrl?.includes('cbot_yt_')) ? (
+              /* Offline Testing / Sandbox Fallback Mode Screen */
+              <div className="rounded-2xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
+                <div className="h-16 w-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 animate-pulse">
+                  <Radio className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-xl font-extrabold text-amber-400 uppercase tracking-wide">SANDBOX FALLBACK MODE ACTIVE</h4>
+                  <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+                    The YouTube Live API integration is running in offline testing/sandbox mode because the Google Channel API is not yet authorized or authorized credentials were bypassed.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground max-w-md mx-auto leading-normal">
+                    🔒 Player broadcast streams are active on local RTMP studio testkeys, but no public YouTube video exists. Administrators can complete YouTube authorization in the Admin portal to enable official public streams.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
+                <iframe
+                  src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
+                  title={`CBOT ${matchId} Video`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="h-full w-full border-0"
+                />
+              </div>
+            )
           ) : isExpired ? (
             /* 2. Expired Video Container */
             <div className="rounded-2xl border border-border bg-slate-900/90 p-10 text-center space-y-3">
