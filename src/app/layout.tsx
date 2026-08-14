@@ -26,6 +26,9 @@ export const metadata: Metadata = {
     images: [{ url: '/logo.png', width: 500, height: 500, alt: 'Carrom Balu Online Tournament Logo' }],
     type: 'website',
   },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+  },
 };
 
 export default function RootLayout({

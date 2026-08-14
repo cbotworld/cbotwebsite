@@ -307,7 +307,11 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
   }
 }
 
-export async function sendFinalDailyLineupSummaryAction(dayNumber: number) {
+export async function sendFinalDailyLineupSummaryAction(dayNumber: number): Promise<{ success: boolean; previewUrl?: string | null; error?: string; message?: string }> {
+  // Email sending is disabled per user request
+  return { success: true, message: 'Email sending is disabled.' };
+
+  /*
   try {
     const activeEdition = await prisma.edition.findFirst({
       orderBy: { number: 'desc' },
@@ -416,4 +420,5 @@ export async function sendFinalDailyLineupSummaryAction(dayNumber: number) {
     console.error('[sendFinalDailyLineupSummaryAction] Error:', error);
     return { success: false, error: error?.message || 'Failed to send 9:45 PM IST summary email' };
   }
+  */
 }
