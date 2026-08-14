@@ -5,8 +5,10 @@ import { prisma } from '@/lib/prisma';
 // Historical baseline visitor count for CBOT website
 const INITIAL_BASELINE = 12450;
 let inMemoryFallback = INITIAL_BASELINE;
+let tableChecked = false;
 
 async function ensureTableExists() {
+  if (tableChecked) return;
   try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "VisitorCount" (
@@ -15,6 +17,7 @@ async function ensureTableExists() {
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    tableChecked = true;
   } catch (err) {
     // Ignore if table exists or raw query unsupported
   }

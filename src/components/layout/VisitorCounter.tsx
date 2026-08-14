@@ -55,14 +55,7 @@ export function VisitorCounter() {
     // 1. Initial hit
     initialRecordAndFetch();
 
-    // 2. Poll every 10 seconds for live updates when other users visit
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchLatestCount();
-      }
-    }, 10000);
-
-    // 3. Immediately refresh when user switches back to this tab
+    // 2. Immediately refresh when user switches back to this tab
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         fetchLatestCount();
@@ -73,7 +66,6 @@ export function VisitorCounter() {
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
