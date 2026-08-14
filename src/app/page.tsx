@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import HomeClient from './HomeClient';
 
-export const revalidate = 60;
+export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
 export default async function HomePage() {
   try {
