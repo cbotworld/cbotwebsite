@@ -58,10 +58,27 @@ export default function CanvasOverlayRenderer({
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const animFrameIdRef = React.useRef<number | null>(null);
 
-  const [cameraPermission, setCameraPermission] = React.useState<'pending' | 'granted' | 'denied'>('pending');
+  const [cameraPermission, setCameraPermission] = React.useState<'granted' | 'denied' | 'pending'>('pending');
   const [facingMode, setFacingMode] = React.useState<'environment' | 'user'>('environment');
   const [currentTimeStr, setCurrentTimeStr] = React.useState<string>('');
   const [elapsedTimerStr, setElapsedTimerStr] = React.useState<string>('00:00:00');
+  const [isPortrait, setIsPortrait] = React.useState<boolean>(false);
+
+  // Monitor orientation/resize to detect portrait mode
+  React.useEffect(() => {
+    const checkOrientation = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    
+    // Lock screen orientation to landscape if supported
+    if (window.screen && (window.screen as any).orientation && (window.screen as any).orientation.lock) {
+      (window.screen as any).orientation.lock('landscape').catch(() => {});
+    }
+
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
 
   // Update live clock in IST every second
   React.useEffect(() => {
@@ -87,9 +104,10 @@ export default function CanvasOverlayRenderer({
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: mode },
+            facingMode: mode === 'environment' ? { ideal: 'environment' } : 'user',
             width: { ideal: 1280 },
             height: { ideal: 720 },
+            aspectRatio: { ideal: 1.7777777778 }
           },
           audio: true,
         });
@@ -163,9 +181,17 @@ export default function CanvasOverlayRenderer({
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      // 2. Draw Camera Video Frame
+      // 2. Draw Camera Video Frame (preserving aspect ratio with cover scaling)
       if (video.readyState >= 2) {
-        ctx.drawImage(video, 0, 0, width, height);
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        // Calculate aspect-ratio preserving crop/scale parameters (Cover style)
+        const scale = Math.max(width / videoWidth, height / videoHeight);
+        const x = (width - videoWidth * scale) / 2;
+        const y = (height - videoHeight * scale) / 2;
+        
+        ctx.drawImage(video, x, y, videoWidth * scale, videoHeight * scale);
       }
 
       // 3. Draw Framing Guidance Guidelines (if not live yet)
@@ -287,6 +313,21 @@ export default function CanvasOverlayRenderer({
           height={720}
           className="h-full w-full object-contain"
         />
+
+        {/* Rotate to Landscape Prompt Overlay */}
+        {isPortrait && (
+          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 z-20">
+            <div className="h-16 w-16 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center text-amber-400 animate-spin">
+              <RefreshCw className="h-8 w-8" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-amber-400">Rotate Device to Landscape</h3>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Matches must be streamed in landscape orientation. Please turn your device sideways to continue.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Camera Permission Overlay Warning */}
         {cameraPermission === 'denied' && (

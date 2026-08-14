@@ -11,7 +11,7 @@ const RETENTION_DAYS = 15;
  * Server Action to initialize a live stream for a match.
  * Performs strict authentication and authorization checks.
  */
-export async function createLiveStreamAction(matchId: string) {
+export async function createLiveStreamAction(matchId: string, replayComment?: string) {
   noStore();
   try {
     const session = await getServerSession(authOptions);
@@ -64,12 +64,71 @@ export async function createLiveStreamAction(matchId: string) {
         include: { team: true }
       });
 
-      const otherTeam = await prisma.team.findFirst({
-        where: participant?.teamId ? { NOT: { id: participant.teamId } } : {}
-      });
+      let team1Id = participant?.teamId || null;
+      let team2Id = null;
+      let roundNum = 4;
+      let scheduledTime = new Date();
 
-      const team1Id = participant?.teamId || otherTeam?.id;
-      const team2Id = otherTeam?.id || team1Id;
+      // Check if it is a monument match
+      const monMatch = matchId.match(/monument_(\d+)/i);
+      if (monMatch && participant?.team) {
+        const monNum = parseInt(monMatch[1], 10);
+        roundNum = monNum;
+        
+        const monuments = [
+          { num: 1, startIso: '2026-08-09T21:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'POCKET DYNAMOS', t2: 'LUMEN PILLAR' }, { t1: 'VANILLA FALCONS', t2: 'VINTAGE STRIKERS' }, { t1: 'EBONY OVERLORDS', t2: 'BORIC SPEEDSTERS' }] },
+          { num: 2, startIso: '2026-08-10T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VINTAGE STRIKERS' }, { t1: 'LUMEN PILLAR', t2: 'BORIC SPEEDSTERS' }, { t1: 'SUPERNOVA QUEEN', t2: 'EBONY OVERLORDS' }, { t1: 'POCKET DYNAMOS', t2: 'VANILLA FALCONS' }] },
+          { num: 3, startIso: '2026-08-11T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'EBONY OVERLORDS' }, { t1: 'BORIC SPEEDSTERS', t2: 'VANILLA FALCONS' }, { t1: 'VINTAGE STRIKERS', t2: 'POCKET DYNAMOS' }, { t1: 'LUMEN PILLAR', t2: 'SUPERNOVA QUEEN' }] },
+          { num: 4, startIso: '2026-08-12T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VANILLA FALCONS' }, { t1: 'EBONY OVERLORDS', t2: 'POCKET DYNAMOS' }, { t1: 'BORIC SPEEDSTERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'VINTAGE STRIKERS', t2: 'LUMEN PILLAR' }] },
+          { num: 5, startIso: '2026-08-13T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'LUMEN PILLAR' }, { t1: 'SUPERNOVA QUEEN', t2: 'VINTAGE STRIKERS' }, { t1: 'POCKET DYNAMOS', t2: 'BORIC SPEEDSTERS' }, { t1: 'VANILLA FALCONS', t2: 'EBONY OVERLORDS' }] },
+          { num: 6, startIso: '2026-08-14T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'BORIC SPEEDSTERS' }, { t1: 'VINTAGE STRIKERS', t2: 'EBONY OVERLORDS' }, { t1: 'LUMEN PILLAR', t2: 'VANILLA FALCONS' }, { t1: 'SUPERNOVA QUEEN', t2: 'POCKET DYNAMOS' }] },
+          { num: 7, startIso: '2026-08-15T20:00:00+05:30', matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'POCKET DYNAMOS' }, { t1: 'VANILLA FALCONS', t2: 'SUPERNOVA QUEEN' }, { t1: 'EBONY OVERLORDS', t2: 'LUMEN PILLAR' }, { t1: 'BORIC SPEEDSTERS', t2: 'VINTAGE STRIKERS' }] },
+        ];
+        
+        const currentMon = monuments.find(m => m.num === monNum);
+        if (currentMon) {
+          scheduledTime = new Date(currentMon.startIso);
+          const teamNameUpper = participant.team.name.toUpperCase().trim();
+          const fix = currentMon.matches.find(
+            f => f.t1.toUpperCase() === teamNameUpper || f.t2.toUpperCase() === teamNameUpper
+          );
+          if (fix) {
+            const oppName = fix.t1.toUpperCase() === teamNameUpper ? fix.t2 : fix.t1;
+            const dbOppTeam = await prisma.team.findFirst({
+              where: { 
+                editionId: activeEdition.id,
+                name: { equals: oppName, mode: 'insensitive' }
+              }
+            });
+            if (dbOppTeam) {
+              const dbT1 = await prisma.team.findFirst({
+                where: {
+                  editionId: activeEdition.id,
+                  name: { equals: fix.t1, mode: 'insensitive' }
+                }
+              });
+              const dbT2 = await prisma.team.findFirst({
+                where: {
+                  editionId: activeEdition.id,
+                  name: { equals: fix.t2, mode: 'insensitive' }
+                }
+              });
+              if (dbT1 && dbT2) {
+                team1Id = dbT1.id;
+                team2Id = dbT2.id;
+              }
+            }
+          }
+        }
+      }
+
+      if (!team1Id || !team2Id) {
+        const otherTeam = await prisma.team.findFirst({
+          where: participant?.teamId ? { NOT: { id: participant.teamId } } : {}
+        });
+        team1Id = participant?.teamId || otherTeam?.id || null;
+        team2Id = otherTeam?.id || team1Id || null;
+      }
 
       if (team1Id && team2Id) {
         match = await prisma.match.create({
@@ -79,10 +138,10 @@ export async function createLiveStreamAction(matchId: string) {
             team1Id,
             team2Id,
             status: 'LIVE',
-            scheduledTime: new Date(),
+            scheduledTime,
             tableNumber: 1,
             matchNumber: 1,
-            round: 4,
+            round: roundNum,
           },
           include: {
             edition: true,
@@ -111,8 +170,8 @@ export async function createLiveStreamAction(matchId: string) {
     const playerTeamName = isTeam1Member ? match.team1?.name : isTeam2Member ? match.team2?.name : 'Team';
     const opponentTeamName = isTeam1Member ? (match.team2?.name || 'Opponent') : (match.team1?.name || 'Opponent');
 
-    // 3. Check for existing stream for this match
-    const existingStream = await prisma.liveStream.findFirst({
+    // 3. Check for an ACTIVE stream for this match (block duplicate live starts, allow replays)
+    const existingActiveStream = await prisma.liveStream.findFirst({
       where: {
         matchId,
         playerId: userId,
@@ -120,10 +179,11 @@ export async function createLiveStreamAction(matchId: string) {
       }
     });
 
-    if (existingStream) {
+    // If an active stream already exists (not a replay), return it
+    if (existingActiveStream && !replayComment) {
       return {
         success: true,
-        stream: existingStream,
+        stream: existingActiveStream,
         matchDetails: {
           editionTitle: match.edition?.title || 'Edition #200',
           editionNumber: match.edition?.number || 200,
@@ -272,6 +332,8 @@ export async function createLiveStreamAction(matchId: string) {
         streamKey,
         status: 'READY',
         scheduledAt: new Date(),
+        // Store replay reason if this is a replay stream
+        ...(replayComment ? { streamNotes: `REPLAY: ${replayComment}` } : {}),
       }
     });
 

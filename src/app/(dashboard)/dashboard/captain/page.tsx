@@ -88,6 +88,30 @@ export default async function CaptainPage() {
   ]);
   const members = team?.members?.map((m: any) => m.user) || [];
 
+  // ── PLAYER DATA for the embedded player dashboard panel ─────────────────
+  // Captains are also players — fetch all the same data PlayerClient needs
+  const captainPlayerMatches = team ? await prisma.match.findMany({
+    where: {
+      OR: [
+        { team1Id: team.id },
+        { team2Id: team.id },
+      ]
+    },
+    include: { team1: true, team2: true },
+    orderBy: { scheduledTime: 'asc' },
+  }) : [];
+
+  const captainLiveStreams = captainUser ? await prisma.liveStream.findMany({
+    where: {
+      playerId: captainUser.id,
+      matchId: { in: captainPlayerMatches.map((m) => m.id) },
+    },
+    select: { id: true, matchId: true, status: true, createdAt: true, youtubeUrl: true },
+    orderBy: { createdAt: 'desc' },
+  }) : [];
+
+  const boardPatterns = await prisma.boardPattern.findMany({ take: 5 });
+
   return (
     <CaptainClient
       initialTeam={team}
@@ -99,6 +123,10 @@ export default async function CaptainPage() {
         roundsPerDay,
         roundFormats: savedRoundFormats,
       }}
+      initialPlayer={captainUser || { ...sessionUser, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
+      initialPlayerMatches={captainPlayerMatches as any}
+      initialPlayerStreams={captainLiveStreams as any}
+      initialPatterns={boardPatterns as any}
     />
   );
 }

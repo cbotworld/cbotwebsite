@@ -75,6 +75,16 @@ export default async function PlayerPage() {
 
   const patterns = await prisma.boardPattern.findMany({ take: 5 });
 
+  // Fetch liveStreams for this player so client knows which matches already have recordings
+  const liveStreams = player ? await prisma.liveStream.findMany({
+    where: {
+      playerId: player.id,
+      matchId: { in: matches.map((m) => m.id) },
+    },
+    select: { id: true, matchId: true, status: true, createdAt: true, youtubeUrl: true },
+    orderBy: { createdAt: 'desc' },
+  }) : [];
+
   return (
     <PlayerClient
       initialPlayer={player || { ...sessionUser, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
@@ -82,6 +92,7 @@ export default async function PlayerPage() {
       initialTeammates={teammates}
       initialMatches={matches as any}
       initialPatterns={patterns as any}
+      initialStreams={liveStreams as any}
     />
   );
 }

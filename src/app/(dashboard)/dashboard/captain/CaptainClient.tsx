@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
-import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X } from 'lucide-react';
+import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
+import PlayerClient from '../player/PlayerClient';
 
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
   const dateStr = dayDatesMap[dayNum];
@@ -41,12 +42,20 @@ export default function CaptainClient({
   initialAllTeams = [],
   initialAllUsers = [],
   initialActiveEdition,
+  initialPlayer,
+  initialPlayerMatches = [],
+  initialPlayerStreams = [],
+  initialPatterns = [],
 }: {
   initialTeam?: any;
   initialMembers?: any[];
   initialAllTeams?: any[];
   initialAllUsers?: any[];
   initialActiveEdition?: any;
+  initialPlayer?: any;
+  initialPlayerMatches?: any[];
+  initialPlayerStreams?: any[];
+  initialPatterns?: any[];
 }) {
   const { data: session } = useSession();
   const sessionUser = (session?.user as any);
@@ -676,6 +685,29 @@ export default function CaptainClient({
           )}
         </div>
       </Dialog>
+
+      {/* ── PLAYER DASHBOARD PANEL ───────────────────────────────── */}
+      <div className="pt-4">
+        {/* Divider */}
+        <div className="relative flex items-center gap-4 py-2 mb-6">
+          <div className="flex-1 border-t border-border/60" />
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 shadow-sm">
+            <UserCheck className="h-4 w-4 text-amber-400" />
+            <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Also Playing As Player</span>
+          </div>
+          <div className="flex-1 border-t border-border/60" />
+        </div>
+
+        {/* Embedded PlayerClient — captain sees full player dashboard below */}
+        <PlayerClient
+          initialPlayer={initialPlayer || currentTeam?.captain || { name: captainName, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
+          initialTeam={initialTeam}
+          initialTeammates={teamMembers}
+          initialMatches={initialPlayerMatches}
+          initialPatterns={initialPatterns}
+          initialStreams={initialPlayerStreams}
+        />
+      </div>
 
     </div>
   );
