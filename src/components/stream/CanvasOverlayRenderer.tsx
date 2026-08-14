@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2, Maximize, Minimize } from 'lucide-react';
+import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -65,6 +65,7 @@ export default function CanvasOverlayRenderer({
   const [elapsedTimerStr, setElapsedTimerStr] = React.useState<string>('00:00:00');
   const [isPortrait, setIsPortrait] = React.useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = React.useState<boolean>(false);
+  const [isMuted, setIsMuted] = React.useState<boolean>(true); // Muted by default
 
   // Handle Fullscreen Event Changes
   React.useEffect(() => {
@@ -86,6 +87,20 @@ export default function CanvasOverlayRenderer({
         console.error('Error exiting fullscreen:', err);
       });
     }
+  };
+
+  const toggleMute = () => {
+    setIsMuted((prev) => {
+      const newMuted = !prev;
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.enabled = !newMuted;
+        }
+      }
+      return newMuted;
+    });
   };
 
   // Monitor orientation/resize to detect portrait mode
@@ -136,6 +151,12 @@ export default function CanvasOverlayRenderer({
           audio: true,
         });
 
+        // Set initial muted state (muted by default)
+        const audioTrack = mediaStream.getAudioTracks()[0];
+        if (audioTrack) {
+          audioTrack.enabled = !isMuted;
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
           await videoRef.current.play();
@@ -149,9 +170,9 @@ export default function CanvasOverlayRenderer({
           const canvasStream = canvas.captureStream(30);
 
           // Add audio track to canvas stream
-          const audioTrack = mediaStream.getAudioTracks()[0];
-          if (audioTrack) {
-            canvasStream.addTrack(audioTrack);
+          const streamAudioTrack = mediaStream.getAudioTracks()[0];
+          if (streamAudioTrack) {
+            canvasStream.addTrack(streamAudioTrack);
           }
 
           if (onStreamReady) {
@@ -166,7 +187,7 @@ export default function CanvasOverlayRenderer({
         onError(err.message || 'Camera permission denied or camera not found.');
       }
     }
-  }, [onStreamReady, onError]);
+  }, [onStreamReady, onError, isMuted]);
 
   React.useEffect(() => {
     initCamera(facingMode);
@@ -377,6 +398,23 @@ export default function CanvasOverlayRenderer({
         {/* Camera Control Action Bar */}
         {cameraPermission === 'granted' && (
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            {/* Mute / Unmute Toggle Button */}
+            <Button
+              onClick={toggleMute}
+              variant="outline"
+              size="icon"
+              className={`bg-slate-950/80 border-amber-500/40 hover:bg-amber-500/20 h-8 w-8 rounded-xl shadow-lg ${
+                isMuted ? 'text-rose-500 hover:text-rose-400' : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+              title={isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
+            >
+              {isMuted ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )}
+            </Button>
+
             {/* Fullscreen Button */}
             <Button
               onClick={toggleFullscreen}

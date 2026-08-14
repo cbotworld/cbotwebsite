@@ -6,7 +6,7 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2 } from 'lucide-react';
 
 interface MatchDetails {
   matchId: string;
@@ -30,6 +30,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [initialized, setInitialized] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const canvasStreamRef = React.useRef<MediaStream | null>(null);
+  const [copied, setCopied] = React.useState(false);
+  const handleCopyLink = () => {
+    const shareUrl = `${window.location.origin}/matches/${matchDetails.matchId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   // Initialize stream session
   React.useEffect(() => {
@@ -102,12 +110,28 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 space-y-6">
 
       {/* Top Nav */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <Link href="/dashboard/player">
-          <Button variant="outline" size="sm" className="gap-2 text-xs font-bold rounded-xl">
-            <ArrowLeft className="h-4 w-4" /> Back to My Dashboard
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/player">
+            <Button variant="outline" size="sm" className="gap-2 text-xs font-bold rounded-xl">
+              <ArrowLeft className="h-4 w-4" /> Back to My Dashboard
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyLink}
+            className="gap-2 text-xs font-bold rounded-xl border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+          >
+            {copied ? (
+              <span className="animate-pulse">Copied!</span>
+            ) : (
+              <>
+                <Share2 className="h-3.5 w-3.5" /> Copy Shareable Live Link
+              </>
+            )}
           </Button>
-        </Link>
+        </div>
         <Badge variant="carrom" className="text-xs font-black">{matchDetails.editionTitle}</Badge>
       </div>
 
@@ -241,11 +265,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               <p className="text-xs text-emerald-400 font-bold">
                 🎉 Match stream saved! Available on CBOT for 15 days.
               </p>
-              <Link href={`/matches/${matchDetails.matchId}`}>
-                <Button variant="outline" className="text-xs font-bold rounded-xl border-amber-500/40 text-amber-400">
-                  View Public Match Recording
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="text-xs font-bold rounded-xl border-amber-500/40 text-amber-400"
+                onClick={() => {
+                  window.location.href = `/matches/${matchDetails.matchId}`;
+                }}
+              >
+                View Public Match Recording
+              </Button>
             </div>
           )}
         </div>
