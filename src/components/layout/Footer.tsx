@@ -79,7 +79,14 @@ export function Footer() {
         </div>
 
         <div className="border-t border-border/40 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>© 2026 CBOT (Carrom Balu Online Tournament). All rights reserved.</p>
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+            <p>© 2026 CBOT (Carrom Balu Online Tournament). All rights reserved.</p>
+            <div className="flex items-center gap-2 text-muted-foreground/60">
+              <Link href="/privacy" className="hover:text-amber-500 transition-colors">Privacy Policy</Link>
+              <span>•</span>
+              <Link href="/terms" className="hover:text-amber-500 transition-colors">Terms & Conditions</Link>
+            </div>
+          </div>
           <div className="flex items-center gap-2.5">
             <span className="text-xs sm:text-sm text-muted-foreground">Designed and developed by</span>
             <a
