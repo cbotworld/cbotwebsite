@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 
-export const revalidate = 0; // Disable cache for live data
+export const revalidate = 3600; // Cache teams directory for up to 1 hour; revalidated on-demand via actions
 
 export default async function TeamsPage() {
   const teams = await prisma.team.findMany({

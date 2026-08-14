@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import LeaderboardClient from './LeaderboardClient';
 
-export const revalidate = 0; // Disable caching to always show live rankings
+export const revalidate = 3600; // Cache rankings for up to 1 hour; revalidated on-demand via actions
 
 export default async function LeaderboardPage() {
   let users: any[] = [];

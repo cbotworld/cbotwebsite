@@ -5,41 +5,37 @@ export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-dem
 
 export default async function HomePage() {
   try {
-    // Parallelize main database queries for sub-millisecond execution
-    const [currentEdition, players, allTeams] = await Promise.all([
+    // Only query what is actually rendered on the UI to minimize data transfer size.
+    // HomeClient only needs edition metadata for basic display, and teams/allTeams for the marquee image strip (using id, name, tag, logo).
+    const [currentEdition, allTeams] = await Promise.all([
       prisma.edition.findFirst({
         orderBy: { number: 'desc' },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          number: true,
+          theme: true,
+          bannerImage: true,
+          posterUrl: true,
+          tournamentStartDate: true,
+          dayDates: true,
+          totalDays: true,
           teams: {
-            include: {
-              captain: true,
-              members: {
-                include: { user: true },
-              },
-              leagueStandings: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-              },
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              logo: true,
             },
           },
         },
       }),
-      prisma.user.findMany({
-        orderBy: { rating: 'desc' },
-        include: {
-          rankingSnapshots: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-      }),
       prisma.team.findMany({
-        include: {
-          captain: true,
-          leagueStandings: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
+        select: {
+          id: true,
+          name: true,
+          tag: true,
+          logo: true,
         },
       }),
     ]);
@@ -49,27 +45,13 @@ export default async function HomePage() {
       ? `${currentEdition.title} (Edition #${currentEdition.number})`
       : null;
 
-    // Fetch current edition matches
-    const rawMatches = currentEdition
-      ? await prisma.match.findMany({
-          where: { editionId: currentEdition.id },
-          include: { team1: true, team2: true },
-          orderBy: { scheduledTime: 'asc' },
-        })
-      : [];
-
-    const matches = rawMatches.map(m => ({
-      ...m,
-      scheduledTime: m.scheduledTime ? m.scheduledTime.toISOString() : new Date().toISOString(),
-    }));
-
-    // Safely serialize all database records before passing to client component
+    // Safely serialize and pass only the necessary properties to the client component
     return (
       <HomeClient
         teams={JSON.parse(JSON.stringify(currentEditionTeams))}
         allTeams={JSON.parse(JSON.stringify(allTeams))}
-        players={JSON.parse(JSON.stringify(players))}
-        matches={JSON.parse(JSON.stringify(matches))}
+        players={[]}
+        matches={[]}
         currentEditionName={currentEditionName}
         editionPosterUrl={currentEdition?.posterUrl ?? null}
         currentEdition={currentEdition ? {

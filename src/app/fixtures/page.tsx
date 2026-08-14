@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import FixturesClient from './FixturesClient';
 
-export const revalidate = 0;
+export const revalidate = 3600; // Cache fixtures for up to 1 hour; revalidated on-demand via actions
 
 export default async function FixturesPage() {
   const matches = await prisma.match.findMany({

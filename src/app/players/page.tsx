@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import PlayersClient from './PlayersClient';
 import { DELETED_USERNAMES } from '@/lib/mock-data';
 
-export const revalidate = 0; // Ensures fresh data
+export const revalidate = 3600; // Cache players list for up to 1 hour; revalidated on-demand via actions
 
 export default async function PlayersPage() {
   let users: any[] = [];
