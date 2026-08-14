@@ -20,11 +20,11 @@ export function Footer() {
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Carrom Balu Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <span className="text-lg font-black tracking-tight bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                CBOT
+                CBOT World
               </span>
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-sm">
-              Founded by Carrom Balu in August 2020, CBOT reaches its monumental 200th edition connecting players worldwide.
+              Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.
             </p>
             <div className="pt-2">
               <VisitorCounter />
@@ -80,7 +80,7 @@ export function Footer() {
 
         <div className="border-t border-border/40 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-            <p>© 2026 CBOT (Carrom Balu Online Tournament). All rights reserved.</p>
+            <p>© 2026 CBOT World (Carrom Balu Online Tournament). All rights reserved.</p>
             <div className="flex items-center gap-2 text-muted-foreground/60">
               <Link href="/privacy" className="hover:text-amber-500 transition-colors">Privacy Policy</Link>
             </div>

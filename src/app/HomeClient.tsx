@@ -173,7 +173,7 @@ export default function HomeClient({
               </h1>
 
               <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Founded by Carrom Balu in August 2020, CBOT reaches its monumental 200th edition connecting players worldwide.
+                Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.
               </p>
 
               {/* Stats ticker */}
