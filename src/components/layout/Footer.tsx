@@ -83,8 +83,6 @@ export function Footer() {
             <p>© 2026 CBOT (Carrom Balu Online Tournament). All rights reserved.</p>
             <div className="flex items-center gap-2 text-muted-foreground/60">
               <Link href="/privacy" className="hover:text-amber-500 transition-colors">Privacy Policy</Link>
-              <span>•</span>
-              <Link href="/terms" className="hover:text-amber-500 transition-colors">Terms & Conditions</Link>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
