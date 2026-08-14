@@ -392,15 +392,15 @@ export default function CanvasOverlayRenderer({
               )}
             </Button>
 
-            {/* Rear/Front Camera Toggle Button */}
+            {/* Rear/Front Camera Toggle Button (Icon Only) */}
             <Button
               onClick={toggleCamera}
               variant="outline"
-              size="sm"
-              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 text-xs font-black rounded-xl gap-2 shadow-lg h-8"
+              size="icon"
+              className="bg-slate-950/80 border-amber-500/40 text-amber-400 hover:bg-amber-500/20 h-8 w-8 rounded-xl shadow-lg"
+              title={facingMode === 'environment' ? 'Switch to Front Camera' : 'Switch to Rear Camera'}
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>{facingMode === 'environment' ? 'Rear' : 'Front'}</span>
             </Button>
           </div>
         )}
