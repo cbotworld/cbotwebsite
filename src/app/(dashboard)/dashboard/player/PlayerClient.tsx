@@ -240,8 +240,8 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
   };
 
   const handleReplaySubmit = () => {
-    if (!replayComment.trim() || replayComment.trim().length < 10) {
-      setReplayCommentError('Please enter a reason (at least 10 characters) before going live again.');
+    if (!replayComment.trim()) {
+      setReplayCommentError('Please enter a reason before going live again.');
       return;
     }
     setGoLiveLoading(goLiveModal.match?.id || 'loading');
