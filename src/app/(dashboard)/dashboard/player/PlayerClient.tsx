@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio, RotateCcw, AlertCircle, MessageSquare
+  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio, RotateCcw, AlertCircle, MessageSquare, Share2
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { ProfileTab } from '@/components/player/ProfileTab';
@@ -22,6 +22,15 @@ import { ProfileTab } from '@/components/player/ProfileTab';
 
 export default function PlayerClient({ initialPlayer, initialTeam, initialTeammates, initialMatches, initialPatterns, initialStreams }: { initialPlayer: any, initialTeam: any, initialTeammates: any[], initialMatches: any[], initialPatterns: any[], initialStreams?: any[] }) {
   const { data: session } = useSession();
+
+  const [copiedMatchId, setCopiedMatchId] = React.useState<string | null>(null);
+  const handleCopyLink = (matchId: string) => {
+    const shareUrl = `${window.location.origin}/matches/${matchId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopiedMatchId(matchId);
+      setTimeout(() => setCopiedMatchId(null), 2000);
+    });
+  };
 
   // Always use the LOGGED-IN session user as primary identity source
   // initialPlayer provides DB stats — session provides the real name/username
@@ -504,7 +513,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
                       {/* Status + Go Live button */}
                       <div className="flex flex-col sm:items-end gap-2 ml-auto">
-                        {/* Status badge */}
+                        {/* Status badge + Copy Link */}
                         <div className="flex items-center gap-1.5">
                           <Badge
                             variant={isCompleted ? 'success' : isCurrentlyLive ? 'warning' : 'outline'}
@@ -517,6 +526,19 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                               📹 Streamed
                             </Badge>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 rounded-md p-0 flex items-center justify-center shrink-0"
+                            title="Copy shareable live link"
+                            onClick={() => handleCopyLink(match.id)}
+                          >
+                            {copiedMatchId === match.id ? (
+                              <span className="text-[8px] font-black text-amber-400 animate-pulse">Copied!</span>
+                            ) : (
+                              <Share2 className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         </div>
 
                         {/* Go Live button — 4 states */}
