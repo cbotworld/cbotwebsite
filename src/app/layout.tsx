@@ -9,9 +9,9 @@ import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: 'CBOT - Carrom Balu Online Tournament',
+  title: 'CBOT World - Carrom Balu Online Tournament',
   description: 'The ultimate online Carrom esports tournament platform for Organizers, Captains, and Players. Live brackets, automated match scoring, and global leaderboards.',
-  keywords: ['Carrom', 'CBOT', 'Carrom Balu', 'Online Tournament', 'Esports', 'Match Scoring', 'Tournament Brackets'],
+  keywords: ['Carrom', 'CBOT', 'CBOT World', 'Carrom Balu', 'Online Tournament', 'Esports', 'Match Scoring', 'Tournament Brackets'],
   authors: [{ name: 'CBOT Team' }],
   icons: {
     icon: '/logo.png',
@@ -19,10 +19,10 @@ export const metadata: Metadata = {
     apple: '/logo.png',
   },
   openGraph: {
-    title: 'CBOT - Carrom Balu Online Tournament',
+    title: 'CBOT World - Carrom Balu Online Tournament',
     description: 'Competitive Carrom tournament portal with visual interactive brackets and real-time match statistics.',
     url: 'https://cbot.gg',
-    siteName: 'CBOT Esports',
+    siteName: 'CBOT World',
     images: [{ url: '/logo.png', width: 500, height: 500, alt: 'Carrom Balu Online Tournament Logo' }],
     type: 'website',
   },

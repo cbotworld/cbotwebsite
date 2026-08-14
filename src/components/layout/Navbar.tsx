@@ -125,7 +125,7 @@ export function Navbar() {
           />
           <div className="flex flex-col justify-center leading-tight">
             <span className="text-lg sm:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-clip-text text-transparent leading-none">
-              CBOT
+              CBOT World
             </span>
             <span className="hidden min-[420px]:block text-[8.5px] sm:text-[10.5px] font-extrabold text-amber-500/90 tracking-wider uppercase leading-none whitespace-nowrap mt-0.5">
               Connect Carrom Enthusiasts Worldwide
