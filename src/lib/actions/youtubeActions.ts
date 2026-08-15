@@ -179,20 +179,24 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       }
     });
 
-    // If an active stream already exists (not a replay), return it
+    // If an active stream already exists (not a replay), return it UNLESS it was a mock sandbox stream
     if (existingActiveStream && !replayComment) {
-      return {
-        success: true,
-        stream: existingActiveStream,
-        matchDetails: {
-          editionTitle: match.edition?.title || 'Edition #200',
-          editionNumber: match.edition?.number || 200,
-          matchId: match.id,
-          playerName: userName,
-          teamName: playerTeamName,
-          opponentName: opponentTeamName,
-        }
-      };
+      if (existingActiveStream.youtubeVideoId?.startsWith('cbot_yt_') || existingActiveStream.youtubeBroadcastId?.startsWith('cbot_yt_')) {
+        await prisma.liveStream.delete({ where: { id: existingActiveStream.id } }).catch(() => {});
+      } else {
+        return {
+          success: true,
+          stream: existingActiveStream,
+          matchDetails: {
+            editionTitle: match.edition?.title || 'Edition #200',
+            editionNumber: match.edition?.number || 200,
+            matchId: match.id,
+            playerName: userName,
+            teamName: playerTeamName,
+            opponentName: opponentTeamName,
+          }
+        };
+      }
     }
 
     // 4. Create YouTube Broadcast Resources or CBOT Stream Identifier
@@ -236,6 +240,10 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
         const accessToken = tokenData.access_token;
 
         if (accessToken) {
+          // Construct YouTube broadcast title (strictly max 100 characters allowed by YouTube API)
+          const rawTitle = `CBOT ${match.edition?.title || 'Edition #200'} - ${match.id} - ${userName} (${playerTeamName}) vs ${opponentTeamName}`;
+          const safeTitle = rawTitle.length > 95 ? rawTitle.slice(0, 92) + '...' : rawTitle;
+
           // 1) Insert Live Broadcast
           const broadcastRes = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
             method: 'POST',
@@ -245,7 +253,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
             },
             body: JSON.stringify({
               snippet: {
-                title: `CBOT ${match.edition?.title || 'Edition #200'} - ${match.id} - ${userName} (${playerTeamName}) vs ${opponentTeamName}`,
+                title: safeTitle,
                 description: `Official CBOT Match Stream\nPlayer: ${userName}\nTeam: ${playerTeamName}\nOpponent: ${opponentTeamName}\nWatch live at https://www.cbotworld.com/`,
                 scheduledStartTime: new Date().toISOString(),
               },
@@ -266,6 +274,8 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
             youtubeVideoId = broadcastData.id;
             youtubeUrl = `https://www.youtube.com/watch?v=${broadcastData.id}`;
             youtubeEmbedUrl = `https://www.youtube.com/embed/${broadcastData.id}?autoplay=1&live=1`;
+          } else {
+            console.error('YouTube liveBroadcasts insert failed:', broadcastData);
           }
 
           // 2) Insert Live Stream

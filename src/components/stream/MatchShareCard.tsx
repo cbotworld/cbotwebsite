@@ -22,9 +22,9 @@ export default function MatchShareCard({
   const [copiedYt, setCopiedYt] = React.useState(false);
   const [copiedArena, setCopiedArena] = React.useState(false);
 
-  // Determine effective YouTube link
+  // Determine effective YouTube link (ignore sandbox mock IDs)
   const effectiveYoutubeUrl = React.useMemo(() => {
-    if (youtubeUrl) return youtubeUrl;
+    if (youtubeUrl && !youtubeUrl.includes('cbot_yt_')) return youtubeUrl;
     if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
       return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
     }
