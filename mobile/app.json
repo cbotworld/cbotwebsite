@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "CBOT Live Stream",
+    "slug": "cbot-live-stream",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cbotworld.livestream",
+      "infoPlist": {
+        "NSCameraUsageDescription": "CBOT needs camera access to record your Carrom board match.",
+        "NSMicrophoneUsageDescription": "CBOT needs microphone access to record audio during the match."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.cbotworld.livestream",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CBOT needs camera access to record your Carrom board match.",
+          "microphonePermission": "CBOT needs microphone access to record audio during the match.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ]
+  }
+}
