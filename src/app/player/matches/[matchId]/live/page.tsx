@@ -6,16 +6,45 @@ import PlayerMatchLiveClient from './LiveClient';
 
 export const revalidate = 0;
 
-export default async function PlayerMatchLivePage({ params }: { params: Promise<{ matchId: string }> }) {
+export default async function PlayerMatchLivePage({ 
+  params,
+  searchParams,
+}: { 
+  params: Promise<{ matchId: string }>;
+  searchParams?: Promise<{ token?: string; playerId?: string }>;
+}) {
   const { matchId } = await params;
+  const sParams = searchParams ? await searchParams : {};
+  
+  let userId: string | null = null;
+  let userName: string = 'Player';
+
+  // 1. Check NextAuth session
   const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    redirect('/login?callbackUrl=/dashboard/player');
+  if (session?.user) {
+    const sessionUser = session.user as any;
+    userId = sessionUser.id;
+    userName = sessionUser.name || sessionUser.username || 'Player';
   }
 
-  const sessionUser = session.user as any;
-  const userId = sessionUser.id;
-  const userName = sessionUser.name || sessionUser.username || 'Player';
+  // 2. Check mobile token fallback if no session cookie
+  if (!userId && sParams.token) {
+    try {
+      const decoded = Buffer.from(sParams.token, 'base64').toString('utf8');
+      const tokenUserId = decoded.split(':')[0];
+      const dbUser = await prisma.user.findUnique({ where: { id: tokenUserId } });
+      if (dbUser) {
+        userId = dbUser.id;
+        userName = dbUser.name || dbUser.username || 'Player';
+      }
+    } catch (e) {
+      console.warn('Mobile token decode error:', e);
+    }
+  }
+
+  if (!userId) {
+    redirect('/login?callbackUrl=/dashboard/player');
+  }
 
   // Fetch the match with both teams fully populated
   const match = await prisma.match.findUnique({
