@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
  * Mobile App - Get Player's Matches
  * GET /api/mobile/matches
  * Headers: Authorization: Bearer <token>
+ * 
+ * Finds matches where the player's team is team1 or team2.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,49 +29,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 401 });
     }
 
-    // Find matches where this player is a participant
-    const participants = await prisma.matchParticipant.findMany({
-      where: { userId: userId },
-      include: {
-        match: {
-          include: {
-            edition: true,
-            participants: {
-              include: {
-                team: true,
-                user: true,
-              }
-            }
-          }
-        },
-        team: true,
+    // Find the player's teams via EditionParticipant
+    const participations = await prisma.editionParticipant.findMany({
+      where: { userId },
+      select: { teamId: true, editionId: true },
+    });
+
+    const teamIds = participations.map(p => p.teamId).filter(Boolean) as string[];
+
+    if (teamIds.length === 0) {
+      return NextResponse.json({ success: true, matches: [] });
+    }
+
+    // Find matches where this player's team is team1 or team2
+    const matches = await prisma.match.findMany({
+      where: {
+        OR: [
+          { team1Id: { in: teamIds } },
+          { team2Id: { in: teamIds } },
+        ],
       },
-      orderBy: { match: { scheduledAt: 'desc' } },
+      include: {
+        edition: true,
+        team1: true,
+        team2: true,
+      },
+      orderBy: { scheduledTime: 'desc' },
       take: 20,
     });
 
-    const matches = participants.map(p => {
-      const match = p.match;
-      const playerTeam = p.team;
-      const opponentParticipant = match.participants.find(mp => mp.userId !== userId);
-      const opponentTeam = opponentParticipant?.team;
+    const formattedMatches = matches.map(match => {
+      const isTeam1 = teamIds.includes(match.team1Id || '');
+      const playerTeam = isTeam1 ? match.team1 : match.team2;
+      const opponentTeam = isTeam1 ? match.team2 : match.team1;
 
       return {
         matchId: match.id,
         editionTitle: match.edition?.title || 'CBOT Edition',
         editionNumber: match.edition?.number || 0,
         playerName: user.name || 'Player',
-        teamName: playerTeam?.name || 'Team 1',
+        teamName: playerTeam?.name || 'My Team',
         teamLogo: playerTeam?.logo || null,
         opponentName: opponentTeam?.name || 'Opponent',
         opponentLogo: opponentTeam?.logo || null,
-        scheduledTime: match.scheduledAt?.toISOString() || null,
+        scheduledTime: match.scheduledTime?.toISOString() || null,
         tableNumber: match.tableNumber || 1,
         status: match.status || 'SCHEDULED',
       };
     });
 
-    return NextResponse.json({ success: true, matches });
+    return NextResponse.json({ success: true, matches: formattedMatches });
   } catch (error: any) {
     console.error('Mobile matches error:', error);
     return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500 });

@@ -25,21 +25,21 @@ export default function App() {
   const [selectedMatch, setSelectedMatch] = useState<MatchDetails | null>(null);
 
   // Login state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+    if (!username || !pin) {
+      Alert.alert('Error', 'Please enter your username and PIN');
       return;
     }
     setLoading(true);
     try {
-      const res = await loginPlayer(email.trim(), password);
+      const res = await loginPlayer(username.trim(), pin.trim());
       if (res.success && res.token) {
         setToken(res.token);
-        setPlayerName(res.user?.name || 'Player');
+        setPlayerName(res.user?.name || res.user?.email || username);
         // Fetch matches
         const matchRes = await getPlayerMatches(res.token);
         if (matchRes.success && matchRes.matches) {
@@ -70,30 +70,32 @@ export default function App() {
           <View style={styles.logoContainer}>
             <Text style={styles.logoText}>🏆</Text>
             <Text style={styles.appTitle}>CBOT</Text>
-            <Text style={styles.appSubtitle}>LIVE STREAM</Text>
+            <Text style={styles.appSubtitle}>LIVE STREAM STUDIO</Text>
           </View>
 
           {/* Login Form */}
           <View style={styles.formContainer}>
-            <Text style={styles.formLabel}>EMAIL</Text>
+            <Text style={styles.formLabel}>USERNAME OR EMAIL</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your CBOT email"
+              placeholder="e.g. player1 or player@cbotworld.com"
               placeholderTextColor="#64748b"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
+              autoCorrect={false}
             />
 
-            <Text style={styles.formLabel}>PASSWORD</Text>
+            <Text style={styles.formLabel}>4-DIGIT PIN</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter your password"
+              placeholder="Enter PIN"
               placeholderTextColor="#64748b"
-              value={password}
-              onChangeText={setPassword}
+              value={pin}
+              onChangeText={setPin}
+              keyboardType="numeric"
               secureTextEntry
+              maxLength={6}
             />
 
             <TouchableOpacity
@@ -104,15 +106,18 @@ export default function App() {
               {loading ? (
                 <ActivityIndicator color="#0f172a" />
               ) : (
-                <Text style={styles.loginButtonText}>SIGN IN</Text>
+                <Text style={styles.loginButtonText}>SIGN IN TO ARENA</Text>
               )}
             </TouchableOpacity>
           </View>
 
           <Text style={styles.footerText}>
-            Use your existing CBOT Arena account to sign in
+            Use your standard CBOT Arena player credentials to log in
           </Text>
         </View>
+      </SafeAreaView>
+    );
+  }
       </SafeAreaView>
     );
   }
@@ -180,32 +185,145 @@ export default function App() {
     );
   }
 
-  // Live Stream Screen - Placeholder (camera + overlay will be added with expo-camera)
+  // Stream state
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamData, setStreamData] = useState<any>(null);
+  const [streamDuration, setStreamDuration] = useState(0);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleStartStream = async () => {
+    if (!selectedMatch || !token) return;
+    setActionLoading(true);
+    try {
+      const res = await createStreamSession(selectedMatch.matchId, token);
+      if (res.success && res.stream) {
+        setStreamData(res.stream);
+        setIsStreaming(true);
+        Alert.alert('Live Stream Ready', 'Stream session created! Broadcast is ready.');
+      } else {
+        Alert.alert('Error', res.error || 'Failed to start stream');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Stream initiation failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStopStream = async () => {
+    if (!token) return;
+    setActionLoading(true);
+    try {
+      const res = await stopStreamSession(streamData?.id || 'active', undefined, token);
+      if (res.success) {
+        setIsStreaming(false);
+        setStreamData(null);
+        Alert.alert('Match Completed', 'Live broadcast ended and match archived successfully!');
+        setScreen('matches');
+        // Refresh matches
+        const matchRes = await getPlayerMatches(token);
+        if (matchRes.success && matchRes.matches) {
+          setMatches(matchRes.matches);
+        }
+      } else {
+        Alert.alert('Error', res.error || 'Failed to stop stream');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to stop stream');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Live Stream Screen
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.liveContainer}>
+        {/* Header Bar */}
         <View style={styles.liveHeader}>
-          <TouchableOpacity onPress={() => setScreen('matches')}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isStreaming) {
+                Alert.alert('Live Stream Active', 'Please end the match before leaving.');
+              } else {
+                setScreen('matches');
+              }
+            }}
+          >
             <Text style={styles.backButton}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.liveTitle}>
-            {selectedMatch?.teamName} vs {selectedMatch?.opponentName}
-          </Text>
+          <View style={styles.liveHeaderCenter}>
+            <Text style={styles.liveTitle}>
+              {selectedMatch?.teamName} vs {selectedMatch?.opponentName}
+            </Text>
+            <Text style={styles.liveSubtitle}>
+              {selectedMatch?.editionTitle} • Table #{selectedMatch?.tableNumber}
+            </Text>
+          </View>
+          {isStreaming && (
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          )}
         </View>
 
-        {/* Camera view placeholder - will be replaced with expo-camera */}
+        {/* Camera / Board View with Overlays */}
         <View style={styles.cameraPlaceholder}>
-          <Text style={styles.cameraText}>📷 Camera Preview</Text>
-          <Text style={styles.cameraSubtext}>
-            Camera module will be loaded here with CBOT overlay
-          </Text>
+          {/* CBOT Live Scoreboard Top Overlay */}
+          <View style={styles.topOverlay}>
+            <View style={styles.scorePill}>
+              <Text style={styles.scorePillTeam}>{selectedMatch?.teamName}</Text>
+              <Text style={styles.scorePillScore}>0</Text>
+              <Text style={styles.scorePillDivider}>VS</Text>
+              <Text style={styles.scorePillScore}>0</Text>
+              <Text style={styles.scorePillTeam}>{selectedMatch?.opponentName}</Text>
+            </View>
+          </View>
+
+          {/* Center Carrom Aim Guide */}
+          <View style={styles.boardGuide}>
+            <View style={styles.boardGuideCircle} />
+            <Text style={styles.boardGuideText}>ALIGN CARROM BOARD HERE</Text>
+          </View>
+
+          {/* Bottom Stream Info Overlay */}
+          <View style={styles.bottomOverlay}>
+            <Text style={styles.watermarkText}>CBOT ARENA • OFFICIAL BROADCAST</Text>
+            {streamData?.youtubeUrl && (
+              <Text style={styles.ytUrlText}>YouTube: {streamData.youtubeUrl}</Text>
+            )}
+          </View>
         </View>
 
+        {/* Bottom Control Action Bar */}
         <View style={styles.liveControls}>
-          <TouchableOpacity style={styles.startButton}>
-            <Text style={styles.startButtonText}>▶ START LIVE STREAM</Text>
-          </TouchableOpacity>
+          {!isStreaming ? (
+            <TouchableOpacity
+              style={[styles.startButton, actionLoading && styles.loginButtonDisabled]}
+              onPress={handleStartStream}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#0f172a" />
+              ) : (
+                <Text style={styles.startButtonText}>▶ GO LIVE TO YOUTUBE</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.stopButton, actionLoading && styles.loginButtonDisabled]}
+              onPress={handleStopStream}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.stopButtonText}>⏹ END MATCH & ARCHIVE</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -407,12 +525,15 @@ const styles = StyleSheet.create({
   // Live Screen
   liveContainer: {
     flex: 1,
+    backgroundColor: '#000',
   },
   liveHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: '#0f172a',
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
   },
@@ -420,42 +541,152 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#f59e0b',
-    marginRight: 16,
+  },
+  liveHeaderCenter: {
+    alignItems: 'center',
   },
   liveTitle: {
     fontSize: 14,
     fontWeight: '900',
     color: '#f1f5f9',
   },
+  liveSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+    marginRight: 6,
+  },
+  liveBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#ef4444',
+    letterSpacing: 1,
+  },
   cameraPlaceholder: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#050b14',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cameraText: {
-    fontSize: 32,
-    color: '#475569',
+  topOverlay: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    zIndex: 10,
   },
-  cameraSubtext: {
-    fontSize: 14,
-    color: '#334155',
-    marginTop: 8,
+  scorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 24,
+  },
+  scorePillTeam: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#f1f5f9',
+    maxWidth: 100,
+  },
+  scorePillScore: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#f59e0b',
+    marginHorizontal: 8,
+  },
+  scorePillDivider: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#64748b',
+    marginHorizontal: 4,
+  },
+  boardGuide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.6,
+  },
+  boardGuideCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+    borderStyle: 'dashed',
+    marginBottom: 8,
+  },
+  boardGuideText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 2,
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  watermarkText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#475569',
+    letterSpacing: 2,
+  },
+  ytUrlText: {
+    fontSize: 10,
+    color: '#38bdf8',
+    marginTop: 2,
   },
   liveControls: {
     padding: 16,
+    backgroundColor: '#0f172a',
     alignItems: 'center',
   },
   startButton: {
     backgroundColor: '#f59e0b',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 40,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 36,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
   },
   startButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: '#0f172a',
+    letterSpacing: 2,
+  },
+  stopButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 36,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  stopButtonText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffffff',
     letterSpacing: 2,
   },
 });

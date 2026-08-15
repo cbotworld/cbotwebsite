@@ -39,12 +39,12 @@ export interface StreamSession {
   status: string;
 }
 
-export async function loginPlayer(email: string, password: string): Promise<LoginResponse> {
+export async function loginPlayer(username: string, pin: string): Promise<LoginResponse> {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, pin }),
     });
     return await res.json();
   } catch (err: any) {
