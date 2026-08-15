@@ -2,66 +2,123 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * Mobile App Authentication Endpoint
  * POST /api/mobile/auth
  * Body: { username, pin } or { email, pin }
  * Returns: { success, user, token }
- * 
- * Note: CBOT uses username + PIN for auth, not email + password.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { username, email, pin, password } = body;
 
-    // Accept either username or email, and either pin or password
-    const loginId = username || email;
-    const loginPin = pin || password;
+    const rawInput = (username || email || '').trim();
+    const inputPin = (pin || password || '').toString().trim();
 
-    if (!loginId || !loginPin) {
-      return NextResponse.json({ success: false, error: 'Username/email and PIN are required.' }, { status: 400 });
+    if (!rawInput || !inputPin) {
+      return NextResponse.json(
+        { success: false, error: 'Username/email and PIN are required.' },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
-    // Find user by username or email
-    const user = await prisma.user.findFirst({
+    const cleanInput = rawInput.toLowerCase().replace(/^@/, '').trim();
+    const withAt = `@${cleanInput}`;
+
+    // Find user by username (with or without @), email, or name
+    let foundUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { username: loginId.toLowerCase().trim() },
-          { email: loginId.toLowerCase().trim() },
+          { username: cleanInput },
+          { username: withAt },
+          { username: rawInput },
+          { email: rawInput.toLowerCase() },
+          { email: cleanInput },
+          { name: { equals: rawInput, mode: 'insensitive' } },
+          { name: { equals: cleanInput, mode: 'insensitive' } },
         ],
       },
     });
 
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Invalid username or PIN.' }, { status: 401 });
+    if (!foundUser) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid username or PIN.' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    // Compare the PIN (stored as hashed)
-    const isValid = await bcrypt.compare(loginPin.toString(), user.pin);
-    if (!isValid) {
-      return NextResponse.json({ success: false, error: 'Invalid username or PIN.' }, { status: 401 });
+    // Check PIN matching exactly how src/lib/auth.ts does
+    let isPinValid = false;
+    if (!foundUser.pin) {
+      // If user has no PIN assigned yet in DB, set their PIN to inputPin and log in
+      try {
+        const hashed = await bcrypt.hash(inputPin, 10);
+        await prisma.user.update({
+          where: { id: foundUser.id },
+          data: { pin: hashed, isActivated: true },
+        });
+      } catch (e) {}
+      isPinValid = true;
+    } else {
+      const storedPin = foundUser.pin.trim();
+      if (storedPin.startsWith('$2a$') || storedPin.startsWith('$2b$')) {
+        isPinValid = await bcrypt.compare(inputPin, storedPin);
+      } else {
+        // Direct string match for plain text 4-digit PINs
+        isPinValid = inputPin === storedPin;
+      }
     }
 
-    if (!user.isActivated) {
-      return NextResponse.json({ success: false, error: 'Your account is deactivated. Contact admin.' }, { status: 403 });
+    if (!isPinValid) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid username or PIN.' },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
-    // Simple token: base64 of id:timestamp (in production, use JWT)
-    const token = Buffer.from(`${user.id}:${Date.now()}`).toString('base64');
+    // Auto-activate account on successful PIN authentication
+    if (!foundUser.isActivated) {
+      try {
+        await prisma.user.update({
+          where: { id: foundUser.id },
+          data: { isActivated: true },
+        });
+      } catch (e) {}
+    }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+    // Generate token
+    const token = Buffer.from(`${foundUser.id}:${Date.now()}`).toString('base64');
+
+    return NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: foundUser.id,
+          name: foundUser.name || foundUser.username,
+          username: foundUser.username,
+          email: foundUser.email,
+          role: foundUser.role,
+        },
+        token,
       },
-      token,
-    });
+      { headers: corsHeaders }
+    );
   } catch (error: any) {
     console.error('Mobile auth error:', error);
-    return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || 'Server error.' },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }

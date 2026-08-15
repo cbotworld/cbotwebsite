@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * Mobile App - Get Player's Matches
  * GET /api/mobile/matches
  * Headers: Authorization: Bearer <token>
- * 
- * Finds matches where the player's team is team1 or team2.
  */
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
     const token = authHeader.slice(7);
@@ -21,12 +29,12 @@ export async function GET(request: NextRequest) {
       const decoded = Buffer.from(token, 'base64').toString('utf8');
       userId = decoded.split(':')[0];
     } catch {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401, headers: corsHeaders });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'User not found' }, { status: 401, headers: corsHeaders });
     }
 
     // Find the player's teams via EditionParticipant
@@ -38,7 +46,7 @@ export async function GET(request: NextRequest) {
     const teamIds = participations.map(p => p.teamId).filter(Boolean) as string[];
 
     if (teamIds.length === 0) {
-      return NextResponse.json({ success: true, matches: [] });
+      return NextResponse.json({ success: true, matches: [] }, { headers: corsHeaders });
     }
 
     // Find matches where this player's team is team1 or team2
@@ -67,7 +75,7 @@ export async function GET(request: NextRequest) {
         matchId: match.id,
         editionTitle: match.edition?.title || 'CBOT Edition',
         editionNumber: match.edition?.number || 0,
-        playerName: user.name || 'Player',
+        playerName: user.name || user.username || 'Player',
         teamName: playerTeam?.name || 'My Team',
         teamLogo: playerTeam?.logo || null,
         opponentName: opponentTeam?.name || 'Opponent',
@@ -78,9 +86,9 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ success: true, matches: formattedMatches });
+    return NextResponse.json({ success: true, matches: formattedMatches }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Mobile matches error:', error);
-    return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: corsHeaders });
   }
 }

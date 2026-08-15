@@ -1,7 +1,7 @@
 // CBOT API Service for Mobile App
 // Connects to the CBOT backend to manage match streams
 
-const API_BASE = 'https://cbotworld.com'; // Production URL
+const API_BASE = 'https://www.cbotworld.com'; // Production URL (with www. to avoid redirect)
 
 export interface LoginResponse {
   success: boolean;

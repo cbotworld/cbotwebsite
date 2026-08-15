@@ -3,6 +3,16 @@ import { prisma } from '@/lib/prisma';
 
 const RETENTION_DAYS = 15;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * Mobile App - Stop Stream Session
  * POST /api/mobile/stream/stop
@@ -13,7 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
     const token = authHeader.slice(7);
@@ -22,13 +32,13 @@ export async function POST(request: NextRequest) {
       const decoded = Buffer.from(token, 'base64').toString('utf8');
       userId = decoded.split(':')[0];
     } catch {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401, headers: corsHeaders });
     }
 
     const { streamId, videoUrl } = await request.json();
 
     if (!streamId) {
-      return NextResponse.json({ success: false, error: 'streamId is required' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'streamId is required' }, { status: 400, headers: corsHeaders });
     }
 
     let stream = await prisma.liveStream.findUnique({ where: { id: streamId } });
@@ -44,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!stream) {
-      return NextResponse.json({ success: true, message: 'Stream already ended.' });
+      return NextResponse.json({ success: true, message: 'Stream already ended.' }, { headers: corsHeaders });
     }
 
     const endedAt = new Date();
@@ -66,9 +76,9 @@ export async function POST(request: NextRequest) {
       data: { status: 'COMPLETED' },
     }).catch(() => {});
 
-    return NextResponse.json({ success: true, message: 'Stream ended and match completed.' });
+    return NextResponse.json({ success: true, message: 'Stream ended and match completed.' }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Mobile stream stop error:', error);
-    return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: corsHeaders });
   }
 }
