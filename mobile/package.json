@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "expo": "~57.0.13",
-    "expo-camera": "~57.0.3",
-    "expo-status-bar": "~57.0.1",
-    "react": "19.2.3",
-    "react-native": "0.86.2"
+    "expo": "~52.0.37",
+    "expo-camera": "~16.0.17",
+    "expo-status-bar": "~2.0.1",
+    "react": "18.3.1",
+    "react-native": "0.76.7"
   },
   "devDependencies": {
-    "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "@types/react": "~18.3.12",
+    "typescript": "^5.3.3"
   },
   "scripts": {
     "start": "expo start",
