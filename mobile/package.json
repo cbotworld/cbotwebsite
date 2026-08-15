@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "expo": "~52.0.37",
-    "expo-camera": "~16.0.17",
-    "expo-status-bar": "~2.0.1",
+    "expo": "~54.0.0",
+    "expo-camera": "~17.0.0",
+    "expo-status-bar": "~3.0.0",
     "react": "18.3.1",
-    "react-native": "0.76.7"
+    "react-native": "0.78.0"
   },
   "devDependencies": {
     "@types/react": "~18.3.12",
