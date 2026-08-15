@@ -260,10 +260,14 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
               status: {
                 privacyStatus: 'unlisted',
                 selfDeclaredMadeForKids: false,
+                embeddable: true,
               },
               contentDetails: {
                 enableAutoStart: true,
                 enableAutoStop: true,
+                enableEmbed: true,
+                enableDvr: true,
+                recordFromStart: true,
               }
             }),
           });
