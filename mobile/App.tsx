@@ -118,9 +118,6 @@ export default function App() {
       </SafeAreaView>
     );
   }
-      </SafeAreaView>
-    );
-  }
 
   if (screen === 'matches') {
     return (
