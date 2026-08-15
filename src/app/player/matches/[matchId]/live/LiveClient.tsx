@@ -45,6 +45,47 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const recordedChunksRef = React.useRef<Blob[]>([]);
   const [copied, setCopied] = React.useState(false);
 
+  // Board-by-Board Scoring
+  const [boards, setBoards] = React.useState([
+    { boardNumber: 1, score: 0, slams: 0 },
+    { boardNumber: 2, score: 0, slams: 0 },
+    { boardNumber: 3, score: 0, slams: 0 },
+  ]);
+
+  const totalScore = React.useMemo(() => boards.reduce((acc, b) => acc + (b.score || 0), 0), [boards]);
+  const totalSlams = React.useMemo(() => boards.reduce((acc, b) => acc + (b.slams || 0), 0), [boards]);
+
+  const handleModifyBoardScore = (boardNum: number, delta: number) => {
+    setBoards((prev) =>
+      prev.map((b) => {
+        if (b.boardNumber === boardNum) {
+          return { ...b, score: Math.max(0, b.score + delta) };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleModifyBoardSlam = (boardNum: number, delta: number) => {
+    setBoards((prev) =>
+      prev.map((b) => {
+        if (b.boardNumber === boardNum) {
+          const newSlams = Math.max(0, b.slams + delta);
+          const scoreDiff = delta > 0 ? 12 : (b.slams > 0 ? -12 : 0);
+          return { ...b, slams: newSlams, score: Math.max(0, b.score + scoreDiff) };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleAddNewBoard = () => {
+    setBoards((prev) => [
+      ...prev,
+      { boardNumber: prev.length + 1, score: 0, slams: 0 },
+    ]);
+  };
+
   const effectiveYoutubeUrl = React.useMemo(() => {
     if (youtubeUrl && !youtubeUrl.includes('cbot_yt_')) return youtubeUrl;
     if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
@@ -349,12 +390,99 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             opponentName={matchDetails.opponentName}
             isStreaming={streamStatus === 'LIVE'}
             streamStartedAt={streamStartedAt}
+            boards={boards}
             onStreamReady={handleStreamReady}
             onError={handleStreamError}
           />
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center text-xs font-semibold text-amber-300">
             💡 Position your camera so the complete Carrom board is clearly visible in landscape mode.
           </div>
+        </div>
+
+        {/* Real-time Board-by-Board Scorer (Player-Centric) */}
+        <div className="rounded-2xl bg-white/5 border border-amber-500/30 p-4 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Scorer</div>
+              <div className="text-base font-black text-amber-400">Player: {matchDetails.playerName}</div>
+            </div>
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/50 flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400">TOTAL SCORE:</span>
+              <span className="text-sm font-black text-amber-400">{totalScore} pts</span>
+              {totalSlams > 0 && (
+                <span className="text-[10px] font-black text-sky-400 bg-sky-500/20 px-2 py-0.5 rounded-md">
+                  ⚡ {totalSlams} Slam
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Board List */}
+          <div className="space-y-2.5">
+            {boards.map((board) => (
+              <div
+                key={board.boardNumber}
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-white/10 gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black text-white min-w-[60px]">Board {board.boardNumber}</span>
+                  <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/15 px-2.5 py-1 rounded-lg">
+                    {board.score} pts
+                  </span>
+                  {board.slams > 0 && (
+                    <span className="text-[10px] font-bold text-sky-400 bg-sky-500/20 px-2 py-0.5 rounded-md">
+                      ⚡ {board.slams} Slam
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleModifyBoardScore(board.boardNumber, -1)}
+                    className="h-8 px-2.5 text-xs font-black rounded-lg border-white/20 hover:bg-white/10"
+                  >
+                    -1
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleModifyBoardScore(board.boardNumber, 1)}
+                    className="h-8 px-2.5 text-xs font-black rounded-lg bg-emerald-600/30 border-emerald-500/50 text-emerald-400 hover:bg-emerald-600/50"
+                  >
+                    +1
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleModifyBoardSlam(board.boardNumber, -1)}
+                    disabled={board.slams === 0}
+                    className="h-8 px-2 text-[11px] font-bold rounded-lg border-white/20 text-slate-400 disabled:opacity-40"
+                  >
+                    Slam -
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleModifyBoardSlam(board.boardNumber, 1)}
+                    className="h-8 px-2.5 text-[11px] font-black rounded-lg bg-amber-600/30 border-amber-500/50 text-amber-300 hover:bg-amber-600/50"
+                  >
+                    ⚡ Slam +
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddNewBoard}
+            className="w-full py-2.5 border-dashed border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs font-black rounded-xl"
+          >
+            ➕ ADD NEW BOARD (BOARD {boards.length + 1})
+          </Button>
         </div>
 
         {/* Controls */}

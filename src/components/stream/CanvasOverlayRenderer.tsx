@@ -5,6 +5,12 @@ import { Camera, RefreshCw, AlertCircle, Video, ShieldCheck, CheckCircle2, Maxim
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+export interface BoardScoreItem {
+  boardNumber: number;
+  score: number;
+  slams: number;
+}
+
 interface CanvasOverlayRendererProps {
   playerName: string;
   editionTitle: string;
@@ -13,6 +19,7 @@ interface CanvasOverlayRendererProps {
   opponentName: string;
   isStreaming: boolean;
   streamStartedAt?: Date | null;
+  boards?: BoardScoreItem[];
   onStreamReady?: (stream: MediaStream) => void;
   onError?: (errMessage: string) => void;
 }
@@ -51,6 +58,7 @@ export default function CanvasOverlayRenderer({
   opponentName,
   isStreaming,
   streamStartedAt,
+  boards = [],
   onStreamReady,
   onError,
 }: CanvasOverlayRendererProps) {
@@ -58,6 +66,8 @@ export default function CanvasOverlayRenderer({
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const animFrameIdRef = React.useRef<number | null>(null);
+  const boardsRef = React.useRef(boards);
+  boardsRef.current = boards;
 
   const [cameraPermission, setCameraPermission] = React.useState<'granted' | 'denied' | 'pending'>('pending');
   const [facingMode, setFacingMode] = React.useState<'environment' | 'user'>('environment');
@@ -306,6 +316,70 @@ export default function CanvasOverlayRenderer({
       ctx.font = '900 20px monospace';
       ctx.fillStyle = '#fbbf24';
       ctx.fillText(matchLabel, width - 200, 45);
+
+      // 4.5 Draw Real-Time Board-by-Board Scoreboard Bar (Top Center)
+      const currentBoards = boardsRef.current || [];
+      if (currentBoards.length > 0) {
+        const totalScore = currentBoards.reduce((acc, b) => acc + (b.score || 0), 0);
+        const totalSlams = currentBoards.reduce((acc, b) => acc + (b.slams || 0), 0);
+
+        const chipWidth = 64;
+        const barWidth = Math.min(width - 500, Math.max(340, currentBoards.length * chipWidth + 140));
+        const barHeight = 44;
+        const barX = (width - barWidth) / 2;
+        const barY = 16;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if ((ctx as any).roundRect) {
+          (ctx as any).roundRect(barX, barY, barWidth, barHeight, 10);
+        } else {
+          ctx.rect(barX, barY, barWidth, barHeight);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        // Total Score Pill (Left inside bar)
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '900 13px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`TOTAL: ${totalScore} PTS`, barX + 12, barY + 26);
+        if (totalSlams > 0) {
+          ctx.fillStyle = '#38bdf8';
+          ctx.font = '900 10px sans-serif';
+          ctx.fillText(`⚡ ${totalSlams} SLAM`, barX + 12, barY + 38);
+        }
+
+        // Board Chips (Center/Right inside bar)
+        let chipX = barX + 120;
+        currentBoards.forEach((b) => {
+          if (chipX + chipWidth > barX + barWidth - 8) return;
+          ctx.fillStyle = 'rgba(30, 41, 59, 0.9)';
+          ctx.strokeStyle = b.slams > 0 ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          if ((ctx as any).roundRect) {
+            (ctx as any).roundRect(chipX, barY + 6, chipWidth - 6, 32, 6);
+          } else {
+            ctx.rect(chipX, barY + 6, chipWidth - 6, 32);
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '800 9px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`B${b.boardNumber}`, chipX + (chipWidth - 6) / 2, barY + 18);
+
+          ctx.fillStyle = b.slams > 0 ? '#38bdf8' : '#ffffff';
+          ctx.font = '900 12px monospace';
+          ctx.fillText(`${b.score}${b.slams > 0 ? '⚡' : ''}`, chipX + (chipWidth - 6) / 2, barY + 31);
+
+          chipX += chipWidth;
+        });
+      }
 
       // 5. Draw Bottom Gradient Footer Banner
       const bottomGradient = ctx.createLinearGradient(0, height - 130, 0, height);
