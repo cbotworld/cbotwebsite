@@ -28,6 +28,12 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type Screen = 'login' | 'matches' | 'live';
 
+interface BoardScore {
+  boardNumber: number;
+  score: number;
+  slams: number; // number of slams on this board
+}
+
 function formatISTDate(date: Date): string {
   try {
     const pad = (n: number) => n.toString().padStart(2, '0');
@@ -71,11 +77,16 @@ export default function App() {
   const [torch, setTorch] = useState(false);
   const [currentTimeStr, setCurrentTimeStr] = useState(formatISTDate(new Date()));
 
-  // In-Match Scores
-  const [score1, setScore1] = useState(0);
-  const [score2, setScore2] = useState(0);
-  const [queen1, setQueen1] = useState(0);
-  const [queen2, setQueen2] = useState(0);
+  // Board-by-Board Scoring System for Player
+  const [boards, setBoards] = useState<BoardScore[]>([
+    { boardNumber: 1, score: 0, slams: 0 },
+    { boardNumber: 2, score: 0, slams: 0 },
+    { boardNumber: 3, score: 0, slams: 0 },
+  ]);
+
+  // Compute Total Score and Total Slams
+  const totalScore = boards.reduce((acc, b) => acc + b.score, 0);
+  const totalSlams = boards.reduce((acc, b) => acc + b.slams, 0);
 
   // Camera & Mic Permissions
   const [camPermission, requestCamPermission] = useCameraPermissions();
@@ -104,10 +115,11 @@ export default function App() {
   // Sync match details when a match is selected
   useEffect(() => {
     if (selectedMatch) {
-      setScore1(selectedMatch.score1 || 0);
-      setScore2(selectedMatch.score2 || 0);
-      setQueen1(selectedMatch.queenStrikes1 || 0);
-      setQueen2(selectedMatch.queenStrikes2 || 0);
+      setBoards([
+        { boardNumber: 1, score: 0, slams: 0 },
+        { boardNumber: 2, score: 0, slams: 0 },
+        { boardNumber: 3, score: 0, slams: 0 },
+      ]);
     }
   }, [selectedMatch]);
 
@@ -125,6 +137,40 @@ export default function App() {
       if (interval) clearInterval(interval);
     };
   }, [isStreaming]);
+
+  // Board scoring modifiers
+  const handleModifyBoardScore = (boardNum: number, delta: number) => {
+    setBoards((prev) =>
+      prev.map((b) => {
+        if (b.boardNumber === boardNum) {
+          const newScore = Math.max(0, b.score + delta);
+          return { ...b, score: newScore };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleModifyBoardSlam = (boardNum: number, delta: number) => {
+    setBoards((prev) =>
+      prev.map((b) => {
+        if (b.boardNumber === boardNum) {
+          const newSlams = Math.max(0, b.slams + delta);
+          // A slam awards +12 points in Carrom or points according to tournament rules
+          const scoreDiff = delta > 0 ? 12 : (b.slams > 0 ? -12 : 0);
+          return { ...b, slams: newSlams, score: Math.max(0, b.score + scoreDiff) };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleAddNewBoard = () => {
+    setBoards((prev) => [
+      ...prev,
+      { boardNumber: prev.length + 1, score: 0, slams: 0 },
+    ]);
+  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -206,7 +252,7 @@ export default function App() {
       if (res.success && res.stream) {
         setStreamData(res.stream);
         setIsStreaming(true);
-        Alert.alert('🔴 Live Stream Active', 'Match broadcast is now live!');
+        Alert.alert('🔴 Live Stream Active', 'Match broadcast is now live on YouTube!');
       } else {
         Alert.alert('Error', res.error || 'Failed to start stream');
       }
@@ -260,7 +306,7 @@ export default function App() {
             <Text style={styles.formLabel}>USERNAME OR EMAIL</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. player1 or player@cbotworld.com"
+              placeholder="e.g. balu or player@cbotworld.com"
               placeholderTextColor="#64748b"
               value={username}
               onChangeText={setUsername}
@@ -413,7 +459,7 @@ export default function App() {
   }
 
   // ==========================================
-  // SCREEN 3: LIVE STUDIO (EXACT CBOT WEBSITE REPLICA)
+  // SCREEN 3: LIVE STUDIO (EXACT CBOT WEBSITE REPLICA WITH BOARD SCORING)
   // ==========================================
   return (
     <SafeAreaView style={styles.container}>
@@ -476,9 +522,8 @@ export default function App() {
             <Text style={styles.streamingAsName}>{playerName} ({playerRole})</Text>
           </View>
 
-          {/* 3-Column Team Identity Bar (Website replica) */}
+          {/* 3-Column Team Identity Bar */}
           <View style={styles.teamIdentityGrid}>
-            {/* Your Team */}
             <View style={styles.teamGridCol}>
               <View style={styles.teamIconBox}>
                 <Text style={styles.teamIconText}>
@@ -489,7 +534,6 @@ export default function App() {
               <Text style={styles.teamGridName} numberOfLines={2}>{selectedMatch?.teamName}</Text>
             </View>
 
-            {/* VS Divider */}
             <View style={styles.teamGridCenter}>
               <Text style={styles.teamGridVs}>VS</Text>
               <View style={styles.tablePill}>
@@ -497,7 +541,6 @@ export default function App() {
               </View>
             </View>
 
-            {/* Opponent */}
             <View style={styles.teamGridCol}>
               <View style={[styles.teamIconBox, { backgroundColor: '#2563eb', borderColor: '#60a5fa' }]}>
                 <Text style={styles.teamIconText}>
@@ -533,7 +576,7 @@ export default function App() {
               </View>
             )}
 
-            {/* OVERLAY 1: Top Tournament Header & Scoreboard Banner */}
+            {/* OVERLAY 1: Top Tournament Header & Player Scoreboard */}
             <View style={styles.cameraTopHUD} pointerEvents="none">
               <View style={styles.hudTopBar}>
                 <Text style={styles.hudEditionTitle} numberOfLines={1}>
@@ -546,22 +589,13 @@ export default function App() {
               <View style={styles.hudScoreboardBanner}>
                 <View style={styles.hudTeamBlockLeft}>
                   <Text style={styles.hudTeamTitle} numberOfLines={1}>
-                    {selectedMatch?.teamName}
+                    Player: {playerName}
                   </Text>
-                  <Text style={styles.hudQueenCount}>👑 {queen1}</Text>
+                  <Text style={styles.hudQueenCount}>⚡ {totalSlams} Slams • {boards.length} Boards</Text>
                 </View>
-                <Text style={styles.hudScoreNum}>{score1}</Text>
-
-                <View style={styles.hudVsDivider}>
-                  <Text style={styles.hudVsText}>VS</Text>
-                </View>
-
-                <Text style={[styles.hudScoreNum, { color: '#38bdf8' }]}>{score2}</Text>
-                <View style={styles.hudTeamBlockRight}>
-                  <Text style={[styles.hudTeamTitle, { textAlign: 'right' }]} numberOfLines={1}>
-                    {selectedMatch?.opponentName}
-                  </Text>
-                  <Text style={[styles.hudQueenCount, { textAlign: 'right' }]}>👑 {queen2}</Text>
+                <View style={styles.hudScoreBadge}>
+                  <Text style={styles.hudScoreLabel}>PTS</Text>
+                  <Text style={styles.hudScoreNum}>{totalScore}</Text>
                 </View>
               </View>
             </View>
@@ -583,7 +617,7 @@ export default function App() {
             <View style={styles.cameraBottomHUD} pointerEvents="none">
               <View style={styles.hudBroadcasterRow}>
                 <Text style={styles.hudVerifiedBadge}>✓ VERIFIED CBOT BROADCAST</Text>
-                <Text style={styles.hudBroadcasterName}>Broadcaster: {playerName}</Text>
+                <Text style={styles.hudBroadcasterName}>{selectedMatch?.teamName} vs {selectedMatch?.opponentName}</Text>
               </View>
             </View>
 
@@ -616,61 +650,83 @@ export default function App() {
             </View>
           </View>
 
-          {/* 4. CAMERA POSITIONING TIP (Website replica) */}
+          {/* 4. CAMERA POSITIONING TIP */}
           <View style={styles.cameraTipBox}>
             <Text style={styles.cameraTipText}>
               💡 Position your camera so the complete Carrom board is clearly visible in the frame.
             </Text>
           </View>
 
-          {/* 5. IN-MATCH REALTIME SCOREKEEPER */}
+          {/* 5. PLAYER-CENTRIC BOARD-BY-BOARD SCORER */}
           <View style={styles.liveScorekeeperContainer}>
-            <Text style={styles.scorekeeperHeading}>🎮 LIVE IN-MATCH SCORER</Text>
-            <View style={styles.scorekeeperRow}>
-              {/* Team 1 Controls */}
-              <View style={styles.scorekeeperCol}>
-                <Text style={styles.scorekeeperTeamName} numberOfLines={1}>{selectedMatch?.teamName}</Text>
-                <View style={styles.scorekeeperBtnGroup}>
-                  <TouchableOpacity style={styles.skBtn} onPress={() => setScore1((s) => Math.max(0, s - 1))}>
-                    <Text style={styles.skBtnText}>-1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.skBtn, styles.skBtnAdd]} onPress={() => setScore1((s) => s + 1)}>
-                    <Text style={styles.skBtnTextAdd}>+1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.skQueenBtn}
-                    onPress={() => {
-                      setQueen1((q) => q + 1);
-                      setScore1((s) => s + 3);
-                    }}
-                  >
-                    <Text style={styles.skQueenText}>👑 Queen (+3)</Text>
-                  </TouchableOpacity>
-                </View>
+            {/* Header: Player Name + Total Points Banner */}
+            <View style={styles.scorerHeaderBar}>
+              <View>
+                <Text style={styles.scorerPlayerLabel}>PLAYER SCORER</Text>
+                <Text style={styles.scorerPlayerName}>{playerName}</Text>
               </View>
-
-              {/* Team 2 Controls */}
-              <View style={styles.scorekeeperCol}>
-                <Text style={[styles.scorekeeperTeamName, { textAlign: 'right' }]} numberOfLines={1}>{selectedMatch?.opponentName}</Text>
-                <View style={[styles.scorekeeperBtnGroup, { justifyContent: 'flex-end' }]}>
-                  <TouchableOpacity
-                    style={styles.skQueenBtn}
-                    onPress={() => {
-                      setQueen2((q) => q + 1);
-                      setScore2((s) => s + 3);
-                    }}
-                  >
-                    <Text style={styles.skQueenText}>👑 Queen (+3)</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.skBtn} onPress={() => setScore2((s) => Math.max(0, s - 1))}>
-                    <Text style={styles.skBtnText}>-1</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.skBtn, styles.skBtnAdd]} onPress={() => setScore2((s) => s + 1)}>
-                    <Text style={styles.skBtnTextAdd}>+1</Text>
-                  </TouchableOpacity>
-                </View>
+              <View style={styles.totalScorePill}>
+                <Text style={styles.totalScorePillLabel}>TOTAL SCORE</Text>
+                <Text style={styles.totalScorePillNum}>{totalScore} pts</Text>
               </View>
             </View>
+
+            {/* Board Cards List */}
+            {boards.map((board) => (
+              <View key={board.boardNumber} style={styles.boardCardRow}>
+                {/* Left: Board Label & Score Indicator */}
+                <View style={styles.boardInfoCol}>
+                  <Text style={styles.boardNumTitle}>Board {board.boardNumber}</Text>
+                  <View style={styles.boardScorePill}>
+                    <Text style={styles.boardScorePillText}>{board.score} pts</Text>
+                    {board.slams > 0 && (
+                      <Text style={styles.boardSlamTag}>⚡ {board.slams} Slam</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Right: Board Action Buttons [-1], [+1], [Slam (+/-)] */}
+                <View style={styles.boardActionsGroup}>
+                  <TouchableOpacity
+                    style={styles.btnMinus}
+                    onPress={() => handleModifyBoardScore(board.boardNumber, -1)}
+                  >
+                    <Text style={styles.btnMinusText}>-1</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.btnAdd}
+                    onPress={() => handleModifyBoardScore(board.boardNumber, 1)}
+                  >
+                    <Text style={styles.btnAddText}>+1</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.btnSlamMinus, board.slams === 0 && styles.btnDisabled]}
+                    onPress={() => handleModifyBoardSlam(board.boardNumber, -1)}
+                    disabled={board.slams === 0}
+                  >
+                    <Text style={styles.btnSlamText}>Slam -</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.btnSlamPlus}
+                    onPress={() => handleModifyBoardSlam(board.boardNumber, 1)}
+                  >
+                    <Text style={styles.btnSlamPlusText}>⚡ Slam +</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+
+            {/* Add New Board Button */}
+            <TouchableOpacity
+              style={styles.addBoardBtn}
+              onPress={handleAddNewBoard}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.addBoardBtnText}>➕ ADD NEW BOARD (BOARD {boards.length + 1})</Text>
+            </TouchableOpacity>
           </View>
 
           {/* 6. PRIMARY BROADCAST ACTIONS */}
@@ -705,7 +761,7 @@ export default function App() {
           </View>
         </View>
 
-        {/* 7. SHAREABLE LINK CARD (Exact MatchShareCard replica) */}
+        {/* 7. SHAREABLE LINK CARD */}
         <View style={styles.shareCardContainer}>
           <View style={styles.shareCardHeader}>
             <Text style={styles.shareCardTitle}>📢 SHARE LIVE MATCH LINK</Text>
@@ -991,7 +1047,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
 
-  // LIVE STUDIO SCREEN (WEBSITE REPLICA)
+  // LIVE STUDIO SCREEN
   liveScroll: {
     flex: 1,
     backgroundColor: '#020617',
@@ -1294,38 +1350,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   hudTeamBlockLeft: {
     flex: 1,
   },
-  hudTeamBlockRight: {
-    flex: 1,
-  },
   hudTeamTitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
     color: '#ffffff',
   },
   hudQueenCount: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '800',
     color: '#f59e0b',
+    marginTop: 1,
+  },
+  hudScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  hudScoreLabel: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#94a3b8',
+    marginRight: 4,
   },
   hudScoreNum: {
     fontSize: 18,
     fontWeight: '900',
     color: '#f59e0b',
-    paddingHorizontal: 8,
-  },
-  hudVsDivider: {
-    paddingHorizontal: 4,
-  },
-  hudVsText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#64748b',
   },
 
   // Overlay: Carrom Board Target
@@ -1460,76 +1521,173 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Live Scorekeeper
+  // BOARD-BY-BOARD SCORER (PLAYER ONLY)
   liveScorekeeperContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    padding: 10,
+    borderRadius: 16,
+    padding: 12,
     marginBottom: 12,
   },
-  scorekeeperHeading: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#f59e0b',
-    letterSpacing: 1,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  scorekeeperRow: {
+  scorerHeaderBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    paddingBottom: 10,
+    marginBottom: 10,
   },
-  scorekeeperCol: {
-    flex: 1,
+  scorerPlayerLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#94a3b8',
+    letterSpacing: 1.5,
   },
-  scorekeeperTeamName: {
+  scorerPlayerName: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#f59e0b',
+  },
+  totalScorePill: {
+    alignItems: 'flex-end',
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  totalScorePillLabel: {
+    fontSize: 7,
+    fontWeight: '900',
+    color: '#94a3b8',
+    letterSpacing: 1,
+  },
+  totalScorePillNum: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#f59e0b',
+  },
+
+  // Board Row
+  boardCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  boardInfoCol: {
+    width: 80,
+  },
+  boardNumTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  boardScorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  boardScorePillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#f1f5f9',
-    marginBottom: 4,
+    color: '#f59e0b',
   },
-  scorekeeperBtnGroup: {
+  boardSlamTag: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#38bdf8',
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+
+  // Board Action Buttons
+  boardActionsGroup: {
     flexDirection: 'row',
-    gap: 4,
     alignItems: 'center',
+    gap: 4,
   },
-  skBtn: {
+  btnMinus: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  btnMinusText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#94a3b8',
+  },
+  btnAdd: {
+    backgroundColor: '#065f46',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  btnAddText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#34d399',
+  },
+  btnSlamMinus: {
     backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#334155',
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  skBtnAdd: {
-    backgroundColor: '#065f46',
-    borderColor: '#10b981',
-  },
-  skBtnText: {
+  btnSlamText: {
     fontSize: 10,
     fontWeight: '800',
     color: '#94a3b8',
   },
-  skBtnTextAdd: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#34d399',
-  },
-  skQueenBtn: {
+  btnSlamPlus: {
     backgroundColor: '#78350f',
     borderWidth: 1,
     borderColor: '#f59e0b',
-    paddingHorizontal: 7,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  skQueenText: {
-    fontSize: 9,
+  btnSlamPlusText: {
+    fontSize: 10,
     fontWeight: '900',
     color: '#fde68a',
+  },
+
+  // Add New Board Button
+  addBoardBtn: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  addBoardBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#f59e0b',
+    letterSpacing: 1,
   },
 
   // Primary Actions
@@ -1572,10 +1730,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   btnDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
 
-  // SHARE CARD (Exact MatchShareCard replica)
+  // SHARE CARD
   shareCardContainer: {
     marginHorizontal: 12,
     marginTop: 12,
