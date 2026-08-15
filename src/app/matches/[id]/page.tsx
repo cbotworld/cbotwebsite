@@ -122,19 +122,28 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {/* 1. Live Stream or Archived Video Embed */}
           {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
             (stream.youtubeVideoId?.startsWith('cbot_yt_') || stream.youtubeEmbedUrl?.includes('cbot_yt_')) && !stream.youtubeUrl?.includes('supabase.co') && !stream.youtubeUrl?.endsWith('.webm') ? (
-              /* Offline Testing / Sandbox Fallback Mode Screen */
+              /* Active In-Match Live Broadcast Screen */
               <div className="rounded-2xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
-                <div className="h-16 w-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 animate-pulse">
+                <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
                   <Radio className="h-8 w-8" />
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-xl font-extrabold text-amber-400 uppercase tracking-wide">SANDBOX FALLBACK MODE ACTIVE</h4>
+                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🔴 LIVE MATCH BROADCAST ACTIVE</h4>
                   <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                    The YouTube Live API integration is running in offline testing/sandbox mode because the Google Channel API is not yet authorized or authorized credentials were bypassed.
+                    This tournament match is broadcasting live. Match score updates and player feed are streaming in real-time.
                   </p>
-                  <p className="text-[11px] text-muted-foreground max-w-md mx-auto leading-normal">
-                    🔒 Player broadcast streams are active on local RTMP studio testkeys, but no public YouTube video exists. Administrators can complete YouTube authorization in the Admin portal to enable official public streams.
-                  </p>
+                  {stream.youtubeUrl && !stream.youtubeUrl.includes('cbot_yt_') && (
+                    <a
+                      href={stream.youtubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-lg shadow-red-600/25 mt-2"
+                    >
+                      <Youtube className="h-4 w-4" />
+                      <span>Watch Stream on YouTube</span>
+                      <ExternalLink className="h-3 w-3 opacity-80" />
+                    </a>
+                  )}
                 </div>
               </div>
             ) : (stream.youtubeUrl?.includes('supabase.co') || stream.youtubeUrl?.endsWith('.webm') || stream.youtubeUrl?.endsWith('.mp4') || stream.youtubeEmbedUrl?.endsWith('.webm') || stream.youtubeEmbedUrl?.endsWith('.mp4')) ? (
