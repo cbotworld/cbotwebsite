@@ -137,6 +137,15 @@ export default function CanvasOverlayRenderer({
     return () => clearInterval(timer);
   }, [isStreaming, streamStartedAt]);
 
+  const onStreamReadyRef = React.useRef(onStreamReady);
+  onStreamReadyRef.current = onStreamReady;
+
+  const onErrorRef = React.useRef(onError);
+  onErrorRef.current = onError;
+
+  const isMutedRef = React.useRef(isMuted);
+  isMutedRef.current = isMuted;
+
   // Request Camera & Microphone Stream
   const initCamera = React.useCallback(async (mode: 'environment' | 'user') => {
     try {
@@ -151,15 +160,23 @@ export default function CanvasOverlayRenderer({
           audio: true,
         });
 
-        // Set initial muted state (muted by default)
+        // Set initial muted state
         const audioTrack = mediaStream.getAudioTracks()[0];
         if (audioTrack) {
-          audioTrack.enabled = !isMuted;
+          audioTrack.enabled = !isMutedRef.current;
         }
 
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
-          await videoRef.current.play();
+          try {
+            await videoRef.current.play();
+          } catch (playErr: any) {
+            // Ignore benign AbortError when play is interrupted by stream re-attachment
+            if (playErr.name === 'AbortError' || playErr.message?.includes('aborted by the user agent')) {
+              return;
+            }
+            console.warn('Video play warning:', playErr);
+          }
         }
 
         setCameraPermission('granted');
@@ -175,19 +192,22 @@ export default function CanvasOverlayRenderer({
             canvasStream.addTrack(streamAudioTrack);
           }
 
-          if (onStreamReady) {
-            onStreamReady(canvasStream);
+          if (onStreamReadyRef.current) {
+            onStreamReadyRef.current(canvasStream);
           }
         }
       }
     } catch (err: any) {
+      if (err.name === 'AbortError' || err.message?.includes('aborted by the user agent')) {
+        return;
+      }
       console.error('Camera initialization error:', err);
       setCameraPermission('denied');
-      if (onError) {
-        onError(err.message || 'Camera permission denied or camera not found.');
+      if (onErrorRef.current) {
+        onErrorRef.current(err.message || 'Camera permission denied or camera not found.');
       }
     }
-  }, [onStreamReady, onError, isMuted]);
+  }, []);
 
   React.useEffect(() => {
     initCamera(facingMode);

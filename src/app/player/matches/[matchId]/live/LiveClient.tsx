@@ -6,7 +6,8 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2 } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink } from 'lucide-react';
+import MatchShareCard from '@/components/stream/MatchShareCard';
 
 interface MatchDetails {
   matchId: string;
@@ -26,13 +27,24 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [streamId, setStreamId] = React.useState<string | null>(null);
   const [streamStatus, setStreamStatus] = React.useState<'CREATED' | 'READY' | 'LIVE' | 'ENDED' | 'ARCHIVED' | 'FAILED'>('CREATED');
   const [streamStartedAt, setStreamStartedAt] = React.useState<Date | null>(null);
+  const [youtubeUrl, setYoutubeUrl] = React.useState<string | null>(null);
+  const [youtubeVideoId, setYoutubeVideoId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [initialized, setInitialized] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const canvasStreamRef = React.useRef<MediaStream | null>(null);
   const [copied, setCopied] = React.useState(false);
+
+  const effectiveYoutubeUrl = React.useMemo(() => {
+    if (youtubeUrl) return youtubeUrl;
+    if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
+      return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+    }
+    return null;
+  }, [youtubeUrl, youtubeVideoId]);
+
   const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}/matches/${matchDetails.matchId}`;
+    const shareUrl = effectiveYoutubeUrl || `${window.location.origin}/matches/${matchDetails.matchId}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -48,6 +60,8 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
+          if (res.stream.youtubeUrl) setYoutubeUrl(res.stream.youtubeUrl);
+          if (res.stream.youtubeVideoId) setYoutubeVideoId(res.stream.youtubeVideoId);
           if (res.stream.streamStartedAt) {
             setStreamStartedAt(new Date(res.stream.streamStartedAt));
           }
@@ -102,6 +116,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   };
 
+  const handleStreamReady = React.useCallback((s: MediaStream) => {
+    canvasStreamRef.current = s;
+  }, []);
+
+  const handleStreamError = React.useCallback((msg: string) => {
+    setErrorMsg(msg);
+  }, []);
+
   const matchTime = matchDetails.scheduledTime
     ? new Date(matchDetails.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
@@ -111,7 +133,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
       {/* Top Nav */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Link href="/dashboard/player">
             <Button variant="outline" size="sm" className="gap-2 text-xs font-bold rounded-xl">
               <ArrowLeft className="h-4 w-4" /> Back to My Dashboard
@@ -127,10 +149,22 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               <span className="animate-pulse">Copied!</span>
             ) : (
               <>
-                <Share2 className="h-3.5 w-3.5" /> Copy Shareable Live Link
+                <Share2 className="h-3.5 w-3.5" /> Copy Shareable Link
               </>
             )}
           </Button>
+          {effectiveYoutubeUrl && (
+            <a
+              href={effectiveYoutubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-md shadow-red-600/20"
+            >
+              <Youtube className="h-3.5 w-3.5" />
+              <span>Watch on YouTube</span>
+              <ExternalLink className="h-3 w-3 opacity-80" />
+            </a>
+          )}
         </div>
         <Badge variant="carrom" className="text-xs font-black">{matchDetails.editionTitle}</Badge>
       </div>
@@ -231,8 +265,8 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             opponentName={matchDetails.opponentName}
             isStreaming={streamStatus === 'LIVE'}
             streamStartedAt={streamStartedAt}
-            onStreamReady={(s) => { canvasStreamRef.current = s; }}
-            onError={(msg) => setErrorMsg(msg)}
+            onStreamReady={handleStreamReady}
+            onError={handleStreamError}
           />
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center text-xs font-semibold text-amber-300">
             💡 Position your camera so the complete Carrom board is clearly visible in landscape mode.
@@ -278,6 +312,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           )}
         </div>
       </div>
+
+      {/* Shareable Link Box Below Studio Video */}
+      <MatchShareCard
+        matchId={matchDetails.matchId}
+        youtubeUrl={youtubeUrl}
+        youtubeVideoId={youtubeVideoId}
+        title={`${matchDetails.editionTitle} - ${matchDetails.teamName} vs ${matchDetails.opponentName}`}
+        isLive={streamStatus === 'LIVE'}
+      />
     </div>
   );
 }

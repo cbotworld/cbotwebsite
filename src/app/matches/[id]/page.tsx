@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Radio, Play, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video } from 'lucide-react';
 import Link from 'next/link';
-
-export const revalidate = 0;
+import MatchShareCard from '@/components/stream/MatchShareCard';
 
 interface MatchPageProps {
   params: Promise<{ id: string }>;
@@ -36,6 +35,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const team1Name = match?.team1?.name || 'Team 1';
   const team2Name = match?.team2?.name || 'Team 2';
   const editionTitle = match?.edition?.title || 'Edition #200';
+  const matchTitle = `${editionTitle} - ${team1Name} vs ${team2Name} (${matchId})`;
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 space-y-8">
@@ -171,6 +171,15 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
               </p>
             </div>
           )}
+
+          {/* 4. Shareable Link Section Below Video Recording */}
+          <MatchShareCard
+            matchId={matchId}
+            youtubeUrl={stream?.youtubeUrl}
+            youtubeVideoId={stream?.youtubeVideoId}
+            title={matchTitle}
+            isLive={stream?.status === 'LIVE'}
+          />
         </div>
 
       </div>
