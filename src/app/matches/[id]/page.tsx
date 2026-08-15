@@ -121,7 +121,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
           {/* 1. Live Stream or Archived Video Embed */}
           {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
-            (stream.youtubeVideoId?.startsWith('cbot_yt_') || stream.youtubeEmbedUrl?.includes('cbot_yt_')) ? (
+            (stream.youtubeVideoId?.startsWith('cbot_yt_') || stream.youtubeEmbedUrl?.includes('cbot_yt_')) && !stream.youtubeUrl?.includes('supabase.co') && !stream.youtubeUrl?.endsWith('.webm') ? (
               /* Offline Testing / Sandbox Fallback Mode Screen */
               <div className="rounded-2xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
                 <div className="h-16 w-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 animate-pulse">
@@ -137,7 +137,18 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                   </p>
                 </div>
               </div>
+            ) : (stream.youtubeUrl?.includes('supabase.co') || stream.youtubeUrl?.endsWith('.webm') || stream.youtubeUrl?.endsWith('.mp4') || stream.youtubeEmbedUrl?.endsWith('.webm') || stream.youtubeEmbedUrl?.endsWith('.mp4')) ? (
+              /* Native High-Performance HTML5 Video Player for Recorded CBOT Matches */
+              <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
+                <video
+                  src={stream.youtubeEmbedUrl || stream.youtubeUrl || ''}
+                  controls
+                  playsInline
+                  className="h-full w-full object-contain bg-black"
+                />
+              </div>
             ) : (
+              /* Official YouTube Live / Recording Video Embed */
               <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
                 <iframe
                   src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}

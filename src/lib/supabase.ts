@@ -70,3 +70,32 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+/**
+ * Uploads a recorded match video blob to Supabase Storage and returns the public URL.
+ */
+export async function uploadMatchVideoToSupabase(videoBlob: Blob, matchId: string): Promise<string> {
+  const ext = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
+  const fileName = `recordings/${matchId.toLowerCase()}_${Date.now()}.${ext}`;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('teams')
+      .upload(fileName, videoBlob, {
+        contentType: videoBlob.type || 'video/webm',
+        cacheControl: '86400',
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Supabase video upload error:', error.message);
+      return '';
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('teams').getPublicUrl(data.path);
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.warn('Supabase video upload exception:', err);
+    return '';
+  }
+}
+

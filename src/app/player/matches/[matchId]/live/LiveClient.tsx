@@ -6,8 +6,9 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check, Download, Loader2 } from 'lucide-react';
 import MatchShareCard from '@/components/stream/MatchShareCard';
+import { uploadMatchVideoToSupabase } from '@/lib/supabase';
 
 interface MatchDetails {
   matchId: string;
@@ -35,9 +36,13 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [copiedKey, setCopiedKey] = React.useState(false);
   const [copiedServer, setCopiedServer] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [isSavingRecording, setIsSavingRecording] = React.useState(false);
+  const [downloadUrl, setDownloadUrl] = React.useState<string | null>(null);
   const [initialized, setInitialized] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const canvasStreamRef = React.useRef<MediaStream | null>(null);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = React.useRef<Blob[]>([]);
   const [copied, setCopied] = React.useState(false);
 
   const effectiveYoutubeUrl = React.useMemo(() => {
@@ -111,6 +116,31 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       if (res.success) {
         setStreamStatus('LIVE');
         setStreamStartedAt(new Date());
+
+        // Start In-Browser Recording with Full CBOT Overlays
+        if (canvasStreamRef.current) {
+          recordedChunksRef.current = [];
+          try {
+            const stream = canvasStreamRef.current;
+            const mimeType = [
+              'video/webm;codecs=vp9,opus',
+              'video/webm;codecs=vp8,opus',
+              'video/webm',
+              'video/mp4',
+            ].find(type => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) || '';
+
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+            recorder.ondataavailable = (e) => {
+              if (e.data && e.data.size > 0) {
+                recordedChunksRef.current.push(e.data);
+              }
+            };
+            recorder.start(1000);
+            mediaRecorderRef.current = recorder;
+          } catch (recErr) {
+            console.warn('MediaRecorder initialization error:', recErr);
+          }
+        }
       } else {
         setErrorMsg(res.error || 'Failed to start live stream.');
       }
@@ -127,9 +157,36 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       return;
     }
     setLoading(true);
+    setIsSavingRecording(true);
     setErrorMsg(null);
     try {
-      const res = await stopLiveStreamAction(streamId);
+      // 1. Finalize in-browser recording
+      let videoBlob: Blob | null = null;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        await new Promise<void>((resolve) => {
+          if (!mediaRecorderRef.current) return resolve();
+          mediaRecorderRef.current.onstop = () => resolve();
+          mediaRecorderRef.current.stop();
+        });
+        if (recordedChunksRef.current.length > 0) {
+          videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const localUrl = URL.createObjectURL(videoBlob);
+          setDownloadUrl(localUrl);
+        }
+      }
+
+      // 2. Upload recording directly to Supabase storage
+      let uploadedUrl: string | undefined = undefined;
+      if (videoBlob && videoBlob.size > 0) {
+        try {
+          uploadedUrl = await uploadMatchVideoToSupabase(videoBlob, matchDetails.matchId);
+        } catch (uploadErr) {
+          console.warn('Video upload exception:', uploadErr);
+        }
+      }
+
+      // 3. Stop stream and attach video URL in DB
+      const res = await stopLiveStreamAction(streamId, uploadedUrl);
       if (res.success || res.error?.includes('not found')) {
         setStreamStatus('ARCHIVED');
       } else {
@@ -139,6 +196,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       setErrorMsg(err.message || 'Failed to stop stream.');
     } finally {
       setLoading(false);
+      setIsSavingRecording(false);
     }
   };
 
@@ -315,10 +373,18 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <Button
                 onClick={handleStopLive}
-                disabled={loading}
+                disabled={loading || isSavingRecording}
                 className="w-full sm:w-auto bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-black text-sm px-8 py-3.5 rounded-2xl shadow-xl shadow-rose-600/30 gap-2 animate-pulse"
               >
-                <Square className="h-4 w-4 fill-white" /> END LIVE STREAM
+                {isSavingRecording ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> SAVING MATCH RECORDING…
+                  </>
+                ) : (
+                  <>
+                    <Square className="h-4 w-4 fill-white" /> END LIVE STREAM
+                  </>
+                )}
               </Button>
               {effectiveYoutubeUrl && (
                 <a
@@ -335,19 +401,31 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             </div>
           )}
           {streamStatus === 'ARCHIVED' && (
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-3">
               <p className="text-xs text-emerald-400 font-bold">
-                🎉 Match stream saved! Available on CBOT for 15 days.
+                🎉 Match stream & recording saved! Available on CBOT Arena for 15 days.
               </p>
-              <Button
-                variant="outline"
-                className="text-xs font-bold rounded-xl border-amber-500/40 text-amber-400"
-                onClick={() => {
-                  window.location.href = `/matches/${matchDetails.matchId}`;
-                }}
-              >
-                View Public Match Recording
-              </Button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  className="text-xs font-bold rounded-xl border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                  onClick={() => {
+                    window.location.href = `/matches/${matchDetails.matchId}`;
+                  }}
+                >
+                  View Public Match Recording
+                </Button>
+                {downloadUrl && (
+                  <a
+                    href={downloadUrl}
+                    download={`cbot_match_${matchDetails.matchId}.webm`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-lg shadow-emerald-600/20"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Match Video
+                  </a>
+                )}
+              </div>
             </div>
           )}
         </div>

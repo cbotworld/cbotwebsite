@@ -412,9 +412,9 @@ export async function startLiveStreamAction(streamId: string) {
 }
 
 /**
- * Server Action to stop/end a live stream and calculate 15-day expiry
+ * Server Action to stop/end a live stream, store match video recording, and calculate 15-day expiry
  */
-export async function stopLiveStreamAction(streamId: string) {
+export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: string) {
   noStore();
   try {
     const session = await getServerSession(authOptions);
@@ -463,6 +463,10 @@ export async function stopLiveStreamAction(streamId: string) {
         streamEndedAt: endedAt,
         recordedAt: endedAt,
         expiresAt: expiresAt,
+        ...(recordedVideoUrl ? {
+          youtubeUrl: recordedVideoUrl,
+          youtubeEmbedUrl: recordedVideoUrl,
+        } : {}),
       }
     });
 
