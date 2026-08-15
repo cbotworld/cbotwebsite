@@ -6,7 +6,7 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 
 interface MatchDetails {
@@ -29,6 +29,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [streamStartedAt, setStreamStartedAt] = React.useState<Date | null>(null);
   const [youtubeUrl, setYoutubeUrl] = React.useState<string | null>(null);
   const [youtubeVideoId, setYoutubeVideoId] = React.useState<string | null>(null);
+  const [streamKey, setStreamKey] = React.useState<string | null>(null);
+  const [rtmpIngestionUrl, setRtmpIngestionUrl] = React.useState<string | null>(null);
+  const [showStreamKey, setShowStreamKey] = React.useState(false);
+  const [copiedKey, setCopiedKey] = React.useState(false);
+  const [copiedServer, setCopiedServer] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [initialized, setInitialized] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
@@ -36,7 +41,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [copied, setCopied] = React.useState(false);
 
   const effectiveYoutubeUrl = React.useMemo(() => {
-    if (youtubeUrl) return youtubeUrl;
+    if (youtubeUrl && !youtubeUrl.includes('cbot_yt_')) return youtubeUrl;
     if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
       return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
     }
@@ -51,6 +56,22 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     });
   };
 
+  const handleCopyKey = () => {
+    if (!streamKey) return;
+    navigator.clipboard.writeText(streamKey).then(() => {
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2500);
+    });
+  };
+
+  const handleCopyServer = () => {
+    const url = rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2';
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedServer(true);
+      setTimeout(() => setCopiedServer(false), 2500);
+    });
+  };
+
   // Initialize stream session
   React.useEffect(() => {
     const init = async () => {
@@ -62,6 +83,8 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           setStreamStatus(res.stream.status as any);
           if (res.stream.youtubeUrl) setYoutubeUrl(res.stream.youtubeUrl);
           if (res.stream.youtubeVideoId) setYoutubeVideoId(res.stream.youtubeVideoId);
+          if (res.stream.streamKey) setStreamKey(res.stream.streamKey);
+          if (res.stream.rtmpIngestionUrl) setRtmpIngestionUrl(res.stream.rtmpIngestionUrl);
           if (res.stream.streamStartedAt) {
             setStreamStartedAt(new Date(res.stream.streamStartedAt));
           }
@@ -315,6 +338,94 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           )}
         </div>
       </div>
+
+      {/* OBS Studio / RTMP Broadcasting Credentials Box */}
+      {streamKey && !streamKey.startsWith('cbot-key') && (
+        <div className="rounded-3xl bg-slate-950/90 border border-red-500/30 p-5 sm:p-6 shadow-xl space-y-4 text-white">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
+            <div className="h-8 w-8 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+              <Server className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-red-400">
+                Direct OBS & Mobile App Streaming (RTMP)
+              </h4>
+              <p className="text-[11px] text-muted-foreground">
+                To transmit video into this official YouTube live stream, enter these credentials in OBS Studio or your mobile streaming app:
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Server URL */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Stream Server URL</label>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
+                <input
+                  type="text"
+                  readOnly
+                  value={rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2'}
+                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none select-all truncate"
+                />
+                <Button
+                  onClick={handleCopyServer}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-bold rounded-lg text-slate-300 hover:text-white shrink-0"
+                >
+                  {copiedServer ? (
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <Check className="h-3 w-3" /> Copied
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Copy className="h-3 w-3" /> Copy
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Stream Key */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Stream Key</label>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
+                <input
+                  type={showStreamKey ? 'text' : 'password'}
+                  readOnly
+                  value={streamKey}
+                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none select-all truncate"
+                />
+                <Button
+                  onClick={() => setShowStreamKey(!showStreamKey)}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-slate-400 hover:text-white shrink-0"
+                  title={showStreamKey ? 'Hide key' : 'Show key'}
+                >
+                  {showStreamKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </Button>
+                <Button
+                  onClick={handleCopyKey}
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-bold rounded-lg text-slate-300 hover:text-white shrink-0"
+                >
+                  {copiedKey ? (
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <Check className="h-3 w-3" /> Copied
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Copy className="h-3 w-3" /> Copy
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Shareable Link Box Below Studio Video */}
       <MatchShareCard
