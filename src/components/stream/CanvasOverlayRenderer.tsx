@@ -331,15 +331,21 @@ export default function CanvasOverlayRenderer({
       ctx.fillText(currentTimeStr || '12 AUG 2026 21:30:00', width - 30, height - 60);
 
       if (isStreaming) {
-        // Red LIVE Badge
+        ctx.font = '900 16px monospace';
+        const liveText = `LIVE  ${elapsedTimerStr}`;
+        const textWidth = ctx.measureText(liveText).width;
+        const textRight = width - 30;
+        const textLeft = textRight - textWidth;
+
+        // Red LIVE Dot (positioned cleanly to the left of LIVE with generous spacing)
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
-        ctx.arc(width - 150, height - 35, 7, 0, 2 * Math.PI);
+        ctx.arc(textLeft - 14, height - 35, 6, 0, 2 * Math.PI);
         ctx.fill();
 
-        ctx.font = '900 16px monospace';
+        // LIVE + Timer Text
         ctx.fillStyle = '#ef4444';
-        ctx.fillText(`LIVE  ${elapsedTimerStr}`, width - 30, height - 30);
+        ctx.fillText(liveText, textRight, height - 30);
       } else {
         ctx.font = '800 14px monospace';
         ctx.fillStyle = '#94a3b8';
