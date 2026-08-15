@@ -45,26 +45,55 @@ export async function GET(request: NextRequest) {
 
     const teamIds = participations.map(p => p.teamId).filter(Boolean) as string[];
 
-    if (teamIds.length === 0) {
-      return NextResponse.json({ success: true, matches: [] }, { headers: corsHeaders });
+    // If user is not yet assigned to a team, show recent scheduled matches so they can still test
+    let matches: any[] = [];
+
+    if (teamIds.length > 0) {
+      matches = await prisma.match.findMany({
+        where: {
+          OR: [
+            { team1Id: { in: teamIds } },
+            { team2Id: { in: teamIds } },
+          ],
+        },
+        include: {
+          edition: true,
+          team1: true,
+          team2: true,
+        },
+        orderBy: { scheduledTime: 'desc' },
+        take: 20,
+      });
     }
 
-    // Find matches where this player's team is team1 or team2
-    const matches = await prisma.match.findMany({
-      where: {
-        OR: [
-          { team1Id: { in: teamIds } },
-          { team2Id: { in: teamIds } },
-        ],
-      },
-      include: {
-        edition: true,
-        team1: true,
-        team2: true,
-      },
-      orderBy: { scheduledTime: 'desc' },
-      take: 20,
-    });
+    // Fallback: If no matches for player's specific team, fetch any active/scheduled matches
+    if (matches.length === 0) {
+      matches = await prisma.match.findMany({
+        where: {
+          status: { in: ['SCHEDULED', 'READY', 'LIVE', 'IN_PROGRESS'] },
+        },
+        include: {
+          edition: true,
+          team1: true,
+          team2: true,
+        },
+        orderBy: { scheduledTime: 'desc' },
+        take: 10,
+      });
+    }
+
+    // Secondary fallback: get latest 10 matches of any status
+    if (matches.length === 0) {
+      matches = await prisma.match.findMany({
+        include: {
+          edition: true,
+          team1: true,
+          team2: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      });
+    }
 
     const formattedMatches = matches.map(match => {
       const isTeam1 = teamIds.includes(match.team1Id || '');
@@ -73,13 +102,23 @@ export async function GET(request: NextRequest) {
 
       return {
         matchId: match.id,
-        editionTitle: match.edition?.title || 'CBOT Edition',
-        editionNumber: match.edition?.number || 0,
+        editionTitle: match.edition?.title || `CBOT Edition #${match.edition?.number || 1}`,
+        editionNumber: match.edition?.number || 1,
+        round: match.round || 1,
+        matchNumber: match.matchNumber || 1,
+        stage: match.stage || 'LEAGUE',
         playerName: user.name || user.username || 'Player',
-        teamName: playerTeam?.name || 'My Team',
-        teamLogo: playerTeam?.logo || null,
-        opponentName: opponentTeam?.name || 'Opponent',
-        opponentLogo: opponentTeam?.logo || null,
+        playerRole: user.role || 'PLAYER',
+        teamName: playerTeam?.name || match.team1?.name || 'Team 1',
+        teamTag: playerTeam?.tag || match.team1?.tag || 'T1',
+        teamLogo: playerTeam?.logo || match.team1?.logo || null,
+        opponentName: opponentTeam?.name || match.team2?.name || 'Team 2',
+        opponentTag: opponentTeam?.tag || match.team2?.tag || 'T2',
+        opponentLogo: opponentTeam?.logo || match.team2?.logo || null,
+        score1: match.score1 || 0,
+        score2: match.score2 || 0,
+        queenStrikes1: match.queenStrikes1 || 0,
+        queenStrikes2: match.queenStrikes2 || 0,
         scheduledTime: match.scheduledTime?.toISOString() || null,
         tableNumber: match.tableNumber || 1,
         status: match.status || 'SCHEDULED',
