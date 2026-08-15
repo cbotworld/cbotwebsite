@@ -312,13 +312,27 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             </Button>
           )}
           {streamStatus === 'LIVE' && (
-            <Button
-              onClick={handleStopLive}
-              disabled={loading}
-              className="w-full sm:w-auto bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-black text-sm px-8 py-3.5 rounded-2xl shadow-xl shadow-rose-600/30 gap-2 animate-pulse"
-            >
-              <Square className="h-4 w-4 fill-white" /> END LIVE STREAM
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <Button
+                onClick={handleStopLive}
+                disabled={loading}
+                className="w-full sm:w-auto bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-black text-sm px-8 py-3.5 rounded-2xl shadow-xl shadow-rose-600/30 gap-2 animate-pulse"
+              >
+                <Square className="h-4 w-4 fill-white" /> END LIVE STREAM
+              </Button>
+              {effectiveYoutubeUrl && (
+                <a
+                  href={effectiveYoutubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm transition-all shadow-xl shadow-red-600/30"
+                >
+                  <Youtube className="h-4 w-4" />
+                  <span>Watch Live on YouTube</span>
+                  <ExternalLink className="h-4 w-4 opacity-80" />
+                </a>
+              )}
+            </div>
           )}
           {streamStatus === 'ARCHIVED' && (
             <div className="text-center space-y-2">
@@ -339,94 +353,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         </div>
       </div>
 
-      {/* OBS Studio / RTMP Broadcasting Credentials Box */}
-      {streamKey && !streamKey.startsWith('cbot-key') && (
-        <div className="rounded-3xl bg-slate-950/90 border border-red-500/30 p-5 sm:p-6 shadow-xl space-y-4 text-white">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
-            <div className="h-8 w-8 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
-              <Server className="h-4 w-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black uppercase tracking-wider text-red-400">
-                Direct OBS & Mobile App Streaming (RTMP)
-              </h4>
-              <p className="text-[11px] text-muted-foreground">
-                To transmit video into this official YouTube live stream, enter these credentials in OBS Studio or your mobile streaming app:
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Server URL */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Stream Server URL</label>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
-                <input
-                  type="text"
-                  readOnly
-                  value={rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2'}
-                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none select-all truncate"
-                />
-                <Button
-                  onClick={handleCopyServer}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs font-bold rounded-lg text-slate-300 hover:text-white shrink-0"
-                >
-                  {copiedServer ? (
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <Check className="h-3 w-3" /> Copied
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Copy className="h-3 w-3" /> Copy
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Stream Key */}
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Stream Key</label>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
-                <input
-                  type={showStreamKey ? 'text' : 'password'}
-                  readOnly
-                  value={streamKey}
-                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none select-all truncate"
-                />
-                <Button
-                  onClick={() => setShowStreamKey(!showStreamKey)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-white shrink-0"
-                  title={showStreamKey ? 'Hide key' : 'Show key'}
-                >
-                  {showStreamKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </Button>
-                <Button
-                  onClick={handleCopyKey}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs font-bold rounded-lg text-slate-300 hover:text-white shrink-0"
-                >
-                  {copiedKey ? (
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <Check className="h-3 w-3" /> Copied
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Copy className="h-3 w-3" /> Copy
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Shareable Link Box Below Studio Video */}
       <MatchShareCard
         matchId={matchDetails.matchId}
@@ -435,6 +361,54 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         title={`${matchDetails.editionTitle} - ${matchDetails.teamName} vs ${matchDetails.opponentName}`}
         isLive={streamStatus === 'LIVE'}
       />
+
+      {/* Optional Collapsible OBS / External App Settings */}
+      {streamKey && !streamKey.startsWith('cbot-key') && (
+        <details className="rounded-2xl bg-slate-950/60 border border-white/10 p-4 text-white text-xs group">
+          <summary className="font-bold text-slate-400 cursor-pointer flex items-center justify-between select-none">
+            <span className="flex items-center gap-2">
+              <Server className="h-3.5 w-3.5 text-amber-400" />
+              Advanced: External OBS / Camera Setup (Optional)
+            </span>
+            <span className="text-[10px] text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+
+          <div className="pt-4 mt-3 border-t border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400">Stream Server URL</label>
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-white/10">
+                <input
+                  type="text"
+                  readOnly
+                  value={rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2'}
+                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none truncate"
+                />
+                <Button onClick={handleCopyServer} variant="ghost" size="sm" className="h-6 px-2 text-[10px]">
+                  {copiedServer ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400">Stream Key</label>
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-white/10">
+                <input
+                  type={showStreamKey ? 'text' : 'password'}
+                  readOnly
+                  value={streamKey}
+                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none truncate"
+                />
+                <Button onClick={() => setShowStreamKey(!showStreamKey)} variant="ghost" size="sm" className="h-6 w-6 p-0 text-slate-400">
+                  {showStreamKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </Button>
+                <Button onClick={handleCopyKey} variant="ghost" size="sm" className="h-6 px-2 text-[10px]">
+                  {copiedKey ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
