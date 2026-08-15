@@ -99,12 +99,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   };
 
   const handleStopLive = async () => {
-    if (!streamId) return;
+    if (!streamId) {
+      setStreamStatus('ARCHIVED');
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
     try {
       const res = await stopLiveStreamAction(streamId);
-      if (res.success) {
+      if (res.success || res.error?.includes('not found')) {
         setStreamStatus('ARCHIVED');
       } else {
         setErrorMsg(res.error || 'Failed to stop stream.');

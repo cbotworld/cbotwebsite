@@ -423,12 +423,26 @@ export async function stopLiveStreamAction(streamId: string) {
     }
 
     const userId = (session.user as any).id;
-    const stream = await prisma.liveStream.findUnique({
+    let stream = await prisma.liveStream.findUnique({
       where: { id: streamId }
     });
 
     if (!stream) {
-      return { success: false, error: 'Stream not found.' };
+      // Fallback: search by matchId or active session for this player
+      stream = await prisma.liveStream.findFirst({
+        where: {
+          OR: [
+            { matchId: streamId, playerId: userId },
+            { playerId: userId, status: { in: ['CREATED', 'READY', 'LIVE'] } }
+          ]
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    // If stream truly doesn't exist anymore in DB, treat as gracefully closed
+    if (!stream) {
+      return { success: true, message: 'Stream session ended.' };
     }
 
     const isOwner = stream.playerId === userId;
@@ -443,7 +457,7 @@ export async function stopLiveStreamAction(streamId: string) {
     const expiresAt = new Date(endedAt.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     const updatedStream = await prisma.liveStream.update({
-      where: { id: streamId },
+      where: { id: stream.id },
       data: {
         status: 'ARCHIVED',
         streamEndedAt: endedAt,
@@ -456,7 +470,57 @@ export async function stopLiveStreamAction(streamId: string) {
     await prisma.match.update({
       where: { id: stream.matchId },
       data: { status: 'COMPLETED' }
-    });
+    }).catch(() => {});
+
+    // Transition YouTube Live Broadcast to complete on YouTube if applicable
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+    if (!googleRefreshToken) {
+      const dbSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'youtube_refresh_token' }
+      });
+      if (dbSetting?.value) {
+        googleRefreshToken = dbSetting.value;
+      }
+    }
+
+    if (
+      googleClientId &&
+      googleClientSecret &&
+      googleRefreshToken &&
+      stream.youtubeBroadcastId &&
+      !stream.youtubeBroadcastId.startsWith('cbot_yt_')
+    ) {
+      try {
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: googleClientId,
+            client_secret: googleClientSecret,
+            refresh_token: googleRefreshToken,
+            grant_type: 'refresh_token',
+          }),
+        });
+
+        const tokenData = await tokenRes.json();
+        const accessToken = tokenData.access_token;
+
+        if (accessToken) {
+          await fetch(
+            `https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id=${stream.youtubeBroadcastId}&part=status`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${accessToken}` },
+            }
+          );
+        }
+      } catch (ytEndErr) {
+        console.error('Error transitioning YouTube broadcast to complete:', ytEndErr);
+      }
+    }
 
     return { success: true, stream: updatedStream };
   } catch (error: any) {
