@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -84,10 +84,10 @@ export default function App() {
   // Auto-request permissions on mount
   useEffect(() => {
     (async () => {
-      if (!camPermission?.granted) {
+      if (!camPermission?.granted && requestCamPermission) {
         await requestCamPermission();
       }
-      if (!micPermission?.granted) {
+      if (!micPermission?.granted && requestMicPermission) {
         await requestMicPermission();
       }
     })();
@@ -193,7 +193,7 @@ export default function App() {
   const handleSelectMatch = (match: MatchDetails) => {
     setSelectedMatch(match);
     setScreen('live');
-    if (!camPermission?.granted) {
+    if (!camPermission?.granted && requestCamPermission) {
       requestCamPermission();
     }
   };
@@ -524,7 +524,10 @@ export default function App() {
                 <Text style={{ fontSize: 36, marginBottom: 8 }}>📷</Text>
                 <Text style={styles.permissionHeading}>Camera Access Needed</Text>
                 <Text style={styles.permissionSub}>Grant camera permission to activate live feed</Text>
-                <TouchableOpacity style={styles.grantBtn} onPress={requestCamPermission}>
+                <TouchableOpacity
+                  style={styles.grantBtn}
+                  onPress={() => requestCamPermission && requestCamPermission()}
+                >
                   <Text style={styles.grantBtnText}>ENABLE CAMERA</Text>
                 </TouchableOpacity>
               </View>
@@ -1214,7 +1217,7 @@ const styles = StyleSheet.create({
   // CAMERA VIEWPORT & OVERLAYS
   cameraViewportContainer: {
     width: '100%',
-    height: 320, // Explicit height for stable camera rendering
+    height: 320,
     backgroundColor: '#000000',
     borderRadius: 16,
     overflow: 'hidden',
