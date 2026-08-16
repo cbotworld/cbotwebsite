@@ -223,6 +223,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       setStreamStatus('ARCHIVED');
       return;
     }
+    setIsScoreDrawerOpen(false);
     setLoading(true);
     setIsSavingRecording(true);
     setErrorMsg(null);
@@ -259,14 +260,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           const upData = await upRes.json();
           if (upData.success && upData.url) {
             uploadedUrl = upData.url;
+            setDownloadUrl(uploadedUrl || null);
           }
         } catch (uploadErr) {
           console.warn('Server recording upload error:', uploadErr);
         }
       }
 
-      // 3. Stop stream and attach video URL in DB
-      const res = await stopLiveStreamAction(streamId, uploadedUrl);
+      // 3. Stop stream, freeze match score permanently in DB
+      const res = await stopLiveStreamAction(streamId, uploadedUrl, { totalScore, totalSlams });
       const finalUrl = uploadedUrl || (videoBlob ? URL.createObjectURL(videoBlob) : null);
       if (finalUrl) {
         setDownloadUrl(finalUrl);

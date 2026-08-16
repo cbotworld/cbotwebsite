@@ -38,9 +38,10 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const editionTitle = match?.edition?.title || 'Edition #200';
   const matchTitle = `${editionTitle} - ${team1Name} vs ${team2Name} (${matchId})`;
 
-  const videoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl;
+  const rawVideoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl;
   const isYouTubeVideo = !!stream?.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_');
-  const isDirectVideo = !!videoUrl && !videoUrl.includes('cbot_yt_') && (videoUrl.startsWith('http') || videoUrl.startsWith('blob:') || videoUrl.startsWith('/'));
+  const isDirectVideo = !!rawVideoUrl && (rawVideoUrl.startsWith('http') || rawVideoUrl.startsWith('blob:') || rawVideoUrl.startsWith('/')) && !rawVideoUrl.includes('cbot_yt_');
+  const videoUrl = isDirectVideo ? rawVideoUrl : null;
   const hasReplay = isYouTubeVideo || isDirectVideo;
   const replayReason = stream?.failureReason?.startsWith('REPLAY_REASON:') 
     ? stream.failureReason.replace('REPLAY_REASON:', '').trim() 
@@ -63,7 +64,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
               <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1 gap-1.5 animate-pulse">
                 <Radio className="h-3 w-3" /> 🔴 LIVE NOW
               </Badge>
-            ) : stream?.status === 'ARCHIVED' ? (
+            ) : stream?.status === 'ARCHIVED' || match?.status === 'COMPLETED' ? (
               <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1 gap-1.5">
                 <CheckCircle2 className="h-3 w-3" /> MATCH COMPLETED
               </Badge>
@@ -89,7 +90,13 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {/* Center VS & Details */}
           <div className="space-y-2">
             <div className="text-xs font-black uppercase tracking-widest text-slate-400">Match ID: {matchId}</div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-600">VS</div>
+            {match?.status === 'COMPLETED' ? (
+              <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
+                {match.score1} : {match.score2}
+              </div>
+            ) : (
+              <div className="text-2xl sm:text-3xl font-black text-slate-600">VS</div>
+            )}
             {match?.tableNumber && (
               <Badge variant="outline" className="border-amber-500/30 text-amber-300/80 text-[11px] font-bold">
                 Table #{match.tableNumber}
@@ -145,97 +152,83 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           </div>
 
           {/* Video / Status Logic */}
-          {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
-            stream.status === 'ARCHIVED' ? (
-              /* ARCHIVED / COMPLETED MATCH */
-              hasReplay ? (
-                /* Native High-Performance HTML5 Video Player or YouTube Archive */
-                <div className="space-y-3">
-                  <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
-                    {isYouTubeVideo ? (
-                      <iframe
-                        src={`https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
-                        title="CBOT Match Replay"
-                        className="w-full h-full border-none"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <video
-                        src={videoUrl || ''}
-                        controls
-                        playsInline
-                        className="h-full w-full object-contain bg-black"
-                      />
-                    )}
-                  </div>
-                  {/* Audience Local Save / Download Box */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/90 border border-white/10 shadow-lg">
-                    <div className="space-y-0.5 text-center sm:text-left">
-                      <div className="text-xs font-black text-white flex items-center justify-center sm:justify-start gap-1.5">
-                        <span>💾 Save Match Video Locally</span>
-                        <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">Free Download</Badge>
-                      </div>
-                      <p className="text-[11px] text-slate-400">
-                        Download this match recording to keep on your device for future reference before the 72-hour retention period ends.
-                      </p>
-                    </div>
-                    {videoUrl && (
-                      <a
-                        href={videoUrl}
-                        download={`cbot_match_${matchId}.webm`}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-500/25 shrink-0 hover:scale-[1.02]"
-                      >
-                        <Download className="h-4 w-4" />
-                        <span>Download Match Video (.webm)</span>
-                      </a>
-                    )}
-                  </div>
+          {stream?.status === 'LIVE' ? (
+            /* Native Real-Time In-Browser Live Video Stream for Spectators */
+            <WebRTCLiveViewer
+              matchId={matchId}
+              player1Name={team1Name}
+              player2Name={team2Name}
+              team1Name={team1Name}
+              team2Name={team2Name}
+            />
+          ) : (stream?.status === 'ARCHIVED' || match?.status === 'COMPLETED') && !isExpired ? (
+            /* ARCHIVED / COMPLETED MATCH */
+            hasReplay ? (
+              /* Native High-Performance HTML5 Video Player or YouTube Archive */
+              <div className="space-y-3">
+                <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
+                  {isYouTubeVideo ? (
+                    <iframe
+                      src={`https://www.youtube.com/embed/${stream?.youtubeVideoId}?autoplay=1`}
+                      title="CBOT Match Replay"
+                      className="w-full h-full border-none"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={videoUrl || ''}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="h-full w-full object-contain bg-black"
+                    />
+                  )}
                 </div>
-              ) : (
-                /* Match Completed / Saved Notice */
-                <div className="rounded-3xl border-2 border-emerald-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
-                  <div className="h-16 w-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                    <CheckCircle2 className="h-8 w-8" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🎉 MATCH COMPLETED & SAVED</h4>
-                    <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                      This match has concluded. Live scoring data and recorded match overlays are saved to CBOT Arena.
+                {/* Audience Local Save / Download Box */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/90 border border-white/10 shadow-lg">
+                  <div className="space-y-0.5 text-center sm:text-left">
+                    <div className="text-xs font-black text-white flex items-center justify-center sm:justify-start gap-1.5">
+                      <span>💾 Save Match Video Locally</span>
+                      <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">Free Download</Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Download this match recording to keep on your device for future reference before the 72-hour retention period ends.
                     </p>
                   </div>
+                  {videoUrl && (
+                    <a
+                      href={videoUrl}
+                      download={`cbot_match_${matchId}.webm`}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-500/25 shrink-0 hover:scale-[1.02]"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Download Match Video (.webm)</span>
+                    </a>
+                  )}
                 </div>
-              )
+              </div>
             ) : (
-              /* Native Real-Time In-Browser Live Video Stream for Spectators */
-              <WebRTCLiveViewer
-                matchId={matchId}
-                player1Name={team1Name}
-                player2Name={team2Name}
-                team1Name={team1Name}
-                team2Name={team2Name}
-              />
+              /* Match Completed / Saved Notice */
+              <div className="rounded-3xl border-2 border-emerald-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
+                <div className="h-16 w-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🎉 MATCH COMPLETED &amp; SAVED</h4>
+                  <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+                    This match has concluded. Live scoring data and recorded match overlays are saved to CBOT Arena.
+                  </p>
+                </div>
+              </div>
             )
-          ) : isExpired ? (
-            /* Expired Video Container */
-            <div className="rounded-3xl border border-border bg-slate-900/90 p-10 text-center space-y-3">
-              <div className="h-14 w-14 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 mx-auto">
-                <Lock className="h-6 w-6" />
-              </div>
-              <h4 className="text-lg font-black text-slate-300">VIDEO EXPIRED</h4>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Official CBOT 15-day public match video retention period has ended for this match.
-              </p>
-            </div>
           ) : (
-            /* Standby / Scheduled Match Container */
-            <div className="rounded-3xl border border-amber-500/20 bg-slate-900/50 p-10 text-center space-y-3">
-              <div className="h-14 w-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-                <Radio className="h-6 w-6" />
-              </div>
-              <h4 className="text-lg font-black text-amber-400">MATCH NOT YET STARTED</h4>
+            /* Scheduled State */
+            <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-12 text-center space-y-3">
+              <Clock className="h-10 w-10 text-amber-400 mx-auto opacity-80" />
+              <h4 className="text-base font-bold text-white uppercase">Match Scheduled</h4>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                The match broadcast will appear here when the assigned player begins the session from their Player Studio.
+                This match has not started yet. When the player begins broadcasting, the live camera feed and scoring overlays will appear here automatically.
               </p>
             </div>
           )}

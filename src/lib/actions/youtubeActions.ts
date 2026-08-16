@@ -482,7 +482,11 @@ export async function startLiveStreamAction(streamId: string, deviceSessionId?: 
 /**
  * Server Action to stop/end a live stream, store match video recording, and calculate 15-day expiry
  */
-export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: string) {
+export async function stopLiveStreamAction(
+  streamId: string,
+  recordedVideoUrl?: string,
+  finalScores?: { score1?: number; score2?: number; totalScore?: number; totalSlams?: number }
+) {
   noStore();
   try {
     const session = await getServerSession(authOptions);
@@ -538,10 +542,18 @@ export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: 
       }
     });
 
-    // Mark match as COMPLETED if needed
+    // Mark match as COMPLETED and permanently freeze final match scores
+    const matchUpdateData: any = { status: 'COMPLETED' };
+    if (finalScores) {
+      if (typeof finalScores.score1 === 'number') matchUpdateData.score1 = finalScores.score1;
+      else if (typeof finalScores.totalScore === 'number') matchUpdateData.score1 = finalScores.totalScore;
+      if (typeof finalScores.score2 === 'number') matchUpdateData.score2 = finalScores.score2;
+      if (typeof finalScores.totalSlams === 'number') matchUpdateData.queenStrikes1 = finalScores.totalSlams;
+    }
+
     await prisma.match.update({
       where: { id: stream.matchId },
-      data: { status: 'COMPLETED' }
+      data: matchUpdateData,
     }).catch(() => {});
 
     // Transition YouTube Live Broadcast to complete on YouTube if applicable
