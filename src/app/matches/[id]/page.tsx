@@ -52,9 +52,9 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
-          <Link href="/tournaments">
+          <Link href="/dashboard/player">
             <Button variant="outline" size="sm" className="gap-2 text-xs font-bold rounded-xl border-white/15 hover:bg-white/5">
-              <ArrowLeft className="h-4 w-4" /> Back to Tournaments
+              <ArrowLeft className="h-4 w-4" /> Back to Dashboard
             </Button>
           </Link>
           <div className="flex items-center gap-2">
