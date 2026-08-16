@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { supabase } from '@/lib/supabase';
-import { Radio, Volume2, VolumeX, Maximize, Minimize, Loader2, Sparkles, Trophy, Users, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Radio, Volume2, VolumeX, Maximize, Minimize, Loader2, Sparkles, Trophy, Users, RefreshCw, CheckCircle2, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -216,10 +216,17 @@ export default function WebRTCLiveViewer({
             playsInline
             className="h-full w-full object-contain bg-black"
           />
-          <div className="absolute top-3 left-3 z-10 pointer-events-none">
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10 pointer-events-none">
             <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 shadow-lg shadow-emerald-600/30">
-              <CheckCircle2 className="h-3.5 w-3.5" /> REPLAY READY (SAVED)
+              <CheckCircle2 className="h-3.5 w-3.5" /> REPLAY READY (72H RETENTION)
             </Badge>
+            <a
+              href={finishedVideoUrl}
+              download={`cbot_match_${matchId}.webm`}
+              className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20"
+            >
+              <Download className="h-3.5 w-3.5" /> Download
+            </a>
           </div>
         </div>
       )}

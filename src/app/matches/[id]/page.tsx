@@ -39,7 +39,9 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const matchTitle = `${editionTitle} - ${team1Name} vs ${team2Name} (${matchId})`;
 
   const videoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl;
+  const isYouTubeVideo = !!stream?.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_');
   const isDirectVideo = !!videoUrl && !videoUrl.includes('cbot_yt_') && (videoUrl.startsWith('http') || videoUrl.startsWith('blob:') || videoUrl.startsWith('/'));
+  const hasReplay = isYouTubeVideo || isDirectVideo;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-8 px-4 sm:px-6">
@@ -109,13 +111,14 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
         {/* Video Player Display Container */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
               <Video className="h-4 w-4" /> CBOT Arena Match Video
             </h3>
             {stream?.expiresAt && !isExpired && (
-              <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" /> Retention Expiry: {new Date(stream.expiresAt).toLocaleDateString()}
+              <span className="text-[11px] font-mono text-amber-400/90 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl">
+                <Clock className="h-3.5 w-3.5 text-amber-400" />
+                <span>72h Retention: Available until {new Date(stream.expiresAt).toLocaleDateString()} {new Date(stream.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} IST</span>
               </span>
             )}
           </div>
@@ -124,26 +127,48 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
             stream.status === 'ARCHIVED' ? (
               /* ARCHIVED / COMPLETED MATCH */
-              isDirectVideo ? (
-                /* Native High-Performance HTML5 Video Player for Recorded CBOT Matches */
+              hasReplay ? (
+                /* Native High-Performance HTML5 Video Player or YouTube Archive */
                 <div className="space-y-3">
                   <div className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
-                    <video
-                      src={videoUrl}
-                      controls
-                      playsInline
-                      className="h-full w-full object-contain bg-black"
-                    />
+                    {isYouTubeVideo ? (
+                      <iframe
+                        src={`https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
+                        title="CBOT Match Replay"
+                        className="w-full h-full border-none"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <video
+                        src={videoUrl || ''}
+                        controls
+                        playsInline
+                        className="h-full w-full object-contain bg-black"
+                      />
+                    )}
                   </div>
-                  <div className="flex justify-end">
-                    <a
-                      href={videoUrl}
-                      download={`cbot_match_${matchId}.webm`}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-white/15 hover:border-amber-500/40 text-white text-xs font-bold transition-all shadow-md"
-                    >
-                      <Download className="h-3.5 w-3.5 text-amber-400" />
-                      <span>Download Match Video</span>
-                    </a>
+                  {/* Audience Local Save / Download Box */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-slate-900/90 border border-white/10 shadow-lg">
+                    <div className="space-y-0.5 text-center sm:text-left">
+                      <div className="text-xs font-black text-white flex items-center justify-center sm:justify-start gap-1.5">
+                        <span>💾 Save Match Video Locally</span>
+                        <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/40">Free Download</Badge>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Download this match recording to keep on your device for future reference before the 72-hour retention period ends.
+                      </p>
+                    </div>
+                    {videoUrl && (
+                      <a
+                        href={videoUrl}
+                        download={`cbot_match_${matchId}.webm`}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-500/25 shrink-0 hover:scale-[1.02]"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Download Match Video (.webm)</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               ) : (

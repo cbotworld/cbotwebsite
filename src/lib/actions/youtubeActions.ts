@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { unstable_noStore as noStore } from 'next/cache';
 
-const RETENTION_DAYS = 15;
+const RETENTION_HOURS = 72; // 72 Hours Retention Window from Day End
 
 const DEFAULT_GOOGLE_CLIENT_ID = '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
 const DEFAULT_GOOGLE_CLIENT_SECRET = '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';
@@ -492,8 +492,8 @@ export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: 
     }
 
     const endedAt = new Date();
-    // Expiry = EndedAt + 15 days
-    const expiresAt = new Date(endedAt.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    // Expiry = EndedAt + 72 hours
+    const expiresAt = new Date(endedAt.getTime() + RETENTION_HOURS * 60 * 60 * 1000);
 
     const updatedStream = await prisma.liveStream.update({
       where: { id: stream.id },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { prisma } from '@/lib/prisma';
+import { uploadRecordedVideoToYouTube } from '@/lib/actions/youtubeActions';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://otvbywtuyvufxxvlizqp.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90dmJ5d3R1eXZ1Znh4dmxpenFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjA3ODk0NywiZXhwIjoyMTAxNjU0OTQ3fQ.WUg--SXP1DAvSXJqinDzorRNkJTGciNnBoK1_80NHB0';
@@ -39,7 +40,9 @@ export async function POST(req: NextRequest) {
     const { data: publicData } = supabaseAdmin.storage.from('teams').getPublicUrl(data.path);
     const videoUrl = publicData.publicUrl;
 
-    // Attach recorded video URL to match stream record in database
+    // Attach recorded video URL to match stream record with 72-Hour Retention Expiry
+    const retention72h = new Date(Date.now() + 72 * 60 * 60 * 1000);
+
     if (streamId) {
       await prisma.liveStream.update({
         where: { id: streamId },
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
           status: 'ARCHIVED',
           streamEndedAt: new Date(),
           recordedAt: new Date(),
-          expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          expiresAt: retention72h,
         },
       }).catch((e) => console.warn('Prisma liveStream update notice:', e));
     } else {
@@ -61,9 +64,23 @@ export async function POST(req: NextRequest) {
           status: 'ARCHIVED',
           streamEndedAt: new Date(),
           recordedAt: new Date(),
-          expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          expiresAt: retention72h,
         },
       }).catch((e) => console.warn('Prisma liveStream updateMany notice:', e));
+    }
+
+    // Trigger Background YouTube API Upload (Permanent cloud archive)
+    const targetStream = streamId 
+      ? { id: streamId } 
+      : await prisma.liveStream.findFirst({ where: { matchId }, orderBy: { createdAt: 'desc' } });
+
+    if (targetStream?.id) {
+      uploadRecordedVideoToYouTube({
+        streamId: targetStream.id,
+        videoUrl: videoUrl,
+        title: `CBOT Official Match - ${matchId.toUpperCase()}`,
+        description: `Official CBOT Match Recording for ${matchId}.\nRecorded live from the player studio.\nVisit https://www.cbotworld.com/`,
+      }).catch((ytErr: any) => console.warn('Background YouTube upload notice:', ytErr));
     }
 
     return NextResponse.json({ success: true, url: videoUrl });
