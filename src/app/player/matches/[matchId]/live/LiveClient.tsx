@@ -6,7 +6,7 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check, Download, Loader2, Plus, Minus, Trash2 } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, ExternalLink, Download, Loader2, Plus, Minus, Trash2, Video } from 'lucide-react';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 import { uploadMatchVideoToSupabase } from '@/lib/supabase';
 
@@ -28,13 +28,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [streamId, setStreamId] = React.useState<string | null>(null);
   const [streamStatus, setStreamStatus] = React.useState<'CREATED' | 'READY' | 'LIVE' | 'ENDED' | 'ARCHIVED' | 'FAILED'>('CREATED');
   const [streamStartedAt, setStreamStartedAt] = React.useState<Date | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = React.useState<string | null>(null);
-  const [youtubeVideoId, setYoutubeVideoId] = React.useState<string | null>(null);
-  const [streamKey, setStreamKey] = React.useState<string | null>(null);
-  const [rtmpIngestionUrl, setRtmpIngestionUrl] = React.useState<string | null>(null);
-  const [showStreamKey, setShowStreamKey] = React.useState(false);
-  const [copiedKey, setCopiedKey] = React.useState(false);
-  const [copiedServer, setCopiedServer] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [isSavingRecording, setIsSavingRecording] = React.useState(false);
   const [downloadUrl, setDownloadUrl] = React.useState<string | null>(null);
@@ -45,7 +38,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const recordedChunksRef = React.useRef<Blob[]>([]);
   const [copied, setCopied] = React.useState(false);
 
-  // Board-by-Board Scoring (Board 1, Board 2, etc.)
+  // Board-by-Board Scoring
   const [boards, setBoards] = React.useState([
     { boardNumber: 1, score: 0, slams: 0 },
     { boardNumber: 2, score: 0, slams: 0 },
@@ -91,35 +84,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     });
   };
 
-  const effectiveYoutubeUrl = React.useMemo(() => {
-    if (youtubeUrl) return youtubeUrl;
-    if (youtubeVideoId) {
-      return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
-    }
-    return null;
-  }, [youtubeUrl, youtubeVideoId]);
-
   const handleCopyLink = () => {
     const shareUrl = `${window.location.origin}/matches/${matchDetails.matchId}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const handleCopyKey = () => {
-    if (!streamKey) return;
-    navigator.clipboard.writeText(streamKey).then(() => {
-      setCopiedKey(true);
-      setTimeout(() => setCopiedKey(false), 2500);
-    });
-  };
-
-  const handleCopyServer = () => {
-    const url = rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2';
-    navigator.clipboard.writeText(url).then(() => {
-      setCopiedServer(true);
-      setTimeout(() => setCopiedServer(false), 2500);
     });
   };
 
@@ -132,19 +101,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
-          if (res.stream.youtubeUrl) setYoutubeUrl(res.stream.youtubeUrl);
-          if (res.stream.youtubeVideoId) setYoutubeVideoId(res.stream.youtubeVideoId);
-          if (res.stream.streamKey) setStreamKey(res.stream.streamKey);
-          if (res.stream.rtmpIngestionUrl) setRtmpIngestionUrl(res.stream.rtmpIngestionUrl);
           if (res.stream.streamStartedAt) {
             setStreamStartedAt(new Date(res.stream.streamStartedAt));
           }
         } else {
-          // Stream session failed but we still render — allow manual retry
-          setErrorMsg(res.error || null);
+          setErrorMsg(res.error || 'Failed to initialize match studio.');
         }
       } catch (err: any) {
-        setErrorMsg(err.message || 'Connection error initializing stream.');
+        setErrorMsg(err.message || 'Network error initializing match studio.');
       } finally {
         setLoading(false);
         setInitialized(true);
@@ -163,35 +127,26 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         setStreamStatus('LIVE');
         setStreamStartedAt(new Date());
 
-        // Start In-Browser Recording with Full CBOT Overlays
+        // Start in-browser recorder
         if (canvasStreamRef.current) {
           recordedChunksRef.current = [];
-          try {
-            const stream = canvasStreamRef.current;
-            const mimeType = [
-              'video/webm;codecs=vp9,opus',
-              'video/webm;codecs=vp8,opus',
-              'video/webm',
-              'video/mp4',
-            ].find(type => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) || '';
-
-            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-            recorder.ondataavailable = (e) => {
-              if (e.data && e.data.size > 0) {
-                recordedChunksRef.current.push(e.data);
-              }
-            };
-            recorder.start(1000);
-            mediaRecorderRef.current = recorder;
-          } catch (recErr) {
-            console.warn('MediaRecorder initialization error:', recErr);
-          }
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9'
+            : 'video/webm';
+          const recorder = new MediaRecorder(canvasStreamRef.current, { mimeType });
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              recordedChunksRef.current.push(e.data);
+            }
+          };
+          recorder.start(1000);
+          mediaRecorderRef.current = recorder;
         }
       } else {
-        setErrorMsg(res.error || 'Failed to start live stream.');
+        setErrorMsg(res.error || 'Failed to start match stream.');
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to start stream.');
+      setErrorMsg(err.message || 'Failed to start match stream.');
     } finally {
       setLoading(false);
     }
@@ -246,12 +201,24 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   };
 
-  const handleStreamReady = React.useCallback((s: MediaStream) => {
-    canvasStreamRef.current = s;
-  }, []);
+  // Elapsed Timer
+  const [elapsed, setElapsed] = React.useState('00:00:00');
+  React.useEffect(() => {
+    if (streamStatus !== 'LIVE' || !streamStartedAt) {
+      return;
+    }
+    const interval = setInterval(() => {
+      const diff = Math.floor((new Date().getTime() - streamStartedAt.getTime()) / 1000);
+      const h = Math.floor(diff / 3600).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+      const s = (diff % 60).toString().padStart(2, '0');
+      setElapsed(`${h}:${m}:${s}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [streamStatus, streamStartedAt]);
 
-  const handleStreamError = React.useCallback((msg: string) => {
-    setErrorMsg(msg);
+  const handleStreamReady = React.useCallback((stream: MediaStream) => {
+    canvasStreamRef.current = stream;
   }, []);
 
   const matchTime = matchDetails.scheduledTime
@@ -290,21 +257,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition-colors shadow-md shadow-amber-500/20"
           >
             <Radio className="h-3.5 w-3.5" />
-            <span>Watch Live on Arena</span>
+            <span>Open Public Match Page</span>
             <ExternalLink className="h-3 w-3 opacity-80" />
           </a>
-          {effectiveYoutubeUrl && (
-            <a
-              href={effectiveYoutubeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-md shadow-red-600/20"
-            >
-              <Youtube className="h-3.5 w-3.5" />
-              <span>Watch on YouTube</span>
-              <ExternalLink className="h-3 w-3 opacity-80" />
-            </a>
-          )}
         </div>
         <Badge variant="carrom" className="text-xs font-black">{matchDetails.editionTitle}</Badge>
       </div>
@@ -317,9 +272,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className={`h-3 w-3 rounded-full ${streamStatus === 'LIVE' ? 'bg-rose-500 animate-ping' : 'bg-amber-400'}`} />
-              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">Official CBOT Live Player Studio</span>
+              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">Official CBOT Match Studio</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Match Broadcast Studio</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Live Match Broadcast Studio</h1>
           </div>
           {streamStatus === 'LIVE' ? (
             <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 animate-pulse">
@@ -327,7 +282,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             </Badge>
           ) : streamStatus === 'ARCHIVED' ? (
             <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" /> STREAM SAVED
+              <CheckCircle2 className="h-3.5 w-3.5" /> MATCH VIDEO SAVED
             </Badge>
           ) : (
             <Badge variant="outline" className="text-amber-400 border-amber-500/50 font-black text-xs px-3 py-1.5">
@@ -336,7 +291,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           )}
         </div>
 
-        {/* Player & Match Identity — the core fix */}
+        {/* Player & Match Identity */}
         <div className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
           {/* Player name row */}
           <div className="px-5 py-3 border-b border-white/5">
@@ -359,44 +314,50 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               <div className="text-sm font-black text-amber-400 text-center leading-tight">{matchDetails.teamName}</div>
             </div>
 
-            {/* VS + time */}
-            <div className="p-4 flex flex-col items-center justify-center gap-1">
-              <div className="text-xl font-black text-slate-500">VS</div>
+            {/* Match Info */}
+            <div className="p-4 flex flex-col items-center justify-center gap-1.5 text-center">
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Board Match</div>
+              <div className="text-xs font-black text-white">Table #{matchDetails.tableNumber}</div>
               {matchTime && (
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+                <div className="flex items-center gap-1 text-[11px] text-slate-400">
                   <Clock className="h-3 w-3" /> {matchTime}
                 </div>
               )}
-              {matchDetails.tableNumber && (
-                <div className="text-[10px] text-slate-600">Table #{matchDetails.tableNumber}</div>
+              {streamStatus === 'LIVE' && (
+                <div className="text-sm font-black font-mono text-rose-400 mt-1">
+                  ⏱ {elapsed}
+                </div>
               )}
             </div>
 
-            {/* Opponent */}
+            {/* Opponent Team */}
             <div className="p-4 flex flex-col items-center gap-2">
               {matchDetails.opponentLogo ? (
                 <img src={matchDetails.opponentLogo} alt={matchDetails.opponentName} className="w-10 h-10 rounded-lg object-contain bg-white/5 border border-white/10" />
               ) : (
-                <div className="w-10 h-10 rounded-lg bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-sm">
+                <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center font-black text-white text-sm">
                   {matchDetails.opponentName[0]}
                 </div>
               )}
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400/60">Opponent</div>
-              <div className="text-sm font-black text-slate-300 text-center leading-tight">{matchDetails.opponentName}</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Opponent</div>
+              <div className="text-sm font-black text-white text-center leading-tight">{matchDetails.opponentName}</div>
             </div>
           </div>
         </div>
 
-        {/* Error */}
-        {errorMsg && (
-          <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-            <div className="flex-1 font-semibold">{errorMsg}</div>
-          </div>
-        )}
-
-        {/* Canvas Stream */}
+        {/* Live Video Canvas Overlay Renderer */}
         <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Monitor className="h-3.5 w-3.5 text-amber-400" /> Live Match Camera & Live Overlays
+            </span>
+            {streamStatus === 'LIVE' && (
+              <span className="flex items-center gap-1 text-[11px] font-bold text-rose-400">
+                <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" /> Recording Live Match Video
+              </span>
+            )}
+          </div>
+
           <CanvasOverlayRenderer
             playerName={matchDetails.playerName}
             editionTitle={matchDetails.editionTitle}
@@ -407,125 +368,118 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             streamStartedAt={streamStartedAt}
             boards={boards}
             onStreamReady={handleStreamReady}
-            onError={handleStreamError}
+            onError={(err) => setErrorMsg(err)}
           />
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center text-xs font-semibold text-amber-300">
-            💡 Position your camera so the complete Carrom board is clearly visible in landscape mode.
-          </div>
         </div>
 
-        {/* Real-time Board-by-Board Scorer (Mobile-grade Web Scorer) */}
-        <div className="rounded-3xl bg-slate-900/90 border border-amber-500/30 p-4 sm:p-6 space-y-4 shadow-xl">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+        {/* Board-by-Board Live Scorer */}
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-amber-400">Match Scorer</div>
-              <div className="text-base sm:text-lg font-black text-white">{matchDetails.playerName} <span className="text-xs text-slate-400 font-normal">({matchDetails.teamName})</span></div>
+              <h3 className="text-sm font-black text-amber-400 uppercase tracking-wide">
+                Live Carrom Board Scorer
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Update board scores and slams in real-time — live overlays update automatically
+              </p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center gap-1.5">
-                <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider">Total Score:</span>
-                <span className="text-sm font-black text-amber-400">{totalScore} pts</span>
-              </div>
-              <div className="px-3.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/40 flex items-center gap-1.5">
-                <span className="text-[10px] font-black text-sky-300 uppercase tracking-wider">Total Slams:</span>
-                <span className="text-sm font-black text-sky-400">⚡ {totalSlams}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="text-xs font-black border-amber-500/40 text-amber-300">
+                Total Score: <span className="ml-1 text-white font-mono">{totalScore}</span>
+              </Badge>
+              <Badge variant="outline" className="text-xs font-black border-yellow-500/40 text-yellow-300">
+                Slams: <span className="ml-1 text-white font-mono">⚡ {totalSlams}</span>
+              </Badge>
             </div>
           </div>
 
-          {/* Board List */}
+          {/* Dynamic Boards List */}
           <div className="space-y-3">
-            {boards.map((board) => (
+            {boards.map((b) => (
               <div
-                key={board.boardNumber}
-                className="flex flex-col md:flex-row md:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-white/10 gap-3 hover:border-amber-500/40 transition-colors"
+                key={b.boardNumber}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-white/10 hover:border-amber-500/30 transition-colors"
               >
-                {/* Board Label & Current Points */}
-                <div className="flex items-center justify-between md:justify-start gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-black uppercase tracking-wider text-white">
-                      Board {board.boardNumber}
-                    </span>
-                    {boards.length > 2 && (
-                      <button
-                        onClick={() => handleRemoveBoard(board.boardNumber)}
-                        className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title={`Remove Board ${board.boardNumber}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2.5 py-1 rounded-lg">
-                      {board.score} pts
-                    </span>
-                    {board.slams > 0 && (
-                      <span className="text-[11px] font-bold text-sky-400 bg-sky-500/20 border border-sky-500/30 px-2 py-0.5 rounded-lg">
-                        ⚡ {board.slams} {board.slams === 1 ? 'Slam' : 'Slams'}
-                      </span>
-                    )}
-                  </div>
+                {/* Board Label */}
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs">
+                    BOARD {b.boardNumber}
+                  </span>
+                  {boards.length > 2 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveBoard(b.boardNumber)}
+                      className="h-7 w-7 p-0 text-slate-500 hover:text-rose-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
 
-                {/* Scoring Buttons (Score +1/-1 & Slam +1/-1) */}
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {/* Points Section */}
-                  <div className="flex items-center rounded-xl bg-slate-900 border border-white/10 p-1 gap-1">
-                    <span className="text-[10px] font-black uppercase text-slate-400 px-2">Pts</span>
+                {/* Score Controls */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Points (+1 / -1) */}
+                  <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/5">
+                    <span className="text-[11px] font-bold text-slate-400 px-1.5">Points:</span>
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => handleModifyBoardScore(board.boardNumber, -1)}
-                      disabled={board.score === 0}
-                      className="h-8 px-3 text-xs font-black rounded-lg hover:bg-white/10 text-slate-300 disabled:opacity-30"
+                      variant="outline"
+                      onClick={() => handleModifyBoardScore(b.boardNumber, -1)}
+                      disabled={b.score <= 0}
+                      className="h-7 w-7 p-0 rounded-lg text-slate-300 hover:text-white border-white/10"
                     >
-                      -1
+                      <Minus className="h-3 w-3" />
                     </Button>
+                    <span className="w-8 text-center font-mono font-black text-amber-300 text-sm">
+                      {b.score}
+                    </span>
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => handleModifyBoardScore(board.boardNumber, 1)}
-                      className="h-8 px-3 text-xs font-black rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-400 border border-emerald-500/40"
+                      variant="outline"
+                      onClick={() => handleModifyBoardScore(b.boardNumber, 1)}
+                      className="h-7 w-7 p-0 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-black border-none"
                     >
-                      +1
+                      <Plus className="h-3 w-3" />
                     </Button>
                   </div>
 
-                  {/* Slams Section */}
-                  <div className="flex items-center rounded-xl bg-slate-900 border border-white/10 p-1 gap-1">
-                    <span className="text-[10px] font-black uppercase text-sky-400 px-2">Slam</span>
+                  {/* Slam (+1 / -1) */}
+                  <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/5">
+                    <span className="text-[11px] font-bold text-yellow-400/90 px-1.5">Slam:</span>
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => handleModifyBoardSlam(board.boardNumber, -1)}
-                      disabled={board.slams === 0}
-                      className="h-8 px-3 text-xs font-black rounded-lg hover:bg-white/10 text-slate-400 disabled:opacity-30"
+                      variant="outline"
+                      onClick={() => handleModifyBoardSlam(b.boardNumber, -1)}
+                      disabled={b.slams <= 0}
+                      className="h-7 w-7 p-0 rounded-lg text-slate-300 hover:text-white border-white/10"
                     >
-                      -1
+                      <Minus className="h-3 w-3" />
                     </Button>
+                    <span className="w-8 text-center font-mono font-black text-yellow-300 text-sm">
+                      {b.slams}
+                    </span>
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => handleModifyBoardSlam(board.boardNumber, 1)}
-                      className="h-8 px-3 text-xs font-black rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40"
+                      variant="outline"
+                      onClick={() => handleModifyBoardSlam(b.boardNumber, 1)}
+                      className="h-7 w-7 p-0 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-black border-none"
                     >
-                      ⚡ +1
+                      <Plus className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               </div>
             ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAddNewBoard}
+              className="w-full py-3 border-dashed border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 text-xs font-black rounded-xl transition-all gap-2"
+            >
+              <Plus className="h-4 w-4" /> ADD BOARD (BOARD {boards.length + 1})
+            </Button>
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAddNewBoard}
-            className="w-full py-3 border-dashed border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 text-xs font-black rounded-2xl transition-all gap-2"
-          >
-            <Plus className="h-4 w-4" /> ADD BOARD (BOARD {boards.length + 1})
-          </Button>
         </div>
 
         {/* Controls */}
@@ -537,7 +491,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm px-8 py-3.5 rounded-2xl shadow-xl shadow-amber-500/20 gap-2"
             >
               <Play className="h-4 w-4 fill-slate-950" />
-              {loading && !initialized ? 'INITIALIZING…' : 'START LIVE STREAM'}
+              {loading && !initialized ? 'INITIALIZING…' : 'START LIVE MATCH'}
             </Button>
           )}
           {streamStatus === 'LIVE' && (
@@ -553,38 +507,16 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   </>
                 ) : (
                   <>
-                    <Square className="h-4 w-4 fill-white" /> END LIVE STREAM
+                    <Square className="h-4 w-4 fill-white" /> END LIVE MATCH
                   </>
                 )}
               </Button>
-              <a
-                href={`/matches/${matchDetails.matchId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm transition-all shadow-xl shadow-amber-500/20"
-              >
-                <Radio className="h-4 w-4" />
-                <span>Watch Live on Arena</span>
-                <ExternalLink className="h-4 w-4 opacity-80" />
-              </a>
-              {effectiveYoutubeUrl && (
-                <a
-                  href={effectiveYoutubeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm transition-all shadow-xl shadow-red-600/30"
-                >
-                  <Youtube className="h-4 w-4" />
-                  <span>Watch on YouTube</span>
-                  <ExternalLink className="h-4 w-4 opacity-80" />
-                </a>
-              )}
             </div>
           )}
           {streamStatus === 'ARCHIVED' && (
             <div className="text-center space-y-3">
               <p className="text-xs text-emerald-400 font-bold">
-                🎉 Match stream & recording saved! Available on CBOT Arena for 15 days.
+                🎉 Match video recording saved! Available on CBOT Arena for 15 days.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button
@@ -594,20 +526,8 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                     window.location.href = `/matches/${matchDetails.matchId}`;
                   }}
                 >
-                  View Public Match Recording
+                  <Video className="h-3.5 w-3.5 mr-1" /> View Public Match Replay
                 </Button>
-                {effectiveYoutubeUrl && (
-                  <a
-                    href={effectiveYoutubeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
-                  >
-                    <Youtube className="h-3.5 w-3.5" />
-                    <span>Watch on YouTube</span>
-                    <ExternalLink className="h-3 w-3 opacity-80" />
-                  </a>
-                )}
                 {downloadUrl && (
                   <a
                     href={downloadUrl}
@@ -624,62 +544,12 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         </div>
       </div>
 
-      {/* Shareable Link Box Below Studio Video */}
+      {/* Shareable Link Box */}
       <MatchShareCard
         matchId={matchDetails.matchId}
-        youtubeUrl={youtubeUrl}
-        youtubeVideoId={youtubeVideoId}
         title={`${matchDetails.editionTitle} - ${matchDetails.teamName} vs ${matchDetails.opponentName}`}
         isLive={streamStatus === 'LIVE'}
       />
-
-      {/* Optional Collapsible OBS / External App Settings */}
-      {streamKey && !streamKey.startsWith('cbot-key') && (
-        <details className="rounded-2xl bg-slate-950/60 border border-white/10 p-4 text-white text-xs group">
-          <summary className="font-bold text-slate-400 cursor-pointer flex items-center justify-between select-none">
-            <span className="flex items-center gap-2">
-              <Server className="h-3.5 w-3.5 text-amber-400" />
-              Advanced: External OBS / Camera Setup (Optional)
-            </span>
-            <span className="text-[10px] text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-
-          <div className="pt-4 mt-3 border-t border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400">Stream Server URL</label>
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-white/10">
-                <input
-                  type="text"
-                  readOnly
-                  value={rtmpIngestionUrl || 'rtmp://a.rtmp.youtube.com/live2'}
-                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none truncate"
-                />
-                <Button onClick={handleCopyServer} variant="ghost" size="sm" className="h-6 px-2 text-[10px]">
-                  {copiedServer ? 'Copied' : 'Copy'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400">Stream Key</label>
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-white/10">
-                <input
-                  type={showStreamKey ? 'text' : 'password'}
-                  readOnly
-                  value={streamKey}
-                  className="bg-transparent text-xs font-mono text-slate-300 w-full outline-none truncate"
-                />
-                <Button onClick={() => setShowStreamKey(!showStreamKey)} variant="ghost" size="sm" className="h-6 w-6 p-0 text-slate-400">
-                  {showStreamKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                </Button>
-                <Button onClick={handleCopyKey} variant="ghost" size="sm" className="h-6 px-2 text-[10px]">
-                  {copiedKey ? 'Copied' : 'Copy'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </details>
-      )}
     </div>
   );
 }
