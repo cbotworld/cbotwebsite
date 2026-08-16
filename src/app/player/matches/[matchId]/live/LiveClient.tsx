@@ -343,7 +343,24 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   }, [streamStatus, startRecorder]);
 
-  // Native WebRTC & Realtime Broadcaster to Spectators
+  // Ref to hold live scores for broadcast without triggering WebRTC teardown
+  const scoreBroadcastRef = React.useRef<{ totalScore: number; totalSlams: number }>({ totalScore: 0, totalSlams: 0 });
+  scoreBroadcastRef.current = { totalScore, totalSlams };
+  const realtimeChannelRef = React.useRef<any>(null);
+
+  // Lightweight score broadcast whenever score changes (Never restarts WebRTC)
+  React.useEffect(() => {
+    if (streamStatus !== 'LIVE' || !realtimeChannelRef.current) return;
+    try {
+      realtimeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'score-update',
+        payload: { scores: { totalScore, totalSlams } },
+      });
+    } catch (e) {}
+  }, [totalScore, totalSlams, streamStatus]);
+
+  // Native WebRTC & Realtime Broadcaster to Spectators (Persistent, zero-reconnect on score changes)
   React.useEffect(() => {
     if (streamStatus !== 'LIVE') return;
 
@@ -351,6 +368,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
+    realtimeChannelRef.current = channel;
 
     const peerConnections = new Map<string, RTCPeerConnection>();
 
@@ -481,7 +499,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             event: 'stream-frame',
             payload: {
               frame,
-              scores: { totalScore, totalSlams },
+              scores: scoreBroadcastRef.current,
             },
           });
         } catch (e) {}
@@ -496,8 +514,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       peerConnections.forEach((pc) => pc.close());
       peerConnections.clear();
       supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
     };
-  }, [streamStatus, matchDetails.matchId, totalScore, totalSlams, deviceSessionId]);
+  }, [streamStatus, matchDetails.matchId, deviceSessionId]);
 
   // Lock body scroll and orientation to landscape
   React.useEffect(() => {

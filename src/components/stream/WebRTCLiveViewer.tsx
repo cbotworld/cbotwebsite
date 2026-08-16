@@ -130,11 +130,16 @@ export default function WebRTCLiveViewer({
         }
       })
       .on('broadcast', { event: 'stream-frame' }, ({ payload }) => {
-        // High-speed fallback live frame
-        if (payload.frame) {
+        // High-speed fallback live frame only if WebRTC not connected
+        if (payload.frame && !hasStream) {
           setLatestSnapshot(payload.frame);
           setConnectionStatus('connected');
         }
+        if (payload.scores) {
+          setLiveScores(payload.scores);
+        }
+      })
+      .on('broadcast', { event: 'score-update' }, ({ payload }) => {
         if (payload.scores) {
           setLiveScores(payload.scores);
         }
