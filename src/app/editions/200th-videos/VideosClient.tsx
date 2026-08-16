@@ -25,8 +25,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
-const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; border: string; bg: string }> = {
+const TEAMS_INFO: Record<string, { name: string; logo: string; tag: string; color: string; border: string; bg: string }> = {
   'PLYWOOD PIONEERS': {
+    name: 'Plywood Pioneers',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
     tag: 'PP',
     color: 'text-amber-400',
@@ -34,6 +35,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-amber-500/10',
   },
   'SUPERNOVA QUEEN': {
+    name: 'Supernova Queen',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
     tag: 'SQ',
     color: 'text-pink-400',
@@ -41,6 +43,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-pink-500/10',
   },
   'POCKET DYNAMOS': {
+    name: 'Pocket Dynamos',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
     tag: 'PD',
     color: 'text-sky-400',
@@ -48,6 +51,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-sky-500/10',
   },
   'LUMEN PILLAR': {
+    name: 'Lumen Pillar',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
     tag: 'LP',
     color: 'text-yellow-400',
@@ -55,6 +59,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-yellow-500/10',
   },
   'VANILLA FALCONS': {
+    name: 'Vanilla Falcons',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
     tag: 'VF',
     color: 'text-emerald-400',
@@ -62,6 +67,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-emerald-500/10',
   },
   'VINTAGE STRIKERS': {
+    name: 'Vintage Strikers',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
     tag: 'VS',
     color: 'text-orange-400',
@@ -69,6 +75,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-orange-500/10',
   },
   'EBONY OVERLORDS': {
+    name: 'Ebony Overlords',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
     tag: 'EO',
     color: 'text-purple-400',
@@ -76,6 +83,7 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
     bg: 'bg-purple-500/10',
   },
   'BORIC SPEEDSTERS': {
+    name: 'Boric Speedsters',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
     tag: 'BS',
     color: 'text-cyan-400',
@@ -84,27 +92,232 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
   },
 };
 
-const MONUMENTS_SCHEDULE = [
-  { day: 1, title: 'MONUMENT 1', timeRange: '9TH AUG 9 PM TO 10TH AUG 8 PM' },
-  { day: 2, title: 'MONUMENT 2', timeRange: '10TH AUG 8 PM TO 11TH AUG 8 PM' },
-  { day: 3, title: 'MONUMENT 3', timeRange: '11TH AUG 8 PM TO 12TH AUG 8 PM' },
-  { day: 4, title: 'MONUMENT 4', timeRange: '12TH AUG 8 PM TO 13TH AUG 8 PM' },
-  { day: 5, title: 'MONUMENT 5', timeRange: '13TH AUG 8 PM TO 14TH AUG 8 PM' },
-  { day: 6, title: 'MONUMENT 6', timeRange: '14TH AUG 8 PM TO 15TH AUG 8 PM' },
-  { day: 7, title: 'MONUMENT 7', timeRange: '15TH AUG 8 PM TO 16TH AUG 8 PM' },
-  { day: 8, title: 'MONUMENT 8', timeRange: '16TH AUG 8 PM TO 17TH AUG 8 PM' },
-  { day: 9, title: 'MONUMENT 9', timeRange: '17TH AUG 8 PM TO 18TH AUG 8 PM' },
-  { day: 10, title: 'MONUMENT 10', timeRange: '18TH AUG 8 PM TO 19TH AUG 8 PM' },
-  { day: 11, title: 'MONUMENT 11', timeRange: '19TH AUG 8 PM TO 20TH AUG 8 PM' },
-  { day: 12, title: 'MONUMENT 12', timeRange: '20TH AUG 8 PM TO 21ST AUG 8 PM' },
-  { day: 13, title: 'MONUMENT 13', timeRange: '21ST AUG 8 PM TO 22ND AUG 8 PM' },
-  { day: 14, title: 'MONUMENT 14', timeRange: '22ND AUG 8 PM TO 23RD AUG 8 PM' },
-  { day: 15, title: 'MONUMENT 15', timeRange: '23RD AUG 8 PM TO 24TH AUG 8 PM' },
-  { day: 16, title: 'MONUMENT 16', timeRange: '24TH AUG 8 PM TO 25TH AUG 8 PM' },
-  { day: 17, title: 'MONUMENT 17', timeRange: '25TH AUG 8 PM TO 26TH AUG 8 PM' },
-  { day: 18, title: 'MONUMENT 18', timeRange: '26TH AUG 8 PM TO 27TH AUG 8 PM' },
-  { day: 19, title: 'MONUMENT 19', timeRange: '27TH AUG 8 PM TO 28TH AUG 8 PM' },
-  { day: 20, title: 'MONUMENT 20', timeRange: '28TH AUG 8 PM TO 29TH AUG 8 PM' },
+const OFFICIAL_MONUMENTS_DATA: Array<{
+  day: number;
+  title: string;
+  timeRange: string;
+  matches: Array<{ team1: string; team2: string }>;
+}> = [
+  {
+    day: 1,
+    title: 'BICENTENNIAL MONUMENT 1',
+    timeRange: '9TH AUG 9 PM TO 10TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'POCKET DYNAMOS', team2: 'LUMEN PILLAR' },
+      { team1: 'VANILLA FALCONS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'EBONY OVERLORDS', team2: 'BORIC SPEEDSTERS' },
+    ],
+  },
+  {
+    day: 2,
+    title: 'BICENTENNIAL MONUMENT 2',
+    timeRange: '10TH AUG 8 PM TO 11TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'LUMEN PILLAR', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'EBONY OVERLORDS' },
+      { team1: 'POCKET DYNAMOS', team2: 'VANILLA FALCONS' },
+    ],
+  },
+  {
+    day: 3,
+    title: 'BICENTENNIAL MONUMENT 3',
+    timeRange: '11TH AUG 8 PM TO 12TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'EBONY OVERLORDS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'VANILLA FALCONS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'POCKET DYNAMOS' },
+      { team1: 'LUMEN PILLAR', team2: 'SUPERNOVA QUEEN' },
+    ],
+  },
+  {
+    day: 4,
+    title: 'BICENTENNIAL MONUMENT 4',
+    timeRange: '12TH AUG 8 PM TO 13TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'VANILLA FALCONS' },
+      { team1: 'EBONY OVERLORDS', team2: 'POCKET DYNAMOS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'VINTAGE STRIKERS', team2: 'LUMEN PILLAR' },
+    ],
+  },
+  {
+    day: 5,
+    title: 'BICENTENNIAL MONUMENT 5',
+    timeRange: '13TH AUG 8 PM TO 14TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'LUMEN PILLAR' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'VINTAGE STRIKERS' },
+      { team1: 'POCKET DYNAMOS', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'VANILLA FALCONS', team2: 'EBONY OVERLORDS' },
+    ],
+  },
+  {
+    day: 6,
+    title: 'BICENTENNIAL MONUMENT 6',
+    timeRange: '14TH AUG 8 PM TO 15TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'EBONY OVERLORDS' },
+      { team1: 'LUMEN PILLAR', team2: 'VANILLA FALCONS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'POCKET DYNAMOS' },
+    ],
+  },
+  {
+    day: 7,
+    title: 'BICENTENNIAL MONUMENT 7',
+    timeRange: '15TH AUG 8 PM TO 16TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'POCKET DYNAMOS' },
+      { team1: 'VANILLA FALCONS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'EBONY OVERLORDS', team2: 'LUMEN PILLAR' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'VINTAGE STRIKERS' },
+    ],
+  },
+  {
+    day: 8,
+    title: 'BICENTENNIAL MONUMENT 8',
+    timeRange: '16TH AUG 8 PM TO 17TH AUG 8 PM',
+    matches: [
+      { team1: 'SUPERNOVA QUEEN', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'LUMEN PILLAR', team2: 'POCKET DYNAMOS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'VANILLA FALCONS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'EBONY OVERLORDS' },
+    ],
+  },
+  {
+    day: 9,
+    title: 'BICENTENNIAL MONUMENT 9',
+    timeRange: '17TH AUG 8 PM TO 18TH AUG 8 PM',
+    matches: [
+      { team1: 'VINTAGE STRIKERS', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'LUMEN PILLAR' },
+      { team1: 'EBONY OVERLORDS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'VANILLA FALCONS', team2: 'POCKET DYNAMOS' },
+    ],
+  },
+  {
+    day: 10,
+    title: 'BICENTENNIAL MONUMENT 10',
+    timeRange: '18TH AUG 8 PM TO 19TH AUG 8 PM',
+    matches: [
+      { team1: 'EBONY OVERLORDS', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'VANILLA FALCONS', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'POCKET DYNAMOS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'LUMEN PILLAR' },
+    ],
+  },
+  {
+    day: 11,
+    title: 'BICENTENNIAL MONUMENT 11',
+    timeRange: '19TH AUG 8 PM TO 20TH AUG 8 PM',
+    matches: [
+      { team1: 'VANILLA FALCONS', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'POCKET DYNAMOS', team2: 'EBONY OVERLORDS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'LUMEN PILLAR', team2: 'VINTAGE STRIKERS' },
+    ],
+  },
+  {
+    day: 12,
+    title: 'BICENTENNIAL MONUMENT 12',
+    timeRange: '20TH AUG 8 PM TO 21ST AUG 8 PM',
+    matches: [
+      { team1: 'LUMEN PILLAR', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'POCKET DYNAMOS' },
+      { team1: 'EBONY OVERLORDS', team2: 'VANILLA FALCONS' },
+    ],
+  },
+  {
+    day: 13,
+    title: 'BICENTENNIAL MONUMENT 13',
+    timeRange: '21ST AUG 8 PM TO 22ND AUG 8 PM',
+    matches: [
+      { team1: 'BORIC SPEEDSTERS', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'EBONY OVERLORDS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'VANILLA FALCONS', team2: 'LUMEN PILLAR' },
+      { team1: 'POCKET DYNAMOS', team2: 'SUPERNOVA QUEEN' },
+    ],
+  },
+  {
+    day: 14,
+    title: 'BICENTENNIAL MONUMENT 14',
+    timeRange: '22ND AUG 8 PM TO 23RD AUG 8 PM',
+    matches: [
+      { team1: 'POCKET DYNAMOS', team2: 'PLYWOOD PIONEERS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'VANILLA FALCONS' },
+      { team1: 'LUMEN PILLAR', team2: 'EBONY OVERLORDS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'BORIC SPEEDSTERS' },
+    ],
+  },
+  {
+    day: 15,
+    title: 'BICENTENNIAL MONUMENT 15',
+    timeRange: '23RD AUG 8 PM TO 24TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'POCKET DYNAMOS', team2: 'LUMEN PILLAR' },
+      { team1: 'VANILLA FALCONS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'EBONY OVERLORDS', team2: 'BORIC SPEEDSTERS' },
+    ],
+  },
+  {
+    day: 16,
+    title: 'BICENTENNIAL MONUMENT 16',
+    timeRange: '24TH AUG 8 PM TO 25TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'VINTAGE STRIKERS' },
+      { team1: 'LUMEN PILLAR', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'EBONY OVERLORDS' },
+      { team1: 'POCKET DYNAMOS', team2: 'VANILLA FALCONS' },
+    ],
+  },
+  {
+    day: 17,
+    title: 'BICENTENNIAL MONUMENT 17',
+    timeRange: '25TH AUG 8 PM TO 26TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'EBONY OVERLORDS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'VANILLA FALCONS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'POCKET DYNAMOS' },
+      { team1: 'LUMEN PILLAR', team2: 'SUPERNOVA QUEEN' },
+    ],
+  },
+  {
+    day: 18,
+    title: 'BICENTENNIAL MONUMENT 18',
+    timeRange: '26TH AUG 8 PM TO 27TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'VANILLA FALCONS' },
+      { team1: 'EBONY OVERLORDS', team2: 'POCKET DYNAMOS' },
+      { team1: 'BORIC SPEEDSTERS', team2: 'SUPERNOVA QUEEN' },
+      { team1: 'VINTAGE STRIKERS', team2: 'LUMEN PILLAR' },
+    ],
+  },
+  {
+    day: 19,
+    title: 'BICENTENNIAL MONUMENT 19',
+    timeRange: '27TH AUG 8 PM TO 28TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'LUMEN PILLAR' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'VINTAGE STRIKERS' },
+      { team1: 'POCKET DYNAMOS', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'VANILLA FALCONS', team2: 'EBONY OVERLORDS' },
+    ],
+  },
+  {
+    day: 20,
+    title: 'BICENTENNIAL MONUMENT 20',
+    timeRange: '28TH AUG 8 PM TO 29TH AUG 8 PM',
+    matches: [
+      { team1: 'PLYWOOD PIONEERS', team2: 'BORIC SPEEDSTERS' },
+      { team1: 'VINTAGE STRIKERS', team2: 'EBONY OVERLORDS' },
+      { team1: 'LUMEN PILLAR', team2: 'VANILLA FALCONS' },
+      { team1: 'SUPERNOVA QUEEN', team2: 'POCKET DYNAMOS' },
+    ],
+  },
 ];
 
 export interface VideoItem {
@@ -114,7 +327,7 @@ export interface VideoItem {
   team2Name: string;
   score1: number;
   score2: number;
-  status: string; // 'LIVE' | 'COMPLETED' | 'SCHEDULED'
+  status: string;
   isLive: boolean;
   hasReplay: boolean;
   videoUrl: string | null;
@@ -133,83 +346,62 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
   const [searchQuery, setSearchQuery] = React.useState('');
   const [copiedMatchId, setCopiedMatchId] = React.useState<string | null>(null);
 
-  // Compile full video list by joining matches and live streams
+  // Compile full video list by combining Official 20 Monument fixtures with live DB records
   const allVideoItems: VideoItem[] = React.useMemo(() => {
     const items: VideoItem[] = [];
 
-    // Process all matches from DB
-    initialMatches.forEach((m: any) => {
-      let dayNumber = 1;
-      const monMatch = m.id.match(/monument_(\d+)/i);
-      if (monMatch) {
-        dayNumber = parseInt(monMatch[1], 10);
-      } else if (m.round) {
-        dayNumber = m.round;
-      }
+    OFFICIAL_MONUMENTS_DATA.forEach((monument) => {
+      monument.matches.forEach((fix) => {
+        const team1Key = fix.team1.toUpperCase();
+        const team2Key = fix.team2.toUpperCase();
+        const defaultMatchId = `monument_${monument.day}_${team1Key.replace(/\s+/g, '_')}`;
 
-      // Find stream for this match
-      const stream = m.liveStreams?.[0] || initialStreams.find((s: any) => s.matchId === m.id);
+        // Find matching record in DB matches
+        const dbMatch = initialMatches.find((m: any) => {
+          if (m.id === defaultMatchId) return true;
+          const monMatch = m.id.match(/monument_(\d+)/i);
+          const matchDay = monMatch ? parseInt(monMatch[1], 10) : m.round;
+          if (matchDay !== monument.day) return false;
 
-      const isLive = m.status === 'LIVE' || stream?.status === 'LIVE';
-      const hasReplay = !!stream?.youtubeUrl || !!stream?.youtubeVideoId || m.status === 'COMPLETED';
-      const videoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl || null;
-      const replayReason = stream?.failureReason?.startsWith('REPLAY_REASON:')
-        ? stream.failureReason.replace('REPLAY_REASON:', '').trim()
-        : null;
+          const m1 = (m.team1?.name || '').toUpperCase();
+          const m2 = (m.team2?.name || '').toUpperCase();
+          return (m1 === team1Key && m2 === team2Key) || (m1 === team2Key && m2 === team1Key);
+        });
 
-      items.push({
-        matchId: m.id,
-        dayNumber,
-        team1Name: m.team1?.name || 'Team 1',
-        team2Name: m.team2?.name || 'Team 2',
-        score1: m.score1 || 0,
-        score2: m.score2 || 0,
-        status: isLive ? 'LIVE' : hasReplay ? 'COMPLETED' : m.status,
-        isLive,
-        hasReplay,
-        videoUrl,
-        youtubeVideoId: stream?.youtubeVideoId || null,
-        playerName: stream?.player?.name || stream?.player?.username || undefined,
-        playerUsername: stream?.player?.username || undefined,
-        playerTeamName: stream?.team?.name || undefined,
-        replayReason,
-        expiresAt: stream?.expiresAt || null,
-        scheduledTime: m.scheduledTime ? new Date(m.scheduledTime).toISOString() : null,
-      });
-    });
+        const activeMatchId = dbMatch?.id || defaultMatchId;
 
-    // Also include any standalone streams that might not be directly in initialMatches
-    initialStreams.forEach((s: any) => {
-      if (!items.some((i) => i.matchId === s.matchId)) {
-        let dayNumber = 1;
-        const monMatch = s.matchId.match(/monument_(\d+)/i);
-        if (monMatch) dayNumber = parseInt(monMatch[1], 10);
+        // Find stream in DB streams
+        const stream = dbMatch?.liveStreams?.[0] || initialStreams.find((s: any) => s.matchId === activeMatchId);
 
-        const isLive = s.status === 'LIVE';
-        const hasReplay = !!s.youtubeUrl || !!s.youtubeVideoId || s.status === 'ARCHIVED';
-        const replayReason = s.failureReason?.startsWith('REPLAY_REASON:')
-          ? s.failureReason.replace('REPLAY_REASON:', '').trim()
+        const isLive = dbMatch?.status === 'LIVE' || stream?.status === 'LIVE';
+        const rawVideoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl || null;
+        const isDirectVideo = !!rawVideoUrl && !rawVideoUrl.includes('cbot_yt_') && (rawVideoUrl.startsWith('http') || rawVideoUrl.startsWith('blob:') || rawVideoUrl.startsWith('/'));
+        const hasReplay = isDirectVideo || (!!stream?.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_')) || dbMatch?.status === 'COMPLETED' || stream?.status === 'ARCHIVED';
+
+        const replayReason = stream?.failureReason?.startsWith('REPLAY_REASON:')
+          ? stream.failureReason.replace('REPLAY_REASON:', '').trim()
           : null;
 
         items.push({
-          matchId: s.matchId,
-          dayNumber,
-          team1Name: s.match?.team1?.name || s.team?.name || 'Team 1',
-          team2Name: s.match?.team2?.name || 'Opponent',
-          score1: s.match?.score1 || 0,
-          score2: s.match?.score2 || 0,
-          status: isLive ? 'LIVE' : hasReplay ? 'COMPLETED' : 'SCHEDULED',
+          matchId: activeMatchId,
+          dayNumber: monument.day,
+          team1Name: TEAMS_INFO[team1Key]?.name || fix.team1,
+          team2Name: TEAMS_INFO[team2Key]?.name || fix.team2,
+          score1: dbMatch?.score1 || 0,
+          score2: dbMatch?.score2 || 0,
+          status: isLive ? 'LIVE' : hasReplay ? 'COMPLETED' : dbMatch?.status || 'SCHEDULED',
           isLive,
           hasReplay,
-          videoUrl: s.youtubeUrl || null,
-          youtubeVideoId: s.youtubeVideoId || null,
-          playerName: s.player?.name || s.player?.username,
-          playerUsername: s.player?.username,
-          playerTeamName: s.team?.name,
+          videoUrl: isDirectVideo ? rawVideoUrl : null,
+          youtubeVideoId: stream?.youtubeVideoId || null,
+          playerName: stream?.player?.name || stream?.player?.username || undefined,
+          playerUsername: stream?.player?.username || undefined,
+          playerTeamName: stream?.team?.name || undefined,
           replayReason,
-          expiresAt: s.expiresAt || null,
+          expiresAt: stream?.expiresAt || null,
+          scheduledTime: dbMatch?.scheduledTime ? new Date(dbMatch.scheduledTime).toISOString() : null,
         });
-      }
+      });
     });
 
     return items;
@@ -395,9 +587,9 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
               onClick={() => setSelectedDay('ALL')}
               className="h-7 px-3 text-xs font-black rounded-lg shrink-0"
             >
-              All Days
+              All Days (1-20)
             </Button>
-            {MONUMENTS_SCHEDULE.map((m) => (
+            {OFFICIAL_MONUMENTS_DATA.map((m) => (
               <Button
                 key={m.day}
                 size="sm"
@@ -436,7 +628,7 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
       ) : (
         <div className="space-y-10">
           {groupedByDay.map(([dayNum, matches]) => {
-            const scheduleInfo = MONUMENTS_SCHEDULE.find((s) => s.day === dayNum);
+            const scheduleInfo = OFFICIAL_MONUMENTS_DATA.find((s) => s.day === dayNum);
 
             return (
               <div key={dayNum} className="space-y-4 animate-in fade-in duration-300">
@@ -456,20 +648,24 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
                     </div>
                   </div>
                   <Badge variant="outline" className="text-slate-400 border-white/10 text-xs font-mono self-start sm:self-auto">
-                    {matches.length} Match{matches.length > 1 ? 'es' : ''}
+                    {matches.length} Official Match{matches.length > 1 ? 'es' : ''}
                   </Badge>
                 </div>
 
                 {/* Match Cards Grid for this Day */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {matches.map((m) => {
-                    const t1Info = TEAMS_INFO[m.team1Name.toUpperCase()] || {
+                    const t1Key = m.team1Name.toUpperCase();
+                    const t2Key = m.team2Name.toUpperCase();
+                    const t1Info = TEAMS_INFO[t1Key] || {
+                      name: m.team1Name,
                       logo: '/logo.png',
                       color: 'text-amber-400',
                       border: 'border-white/10',
                       bg: 'bg-slate-900',
                     };
-                    const t2Info = TEAMS_INFO[m.team2Name.toUpperCase()] || {
+                    const t2Info = TEAMS_INFO[t2Key] || {
+                      name: m.team2Name,
                       logo: '/logo.png',
                       color: 'text-emerald-400',
                       border: 'border-white/10',
@@ -518,11 +714,11 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
                         <div className="grid grid-cols-3 items-center gap-3 text-center py-1">
                           {/* Team 1 */}
                           <div className="space-y-1.5 flex flex-col items-center">
-                            <div className="h-12 w-12 rounded-xl bg-slate-950 border border-white/10 p-1 flex items-center justify-center shadow-md">
-                              <img src={t1Info.logo} alt={m.team1Name} className="h-full w-full object-contain rounded-lg" />
+                            <div className="h-14 w-14 rounded-2xl bg-slate-950 border-2 border-white/10 p-1 flex items-center justify-center shadow-lg">
+                              <img src={t1Info.logo} alt={t1Info.name} className="h-full w-full object-contain rounded-xl" />
                             </div>
                             <span className="text-xs font-black text-white leading-tight line-clamp-2">
-                              {m.team1Name}
+                              {t1Info.name}
                             </span>
                           </div>
 
@@ -540,11 +736,11 @@ export default function VideosClient({ initialMatches, initialStreams }: { initi
 
                           {/* Team 2 */}
                           <div className="space-y-1.5 flex flex-col items-center">
-                            <div className="h-12 w-12 rounded-xl bg-slate-950 border border-white/10 p-1 flex items-center justify-center shadow-md">
-                              <img src={t2Info.logo} alt={m.team2Name} className="h-full w-full object-contain rounded-lg" />
+                            <div className="h-14 w-14 rounded-2xl bg-slate-950 border-2 border-white/10 p-1 flex items-center justify-center shadow-lg">
+                              <img src={t2Info.logo} alt={t2Info.name} className="h-full w-full object-contain rounded-xl" />
                             </div>
                             <span className="text-xs font-black text-white leading-tight line-clamp-2">
-                              {m.team2Name}
+                              {t2Info.name}
                             </span>
                           </div>
                         </div>
