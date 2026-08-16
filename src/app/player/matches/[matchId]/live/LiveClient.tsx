@@ -172,14 +172,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     init();
   }, [matchDetails.matchId, matchDetails.initialReplayComment, deviceSessionId]);
 
-  const handleStreamReady = React.useCallback((stream: MediaStream) => {
-    canvasStreamRef.current = stream;
-  }, []);
-
-  const handleCanvasError = React.useCallback((err: string) => {
-    console.warn('Canvas Error:', err);
-  }, []);
-
   const startRecorder = React.useCallback((stream: MediaStream) => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       return;
@@ -200,6 +192,20 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     } catch (e) {
       console.warn('Failed to start MediaRecorder:', e);
     }
+  }, []);
+
+  const isStreamingLiveRef = React.useRef(false);
+  isStreamingLiveRef.current = streamStatus === 'LIVE';
+
+  const handleStreamReady = React.useCallback((stream: MediaStream) => {
+    canvasStreamRef.current = stream;
+    if (isStreamingLiveRef.current) {
+      startRecorder(stream);
+    }
+  }, [startRecorder]);
+
+  const handleCanvasError = React.useCallback((err: string) => {
+    console.warn('Canvas Error:', err);
   }, []);
 
   const handleStartLive = async () => {
