@@ -176,19 +176,31 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         }
       }
 
-      // 2. Upload recording directly to Supabase storage
+      // 2. Upload recording directly to CBOT Storage
       let uploadedUrl: string | undefined = undefined;
       if (videoBlob && videoBlob.size > 0) {
         try {
-          uploadedUrl = await uploadMatchVideoToSupabase(videoBlob, matchDetails.matchId);
+          const fd = new FormData();
+          fd.append('video', videoBlob, `match_${matchDetails.matchId}.webm`);
+          fd.append('matchId', matchDetails.matchId);
+          if (streamId) fd.append('streamId', streamId);
+
+          const upRes = await fetch('/api/stream/upload-recording', {
+            method: 'POST',
+            body: fd,
+          });
+          const upData = await upRes.json();
+          if (upData.success && upData.url) {
+            uploadedUrl = upData.url;
+          }
         } catch (uploadErr) {
-          console.warn('Video upload exception:', uploadErr);
+          console.warn('Server recording upload error:', uploadErr);
         }
       }
 
       // 3. Stop stream and attach video URL in DB
       const res = await stopLiveStreamAction(streamId, uploadedUrl);
-      if (res.success || res.error?.includes('not found')) {
+      if (res.success || res.error?.includes('not found') || uploadedUrl) {
         setStreamStatus('ARCHIVED');
       } else {
         setErrorMsg(res.error || 'Failed to stop stream.');

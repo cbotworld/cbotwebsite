@@ -39,7 +39,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const matchTitle = `${editionTitle} - ${team1Name} vs ${team2Name} (${matchId})`;
 
   const videoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl;
-  const isDirectVideo = videoUrl && (videoUrl.includes('supabase.co') || videoUrl.endsWith('.webm') || videoUrl.endsWith('.mp4') || videoUrl.startsWith('blob:'));
+  const isDirectVideo = !!videoUrl && !videoUrl.includes('cbot_yt_') && (videoUrl.startsWith('http') || videoUrl.startsWith('blob:') || videoUrl.startsWith('/'));
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-8 px-4 sm:px-6">
