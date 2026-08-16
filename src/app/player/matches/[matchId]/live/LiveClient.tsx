@@ -596,6 +596,18 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                 >
                   View Public Match Recording
                 </Button>
+                {effectiveYoutubeUrl && (
+                  <a
+                    href={effectiveYoutubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-lg shadow-red-600/20"
+                  >
+                    <Youtube className="h-3.5 w-3.5" />
+                    <span>Watch on YouTube</span>
+                    <ExternalLink className="h-3 w-3 opacity-80" />
+                  </a>
+                )}
                 {downloadUrl && (
                   <a
                     href={downloadUrl}
