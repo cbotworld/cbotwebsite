@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { supabase } from '@/lib/supabase';
-import { Radio, Volume2, VolumeX, Maximize, Minimize, Loader2, Sparkles, Trophy, Users, RefreshCw } from 'lucide-react';
+import { Radio, Volume2, VolumeX, Maximize, Minimize, Loader2, Sparkles, Trophy, Users, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -39,6 +39,7 @@ export default function WebRTCLiveViewer({
   const [liveScores, setLiveScores] = React.useState<{ totalScore: number; totalSlams: number } | null>(null);
   const [viewerCount, setViewerCount] = React.useState(1);
   const [connectionStatus, setConnectionStatus] = React.useState<'connecting' | 'connected' | 'waiting'>('connecting');
+  const [finishedVideoUrl, setFinishedVideoUrl] = React.useState<string | null>(null);
   const viewerIdRef = React.useRef<string>(`v_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
 
   React.useEffect(() => {
@@ -138,6 +139,13 @@ export default function WebRTCLiveViewer({
           setLiveScores(payload.scores);
         }
       })
+      .on('broadcast', { event: 'match-ended' }, ({ payload }: { payload: any }) => {
+        if (payload?.videoUrl) {
+          setFinishedVideoUrl(payload.videoUrl);
+          setHasStream(false);
+          setConnectionStatus('connected');
+        }
+      })
       .on('broadcast', { event: 'broadcaster-live' }, () => {
         // Broadcaster signaled active, request offer
         channel.send({
@@ -198,17 +206,37 @@ export default function WebRTCLiveViewer({
       ref={containerRef}
       className="relative rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center group select-none"
     >
+      {/* 0. Instant Match Replay (When Match Ends) */}
+      {finishedVideoUrl && (
+        <div className="relative w-full h-full bg-black flex items-center justify-center">
+          <video
+            src={finishedVideoUrl}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full object-contain bg-black"
+          />
+          <div className="absolute top-3 left-3 z-10 pointer-events-none">
+            <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 shadow-lg shadow-emerald-600/30">
+              <CheckCircle2 className="h-3.5 w-3.5" /> REPLAY READY (SAVED)
+            </Badge>
+          </div>
+        </div>
+      )}
+
       {/* 1. Live WebRTC Video Element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isMuted}
-        className={`h-full w-full object-contain bg-black ${hasStream ? 'block' : 'hidden'}`}
-      />
+      {!finishedVideoUrl && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isMuted}
+          className={`h-full w-full object-contain bg-black ${hasStream ? 'block' : 'hidden'}`}
+        />
+      )}
 
       {/* 2. Real-Time Snapshot Stream Fallback */}
-      {!hasStream && latestSnapshot && (
+      {!finishedVideoUrl && !hasStream && latestSnapshot && (
         <img
           src={latestSnapshot}
           alt="Live Match Feed"
@@ -217,7 +245,7 @@ export default function WebRTCLiveViewer({
       )}
 
       {/* 3. Connecting / Waiting State */}
-      {!hasStream && !latestSnapshot && (
+      {!finishedVideoUrl && !hasStream && !latestSnapshot && (
         <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
           <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
             <Radio className="h-8 w-8" />

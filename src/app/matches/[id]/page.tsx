@@ -79,7 +79,6 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
               <img src={match?.team1?.logo || '/logo.png'} alt={team1Name} className="h-full w-full object-contain" />
             </div>
             <h2 className="text-sm sm:text-base font-black text-amber-400 leading-tight">{team1Name}</h2>
-            <div className="text-3xl sm:text-4xl font-black font-mono text-white">{match?.score1 ?? 0}</div>
           </div>
 
           {/* Center VS & Details */}
@@ -104,7 +103,6 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
               <img src={match?.team2?.logo || '/logo.png'} alt={team2Name} className="h-full w-full object-contain" />
             </div>
             <h2 className="text-sm sm:text-base font-black text-emerald-400 leading-tight">{team2Name}</h2>
-            <div className="text-3xl sm:text-4xl font-black font-mono text-white">{match?.score2 ?? 0}</div>
           </div>
 
         </div>

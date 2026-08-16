@@ -217,6 +217,27 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
       // 3. Stop stream and attach video URL in DB
       const res = await stopLiveStreamAction(streamId, uploadedUrl);
+      const finalUrl = uploadedUrl || (videoBlob ? URL.createObjectURL(videoBlob) : null);
+      if (finalUrl) {
+        setDownloadUrl(finalUrl);
+      }
+
+      // 4. Notify all live spectators on the channel so their screen immediately switches to the recording replay
+      try {
+        const channelName = `cbot_match_${matchDetails.matchId}`;
+        const channel = supabase.channel(channelName);
+        channel.send({
+          type: 'broadcast',
+          event: 'match-ended',
+          payload: {
+            videoUrl: finalUrl,
+            scores: { totalScore, totalSlams },
+          },
+        });
+      } catch (e) {
+        console.warn('Failed to broadcast match-ended event:', e);
+      }
+
       if (res.success || res.error?.includes('not found') || uploadedUrl) {
         setStreamStatus('ARCHIVED');
       } else {
@@ -472,36 +493,54 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         )}
 
         {streamStatus === 'ARCHIVED' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-md z-10 p-6 text-center space-y-4">
-            <div className="h-16 w-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-emerald-400">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-xl font-black text-white uppercase">Match Video Saved to CBOT Arena!</h3>
-              <p className="text-xs text-slate-300 max-w-md mx-auto">
-                Your match has concluded and is saved with all Carrom board overlays.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <Button
-                variant="outline"
-                className="rounded-2xl border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs font-black px-5 py-3"
-                onClick={() => {
-                  window.location.href = `/matches/${matchDetails.matchId}`;
-                }}
-              >
-                <Video className="h-4 w-4 mr-2" /> Watch Match Replay
-              </Button>
-              {downloadUrl && (
-                <a
-                  href={downloadUrl}
-                  download={`cbot_match_${matchDetails.matchId}.webm`}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-lg shadow-emerald-600/30"
-                >
-                  <Download className="h-4 w-4" /> Download Video
-                </a>
-              )}
-            </div>
+          <div className="absolute inset-0 w-full h-full bg-black z-30 flex items-center justify-center">
+            {downloadUrl ? (
+              <div className="relative w-full h-full flex items-center justify-center bg-black group">
+                <video
+                  src={downloadUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain bg-black"
+                />
+
+                {/* Floating Top Info Pill */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20">
+                  <div className="flex items-center gap-2 pointer-events-auto">
+                    <Link href="/dashboard/player">
+                      <Button size="sm" variant="ghost" className="h-9 px-3 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1.5 border border-white/15">
+                        <ArrowLeft className="h-4 w-4" /> Dashboard
+                      </Button>
+                    </Link>
+                    <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 shadow-lg shadow-emerald-600/30">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> REPLAY READY (SAVED)
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center gap-2 pointer-events-auto">
+                    <Button
+                      size="sm"
+                      onClick={() => setShowShareModal(true)}
+                      className="h-9 px-3 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-amber-400 font-bold text-xs gap-1.5 border border-amber-500/40"
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Share Replay
+                    </Button>
+                    <a
+                      href={downloadUrl}
+                      download={`cbot_match_${matchDetails.matchId}.webm`}
+                      className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-emerald-600/30"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+                <Loader2 className="h-10 w-10 animate-spin text-amber-400" />
+                <h3 className="text-lg font-black text-white uppercase">Finalizing Match Video Recording…</h3>
+              </div>
+            )}
           </div>
         )}
 
