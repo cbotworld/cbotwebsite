@@ -827,20 +827,33 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <Button
-                  onClick={handleWhatsAppShare}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 shadow-lg shadow-emerald-600/30"
-                >
-                  <MessageCircle className="h-4 w-4" /> Share WhatsApp
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowShareModal(false)}
-                  className="w-full py-2.5 rounded-xl border-white/20 text-slate-300 hover:text-white text-xs font-bold"
-                >
-                  Close
-                </Button>
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={shareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/20"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Watch on Arena
+                  </a>
+                  <Button
+                    onClick={handleWhatsAppShare}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 shadow-lg shadow-emerald-600/30"
+                  >
+                    <MessageCircle className="h-4 w-4" /> Share WhatsApp
+                  </Button>
+                </div>
+
+                {downloadUrl && (
+                  <a
+                    href={downloadUrl}
+                    download={`cbot_match_${matchDetails.matchId}.webm`}
+                    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-bold text-xs inline-flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <Download className="h-4 w-4 text-amber-400" /> Download Match Video (.webm)
+                  </a>
+                )}
               </div>
             </div>
           </div>

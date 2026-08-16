@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Share2, ExternalLink, Copy, Check, MessageCircle, Radio, Sparkles } from 'lucide-react';
+import { Share2, ExternalLink, Copy, Check, MessageCircle, Radio, Sparkles, Download, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface MatchShareCardProps {
@@ -14,6 +14,8 @@ interface MatchShareCardProps {
 
 export default function MatchShareCard({
   matchId,
+  youtubeUrl,
+  youtubeVideoId,
   title = 'CBOT Match Stream',
   isLive = false,
 }: MatchShareCardProps) {
@@ -23,6 +25,8 @@ export default function MatchShareCard({
   const arenaUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/matches/${matchId}`
     : `https://www.cbotworld.com/matches/${matchId}`;
+
+  const isDirectVideo = !!youtubeUrl && (youtubeUrl.startsWith('http') || youtubeUrl.startsWith('/')) && !youtubeUrl.includes('youtube.com');
 
   const handleCopyArena = () => {
     navigator.clipboard.writeText(arenaUrl).then(() => {
@@ -48,10 +52,10 @@ export default function MatchShareCard({
           </div>
           <div>
             <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
-              Shareable Match Link
+              Shareable Match Link &amp; Recording
             </h4>
             <p className="text-[11px] text-muted-foreground">
-              Share this official match link with fans, teammates, and tournament viewers
+              Share this official link or download the recorded video for future reference
             </p>
           </div>
         </div>
@@ -62,12 +66,23 @@ export default function MatchShareCard({
             href={arenaUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition-colors shadow-lg shadow-amber-500/20"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-colors shadow-lg shadow-amber-500/20"
           >
-            <Radio className="h-4 w-4" />
-            <span>{isLive ? 'Watch Live on Arena' : 'Open Match Page'}</span>
+            {isLive ? <Radio className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+            <span>{isLive ? 'Watch Live on Arena' : 'Watch Match Video'}</span>
             <ExternalLink className="h-3 w-3 opacity-75" />
           </a>
+
+          {isDirectVideo && (
+            <a
+              href={youtubeUrl}
+              download={`cbot_match_${matchId}.webm`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-lg shadow-emerald-600/20"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>Download Video</span>
+            </a>
+          )}
 
           <Button
             onClick={handleWhatsAppShare}
