@@ -30,8 +30,8 @@ export async function GET(request: Request) {
     console.log(`[Cron Expiry] Found ${expiredStreams.length} streams to expire.`);
 
     let processedCount = 0;
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
     let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
     if (!googleRefreshToken) {

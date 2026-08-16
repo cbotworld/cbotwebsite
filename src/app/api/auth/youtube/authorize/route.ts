@@ -37,22 +37,8 @@ export async function GET(request: Request) {
     `, { status: 403, headers: { 'Content-Type': 'text/html' } });
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID || '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://www.cbotworld.com/api/auth/youtube/callback';
-
-  if (!clientId) {
-    return new NextResponse(`
-      <!DOCTYPE html>
-      <html>
-        <body style="font-family: system-ui, sans-serif; background: #020617; color: #f87171; padding: 40px; text-align: center;">
-          <div style="max-width: 500px; margin: 0 auto; background: #0f172a; border: 1px solid #ef4444; border-radius: 20px; padding: 30px;">
-            <h2>⚠️ Server Configuration Error</h2>
-            <p style="color: #cbd5e1; font-size: 14px;">GOOGLE_CLIENT_ID environment variable is missing on server.</p>
-          </div>
-        </body>
-      </html>
-    `, { status: 500, headers: { 'Content-Type': 'text/html' } });
-  }
 
   const scopes = [
     'https://www.googleapis.com/auth/youtube.force-ssl',

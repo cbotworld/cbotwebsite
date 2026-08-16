@@ -7,6 +7,26 @@ import { unstable_noStore as noStore } from 'next/cache';
 
 const RETENTION_DAYS = 15;
 
+const DEFAULT_GOOGLE_CLIENT_ID = '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_CLIENT_SECRET = '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';
+
+async function getYouTubeOAuthCredentials() {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || DEFAULT_GOOGLE_CLIENT_SECRET;
+  let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!googleRefreshToken) {
+    const dbSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'youtube_refresh_token' }
+    });
+    if (dbSetting?.value) {
+      googleRefreshToken = dbSetting.value;
+    }
+  }
+
+  return { googleClientId, googleClientSecret, googleRefreshToken };
+}
+
 /**
  * Server Action to initialize a live stream for a match.
  * Performs strict authentication and authorization checks.
@@ -199,20 +219,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       }
     }
 
-    // 4. Create YouTube Broadcast Resources or CBOT Stream Identifier
-    // Check if official Google OAuth credentials exist in environment or Database
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-    if (!googleRefreshToken) {
-      const dbSetting = await prisma.systemSetting.findUnique({
-        where: { key: 'youtube_refresh_token' }
-      });
-      if (dbSetting?.value) {
-        googleRefreshToken = dbSetting.value;
-      }
-    }
+    const { googleClientId, googleClientSecret, googleRefreshToken } = await getYouTubeOAuthCredentials();
 
     let youtubeBroadcastId: string | null = null;
     let youtubeStreamId: string | null = null;
@@ -481,18 +488,7 @@ export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: 
     }).catch(() => {});
 
     // Transition YouTube Live Broadcast to complete on YouTube if applicable
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-    if (!googleRefreshToken) {
-      const dbSetting = await prisma.systemSetting.findUnique({
-        where: { key: 'youtube_refresh_token' }
-      });
-      if (dbSetting?.value) {
-        googleRefreshToken = dbSetting.value;
-      }
-    }
+    const { googleClientId, googleClientSecret, googleRefreshToken } = await getYouTubeOAuthCredentials();
 
     if (
       googleClientId &&
@@ -578,18 +574,7 @@ export async function uploadRecordedVideoToYouTube({
   description?: string;
 }) {
   try {
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-
-    if (!googleRefreshToken) {
-      const dbSetting = await prisma.systemSetting.findUnique({
-        where: { key: 'youtube_refresh_token' }
-      });
-      if (dbSetting?.value) {
-        googleRefreshToken = dbSetting.value;
-      }
-    }
+    const { googleClientId, googleClientSecret, googleRefreshToken } = await getYouTubeOAuthCredentials();
 
     if (!googleClientId || !googleClientSecret || !googleRefreshToken) {
       return { success: false, error: 'YouTube OAuth credentials not configured.' };
