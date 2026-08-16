@@ -145,14 +145,29 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                   />
                 </div>
               ) : (
-                /* Match Stream Recorded */
-                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
-                  <video
-                    src={stream.youtubeEmbedUrl || stream.youtubeUrl || ''}
-                    controls
-                    playsInline
-                    className="h-full w-full object-contain bg-black"
-                  />
+                /* Match Completed / Saved Notice */
+                <div className="rounded-2xl border-2 border-emerald-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
+                  <div className="h-16 w-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🎉 MATCH STREAM COMPLETED & SAVED</h4>
+                    <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+                      Match concluded and recorded with live scores and Carrom overlays.
+                    </p>
+                    {stream.youtubeUrl && !stream.youtubeUrl.includes('cbot_yt_') && (
+                      <a
+                        href={stream.youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-lg shadow-red-600/25 mt-2"
+                      >
+                        <Youtube className="h-4 w-4" />
+                        <span>Watch on YouTube</span>
+                        <ExternalLink className="h-3 w-3 opacity-80" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               )
             ) : (
