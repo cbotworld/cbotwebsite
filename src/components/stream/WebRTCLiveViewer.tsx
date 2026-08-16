@@ -176,7 +176,28 @@ export default function WebRTCLiveViewer({
       }
     }, 4000);
 
+    // Auto-resume video playback and reconnect WebRTC on tab visibility change
+    const handleViewerFocus = () => {
+      if (videoRef.current && videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      }
+      if (!hasStream) {
+        channel.send({
+          type: 'broadcast',
+          event: 'viewer-join',
+          payload: { viewerId: viewerIdRef.current },
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleViewerFocus);
+    window.addEventListener('focus', handleViewerFocus);
+    window.addEventListener('pageshow', handleViewerFocus);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleViewerFocus);
+      window.removeEventListener('focus', handleViewerFocus);
+      window.removeEventListener('pageshow', handleViewerFocus);
       clearInterval(retryInterval);
       cleanupPeer();
       supabase.removeChannel(channel);

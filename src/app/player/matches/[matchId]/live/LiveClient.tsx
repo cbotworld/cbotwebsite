@@ -113,14 +113,37 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [replayReason, setReplayReason] = React.useState<string | null>(matchDetails.initialReplayComment || null);
   const [attemptsCount, setAttemptsCount] = React.useState<number>(1);
   const [elapsedSeconds, setElapsedSeconds] = React.useState<number>(0);
+  const [deviceSessionId, setDeviceSessionId] = React.useState<string>('');
   const MAX_STREAM_SECONDS = 45 * 60; // 45 Minutes Cutoff (2700s)
+
+  // Initialize persistent device session
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let id = localStorage.getItem('cbot_device_session_id');
+      if (!id) {
+        id = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        localStorage.setItem('cbot_device_session_id', id);
+      }
+      setDeviceSessionId(id);
+    }
+  }, []);
 
   // Initialize stream session
   React.useEffect(() => {
     const init = async () => {
       setLoading(true);
       try {
-        const res = await createLiveStreamAction(matchDetails.matchId, matchDetails.initialReplayComment || undefined);
+        let currentDeviceId = deviceSessionId;
+        if (!currentDeviceId && typeof window !== 'undefined') {
+          currentDeviceId = localStorage.getItem('cbot_device_session_id') || `dev_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+          localStorage.setItem('cbot_device_session_id', currentDeviceId);
+        }
+
+        const res = await createLiveStreamAction(
+          matchDetails.matchId,
+          matchDetails.initialReplayComment || undefined,
+          currentDeviceId || undefined
+        );
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
@@ -144,14 +167,35 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       }
     };
     init();
-  }, [matchDetails.matchId, matchDetails.initialReplayComment]);
+  }, [matchDetails.matchId, matchDetails.initialReplayComment, deviceSessionId]);
+
+  const startRecorder = React.useCallback((stream: MediaStream) => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      return;
+    }
+    try {
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+    } catch (e) {
+      console.warn('Failed to start MediaRecorder:', e);
+    }
+  }, []);
 
   const handleStartLive = async () => {
     if (!streamId) return;
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await startLiveStreamAction(streamId);
+      const res = await startLiveStreamAction(streamId, deviceSessionId);
       if (res.success) {
         setStreamStatus('LIVE');
         setStreamStartedAt(new Date());
@@ -159,17 +203,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         // Start in-browser recorder
         if (canvasStreamRef.current) {
           recordedChunksRef.current = [];
-          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-            ? 'video/webm;codecs=vp9'
-            : 'video/webm';
-          const recorder = new MediaRecorder(canvasStreamRef.current, { mimeType });
-          recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) {
-              recordedChunksRef.current.push(e.data);
-            }
-          };
-          recorder.start(1000);
-          mediaRecorderRef.current = recorder;
+          startRecorder(canvasStreamRef.current);
         }
       } else {
         setErrorMsg(res.error || 'Failed to start match stream.');
@@ -289,7 +323,17 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
   const handleStreamReady = React.useCallback((stream: MediaStream) => {
     canvasStreamRef.current = stream;
-  }, []);
+    if (streamStatus === 'LIVE') {
+      startRecorder(stream);
+    }
+  }, [streamStatus, startRecorder]);
+
+  // Auto-resume recorder if stream status is LIVE on tab reopen/mount
+  React.useEffect(() => {
+    if (streamStatus === 'LIVE' && canvasStreamRef.current) {
+      startRecorder(canvasStreamRef.current);
+    }
+  }, [streamStatus, startRecorder]);
 
   // Native WebRTC & Realtime Broadcaster to Spectators
   React.useEffect(() => {
@@ -351,11 +395,34 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           },
         });
       } catch (err) {
-        console.warn('Error creating WebRTC offer for viewer:', err);
+        console.warn('WebRTC offer creation error:', err);
       }
     };
 
+    // Re-announce broadcaster live on tab focus or connect
+    const announceLive = () => {
+      channel.send({
+        type: 'broadcast',
+        event: 'broadcaster-live',
+        payload: { ready: true },
+      });
+    };
+
+    // Device session heartbeat broadcast
+    const heartbeatInterval = setInterval(() => {
+      channel.send({
+        type: 'broadcast',
+        event: 'broadcaster-heartbeat',
+        payload: { deviceSessionId, matchId: matchDetails.matchId },
+      });
+    }, 2500);
+
     channel
+      .on('broadcast', { event: 'broadcaster-heartbeat' }, ({ payload }: { payload: any }) => {
+        if (payload?.deviceSessionId && deviceSessionId && payload.deviceSessionId !== deviceSessionId) {
+          setErrorMsg('🔒 Active Broadcast on Another Device: This match is currently streaming live from another device. Simultaneous streaming on multiple devices is strictly prohibited.');
+        }
+      })
       .on('broadcast', { event: 'viewer-join' }, ({ payload }: { payload: any }) => {
         if (payload?.viewerId) {
           createPeerForViewer(payload.viewerId);
@@ -414,30 +481,55 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }, 1500);
 
     return () => {
+      clearInterval(heartbeatInterval);
       clearInterval(snapshotInterval);
+      document.removeEventListener('visibilitychange', announceLive);
+      window.removeEventListener('focus', announceLive);
       peerConnections.forEach((pc) => pc.close());
       peerConnections.clear();
       supabase.removeChannel(channel);
     };
-  }, [streamStatus, matchDetails.matchId, totalScore, totalSlams]);
+  }, [streamStatus, matchDetails.matchId, totalScore, totalSlams, deviceSessionId]);
 
-  // Lock screen to landscape if supported on mobile devices
+  // Lock body scroll and orientation to landscape
   React.useEffect(() => {
+    const origOverflow = document.body.style.overflow;
+    const origTouchAction = document.body.style.touchAction;
+    const origHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    document.documentElement.style.overflow = 'hidden';
+
     try {
       if (typeof window !== 'undefined' && 'screen' in window && (window.screen as any).orientation?.lock) {
         (window.screen as any).orientation.lock('landscape').catch(() => {});
       }
     } catch (e) {}
+
+    return () => {
+      document.body.style.overflow = origOverflow;
+      document.body.style.touchAction = origTouchAction;
+      document.documentElement.style.overflow = origHtmlOverflow;
+    };
   }, []);
 
   return (
-    <div className="fixed inset-0 w-screen h-screen z-50 bg-black text-white select-none overflow-hidden flex items-center justify-center">
+    <div 
+      className="fixed inset-0 z-50 bg-black text-white select-none overflow-hidden flex items-center justify-center overscroll-none touch-none"
+      style={{
+        width: '100dvw',
+        height: '100dvh',
+        maxWidth: '100dvw',
+        maxHeight: '100dvh',
+      }}
+    >
       
       {/* Immersive Edge-to-Edge Fullscreen Camera Studio Container */}
-      <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center group">
+      <div className="relative w-full h-full max-w-full max-h-full bg-black overflow-hidden flex items-center justify-center">
 
         {/* 1. Underlying High-Definition Video Canvas */}
-        <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
           <CanvasOverlayRenderer
             playerName={matchDetails.playerName}
             editionTitle={matchDetails.editionTitle}
@@ -452,20 +544,27 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           />
         </div>
 
-        {/* 2. Floating Top Bar (Controls on Video) */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
+        {/* 2. Floating Top Bar (Controls on Video - Safe Area Aware) */}
+        <div 
+          className="absolute flex items-center justify-between pointer-events-none z-20"
+          style={{
+            top: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+            left: 'max(0.75rem, env(safe-area-inset-left, 0.75rem))',
+            right: 'max(0.75rem, env(safe-area-inset-right, 0.75rem))',
+          }}
+        >
           <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
             <Link href="/dashboard/player">
-              <Button size="sm" variant="ghost" className="h-9 px-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1.5 border border-white/10">
-                <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Dashboard</span>
+              <Button size="sm" variant="ghost" className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1 border border-white/15">
+                <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Dashboard</span>
               </Button>
             </Link>
             {streamStatus === 'LIVE' ? (
               <>
-                <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 animate-pulse shadow-lg shadow-rose-600/30">
-                  <Radio className="h-3.5 w-3.5" /> 🔴 LIVE {elapsed} <span className="opacity-80 text-[10px]">/ 45:00 max</span>
+                <Badge className="bg-rose-600 text-white font-black text-[11px] px-2.5 py-1 gap-1 animate-pulse shadow-lg shadow-rose-600/30">
+                  <Radio className="h-3 w-3" /> 🔴 LIVE {elapsed} <span className="opacity-80 text-[9px]">/ 45:00 max</span>
                 </Badge>
-                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-amber-400 border-amber-500/40 text-[11px] font-mono font-bold">
+                <Badge variant="outline" className="bg-black/70 backdrop-blur-md text-amber-400 border-amber-500/40 text-[10px] font-mono font-bold py-0.5 px-2">
                   Attempt {attemptsCount}/3
                 </Badge>
               </>
@@ -475,10 +574,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               </Badge>
             ) : (
               <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-amber-400 border-amber-500/50 font-black text-xs px-3 py-1.5">
+                <Badge variant="outline" className="bg-black/70 backdrop-blur-md text-amber-400 border-amber-500/50 font-black text-[11px] px-2.5 py-1">
                   {loading && !initialized ? 'INITIALIZING…' : 'READY TO GO LIVE'}
                 </Badge>
-                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-slate-300 border-white/10 text-[10px] font-mono font-bold">
+                <Badge variant="outline" className="bg-black/70 backdrop-blur-md text-slate-300 border-white/10 text-[10px] font-mono font-bold py-0.5 px-2">
                   Attempt {attemptsCount}/3
                 </Badge>
               </div>
@@ -489,15 +588,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             <Button
               size="sm"
               onClick={() => setShowShareModal(true)}
-              className="h-9 px-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-xl text-amber-400 font-bold text-xs gap-1.5 border border-amber-500/30"
+              className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-amber-400 font-bold text-xs gap-1 border border-amber-500/40"
             >
-              <Share2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Share Match</span>
+              <Share2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Share</span>
             </Button>
             <a
               href={`/matches/${matchDetails.matchId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-9 px-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+              className="h-8 px-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl inline-flex items-center gap-1 shadow-lg shadow-amber-500/20"
             >
               <ExternalLink className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Public Page</span>
             </a>
@@ -506,8 +605,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         {/* 2.5 Replay Reason Chip (if rematch) */}
         {replayReason && (
-          <div className="absolute top-14 left-3 z-20 pointer-events-none max-w-sm">
-            <div className="bg-black/70 backdrop-blur-md border border-amber-500/40 rounded-xl px-3 py-1.5 text-[11px] text-amber-300 flex items-center gap-1.5 shadow-lg">
+          <div 
+            className="absolute z-20 pointer-events-none max-w-sm"
+            style={{
+              top: 'calc(max(0.5rem, env(safe-area-inset-top, 0.5rem)) + 2.5rem)',
+              left: 'max(0.75rem, env(safe-area-inset-left, 0.75rem))',
+            }}
+          >
+            <div className="bg-black/80 backdrop-blur-md border border-amber-500/40 rounded-xl px-2.5 py-1 text-[10px] text-amber-300 flex items-center gap-1.5 shadow-lg">
               <span className="font-black text-amber-400">💬 Reason:</span>
               <span className="italic truncate">"{replayReason}"</span>
             </div>
@@ -516,7 +621,12 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         {/* 2.6 40-Minute Warning Banner (5 mins before 45-min hard cutoff) */}
         {streamStatus === 'LIVE' && elapsedSeconds >= 2400 && (
-          <div className="absolute top-16 inset-x-4 max-w-md mx-auto bg-amber-500 text-slate-950 px-4 py-2 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-2xl z-30 animate-bounce">
+          <div 
+            className="absolute inset-x-4 max-w-md mx-auto bg-amber-500 text-slate-950 px-4 py-1.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-2xl z-30 animate-bounce"
+            style={{
+              top: 'calc(max(0.5rem, env(safe-area-inset-top, 0.5rem)) + 2.5rem)',
+            }}
+          >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>45-Min Match Limit: Stream will auto-end in {Math.max(1, Math.ceil((MAX_STREAM_SECONDS - elapsedSeconds) / 60))} min</span>
           </div>
@@ -524,16 +634,16 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         {/* 2.6 Error Modal (e.g. 3 attempts exceeded or active stream elsewhere) */}
         {errorMsg && streamStatus !== 'LIVE' && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 z-40">
-            <div className="max-w-md w-full bg-slate-900 border border-rose-500/50 rounded-3xl p-6 shadow-2xl text-center space-y-4">
-              <div className="h-14 w-14 rounded-full bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-7 w-7" />
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-40">
+            <div className="max-w-md w-full bg-slate-900 border border-rose-500/50 rounded-3xl p-5 shadow-2xl text-center space-y-3 max-h-[90dvh] overflow-y-auto">
+              <div className="h-12 w-12 rounded-full bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+                <AlertCircle className="h-6 w-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-lg font-black text-white uppercase">Streaming Notice</h3>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-white uppercase">Streaming Notice</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">{errorMsg}</p>
               </div>
-              <div className="flex gap-2 justify-center pt-2">
+              <div className="flex gap-2 justify-center pt-1">
                 <Link href="/dashboard/player">
                   <Button variant="outline" className="rounded-xl border-white/20 text-xs font-bold px-4 py-2">
                     <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
@@ -554,17 +664,17 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         {/* 3. Floating Center Action Buttons (Start / Saved state on video) */}
         {streamStatus !== 'LIVE' && streamStatus !== 'ARCHIVED' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px] z-10 p-4 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/35 backdrop-blur-[1px] z-10 p-4 text-center">
             <Button
               onClick={handleStartLive}
               disabled={loading || !streamId}
               size="lg"
-              className="h-16 px-10 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-lg shadow-2xl shadow-amber-500/50 hover:scale-105 transition-all gap-3 border-2 border-white/20"
+              className="h-14 px-8 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-base shadow-2xl shadow-amber-500/50 hover:scale-105 transition-all gap-2.5 border-2 border-white/20"
             >
-              <Play className="h-6 w-6 fill-slate-950" />
+              <Play className="h-5 w-5 fill-slate-950" />
               {loading && !initialized ? 'INITIALIZING STUDIO…' : 'START LIVE MATCH'}
             </Button>
-            <p className="text-xs font-semibold text-slate-300 mt-3 drop-shadow-md">
+            <p className="text-[11px] font-semibold text-slate-300 mt-2.5 drop-shadow-md">
               Tap to broadcast your Carrom board with live score overlays
             </p>
           </div>
@@ -583,14 +693,21 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                 />
 
                 {/* Floating Top Info Pill */}
-                <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-20">
+                <div 
+                  className="absolute flex items-center justify-between pointer-events-none z-20"
+                  style={{
+                    top: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+                    left: 'max(0.75rem, env(safe-area-inset-left, 0.75rem))',
+                    right: 'max(0.75rem, env(safe-area-inset-right, 0.75rem))',
+                  }}
+                >
                   <div className="flex items-center gap-2 pointer-events-auto">
                     <Link href="/dashboard/player">
-                      <Button size="sm" variant="ghost" className="h-9 px-3 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1.5 border border-white/15">
-                        <ArrowLeft className="h-4 w-4" /> Dashboard
+                      <Button size="sm" variant="ghost" className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1 border border-white/15">
+                        <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
                       </Button>
                     </Link>
-                    <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 shadow-lg shadow-emerald-600/30">
+                    <Badge className="bg-emerald-600 text-white font-black text-xs px-2.5 py-1 gap-1 shadow-lg shadow-emerald-600/30">
                       <CheckCircle2 className="h-3.5 w-3.5" /> REPLAY READY (SAVED)
                     </Badge>
                   </div>
@@ -599,14 +716,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                     <Button
                       size="sm"
                       onClick={() => setShowShareModal(true)}
-                      className="h-9 px-3 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-amber-400 font-bold text-xs gap-1.5 border border-amber-500/40"
+                      className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-amber-400 font-bold text-xs gap-1 border border-amber-500/40"
                     >
                       <Share2 className="h-3.5 w-3.5" /> Share Replay
                     </Button>
                     <a
                       href={downloadUrl}
                       download={`cbot_match_${matchDetails.matchId}.webm`}
-                      className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-emerald-600/30"
+                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl inline-flex items-center gap-1 shadow-lg shadow-emerald-600/30"
                     >
                       <Download className="h-3.5 w-3.5" /> Download
                     </a>
@@ -622,23 +739,30 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           </div>
         )}
 
-        {/* 4. Floating Bottom Action Bar (On Video) */}
+        {/* 4. Floating Bottom Action Bar (On Video - Safe Area Aware) */}
         {streamStatus === 'LIVE' && (
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
+          <div 
+            className="absolute flex items-center justify-between pointer-events-none z-20"
+            style={{
+              bottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))',
+              left: 'max(0.75rem, env(safe-area-inset-left, 0.75rem))',
+              right: 'max(0.75rem, env(safe-area-inset-right, 0.75rem))',
+            }}
+          >
             {/* End Live Match Button */}
             <div className="pointer-events-auto">
               <Button
                 onClick={handleStopLive}
                 disabled={loading || isSavingRecording}
-                className="h-12 px-6 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-sm shadow-xl shadow-rose-600/40 gap-2 border border-white/20 animate-pulse"
+                className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-xl shadow-rose-600/40 gap-1.5 border border-white/20 animate-pulse"
               >
                 {isSavingRecording ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> SAVING MATCH…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> SAVING MATCH…
                   </>
                 ) : (
                   <>
-                    <Square className="h-4 w-4 fill-white" /> END MATCH
+                    <Square className="h-3.5 w-3.5 fill-white" /> END MATCH
                   </>
                 )}
               </Button>
@@ -648,14 +772,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             <div className="pointer-events-auto">
               <Button
                 onClick={() => setIsScoreDrawerOpen(!isScoreDrawerOpen)}
-                className="h-12 px-5 rounded-2xl bg-black/80 hover:bg-black text-amber-400 font-black text-xs gap-2 border-2 border-amber-500/60 backdrop-blur-xl shadow-2xl hover:scale-105 transition-all"
+                className="h-10 px-3.5 rounded-xl bg-black/80 hover:bg-black text-amber-400 font-black text-xs gap-1.5 border-2 border-amber-500/60 backdrop-blur-xl shadow-2xl hover:scale-105 transition-all"
               >
-                <span className="flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4 text-amber-400" />
+                <span className="flex items-center gap-1">
+                  <Trophy className="h-3.5 w-3.5 text-amber-400" />
                   <span>SCORE: {totalScore}</span>
                   {totalSlams > 0 && <span className="text-sky-400">⚡{totalSlams}</span>}
                 </span>
-                {isScoreDrawerOpen ? <ChevronDown className="h-4 w-4 text-white" /> : <ChevronUp className="h-4 w-4 text-white animate-bounce" />}
+                {isScoreDrawerOpen ? <ChevronDown className="h-3.5 w-3.5 text-white" /> : <ChevronUp className="h-3.5 w-3.5 text-white animate-bounce" />}
               </Button>
             </div>
           </div>

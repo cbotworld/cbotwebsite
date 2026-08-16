@@ -156,6 +156,23 @@ export default function CanvasOverlayRenderer({
   const isMutedRef = React.useRef(isMuted);
   isMutedRef.current = isMuted;
 
+  // Auto-resume camera feed when browser tab gains focus or returns from background
+  React.useEffect(() => {
+    const handleResume = () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('focus', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    return () => {
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+    };
+  }, []);
+
   // Request Camera & Microphone Stream
   const initCamera = React.useCallback(async (mode: 'environment' | 'user') => {
     try {
@@ -177,6 +194,10 @@ export default function CanvasOverlayRenderer({
         }
 
         if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.playsInline = true;
+          videoRef.current.setAttribute('playsinline', 'true');
+          videoRef.current.setAttribute('muted', 'true');
           videoRef.current.srcObject = mediaStream;
           try {
             await videoRef.current.play();
@@ -251,6 +272,11 @@ export default function CanvasOverlayRenderer({
 
       const width = 1280;
       const height = 720;
+
+      // Auto-recover video if paused
+      if (video.paused && video.srcObject) {
+        video.play().catch(() => {});
+      }
 
       // 1. Clear background
       ctx.fillStyle = '#0f172a';
@@ -498,9 +524,15 @@ export default function CanvasOverlayRenderer({
           </div>
         )}
 
-        {/* Camera Control Action Bar */}
+        {/* Camera Control Action Bar (Safe Area Aware) */}
         {cameraPermission === 'granted' && (
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <div 
+            className="absolute z-10 flex items-center gap-1.5 pointer-events-auto"
+            style={{
+              top: 'calc(max(0.5rem, env(safe-area-inset-top, 0.5rem)) + 2.5rem)',
+              right: 'max(0.75rem, env(safe-area-inset-right, 0.75rem))',
+            }}
+          >
             {/* Mute / Unmute Toggle Button */}
             <Button
               onClick={toggleMute}

@@ -31,7 +31,7 @@ async function getYouTubeOAuthCredentials() {
  * Server Action to initialize a live stream for a match.
  * Performs strict authentication and authorization checks.
  */
-export async function createLiveStreamAction(matchId: string, replayComment?: string) {
+export async function createLiveStreamAction(matchId: string, replayComment?: string, deviceSessionId?: string) {
   noStore();
   try {
     const session = await getServerSession(authOptions);
@@ -173,10 +173,10 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
     }
 
     if (!match) {
-      return { success: false, error: 'Unable to initialize match stream session.' };
+      return { success: false, error: 'Match not found.' };
     }
 
-    // 2. Verify authorization: player must belong to team1, team2, or be captain/organizer
+    // 2. Authorization check: User must be in team1, team2, or be organizer/admin
     const isTeam1Member = match.team1?.members?.some((m) => m.userId === userId) || match.team1?.captainId === userId;
     const isTeam2Member = match.team2?.members?.some((m) => m.userId === userId) || match.team2?.captainId === userId;
     const isOrganizer = (session.user as any).role === 'ORGANIZER' || (session.user as any).role === 'SUPER_ADMIN';
@@ -222,6 +222,18 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
         status: { in: ['CREATED', 'READY', 'LIVE'] }
       }
     });
+
+    // 5. Block simultaneous live stream on another device for the same match
+    if (existingActiveStream && existingActiveStream.status === 'LIVE' && deviceSessionId && existingActiveStream.streamKey) {
+      const isDifferentDevice = existingActiveStream.streamKey !== deviceSessionId;
+      const isRecentlyStarted = existingActiveStream.streamStartedAt && (Date.now() - new Date(existingActiveStream.streamStartedAt).getTime() < 45 * 60 * 1000);
+      if (isDifferentDevice && isRecentlyStarted) {
+        return {
+          success: false,
+          error: '🔒 Active on Another Device: This match is currently being streamed from another phone/device. Simultaneous streaming from two devices is not permitted.'
+        };
+      }
+    }
 
     if (!existingActiveStream && previousAttemptsCount >= 3) {
       return {
@@ -418,7 +430,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
 /**
  * Server Action to start streaming (transitions status from READY -> LIVE)
  */
-export async function startLiveStreamAction(streamId: string) {
+export async function startLiveStreamAction(streamId: string, deviceSessionId?: string) {
   noStore();
   try {
     const session = await getServerSession(authOptions);
@@ -434,11 +446,23 @@ export async function startLiveStreamAction(streamId: string) {
       return { success: false, error: 'Live stream not found.' };
     }
 
+    // Check if another device is already live
+    if (stream.status === 'LIVE' && stream.streamKey && deviceSessionId && stream.streamKey !== deviceSessionId) {
+      const isRecentlyStarted = stream.streamStartedAt && (Date.now() - new Date(stream.streamStartedAt).getTime() < 45 * 60 * 1000);
+      if (isRecentlyStarted) {
+        return {
+          success: false,
+          error: '🔒 Active on Another Device: This match is already live on your other device.'
+        };
+      }
+    }
+
     const updatedStream = await prisma.liveStream.update({
       where: { id: streamId },
       data: {
         status: 'LIVE',
-        streamStartedAt: new Date(),
+        streamStartedAt: stream.streamStartedAt || new Date(),
+        ...(deviceSessionId ? { streamKey: deviceSessionId } : {}),
       }
     });
 
