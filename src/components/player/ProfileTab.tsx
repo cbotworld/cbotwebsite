@@ -205,20 +205,7 @@ export function ProfileTab({ currentPlayer: p, currentTeam: team }: ProfileTabPr
             </div>
           )}
 
-          {/* ── Stats Row (read-only) ────────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Wins', value: p.wins || 0, color: 'text-emerald-400' },
-              { label: 'Losses', value: p.losses || 0, color: 'text-rose-400' },
-              { label: 'Boards Won', value: p.boardsWon || 0, color: 'text-amber-400' },
-              { label: 'Average', value: avg, color: 'text-violet-400' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="p-3 rounded-xl border border-border bg-muted/10 text-center">
-                <div className={`text-2xl font-black ${color}`}>{value}</div>
-                <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide mt-0.5">{label}</div>
-              </div>
-            ))}
-          </div>
+
 
           {/* ── EDIT FORM (inline) ──────────────────────────────── */}
           {editing ? (
