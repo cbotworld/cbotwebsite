@@ -209,16 +209,30 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                 </div>
               </div>
             ) : (
-              /* Match Completed / Saved Notice */
+              /* Match Completed / Saved Notice with Video Refresh */
               <div className="rounded-3xl border-2 border-emerald-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
                 <div className="h-16 w-16 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🎉 MATCH COMPLETED &amp; SAVED</h4>
+                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🎉 MATCH COMPLETED &amp; SCORES SAVED</h4>
                   <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                    This match has concluded. Live scoring data and recorded match overlays are saved to CBOT Arena.
+                    This match broadcast has concluded and official scores are locked in CBOT Arena.
                   </p>
+                </div>
+                <div className="pt-2 flex items-center gap-3">
+                  <a
+                    href={`/matches/${matchId}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-all shadow-md"
+                  >
+                    <span>🔄 Refresh Video Player</span>
+                  </a>
+                  <Link
+                    href="/edition-200-videos"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-white/10"
+                  >
+                    <span>🎬 All Match Videos</span>
+                  </Link>
                 </div>
               </div>
             )

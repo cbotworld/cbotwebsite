@@ -172,11 +172,20 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     init();
   }, [matchDetails.matchId, matchDetails.initialReplayComment, deviceSessionId]);
 
+  const handleStreamReady = React.useCallback((stream: MediaStream) => {
+    canvasStreamRef.current = stream;
+  }, []);
+
+  const handleCanvasError = React.useCallback((err: string) => {
+    console.warn('Canvas Error:', err);
+  }, []);
+
   const startRecorder = React.useCallback((stream: MediaStream) => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       return;
     }
     try {
+      recordedChunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9'
         : 'video/webm';
@@ -205,7 +214,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         // Start in-browser recorder
         if (canvasStreamRef.current) {
-          recordedChunksRef.current = [];
           startRecorder(canvasStreamRef.current);
         }
       } else {
@@ -233,18 +241,19 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         await new Promise<void>((resolve) => {
           if (!mediaRecorderRef.current) return resolve();
-          mediaRecorderRef.current.onstop = () => resolve();
+          mediaRecorderRef.current.addEventListener('stop', () => resolve(), { once: true });
           mediaRecorderRef.current.stop();
         });
-        if (recordedChunksRef.current.length > 0) {
-          videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-          const localUrl = URL.createObjectURL(videoBlob);
-          setDownloadUrl(localUrl);
-          setStreamStatus('ARCHIVED');
-        }
+      }
+      
+      if (recordedChunksRef.current.length > 0) {
+        videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const localUrl = URL.createObjectURL(videoBlob);
+        setDownloadUrl(localUrl);
+        setStreamStatus('ARCHIVED');
       }
 
-      // 2. Upload recording directly to CBOT Storage
+      // 2. Upload recording directly to CBOT Cloud Storage
       let uploadedUrl: string | undefined = undefined;
       if (videoBlob && videoBlob.size > 0) {
         try {
@@ -268,7 +277,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       }
 
       // 3. Stop stream, freeze match score permanently in DB
-      const res = await stopLiveStreamAction(streamId, uploadedUrl, { totalScore, totalSlams });
+      const stopRes = await stopLiveStreamAction(streamId, uploadedUrl, { totalScore, totalSlams });
       const finalUrl = uploadedUrl || (videoBlob ? URL.createObjectURL(videoBlob) : null);
       if (finalUrl) {
         setDownloadUrl(finalUrl);
@@ -290,10 +299,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         console.warn('Failed to broadcast match-ended event:', e);
       }
 
-      if (res.success || res.error?.includes('not found') || uploadedUrl) {
+      if (stopRes.success || stopRes.error?.includes('not found') || uploadedUrl) {
         setStreamStatus('ARCHIVED');
       } else {
-        setErrorMsg(res.error || 'Failed to stop stream.');
+        setErrorMsg(stopRes.error || 'Failed to stop stream.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to stop stream.');
@@ -303,7 +312,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   };
 
-  // Elapsed Timer with 45-Minute Maximum Cutoff
+  // Elapsed Timer with 1.5-Hour (90-Minute) Maximum Cutoff
   const [elapsed, setElapsed] = React.useState('00:00:00');
   React.useEffect(() => {
     if (streamStatus !== 'LIVE' || !streamStartedAt) {
@@ -318,7 +327,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       const s = (diff % 60).toString().padStart(2, '0');
       setElapsed(`${h}:${m}:${s}`);
 
-      // 45-Minute Hard Cutoff Auto-Stop
+      // 1.5-Hour Hard Cutoff Auto-Stop
       if (diff >= MAX_STREAM_SECONDS) {
         clearInterval(interval);
         handleStopLive();
@@ -326,17 +335,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }, 1000);
     return () => clearInterval(interval);
   }, [streamStatus, streamStartedAt]);
-
-  const handleStreamReady = React.useCallback((stream: MediaStream) => {
-    canvasStreamRef.current = stream;
-    if (streamStatus === 'LIVE') {
-      startRecorder(stream);
-    }
-  }, [streamStatus, startRecorder]);
-
-  const handleCanvasError = React.useCallback((err: string) => {
-    setErrorMsg(err);
-  }, []);
 
   // Auto-resume recorder if stream status is LIVE on tab reopen/mount
   React.useEffect(() => {
