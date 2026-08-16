@@ -206,7 +206,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       };
     }
 
-    // 4. Max 3 Stream Attempts Limit per player for this match
+    // 4. Max 8 Stream Attempts Limit per player for this match
     const previousAttemptsCount = await prisma.liveStream.count({
       where: {
         matchId,
@@ -226,7 +226,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
     // 5. Block simultaneous live stream on another device for the same match
     if (existingActiveStream && existingActiveStream.status === 'LIVE' && deviceSessionId && existingActiveStream.streamKey) {
       const isDifferentDevice = existingActiveStream.streamKey !== deviceSessionId;
-      const isRecentlyStarted = existingActiveStream.streamStartedAt && (Date.now() - new Date(existingActiveStream.streamStartedAt).getTime() < 45 * 60 * 1000);
+      const isRecentlyStarted = existingActiveStream.streamStartedAt && (Date.now() - new Date(existingActiveStream.streamStartedAt).getTime() < 90 * 60 * 1000);
       if (isDifferentDevice && isRecentlyStarted) {
         return {
           success: false,
@@ -235,10 +235,10 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       }
     }
 
-    if (!existingActiveStream && previousAttemptsCount >= 3) {
+    if (!existingActiveStream && previousAttemptsCount >= 8) {
       return {
         success: false,
-        error: 'Maximum stream attempts reached (3/3). Each player is permitted a maximum of 3 live stream attempts per match.'
+        error: 'Maximum stream attempts reached (8/8). Each player is permitted a maximum of 8 live stream attempts per match.'
       };
     }
 
@@ -253,7 +253,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       return {
         success: true,
         stream: existingActiveStream,
-        attemptsCount: Math.min(3, previousAttemptsCount + 1),
+        attemptsCount: Math.min(8, previousAttemptsCount + 1),
         matchDetails: {
           editionTitle: match.edition?.title || 'Edition #200',
           editionNumber: match.edition?.number || 200,
@@ -448,7 +448,7 @@ export async function startLiveStreamAction(streamId: string, deviceSessionId?: 
 
     // Check if another device is already live
     if (stream.status === 'LIVE' && stream.streamKey && deviceSessionId && stream.streamKey !== deviceSessionId) {
-      const isRecentlyStarted = stream.streamStartedAt && (Date.now() - new Date(stream.streamStartedAt).getTime() < 45 * 60 * 1000);
+      const isRecentlyStarted = stream.streamStartedAt && (Date.now() - new Date(stream.streamStartedAt).getTime() < 90 * 60 * 1000);
       if (isRecentlyStarted) {
         return {
           success: false,

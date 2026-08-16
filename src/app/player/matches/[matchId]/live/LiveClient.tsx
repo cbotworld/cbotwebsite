@@ -114,7 +114,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const [attemptsCount, setAttemptsCount] = React.useState<number>(1);
   const [elapsedSeconds, setElapsedSeconds] = React.useState<number>(0);
   const [deviceSessionId, setDeviceSessionId] = React.useState<string>('');
-  const MAX_STREAM_SECONDS = 45 * 60; // 45 Minutes Cutoff (2700s)
+  const MAX_STREAM_SECONDS = 90 * 60; // 1.5 Hours (90 Minutes Cutoff: 5400s)
 
   // Initialize persistent device session
   React.useEffect(() => {
@@ -562,10 +562,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             {streamStatus === 'LIVE' ? (
               <>
                 <Badge className="bg-rose-600 text-white font-black text-[11px] px-2.5 py-1 gap-1 animate-pulse shadow-lg shadow-rose-600/30">
-                  <Radio className="h-3 w-3" /> 🔴 LIVE {elapsed} <span className="opacity-80 text-[9px]">/ 45:00 max</span>
+                  <Radio className="h-3 w-3" /> 🔴 LIVE {elapsed} <span className="opacity-80 text-[9px]">/ 1:30:00 max</span>
                 </Badge>
                 <Badge variant="outline" className="bg-black/70 backdrop-blur-md text-amber-400 border-amber-500/40 text-[10px] font-mono font-bold py-0.5 px-2">
-                  Attempt {attemptsCount}/3
+                  Attempt {attemptsCount}/8
                 </Badge>
               </>
             ) : streamStatus === 'ARCHIVED' ? (
@@ -578,7 +578,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   {loading && !initialized ? 'INITIALIZING…' : 'READY TO GO LIVE'}
                 </Badge>
                 <Badge variant="outline" className="bg-black/70 backdrop-blur-md text-slate-300 border-white/10 text-[10px] font-mono font-bold py-0.5 px-2">
-                  Attempt {attemptsCount}/3
+                  Attempt {attemptsCount}/8
                 </Badge>
               </div>
             )}
@@ -619,8 +619,8 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           </div>
         )}
 
-        {/* 2.6 40-Minute Warning Banner (5 mins before 45-min hard cutoff) */}
-        {streamStatus === 'LIVE' && elapsedSeconds >= 2400 && (
+        {/* 2.6 1.5-Hour Warning Banner (5 mins before 1.5-hr hard cutoff) */}
+        {streamStatus === 'LIVE' && elapsedSeconds >= 5100 && (
           <div 
             className="absolute inset-x-4 max-w-md mx-auto bg-amber-500 text-slate-950 px-4 py-1.5 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-2xl z-30 animate-bounce"
             style={{
@@ -628,11 +628,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             }}
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>45-Min Match Limit: Stream will auto-end in {Math.max(1, Math.ceil((MAX_STREAM_SECONDS - elapsedSeconds) / 60))} min</span>
+            <span>1.5-Hour Match Limit: Stream will auto-end in {Math.max(1, Math.ceil((MAX_STREAM_SECONDS - elapsedSeconds) / 60))} min</span>
           </div>
         )}
 
-        {/* 2.6 Error Modal (e.g. 3 attempts exceeded or active stream elsewhere) */}
+        {/* 2.6 Error Modal (e.g. 8 attempts exceeded or active stream elsewhere) */}
         {errorMsg && streamStatus !== 'LIVE' && (
           <div className="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-40">
             <div className="max-w-md w-full bg-slate-900 border border-rose-500/50 rounded-3xl p-5 shadow-2xl text-center space-y-3 max-h-[90dvh] overflow-y-auto">
@@ -649,7 +649,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                     <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
                   </Button>
                 </Link>
-                {attemptsCount < 3 && !errorMsg.includes('already live') && (
+                {attemptsCount < 8 && !errorMsg.includes('already live') && (
                   <Button
                     onClick={() => { setErrorMsg(null); handleStartLive(); }}
                     className="rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-4 py-2"
