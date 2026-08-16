@@ -243,8 +243,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         setStreamStatus('LIVE');
         setStreamStartedAt(new Date());
 
-        // Start in-browser recorder from canvas stream or global active camera stream
-        const streamToRecord = canvasStreamRef.current || (typeof window !== 'undefined' ? (window as any).__cbotActiveStream : null);
+        // Start in-browser recorder from canvas stream, global camera stream, or DOM video element
+        let streamToRecord = canvasStreamRef.current || (typeof window !== 'undefined' ? (window as any).__cbotActiveStream : null);
+        if (!streamToRecord && typeof document !== 'undefined') {
+          const domVideo = document.querySelector('video') as HTMLVideoElement | null;
+          if (domVideo && domVideo.srcObject) {
+            streamToRecord = domVideo.srcObject as MediaStream;
+          }
+        }
+
         if (streamToRecord) {
           canvasStreamRef.current = streamToRecord;
           startRecorder(streamToRecord);
@@ -543,12 +550,12 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         }
       });
 
-    // Frame & score snapshot broadcast every 1.5 seconds as fallback
+    // Frame & score snapshot broadcast every 500ms as real-time stream backup
     const snapshotInterval = setInterval(() => {
       const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
-      if (canvas) {
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
         try {
-          const frame = canvas.toDataURL('image/jpeg', 0.6);
+          const frame = canvas.toDataURL('image/jpeg', 0.5);
           channel.send({
             type: 'broadcast',
             event: 'stream-frame',
@@ -559,7 +566,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           });
         } catch (e) {}
       }
-    }, 1500);
+    }, 500);
 
     return () => {
       clearInterval(heartbeatInterval);

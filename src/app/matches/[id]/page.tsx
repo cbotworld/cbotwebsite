@@ -171,10 +171,11 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                     />
                   ) : (
                     <video
+                      src={videoUrl || ''}
                       controls
                       autoPlay
                       playsInline
-                      preload="metadata"
+                      preload="auto"
                       className="h-full w-full object-contain bg-black"
                     >
                       {videoUrl && <source src={videoUrl} type="video/webm" />}

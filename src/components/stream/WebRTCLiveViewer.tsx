@@ -261,41 +261,46 @@ export default function WebRTCLiveViewer({
         </div>
       )}
 
-      {/* 1. Live WebRTC Video Element */}
+      {/* 1. Real-Time Live Camera Feed (Instant Snapshot & Seamless Video) */}
       {!finishedVideoUrl && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isMuted}
-          className={`h-full w-full object-contain bg-black ${hasStream ? 'block' : 'hidden'}`}
-        />
-      )}
+        <div className="relative w-full h-full flex items-center justify-center bg-black">
+          {/* Live WebRTC video stream */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isMuted}
+            onLoadedData={() => setHasStream(true)}
+            onPlaying={() => setHasStream(true)}
+            className={`absolute inset-0 h-full w-full object-contain bg-black ${hasStream ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+          />
 
-      {/* 2. Real-Time Snapshot Stream Fallback */}
-      {!finishedVideoUrl && !hasStream && latestSnapshot && (
-        <img
-          src={latestSnapshot}
-          alt="Live Match Feed"
-          className="h-full w-full object-contain bg-black"
-        />
-      )}
+          {/* Real-Time Live Frame stream (Instant preview with zero lag) */}
+          {latestSnapshot && (
+            <img
+              src={latestSnapshot}
+              alt="Live Match Feed"
+              className="absolute inset-0 h-full w-full object-contain bg-black z-5"
+            />
+          )}
 
-      {/* 3. Connecting / Waiting State */}
-      {!finishedVideoUrl && !hasStream && !latestSnapshot && (
-        <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-          <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
-            <Radio className="h-8 w-8" />
-          </div>
-          <div className="space-y-1.5">
-            <h4 className="text-lg font-black text-white uppercase tracking-wider flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
-              Connecting to Live Match Stream…
-            </h4>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Connecting directly to the player's studio camera and real-time scoreboard.
-            </p>
-          </div>
+          {/* Connecting state spinner if neither snapshot nor video loaded yet */}
+          {!hasStream && !latestSnapshot && (
+            <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 z-20">
+              <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
+                <Radio className="h-8 w-8" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="text-lg font-black text-white uppercase tracking-wider flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                  Connecting to Live Match Stream…
+                </h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  Receiving live broadcast directly from player studio.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
