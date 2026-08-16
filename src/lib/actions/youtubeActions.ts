@@ -676,8 +676,9 @@ export async function uploadRecordedVideoToYouTube({
 export async function getMatchLiveStreamAction(matchId: string) {
   noStore();
   try {
-    const stream = await prisma.liveStream.findFirst({
-      where: { matchId },
+    // 1. Check if there is an active LIVE stream
+    let stream = await prisma.liveStream.findFirst({
+      where: { matchId, status: 'LIVE' },
       orderBy: { createdAt: 'desc' },
       include: {
         player: { select: { id: true, name: true, username: true, image: true } },
@@ -685,6 +686,36 @@ export async function getMatchLiveStreamAction(matchId: string) {
         edition: { select: { id: true, title: true, number: true } },
       }
     });
+
+    // 2. If not LIVE, find the most recent stream that has a saved video replay URL
+    if (!stream) {
+      stream = await prisma.liveStream.findFirst({
+        where: {
+          matchId,
+          status: 'ARCHIVED',
+          youtubeUrl: { not: null },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          player: { select: { id: true, name: true, username: true, image: true } },
+          team: { select: { id: true, name: true, tag: true, logo: true } },
+          edition: { select: { id: true, title: true, number: true } },
+        }
+      });
+    }
+
+    // 3. Fallback to latest stream
+    if (!stream) {
+      stream = await prisma.liveStream.findFirst({
+        where: { matchId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          player: { select: { id: true, name: true, username: true, image: true } },
+          team: { select: { id: true, name: true, tag: true, logo: true } },
+          edition: { select: { id: true, title: true, number: true } },
+        }
+      });
+    }
 
     if (!stream) {
       return { success: true, stream: null };
