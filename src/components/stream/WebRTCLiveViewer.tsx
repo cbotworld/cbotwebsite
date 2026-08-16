@@ -134,8 +134,7 @@ export default function WebRTCLiveViewer({
         }
       })
       .on('broadcast', { event: 'stream-frame' }, ({ payload }) => {
-        // High-speed fallback live frame only if WebRTC not connected
-        if (payload.frame && !hasStream) {
+        if (payload.frame) {
           setLatestSnapshot(payload.frame);
           setConnectionStatus('connected');
         }
@@ -272,7 +271,7 @@ export default function WebRTCLiveViewer({
             muted={isMuted}
             onLoadedData={() => setHasStream(true)}
             onPlaying={() => setHasStream(true)}
-            className={`absolute inset-0 h-full w-full object-contain bg-black ${hasStream ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            className={`absolute inset-0 h-full w-full object-contain bg-black ${hasStream ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'}`}
           />
 
           {/* Real-Time Live Frame stream (Instant preview with zero lag) */}
@@ -280,7 +279,7 @@ export default function WebRTCLiveViewer({
             <img
               src={latestSnapshot}
               alt="Live Match Feed"
-              className="absolute inset-0 h-full w-full object-contain bg-black z-5"
+              className="absolute inset-0 h-full w-full object-contain bg-black z-[5]"
             />
           )}
 

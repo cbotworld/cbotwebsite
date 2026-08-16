@@ -550,12 +550,23 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         }
       });
 
-    // Frame & score snapshot broadcast every 500ms as real-time stream backup
+    // Lightweight offscreen canvas to downscale live broadcast frames under Supabase websocket payload limits
+    let offscreenCanvas: HTMLCanvasElement | null = null;
+    let offscreenCtx: CanvasRenderingContext2D | null = null;
+    if (typeof document !== 'undefined') {
+      offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = 640;
+      offscreenCanvas.height = 360;
+      offscreenCtx = offscreenCanvas.getContext('2d');
+    }
+
+    // Frame & score snapshot broadcast every 400ms as real-time stream backup
     const snapshotInterval = setInterval(() => {
-      const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
-      if (canvas && canvas.width > 0 && canvas.height > 0) {
+      const sourceCanvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      if (sourceCanvas && sourceCanvas.width > 0 && sourceCanvas.height > 0 && offscreenCanvas && offscreenCtx) {
         try {
-          const frame = canvas.toDataURL('image/jpeg', 0.5);
+          offscreenCtx.drawImage(sourceCanvas, 0, 0, 640, 360);
+          const frame = offscreenCanvas.toDataURL('image/jpeg', 0.45); // Lightweight ~25KB payload
           channel.send({
             type: 'broadcast',
             event: 'stream-frame',
@@ -564,9 +575,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               scores: scoreBroadcastRef.current,
             },
           });
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Frame broadcast error:', e);
+        }
       }
-    }, 500);
+    }, 400);
 
     return () => {
       clearInterval(heartbeatInterval);
