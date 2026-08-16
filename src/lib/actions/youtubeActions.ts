@@ -525,8 +525,22 @@ export async function stopLiveStreamAction(
     }
 
     const endedAt = new Date();
-    // Expiry = EndedAt + 72 hours
-    const expiresAt = new Date(endedAt.getTime() + RETENTION_HOURS * 60 * 60 * 1000);
+    
+    // Calculate Day End Time (8:00 PM IST of the tournament day)
+    // For 200th Edition: Day 1 ends Aug 10 8PM. Day X ends at (Aug 9 + X) at 20:00:00 IST (14:30:00 UTC).
+    let dayEndTime = new Date(endedAt);
+    const monMatch = stream.matchId ? stream.matchId.match(/monument_(\d+)/i) : null;
+    if (monMatch) {
+      const dayNum = parseInt(monMatch[1], 10);
+      // Aug 9 + dayNum at 20:00:00 IST (14:30:00 UTC)
+      dayEndTime = new Date(Date.UTC(2026, 7, 9 + dayNum, 14, 30, 0));
+    } else {
+      // General match: 8:00 PM IST (20:00 IST)
+      dayEndTime.setHours(20, 0, 0, 0);
+    }
+
+    // 72-hour retention strictly begins from 8:00 PM of the tournament day
+    const expiresAt = new Date(dayEndTime.getTime() + RETENTION_HOURS * 60 * 60 * 1000);
 
     const updatedStream = await prisma.liveStream.update({
       where: { id: stream.id },

@@ -369,25 +369,6 @@ export default function VideosClient({
             </div>
           </div>
         </div>
-
-        {/* Live Ticker Alert */}
-        {liveCount > 0 && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/80 to-amber-950/80 border border-rose-500/50 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
-            <div className="flex items-center gap-3">
-              <span className="h-3 w-3 rounded-full bg-rose-500 animate-ping shrink-0" />
-              <p className="text-xs sm:text-sm font-black text-white">
-                🔴 Active broadcasts currently streaming live! Tap any live player card to enter the match arena.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setStatusFilter('LIVE')}
-              className="h-8 px-4 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shrink-0"
-            >
-              Filter Live Only
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Filter & Search Bar */}

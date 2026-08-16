@@ -53,9 +53,9 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
-          <Link href="/dashboard/player">
-            <Button variant="outline" size="sm" className="gap-2 text-xs font-bold rounded-xl border-white/15 hover:bg-white/5">
-              <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          <Link href="/edition-200-videos">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs font-bold rounded-xl border-white/15 hover:bg-white/5">
+              <ArrowLeft className="h-4 w-4" /> Back
             </Button>
           </Link>
           <div className="flex items-center gap-2">
@@ -177,12 +177,16 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                     />
                   ) : (
                     <video
-                      src={videoUrl || ''}
                       controls
                       autoPlay
                       playsInline
+                      preload="metadata"
                       className="h-full w-full object-contain bg-black"
-                    />
+                    >
+                      {videoUrl && <source src={videoUrl} type="video/webm" />}
+                      {videoUrl && <source src={videoUrl} type="video/mp4" />}
+                      Your browser does not support native video playback. Please use the download button below to watch this match recording.
+                    </video>
                   )}
                 </div>
                 {/* Audience Local Save / Download Box */}
@@ -253,6 +257,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           matchId={matchId}
           title={matchTitle}
           isLive={stream?.status === 'LIVE'}
+          showWatchButton={false}
         />
 
         {/* Security & Authenticity Notice */}
@@ -261,7 +266,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           <div>
             <div className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">Official CBOT Match Verification</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">
-              Match recorded with official CBOT overlay certification. Stored on high-performance cloud storage with 15-day retention.
+              Match recorded with official CBOT overlay certification. Stored on high-performance cloud storage with 72-hour retention starting from 8:00 PM of tournament day.
             </div>
           </div>
         </div>

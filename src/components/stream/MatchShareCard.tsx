@@ -10,6 +10,7 @@ interface MatchShareCardProps {
   youtubeVideoId?: string | null;
   title?: string;
   isLive?: boolean;
+  showWatchButton?: boolean;
 }
 
 export default function MatchShareCard({
@@ -18,6 +19,7 @@ export default function MatchShareCard({
   youtubeVideoId,
   title = 'CBOT Match Stream',
   isLive = false,
+  showWatchButton = true,
 }: MatchShareCardProps) {
   const [copiedArena, setCopiedArena] = React.useState(false);
 
@@ -55,23 +57,25 @@ export default function MatchShareCard({
               Shareable Match Link &amp; Recording
             </h4>
             <p className="text-[11px] text-muted-foreground">
-              Share this official link or download the recorded video for future reference
+              Share this official link with spectators or download the recording locally
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <a
-            href={arenaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-colors shadow-lg shadow-amber-500/20"
-          >
-            {isLive ? <Radio className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-            <span>{isLive ? 'Watch Live on Arena' : 'Watch Match Video'}</span>
-            <ExternalLink className="h-3 w-3 opacity-75" />
-          </a>
+          {showWatchButton && (
+            <a
+              href={arenaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-colors shadow-lg shadow-amber-500/20"
+            >
+              {isLive ? <Radio className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+              <span>{isLive ? 'Watch Live on Arena' : 'Watch Match Video'}</span>
+              <ExternalLink className="h-3 w-3 opacity-75" />
+            </a>
+          )}
 
           {isDirectVideo && (
             <a

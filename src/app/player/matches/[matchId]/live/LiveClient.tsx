@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { 
   Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, 
   Share2, ExternalLink, Download, Loader2, Plus, Minus, Trash2, Video, 
-  ChevronUp, ChevronDown, MessageCircle, Copy, Check, Sparkles, X, Trophy
+  ChevronUp, ChevronDown, MessageCircle, Copy, Check, Sparkles, X, Trophy, Zap
 } from 'lucide-react';
 import { uploadMatchVideoToSupabase, supabase } from '@/lib/supabase';
 
@@ -178,10 +178,23 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
     try {
       recordedChunksRef.current = [];
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
+      let options: MediaRecorderOptions = {};
+      if (typeof MediaRecorder !== 'undefined') {
+        const types = [
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=vp9,opus',
+          'video/webm',
+          'video/mp4;codecs=avc1',
+          'video/mp4',
+        ];
+        for (const t of types) {
+          if (MediaRecorder.isTypeSupported(t)) {
+            options = { mimeType: t };
+            break;
+          }
+        }
+      }
+      const recorder = new MediaRecorder(stream, options);
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
           recordedChunksRef.current.push(e.data);
@@ -190,7 +203,19 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
     } catch (e) {
-      console.warn('Failed to start MediaRecorder:', e);
+      console.warn('Primary MediaRecorder failed, attempting fallback:', e);
+      try {
+        const fallback = new MediaRecorder(stream);
+        fallback.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            recordedChunksRef.current.push(e.data);
+          }
+        };
+        fallback.start(1000);
+        mediaRecorderRef.current = fallback;
+      } catch (err) {
+        console.error('Fatal MediaRecorder error:', err);
+      }
     }
   }, []);
 
@@ -248,12 +273,18 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         await new Promise<void>((resolve) => {
           if (!mediaRecorderRef.current) return resolve();
           mediaRecorderRef.current.addEventListener('stop', () => resolve(), { once: true });
+          try {
+            if (mediaRecorderRef.current.state === 'recording') {
+              mediaRecorderRef.current.requestData();
+            }
+          } catch {}
           mediaRecorderRef.current.stop();
         });
       }
       
       if (recordedChunksRef.current.length > 0) {
-        videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const chunkType = recordedChunksRef.current[0]?.type || 'video/webm';
+        videoBlob = new Blob(recordedChunksRef.current, { type: chunkType });
         const localUrl = URL.createObjectURL(videoBlob);
         setDownloadUrl(localUrl);
         setStreamStatus('ARCHIVED');
@@ -262,28 +293,44 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       // 2. Upload recording directly to CBOT Cloud Storage
       let uploadedUrl: string | undefined = undefined;
       if (videoBlob && videoBlob.size > 0) {
+        // Direct upload to Supabase
         try {
-          const fd = new FormData();
-          fd.append('video', videoBlob, `match_${matchDetails.matchId}.webm`);
-          fd.append('matchId', matchDetails.matchId);
-          if (streamId) fd.append('streamId', streamId);
-
-          const upRes = await fetch('/api/stream/upload-recording', {
-            method: 'POST',
-            body: fd,
-          });
-          const upData = await upRes.json();
-          if (upData.success && upData.url) {
-            uploadedUrl = upData.url;
-            setDownloadUrl(uploadedUrl || null);
+          const directUrl = await uploadMatchVideoToSupabase(videoBlob, matchDetails.matchId);
+          if (directUrl && directUrl.startsWith('http')) {
+            uploadedUrl = directUrl;
           }
-        } catch (uploadErr) {
-          console.warn('Server recording upload error:', uploadErr);
+        } catch (directErr) {
+          console.warn('Direct Supabase upload error:', directErr);
+        }
+
+        // Fallback to server route handler
+        if (!uploadedUrl) {
+          try {
+            const fd = new FormData();
+            fd.append('video', videoBlob, `match_${matchDetails.matchId}.webm`);
+            fd.append('matchId', matchDetails.matchId);
+            if (streamId) fd.append('streamId', streamId);
+
+            const upRes = await fetch('/api/stream/upload-recording', {
+              method: 'POST',
+              body: fd,
+            });
+            const upData = await upRes.json();
+            if (upData.success && upData.url) {
+              uploadedUrl = upData.url;
+            }
+          } catch (uploadErr) {
+            console.warn('Server recording upload error:', uploadErr);
+          }
+        }
+
+        if (uploadedUrl) {
+          setDownloadUrl(uploadedUrl);
         }
       }
 
       // 3. Stop stream, freeze match score permanently in DB
-      const stopRes = await stopLiveStreamAction(streamId, uploadedUrl, { totalScore, totalSlams });
+      await stopLiveStreamAction(streamId, uploadedUrl, { totalScore, totalSlams });
       const finalUrl = uploadedUrl || (videoBlob ? URL.createObjectURL(videoBlob) : null);
       if (finalUrl) {
         setDownloadUrl(finalUrl);
@@ -305,13 +352,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         console.warn('Failed to broadcast match-ended event:', e);
       }
 
-      if (stopRes.success || stopRes.error?.includes('not found') || uploadedUrl) {
-        setStreamStatus('ARCHIVED');
-      } else {
-        setErrorMsg(stopRes.error || 'Failed to stop stream.');
-      }
+      setStreamStatus('ARCHIVED');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to stop stream.');
+      console.error('Failed to end match stream:', err);
+      setStreamStatus('ARCHIVED');
     } finally {
       setLoading(false);
       setIsSavingRecording(false);
@@ -589,7 +633,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
             <Link href="/dashboard/player">
               <Button size="sm" variant="ghost" className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1 border border-white/15">
-                <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Dashboard</span>
+                <ArrowLeft className="h-3.5 w-3.5" /> <span>Back</span>
               </Button>
             </Link>
             {streamStatus === 'LIVE' ? (
@@ -679,7 +723,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               <div className="flex gap-2 justify-center pt-1">
                 <Link href="/dashboard/player">
                   <Button variant="outline" className="rounded-xl border-white/20 text-xs font-bold px-4 py-2">
-                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
+                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
                   </Button>
                 </Link>
                 {attemptsCount < 8 && !errorMsg.includes('already live') && (
@@ -718,12 +762,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             {downloadUrl ? (
               <div className="relative w-full h-full flex items-center justify-center bg-black group">
                 <video
-                  src={downloadUrl}
                   controls
                   autoPlay
                   playsInline
+                  preload="metadata"
                   className="w-full h-full object-contain bg-black"
-                />
+                >
+                  <source src={downloadUrl} type="video/webm" />
+                  <source src={downloadUrl} type="video/mp4" />
+                </video>
 
                 {/* Floating Top Info Pill */}
                 <div 
@@ -735,9 +782,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   }}
                 >
                   <div className="flex items-center gap-2 pointer-events-auto">
-                    <Link href="/dashboard/player">
+                    <Link href="/edition-200-videos">
                       <Button size="sm" variant="ghost" className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1 border border-white/15">
-                        <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+                        <ArrowLeft className="h-3.5 w-3.5" /> Back
                       </Button>
                     </Link>
                     <Badge className="bg-emerald-600 text-white font-black text-xs px-2.5 py-1 gap-1 shadow-lg shadow-emerald-600/30">
@@ -876,51 +923,54 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
                   {/* Scoring Steppers */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    {/* Points (+1 / -1) */}
-                    <div className="flex items-center gap-2 bg-black/60 p-1.5 rounded-2xl border border-white/10">
-                      <span className="text-[11px] font-black text-slate-300 px-1">Pts:</span>
+                    {/* Points Stepper (+1 / -1) */}
+                    <div className="flex items-center gap-1.5 bg-black/80 p-1 rounded-2xl border border-amber-500/30 shadow-md">
+                      <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider px-1.5">PTS</span>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => handleModifyBoardScore(b.boardNumber, -1)}
                         disabled={b.score <= 0}
-                        className="h-8 w-8 p-0 rounded-xl text-white border-white/10 hover:bg-white/20 text-sm font-black"
+                        className="h-9 w-9 p-0 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all text-sm font-black disabled:opacity-30"
                       >
-                        -1
+                        <Minus className="h-4 w-4" />
                       </Button>
-                      <span className="w-8 text-center font-mono font-black text-amber-400 text-base">
+                      <span className="w-8 text-center font-mono font-black text-amber-400 text-lg">
                         {b.score}
                       </span>
                       <Button
                         size="sm"
                         onClick={() => handleModifyBoardScore(b.boardNumber, 1)}
-                        className="h-8 w-8 p-0 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm"
+                        className="h-9 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all gap-1"
                       >
-                        +1
+                        <Plus className="h-3.5 w-3.5" /> 1
                       </Button>
                     </div>
 
-                    {/* Slams (+1 / -1) */}
-                    <div className="flex items-center gap-2 bg-black/60 p-1.5 rounded-2xl border border-white/10">
-                      <span className="text-[11px] font-black text-sky-400 px-1">Slam:</span>
+                    {/* Enhanced Slam Button (+1 / -1) */}
+                    <div className="flex items-center gap-1.5 bg-black/80 p-1 rounded-2xl border border-cyan-500/40 shadow-md shadow-cyan-500/10">
+                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-wider px-1.5 flex items-center gap-0.5">
+                        <Zap className="h-3 w-3 fill-cyan-400" /> SLAM
+                      </span>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => handleModifyBoardSlam(b.boardNumber, -1)}
                         disabled={b.slams <= 0}
-                        className="h-8 w-8 p-0 rounded-xl text-white border-white/10 hover:bg-white/20 text-sm font-black"
+                        className="h-9 w-9 p-0 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all text-sm font-black disabled:opacity-30"
                       >
-                        -1
+                        <Minus className="h-4 w-4" />
                       </Button>
-                      <span className="w-8 text-center font-mono font-black text-sky-400 text-base">
+                      <span className="w-7 text-center font-mono font-black text-cyan-300 text-lg">
                         {b.slams}
                       </span>
                       <Button
                         size="sm"
                         onClick={() => handleModifyBoardSlam(b.boardNumber, 1)}
-                        className="h-8 w-8 p-0 rounded-xl bg-sky-500 hover:bg-sky-600 text-slate-950 font-black text-sm"
+                        className="h-9 px-3.5 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-400 to-cyan-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/40 active:scale-95 transition-all flex items-center gap-1 border border-white/20"
                       >
-                        ⚡+1
+                        <Zap className="h-3.5 w-3.5 fill-slate-950" />
+                        <span>+1 SLAM</span>
                       </Button>
                     </div>
                   </div>
