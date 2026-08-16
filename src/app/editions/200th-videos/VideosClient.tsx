@@ -615,16 +615,11 @@ export default function VideosClient({
                             </span>
                           </div>
 
-                          {/* Center Score / VS */}
-                          <div className="space-y-1">
-                            <div className="text-xs font-black uppercase text-slate-500">VS</div>
-                            {m.status === 'COMPLETED' || isMatchLive ? (
-                              <div className="text-2xl font-black text-amber-400 font-mono">
-                                {m.score1} : {m.score2}
-                              </div>
-                            ) : (
-                              <span className="text-[11px] font-mono text-slate-500">Upcoming</span>
-                            )}
+                          {/* Center VS Badge */}
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="px-3 py-1 rounded-full bg-slate-950 border border-white/15 text-xs font-black uppercase tracking-wider text-amber-400 shadow-md">
+                              VS
+                            </span>
                           </div>
 
                           {/* Team 2 */}
