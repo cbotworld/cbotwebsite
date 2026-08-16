@@ -256,7 +256,31 @@ export default function CanvasOverlayRenderer({
     setFacingMode(newMode);
   };
 
-  // High-performance Canvas Rendering Loop
+  // Maintain uninterrupted render state ref to eliminate re-render tearing or blank screens
+  const renderStateRef = React.useRef({
+    playerName,
+    editionTitle,
+    matchId,
+    teamName,
+    opponentName,
+    isStreaming,
+    boards,
+    currentTimeStr,
+    elapsedTimerStr,
+  });
+  renderStateRef.current = {
+    playerName,
+    editionTitle,
+    matchId,
+    teamName,
+    opponentName,
+    isStreaming,
+    boards,
+    currentTimeStr,
+    elapsedTimerStr,
+  };
+
+  // High-performance Continuous Canvas Rendering Loop (Runs seamlessly without restarts)
   React.useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
@@ -269,6 +293,18 @@ export default function CanvasOverlayRenderer({
 
     const renderFrame = () => {
       if (!isMounted) return;
+
+      const {
+        playerName: curPlayerName,
+        editionTitle: curEditionTitle,
+        matchId: curMatchId,
+        teamName: curTeamName,
+        opponentName: curOpponentName,
+        isStreaming: curIsStreaming,
+        boards: currentBoardsList,
+        currentTimeStr: curTime,
+        elapsedTimerStr: curElapsed,
+      } = renderStateRef.current;
 
       const width = 1280;
       const height = 720;
@@ -307,7 +343,7 @@ export default function CanvasOverlayRenderer({
       }
 
       // 3. Draw Framing Guidance Guidelines (if not live yet)
-      if (!isStreaming) {
+      if (!curIsStreaming) {
         ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 8]);
@@ -338,15 +374,15 @@ export default function CanvasOverlayRenderer({
 
       ctx.font = '800 14px sans-serif';
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText(`OFFICIAL MATCH BROADCAST • ${editionTitle.toUpperCase()}`, 30, 68);
+      ctx.fillText(`OFFICIAL MATCH BROADCAST • ${curEditionTitle.toUpperCase()}`, 30, 68);
 
       // Top Right: Match / Day Label (shifted left to clear Rear Camera button)
       const matchLabel = (() => {
-        if (!matchId) return 'DAY 4';
-        const monMatch = matchId.match(/monument_(\d+)/i);
+        if (!curMatchId) return 'DAY 4';
+        const monMatch = curMatchId.match(/monument_(\d+)/i);
         if (monMatch) return `DAY ${monMatch[1]}`;
-        if (matchId.startsWith('match_')) return `MATCH ${matchId.replace('match_', '#')}`;
-        return matchId.toUpperCase();
+        if (curMatchId.startsWith('match_')) return `MATCH ${curMatchId.replace('match_', '#')}`;
+        return curMatchId.toUpperCase();
       })();
 
       ctx.textAlign = 'right';
@@ -355,7 +391,7 @@ export default function CanvasOverlayRenderer({
       ctx.fillText(matchLabel, width - 200, 45);
 
       // 4.5 Draw Real-Time Board-by-Board Scoreboard Bar (Top Center / Prominent)
-      const currentBoards = boardsRef.current || [];
+      const currentBoards = currentBoardsList || [];
       if (currentBoards.length > 0) {
         const totalScore = currentBoards.reduce((acc, b) => acc + (b.score || 0), 0);
         const totalSlams = currentBoards.reduce((acc, b) => acc + (b.slams || 0), 0);
@@ -436,21 +472,21 @@ export default function CanvasOverlayRenderer({
       ctx.textAlign = 'left';
       ctx.font = '900 26px sans-serif';
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(playerName.toUpperCase(), 30, height - 60);
+      ctx.fillText(curPlayerName.toUpperCase(), 30, height - 60);
 
       ctx.font = '800 17px sans-serif';
       ctx.fillStyle = '#34d399';
-      ctx.fillText(`${teamName.toUpperCase()}  VS  ${opponentName.toUpperCase()}`, 30, height - 30);
+      ctx.fillText(`${curTeamName.toUpperCase()}  VS  ${curOpponentName.toUpperCase()}`, 30, height - 30);
 
       // Bottom Right: Live Updating Timestamp & Timer
       ctx.textAlign = 'right';
       ctx.font = '900 19px monospace';
       ctx.fillStyle = '#f59e0b';
-      ctx.fillText(currentTimeStr || '12 AUG 2026 21:30:00', width - 30, height - 60);
+      ctx.fillText(curTime || '12 AUG 2026 21:30:00', width - 30, height - 60);
 
-      if (isStreaming) {
+      if (curIsStreaming) {
         ctx.font = '900 18px monospace';
-        const liveText = `LIVE  ${elapsedTimerStr}`;
+        const liveText = `LIVE  ${curElapsed}`;
         const textWidth = ctx.measureText(liveText).width;
         const textRight = width - 30;
         const textLeft = textRight - textWidth;
@@ -481,7 +517,7 @@ export default function CanvasOverlayRenderer({
         cancelAnimationFrame(animFrameIdRef.current);
       }
     };
-  }, [playerName, editionTitle, matchId, teamName, opponentName, isStreaming, currentTimeStr, elapsedTimerStr]);
+  }, []);
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-black">

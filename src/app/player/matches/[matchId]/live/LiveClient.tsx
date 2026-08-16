@@ -328,6 +328,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   }, [streamStatus, startRecorder]);
 
+  const handleCanvasError = React.useCallback((err: string) => {
+    setErrorMsg(err);
+  }, []);
+
   // Auto-resume recorder if stream status is LIVE on tab reopen/mount
   React.useEffect(() => {
     if (streamStatus === 'LIVE' && canvasStreamRef.current) {
@@ -540,7 +544,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             streamStartedAt={streamStartedAt}
             boards={boards}
             onStreamReady={handleStreamReady}
-            onError={(err) => setErrorMsg(err)}
+            onError={handleCanvasError}
           />
         </div>
 
@@ -785,34 +789,40 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           </div>
         )}
 
-        {/* 5. Slide-Up Interactive Score Drawer (DOM Overlay - Not recorded on video canvas) */}
+        {/* 5. Floating Compact Score HUD (Never blanks or covers video feed) */}
         {isScoreDrawerOpen && (
-          <div className="absolute inset-x-0 bottom-0 max-h-[85%] bg-slate-950/95 backdrop-blur-2xl border-t-2 border-amber-500/60 p-4 sm:p-6 rounded-t-3xl shadow-2xl z-30 overflow-y-auto space-y-4 animate-in slide-in-from-bottom duration-300">
+          <div 
+            className="absolute z-30 w-[min(95vw,480px)] max-h-[68dvh] bg-slate-950/90 backdrop-blur-xl border border-amber-500/60 p-3.5 sm:p-4 rounded-3xl shadow-2xl overflow-y-auto space-y-3 animate-in fade-in zoom-in-95 duration-200"
+            style={{
+              bottom: 'calc(max(0.5rem, env(safe-area-inset-bottom, 0.5rem)) + 3.2rem)',
+              right: 'max(0.75rem, env(safe-area-inset-right, 0.75rem))',
+            }}
+          >
             {/* Drawer Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-amber-400 animate-ping" />
-                <h3 className="text-sm sm:text-base font-black text-white uppercase tracking-wider">
-                  Update Board Scores & Slams
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400 animate-ping" />
+                <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                  Update Scores & Slams
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-amber-500/10 border-amber-500/40 text-amber-400 font-mono font-bold text-xs">
+                <Badge variant="outline" className="bg-amber-500/10 border-amber-500/40 text-amber-400 font-mono font-bold text-[11px] px-2 py-0.5">
                   Total: {totalScore} pts | ⚡ {totalSlams}
                 </Badge>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setIsScoreDrawerOpen(false)}
-                  className="h-8 px-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 text-xs font-bold gap-1"
+                  className="h-7 px-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 text-xs font-bold gap-1"
                 >
-                  <ChevronDown className="h-4 w-4" /> Collapse
+                  <ChevronDown className="h-3.5 w-3.5" /> Close
                 </Button>
               </div>
             </div>
 
             {/* Dynamic Boards List */}
-            <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
               {boards.map((b) => (
                 <div
                   key={b.boardNumber}
