@@ -121,52 +121,67 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
           {/* 1. Live Stream or Archived Video Embed */}
           {stream && (stream.status === 'LIVE' || stream.status === 'ARCHIVED') && !isExpired ? (
-            (stream.youtubeVideoId?.startsWith('cbot_yt_') || stream.youtubeEmbedUrl?.includes('cbot_yt_')) && !stream.youtubeUrl?.includes('supabase.co') && !stream.youtubeUrl?.endsWith('.webm') ? (
-              /* Active In-Match Live Broadcast Screen */
-              <div className="rounded-2xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
-                <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
-                  <Radio className="h-8 w-8" />
+            stream.status === 'ARCHIVED' ? (
+              /* ARCHIVED / COMPLETED MATCH */
+              (stream.youtubeUrl?.includes('supabase.co') || stream.youtubeUrl?.endsWith('.webm') || stream.youtubeUrl?.endsWith('.mp4') || stream.youtubeEmbedUrl?.endsWith('.webm') || stream.youtubeEmbedUrl?.endsWith('.mp4')) ? (
+                /* Native High-Performance HTML5 Video Player for Recorded CBOT Matches */
+                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
+                  <video
+                    src={stream.youtubeEmbedUrl || stream.youtubeUrl || ''}
+                    controls
+                    playsInline
+                    className="h-full w-full object-contain bg-black"
+                  />
                 </div>
-                <div className="space-y-2">
-                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🔴 LIVE MATCH BROADCAST ACTIVE</h4>
-                  <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                    This tournament match is broadcasting live. Match score updates and player feed are streaming in real-time.
-                  </p>
-                  {stream.youtubeUrl && !stream.youtubeUrl.includes('cbot_yt_') && (
-                    <a
-                      href={stream.youtubeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-lg shadow-red-600/25 mt-2"
-                    >
-                      <Youtube className="h-4 w-4" />
-                      <span>Watch Stream on YouTube</span>
-                      <ExternalLink className="h-3 w-3 opacity-80" />
-                    </a>
-                  )}
+              ) : stream.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_') ? (
+                /* Official YouTube Recording Video Embed */
+                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
+                  <iframe
+                    src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
+                    title={`CBOT ${matchId} Video`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="h-full w-full border-0"
+                  />
                 </div>
-              </div>
-            ) : (stream.youtubeUrl?.includes('supabase.co') || stream.youtubeUrl?.endsWith('.webm') || stream.youtubeUrl?.endsWith('.mp4') || stream.youtubeEmbedUrl?.endsWith('.webm') || stream.youtubeEmbedUrl?.endsWith('.mp4')) ? (
-              /* Native High-Performance HTML5 Video Player for Recorded CBOT Matches */
-              <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
-                <video
-                  src={stream.youtubeEmbedUrl || stream.youtubeUrl || ''}
-                  controls
-                  playsInline
-                  className="h-full w-full object-contain bg-black"
-                />
-              </div>
+              ) : (
+                /* Match Stream Recorded */
+                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl flex items-center justify-center">
+                  <video
+                    src={stream.youtubeEmbedUrl || stream.youtubeUrl || ''}
+                    controls
+                    playsInline
+                    className="h-full w-full object-contain bg-black"
+                  />
+                </div>
+              )
             ) : (
-              /* Official YouTube Live / Recording Video Embed */
-              <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
-                <iframe
-                  src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1`}
-                  title={`CBOT ${matchId} Video`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  className="h-full w-full border-0"
-                />
-              </div>
+              /* LIVE MATCH STREAMING */
+              stream.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_') ? (
+                /* Official YouTube Live Broadcast */
+                <div className="relative rounded-2xl overflow-hidden border-2 border-amber-500/40 bg-slate-950 aspect-video shadow-2xl">
+                  <iframe
+                    src={stream.youtubeEmbedUrl || `https://www.youtube.com/embed/${stream.youtubeVideoId}?autoplay=1&live=1`}
+                    title={`CBOT ${matchId} Live Stream`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="h-full w-full border-0"
+                  />
+                </div>
+              ) : (
+                /* In-Studio Browser Live Broadcast in Progress */
+                <div className="rounded-2xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
+                  <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
+                    <Radio className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🔴 LIVE MATCH BROADCAST ACTIVE</h4>
+                    <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+                      This tournament match is broadcasting live. Full HD match video and overlays will be available here immediately upon match completion.
+                    </p>
+                  </div>
+                </div>
+              )
             )
           ) : isExpired ? (
             /* 2. Expired Video Container */

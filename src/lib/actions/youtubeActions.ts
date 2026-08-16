@@ -530,10 +530,158 @@ export async function stopLiveStreamAction(streamId: string, recordedVideoUrl?: 
       }
     }
 
+    // Auto-upload recorded video to YouTube channel in background if recorded video exists
+    if (recordedVideoUrl && recordedVideoUrl.startsWith('http')) {
+      const matchInfo = await prisma.match.findUnique({
+        where: { id: stream.matchId },
+        include: { edition: true, team1: true, team2: true }
+      }).catch(() => null);
+
+      const matchTitle = `CBOT ${matchInfo?.edition?.title || 'Edition #200'} - ${stream.matchId} - ${matchInfo?.team1?.name || 'Team 1'} vs ${matchInfo?.team2?.name || 'Team 2'}`;
+
+      // Trigger YouTube auto-upload asynchronously
+      uploadRecordedVideoToYouTube({
+        streamId: stream.id,
+        videoUrl: recordedVideoUrl,
+        title: matchTitle,
+        description: `Official CBOT Match Recording\nEdition: ${matchInfo?.edition?.title || '200th Edition'}\nMatch: ${stream.matchId}\nWatch live tournaments at https://www.cbotworld.com/matches/${stream.matchId}`,
+      }).then(res => {
+        if (res.success) {
+          console.log(`✅ Successfully auto-published match ${stream.matchId} to YouTube: ${res.url}`);
+        } else {
+          console.warn(`ℹ️ YouTube auto-upload notice for match ${stream.matchId}:`, res.error);
+        }
+      }).catch(err => {
+        console.error('YouTube auto-upload background error:', err);
+      });
+    }
+
     return { success: true, stream: updatedStream };
   } catch (error: any) {
     console.error('Failed to stop live stream:', error);
     return { success: false, error: error?.message || 'Error stopping stream' };
+  }
+}
+
+/**
+ * Upload recorded match video buffer/URL directly to YouTube via YouTube Data API v3
+ */
+export async function uploadRecordedVideoToYouTube({
+  streamId,
+  videoUrl,
+  title,
+  description,
+}: {
+  streamId: string;
+  videoUrl: string;
+  title: string;
+  description?: string;
+}) {
+  try {
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+    if (!googleRefreshToken) {
+      const dbSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'youtube_refresh_token' }
+      });
+      if (dbSetting?.value) {
+        googleRefreshToken = dbSetting.value;
+      }
+    }
+
+    if (!googleClientId || !googleClientSecret || !googleRefreshToken) {
+      return { success: false, error: 'YouTube OAuth credentials not configured.' };
+    }
+
+    // 1. Get access token
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: googleClientId,
+        client_secret: googleClientSecret,
+        refresh_token: googleRefreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+    if (!accessToken) {
+      return { success: false, error: 'Failed to retrieve YouTube access token.' };
+    }
+
+    // 2. Fetch video file from storage
+    const videoFetchRes = await fetch(videoUrl);
+    if (!videoFetchRes.ok) {
+      return { success: false, error: 'Failed to fetch video file from storage.' };
+    }
+
+    const videoBuffer = await videoFetchRes.arrayBuffer();
+    const contentType = videoFetchRes.headers.get('content-type') || 'video/webm';
+
+    // 3. Initiate YouTube Resumable Upload
+    const initRes = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': contentType,
+        'X-Upload-Content-Length': videoBuffer.byteLength.toString(),
+      },
+      body: JSON.stringify({
+        snippet: {
+          title: title.length > 95 ? title.slice(0, 92) + '...' : title,
+          description: description || 'Official CBOT Match Video\nhttps://www.cbotworld.com/',
+          tags: ['CBOT', 'Carrom', 'Tournament', 'Live Stream', 'Match Replay'],
+        },
+        status: {
+          privacyStatus: 'unlisted',
+          selfDeclaredMadeForKids: false,
+          embeddable: true,
+        },
+      }),
+    });
+
+    const uploadLocation = initRes.headers.get('location');
+    if (!uploadLocation) {
+      const errText = await initRes.text();
+      return { success: false, error: `YouTube upload initialization failed: ${errText}` };
+    }
+
+    // 4. Upload binary to YouTube
+    const uploadRes = await fetch(uploadLocation, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+      },
+      body: videoBuffer,
+    });
+
+    const uploadData = await uploadRes.json();
+    if (uploadData.id) {
+      const youtubeVideoId = uploadData.id;
+      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`;
+      const youtubeEmbedUrl = `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1`;
+
+      await prisma.liveStream.update({
+        where: { id: streamId },
+        data: {
+          youtubeVideoId,
+          youtubeUrl,
+          youtubeEmbedUrl,
+        }
+      });
+
+      return { success: true, videoId: youtubeVideoId, url: youtubeUrl };
+    } else {
+      return { success: false, error: JSON.stringify(uploadData) };
+    }
+  } catch (err: any) {
+    console.error('YouTube Auto-Upload exception:', err);
+    return { success: false, error: err.message || 'Auto-upload to YouTube failed' };
   }
 }
 

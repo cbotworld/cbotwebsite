@@ -92,15 +92,15 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   };
 
   const effectiveYoutubeUrl = React.useMemo(() => {
-    if (youtubeUrl && !youtubeUrl.includes('cbot_yt_')) return youtubeUrl;
-    if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
+    if (youtubeUrl) return youtubeUrl;
+    if (youtubeVideoId) {
       return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
     }
     return null;
   }, [youtubeUrl, youtubeVideoId]);
 
   const handleCopyLink = () => {
-    const shareUrl = effectiveYoutubeUrl || `${window.location.origin}/matches/${matchDetails.matchId}`;
+    const shareUrl = `${window.location.origin}/matches/${matchDetails.matchId}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -283,6 +283,16 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
               </>
             )}
           </Button>
+          <a
+            href={`/matches/${matchDetails.matchId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition-colors shadow-md shadow-amber-500/20"
+          >
+            <Radio className="h-3.5 w-3.5" />
+            <span>Watch Live on Arena</span>
+            <ExternalLink className="h-3 w-3 opacity-80" />
+          </a>
           {effectiveYoutubeUrl && (
             <a
               href={effectiveYoutubeUrl}
@@ -547,6 +557,16 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   </>
                 )}
               </Button>
+              <a
+                href={`/matches/${matchDetails.matchId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm transition-all shadow-xl shadow-amber-500/20"
+              >
+                <Radio className="h-4 w-4" />
+                <span>Watch Live on Arena</span>
+                <ExternalLink className="h-4 w-4 opacity-80" />
+              </a>
               {effectiveYoutubeUrl && (
                 <a
                   href={effectiveYoutubeUrl}
@@ -555,7 +575,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm transition-all shadow-xl shadow-red-600/30"
                 >
                   <Youtube className="h-4 w-4" />
-                  <span>Watch Live on YouTube</span>
+                  <span>Watch on YouTube</span>
                   <ExternalLink className="h-4 w-4 opacity-80" />
                 </a>
               )}

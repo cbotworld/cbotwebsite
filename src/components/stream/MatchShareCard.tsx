@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Share2, ExternalLink, Copy, Check, Youtube, MessageCircle } from 'lucide-react';
+import { Share2, ExternalLink, Copy, Check, Youtube, MessageCircle, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface MatchShareCardProps {
@@ -22,10 +22,10 @@ export default function MatchShareCard({
   const [copiedYt, setCopiedYt] = React.useState(false);
   const [copiedArena, setCopiedArena] = React.useState(false);
 
-  // Determine effective YouTube link (ignore sandbox mock IDs)
+  // Determine effective YouTube link
   const effectiveYoutubeUrl = React.useMemo(() => {
-    if (youtubeUrl && !youtubeUrl.includes('cbot_yt_')) return youtubeUrl;
-    if (youtubeVideoId && !youtubeVideoId.startsWith('cbot_yt_')) {
+    if (youtubeUrl) return youtubeUrl;
+    if (youtubeVideoId) {
       return `https://www.youtube.com/watch?v=${youtubeVideoId}`;
     }
     return null;
@@ -36,7 +36,7 @@ export default function MatchShareCard({
     ? `${window.location.origin}/matches/${matchId}`
     : `https://www.cbotworld.com/matches/${matchId}`;
 
-  const primaryShareUrl = effectiveYoutubeUrl || arenaUrl;
+  const primaryShareUrl = arenaUrl;
 
   const handleCopyYt = () => {
     if (!effectiveYoutubeUrl) return;
@@ -80,6 +80,17 @@ export default function MatchShareCard({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={arenaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition-colors shadow-lg shadow-amber-500/20"
+          >
+            <Radio className="h-4 w-4" />
+            <span>{isLive ? 'Watch Live on Arena' : 'Open Match Page'}</span>
+            <ExternalLink className="h-3 w-3 opacity-75" />
+          </a>
+
           {effectiveYoutubeUrl && (
             <a
               href={effectiveYoutubeUrl}
