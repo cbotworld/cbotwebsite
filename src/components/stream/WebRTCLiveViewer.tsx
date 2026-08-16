@@ -234,53 +234,27 @@ export default function WebRTCLiveViewer({
         </div>
       )}
 
-      {/* Top Overlay Badge Bar */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1 gap-1.5 shadow-lg shadow-rose-600/30 animate-pulse">
-            <Radio className="h-3.5 w-3.5" /> 🔴 LIVE MATCH BROADCAST
-          </Badge>
-          {liveScores && (
-            <Badge variant="outline" className="bg-black/60 backdrop-blur-md border-amber-500/40 text-amber-400 text-xs font-mono font-black">
-              Score: {liveScores.totalScore} | ⚡ Slams: {liveScores.totalSlams}
-            </Badge>
-          )}
-        </div>
-        <div className="pointer-events-auto flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/10 text-[11px] font-bold text-slate-300">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-          <span>Ultra-Low Latency</span>
-        </div>
-      </div>
+      {/* Minimal Floating Controls (Mute & Fullscreen) */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-black/70 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={toggleMute}
+          className="h-8 w-8 p-0 rounded-xl text-white hover:bg-white/20"
+          title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+        >
+          {isMuted ? <VolumeX className="h-4 w-4 text-rose-400" /> : <Volume2 className="h-4 w-4 text-emerald-400" />}
+        </Button>
 
-      {/* Bottom Floating Controls Bar */}
-      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 rounded-2xl opacity-90 group-hover:opacity-100 transition-opacity z-10">
-        <div className="flex items-center gap-2 text-xs font-black text-white pl-2">
-          <span className="text-amber-400">{team1Name}</span>
-          <span className="text-slate-400">vs</span>
-          <span className="text-emerald-400">{team2Name}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={toggleMute}
-            className="h-8 w-8 p-0 rounded-xl text-white hover:bg-white/20"
-            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
-          >
-            {isMuted ? <VolumeX className="h-4 w-4 text-rose-400" /> : <Volume2 className="h-4 w-4 text-emerald-400" />}
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={toggleFullscreen}
-            className="h-8 w-8 p-0 rounded-xl text-white hover:bg-white/20"
-            title="Toggle Fullscreen"
-          >
-            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={toggleFullscreen}
+          className="h-8 w-8 p-0 rounded-xl text-white hover:bg-white/20"
+          title="Toggle Fullscreen"
+        >
+          {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </Button>
       </div>
     </div>
   );

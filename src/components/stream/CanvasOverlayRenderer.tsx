@@ -317,24 +317,24 @@ export default function CanvasOverlayRenderer({
       ctx.fillStyle = '#fbbf24';
       ctx.fillText(matchLabel, width - 200, 45);
 
-      // 4.5 Draw Real-Time Board-by-Board Scoreboard Bar (Top Center)
+      // 4.5 Draw Real-Time Board-by-Board Scoreboard Bar (Top Center / Prominent)
       const currentBoards = boardsRef.current || [];
       if (currentBoards.length > 0) {
         const totalScore = currentBoards.reduce((acc, b) => acc + (b.score || 0), 0);
         const totalSlams = currentBoards.reduce((acc, b) => acc + (b.slams || 0), 0);
 
-        const chipWidth = 64;
-        const barWidth = Math.min(width - 500, Math.max(340, currentBoards.length * chipWidth + 140));
-        const barHeight = 44;
+        const chipWidth = 92;
+        const barWidth = Math.min(width - 440, Math.max(420, currentBoards.length * chipWidth + 180));
+        const barHeight = 64;
         const barX = (width - barWidth) / 2;
-        const barY = 16;
+        const barY = 14;
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-        ctx.lineWidth = 1.5;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.85)';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         if ((ctx as any).roundRect) {
-          (ctx as any).roundRect(barX, barY, barWidth, barHeight, 10);
+          (ctx as any).roundRect(barX, barY, barWidth, barHeight, 14);
         } else {
           ctx.rect(barX, barY, barWidth, barHeight);
         }
@@ -342,40 +342,47 @@ export default function CanvasOverlayRenderer({
         ctx.stroke();
 
         // Total Score Pill (Left inside bar)
-        ctx.fillStyle = '#f59e0b';
-        ctx.font = '900 13px sans-serif';
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = '900 19px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(`TOTAL: ${totalScore} PTS`, barX + 12, barY + 26);
-        if (totalSlams > 0) {
-          ctx.fillStyle = '#38bdf8';
-          ctx.font = '900 10px sans-serif';
-          ctx.fillText(`⚡ ${totalSlams} SLAM`, barX + 12, barY + 38);
-        }
+        ctx.fillText(`SCORE: ${totalScore}`, barX + 16, barY + 30);
+        
+        ctx.fillStyle = totalSlams > 0 ? '#38bdf8' : '#94a3b8';
+        ctx.font = '900 14px sans-serif';
+        ctx.fillText(`⚡ SLAMS: ${totalSlams}`, barX + 16, barY + 52);
+
+        // Divider
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(barX + 150, barY + 8);
+        ctx.lineTo(barX + 150, barY + barHeight - 8);
+        ctx.stroke();
 
         // Board Chips (Center/Right inside bar)
-        let chipX = barX + 120;
+        let chipX = barX + 162;
         currentBoards.forEach((b) => {
           if (chipX + chipWidth > barX + barWidth - 8) return;
-          ctx.fillStyle = 'rgba(30, 41, 59, 0.9)';
-          ctx.strokeStyle = b.slams > 0 ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 1;
+          ctx.fillStyle = 'rgba(30, 41, 59, 0.95)';
+          ctx.strokeStyle = b.slams > 0 ? '#38bdf8' : 'rgba(245, 158, 11, 0.4)';
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
           if ((ctx as any).roundRect) {
-            (ctx as any).roundRect(chipX, barY + 6, chipWidth - 6, 32, 6);
+            (ctx as any).roundRect(chipX, barY + 7, chipWidth - 8, barHeight - 14, 10);
           } else {
-            ctx.rect(chipX, barY + 6, chipWidth - 6, 32);
+            ctx.rect(chipX, barY + 7, chipWidth - 8, barHeight - 14);
           }
           ctx.fill();
           ctx.stroke();
 
           ctx.fillStyle = '#94a3b8';
-          ctx.font = '800 9px sans-serif';
+          ctx.font = '900 12px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(`B${b.boardNumber}`, chipX + (chipWidth - 6) / 2, barY + 18);
+          ctx.fillText(`BOARD ${b.boardNumber}`, chipX + (chipWidth - 8) / 2, barY + 24);
 
           ctx.fillStyle = b.slams > 0 ? '#38bdf8' : '#ffffff';
-          ctx.font = '900 12px monospace';
-          ctx.fillText(`${b.score}${b.slams > 0 ? '⚡' : ''}`, chipX + (chipWidth - 6) / 2, barY + 31);
+          ctx.font = '900 18px monospace';
+          ctx.fillText(`${b.score}${b.slams > 0 ? '⚡' : ''}`, chipX + (chipWidth - 8) / 2, barY + 45);
 
           chipX += chipWidth;
         });
@@ -390,22 +397,22 @@ export default function CanvasOverlayRenderer({
 
       // Bottom Left: Player Name & Team Info
       ctx.textAlign = 'left';
-      ctx.font = '900 24px sans-serif';
+      ctx.font = '900 26px sans-serif';
       ctx.fillStyle = '#ffffff';
       ctx.fillText(playerName.toUpperCase(), 30, height - 60);
 
-      ctx.font = '700 15px sans-serif';
+      ctx.font = '800 17px sans-serif';
       ctx.fillStyle = '#34d399';
-      ctx.fillText(`${teamName.toUpperCase()}  VS  ${opponentName.toUpperCase()}`, 30, height - 32);
+      ctx.fillText(`${teamName.toUpperCase()}  VS  ${opponentName.toUpperCase()}`, 30, height - 30);
 
       // Bottom Right: Live Updating Timestamp & Timer
       ctx.textAlign = 'right';
-      ctx.font = '900 18px monospace';
+      ctx.font = '900 19px monospace';
       ctx.fillStyle = '#f59e0b';
       ctx.fillText(currentTimeStr || '12 AUG 2026 21:30:00', width - 30, height - 60);
 
       if (isStreaming) {
-        ctx.font = '900 16px monospace';
+        ctx.font = '900 18px monospace';
         const liveText = `LIVE  ${elapsedTimerStr}`;
         const textWidth = ctx.measureText(liveText).width;
         const textRight = width - 30;
@@ -414,16 +421,16 @@ export default function CanvasOverlayRenderer({
         // Red LIVE Dot (positioned cleanly to the left of LIVE with generous spacing)
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
-        ctx.arc(textLeft - 14, height - 35, 6, 0, 2 * Math.PI);
+        ctx.arc(textLeft - 14, height - 35, 7, 0, 2 * Math.PI);
         ctx.fill();
 
         // LIVE + Timer Text
         ctx.fillStyle = '#ef4444';
-        ctx.fillText(liveText, textRight, height - 30);
+        ctx.fillText(liveText, textRight, height - 28);
       } else {
-        ctx.font = '800 14px monospace';
+        ctx.font = '800 15px monospace';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('STANDBY • READY TO STREAM', width - 30, height - 30);
+        ctx.fillText('STANDBY • READY TO STREAM', width - 30, height - 28);
       }
 
       animFrameIdRef.current = requestAnimationFrame(renderFrame);
