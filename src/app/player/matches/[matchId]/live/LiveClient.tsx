@@ -25,6 +25,7 @@ interface MatchDetails {
   scheduledTime: string | null;
   tableNumber: number;
   status: string;
+  initialReplayComment?: string | null;
 }
 
 export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: MatchDetails }) {
@@ -109,6 +110,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  const [replayReason, setReplayReason] = React.useState<string | null>(matchDetails.initialReplayComment || null);
   const [attemptsCount, setAttemptsCount] = React.useState<number>(1);
   const [elapsedSeconds, setElapsedSeconds] = React.useState<number>(0);
   const MAX_STREAM_SECONDS = 45 * 60; // 45 Minutes Cutoff (2700s)
@@ -118,7 +120,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     const init = async () => {
       setLoading(true);
       try {
-        const res = await createLiveStreamAction(matchDetails.matchId);
+        const res = await createLiveStreamAction(matchDetails.matchId, matchDetails.initialReplayComment || undefined);
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
@@ -127,6 +129,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           }
           if (res.stream.streamStartedAt) {
             setStreamStartedAt(new Date(res.stream.streamStartedAt));
+          }
+          if (res.stream.failureReason?.startsWith('REPLAY_REASON:')) {
+            setReplayReason(res.stream.failureReason.replace('REPLAY_REASON:', '').trim());
           }
         } else {
           setErrorMsg(res.error || 'Failed to initialize match studio.');
@@ -139,7 +144,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       }
     };
     init();
-  }, [matchDetails.matchId]);
+  }, [matchDetails.matchId, matchDetails.initialReplayComment]);
 
   const handleStartLive = async () => {
     if (!streamId) return;
@@ -499,7 +504,17 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           </div>
         </div>
 
-        {/* 2.5 40-Minute Warning Banner (5 mins before 45-min hard cutoff) */}
+        {/* 2.5 Replay Reason Chip (if rematch) */}
+        {replayReason && (
+          <div className="absolute top-14 left-3 z-20 pointer-events-none max-w-sm">
+            <div className="bg-black/70 backdrop-blur-md border border-amber-500/40 rounded-xl px-3 py-1.5 text-[11px] text-amber-300 flex items-center gap-1.5 shadow-lg">
+              <span className="font-black text-amber-400">💬 Reason:</span>
+              <span className="italic truncate">"{replayReason}"</span>
+            </div>
+          </div>
+        )}
+
+        {/* 2.6 40-Minute Warning Banner (5 mins before 45-min hard cutoff) */}
         {streamStatus === 'LIVE' && elapsedSeconds >= 2400 && (
           <div className="absolute top-16 inset-x-4 max-w-md mx-auto bg-amber-500 text-slate-950 px-4 py-2 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-2xl z-30 animate-bounce">
             <AlertCircle className="h-4 w-4 shrink-0" />

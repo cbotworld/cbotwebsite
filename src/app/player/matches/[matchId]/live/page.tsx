@@ -11,7 +11,7 @@ export default async function PlayerMatchLivePage({
   searchParams,
 }: { 
   params: Promise<{ matchId: string }>;
-  searchParams?: Promise<{ token?: string; playerId?: string }>;
+  searchParams?: Promise<{ token?: string; playerId?: string; comment?: string; replay?: string }>;
 }) {
   const { matchId } = await params;
   const sParams = searchParams ? await searchParams : {};
@@ -198,6 +198,7 @@ export default async function PlayerMatchLivePage({
     scheduledTime: resolvedMatch.scheduledTime?.toISOString() || null,
     tableNumber: (resolvedMatch as any).tableNumber || 1,
     status: resolvedMatch.status,
+    initialReplayComment: sParams.comment || null,
   };
 
   return <PlayerMatchLiveClient matchDetails={matchDetails} />;

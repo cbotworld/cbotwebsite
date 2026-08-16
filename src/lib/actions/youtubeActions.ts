@@ -231,7 +231,13 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
     }
 
     // If an active stream already exists for this match, return it
-    if (existingActiveStream && !replayComment) {
+    if (existingActiveStream) {
+      if (replayComment) {
+        await prisma.liveStream.update({
+          where: { id: existingActiveStream.id },
+          data: { failureReason: `REPLAY_REASON: ${replayComment}` }
+        }).catch(() => {});
+      }
       return {
         success: true,
         stream: existingActiveStream,
@@ -381,8 +387,7 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
         streamKey,
         status: 'READY',
         scheduledAt: new Date(),
-        // Store replay reason if this is a replay stream
-        ...(replayComment ? { streamNotes: `REPLAY: ${replayComment}` } : {}),
+        failureReason: replayComment ? `REPLAY_REASON: ${replayComment}` : null,
       }
     });
 

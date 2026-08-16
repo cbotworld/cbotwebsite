@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Radio, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video, Download, ArrowLeft } from 'lucide-react';
+import { Radio, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video, Download, ArrowLeft, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 import WebRTCLiveViewer from '@/components/stream/WebRTCLiveViewer';
@@ -42,6 +42,9 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const isYouTubeVideo = !!stream?.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_');
   const isDirectVideo = !!videoUrl && !videoUrl.includes('cbot_yt_') && (videoUrl.startsWith('http') || videoUrl.startsWith('blob:') || videoUrl.startsWith('/'));
   const hasReplay = isYouTubeVideo || isDirectVideo;
+  const replayReason = stream?.failureReason?.startsWith('REPLAY_REASON:') 
+    ? stream.failureReason.replace('REPLAY_REASON:', '').trim() 
+    : null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white py-8 px-4 sm:px-6">
@@ -108,6 +111,24 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           </div>
 
         </div>
+
+        {/* Replay / Rematch Reason Comment Box */}
+        {replayReason && (
+          <div className="flex items-start gap-3.5 p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-200 shadow-xl">
+            <div className="h-9 w-9 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-amber-400 mt-0.5 shadow-md">
+              <MessageSquare className="h-4 w-4" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400">Player Rematch / Replay Reason:</span>
+                <Badge variant="outline" className="text-[10px] text-amber-300 border-amber-500/40 py-0 px-2 font-mono">Verified Reason</Badge>
+              </div>
+              <p className="text-xs sm:text-sm text-white italic leading-relaxed font-medium">
+                "{replayReason}"
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Video Player Display Container */}
         <div className="space-y-4">
