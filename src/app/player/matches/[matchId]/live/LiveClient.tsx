@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, ExternalLink, Download, Loader2, Plus, Minus, Trash2, Video } from 'lucide-react';
 import MatchShareCard from '@/components/stream/MatchShareCard';
-import { uploadMatchVideoToSupabase } from '@/lib/supabase';
+import { uploadMatchVideoToSupabase, supabase } from '@/lib/supabase';
 
 interface MatchDetails {
   matchId: string;
@@ -220,6 +220,136 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const handleStreamReady = React.useCallback((stream: MediaStream) => {
     canvasStreamRef.current = stream;
   }, []);
+
+  // Native WebRTC & Realtime Broadcaster to Spectators
+  React.useEffect(() => {
+    if (streamStatus !== 'LIVE') return;
+
+    const channelName = `cbot_match_${matchDetails.matchId}`;
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: false } },
+    });
+
+    const peerConnections = new Map<string, RTCPeerConnection>();
+
+    const createPeerForViewer = async (viewerId: string) => {
+      if (!canvasStreamRef.current) return;
+      if (peerConnections.has(viewerId)) {
+        peerConnections.get(viewerId)?.close();
+        peerConnections.delete(viewerId);
+      }
+
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+      });
+      peerConnections.set(viewerId, pc);
+
+      // Add live canvas stream tracks
+      canvasStreamRef.current.getTracks().forEach((track) => {
+        if (canvasStreamRef.current) {
+          pc.addTrack(track, canvasStreamRef.current);
+        }
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          channel.send({
+            type: 'broadcast',
+            event: 'ice-candidate',
+            payload: {
+              target: viewerId,
+              sender: 'broadcaster',
+              candidate: event.candidate,
+            },
+          });
+        }
+      };
+
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channel.send({
+          type: 'broadcast',
+          event: 'stream-offer',
+          payload: {
+            target: viewerId,
+            sender: 'broadcaster',
+            offer: offer,
+          },
+        });
+      } catch (err) {
+        console.warn('Error creating WebRTC offer for viewer:', err);
+      }
+    };
+
+    channel
+      .on('broadcast', { event: 'viewer-join' }, ({ payload }: { payload: any }) => {
+        if (payload?.viewerId) {
+          createPeerForViewer(payload.viewerId);
+        }
+      })
+      .on('broadcast', { event: 'stream-answer' }, async ({ payload }: { payload: any }) => {
+        if (payload?.sender && peerConnections.has(payload.sender) && payload.answer) {
+          try {
+            const pc = peerConnections.get(payload.sender);
+            if (pc && pc.signalingState === 'have-local-offer') {
+              await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            }
+          } catch (e) {
+            console.warn('Error setting remote answer:', e);
+          }
+        }
+      })
+      .on('broadcast', { event: 'ice-candidate' }, async ({ payload }: { payload: any }) => {
+        if (payload?.sender && peerConnections.has(payload.sender) && payload.candidate) {
+          try {
+            const pc = peerConnections.get(payload.sender);
+            if (pc) {
+              await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+            }
+          } catch (e) {
+            console.warn('Error adding ICE candidate:', e);
+          }
+        }
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'broadcaster-live',
+            payload: { matchId: matchDetails.matchId },
+          });
+        }
+      });
+
+    // Frame & score snapshot broadcast every 1.5 seconds as fallback
+    const snapshotInterval = setInterval(() => {
+      const canvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      if (canvas) {
+        try {
+          const frame = canvas.toDataURL('image/jpeg', 0.6);
+          channel.send({
+            type: 'broadcast',
+            event: 'stream-frame',
+            payload: {
+              frame,
+              scores: { totalScore, totalSlams },
+            },
+          });
+        } catch (e) {}
+      }
+    }, 1500);
+
+    return () => {
+      clearInterval(snapshotInterval);
+      peerConnections.forEach((pc) => pc.close());
+      peerConnections.clear();
+      supabase.removeChannel(channel);
+    };
+  }, [streamStatus, matchDetails.matchId, totalScore, totalSlams]);
 
   const matchTime = matchDetails.scheduledTime
     ? new Date(matchDetails.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

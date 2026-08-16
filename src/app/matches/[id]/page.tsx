@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Radio, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video, Download, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import MatchShareCard from '@/components/stream/MatchShareCard';
+import WebRTCLiveViewer from '@/components/stream/WebRTCLiveViewer';
 
 interface MatchPageProps {
   params: Promise<{ id: string }>;
@@ -162,18 +163,14 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                 </div>
               )
             ) : (
-              /* In-Studio Browser Live Broadcast in Progress */
-              <div className="rounded-3xl border-2 border-amber-500/40 bg-slate-950 p-10 text-center space-y-4 shadow-2xl aspect-video flex flex-col items-center justify-center">
-                <div className="h-16 w-16 rounded-full bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-500 animate-pulse">
-                  <Radio className="h-8 w-8" />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="text-xl font-extrabold text-white uppercase tracking-wide">🔴 LIVE MATCH BROADCAST ACTIVE</h4>
-                  <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-                    This tournament match is currently broadcasting live from the Player Studio. Full match video with live overlays will be available here immediately upon match completion.
-                  </p>
-                </div>
-              </div>
+              /* Native Real-Time In-Browser Live Video Stream for Spectators */
+              <WebRTCLiveViewer
+                matchId={matchId}
+                player1Name={team1Name}
+                player2Name={team2Name}
+                team1Name={team1Name}
+                team2Name={team2Name}
+              />
             )
           ) : isExpired ? (
             /* Expired Video Container */
