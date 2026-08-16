@@ -212,20 +212,28 @@ export default function CanvasOverlayRenderer({
 
         setCameraPermission('granted');
 
-        // Create Canvas Stream Pipeline
-        if (canvasRef.current) {
-          const canvas = canvasRef.current;
-          const canvasStream = canvas.captureStream(30);
-
-          // Add audio track to canvas stream
-          const streamAudioTrack = mediaStream.getAudioTracks()[0];
-          if (streamAudioTrack) {
-            canvasStream.addTrack(streamAudioTrack);
+        // Create Canvas Stream Pipeline with robust fallback to mediaStream
+        let streamToPass = mediaStream;
+        try {
+          if (canvasRef.current && (canvasRef.current as any).captureStream) {
+            const canvas = canvasRef.current;
+            const canvasStream = canvas.captureStream(30);
+            const streamAudioTrack = mediaStream.getAudioTracks()[0];
+            if (streamAudioTrack) {
+              canvasStream.addTrack(streamAudioTrack);
+            }
+            streamToPass = canvasStream;
           }
+        } catch (streamErr) {
+          console.warn('Canvas captureStream fallback to mediaStream:', streamErr);
+        }
 
-          if (onStreamReadyRef.current) {
-            onStreamReadyRef.current(canvasStream);
-          }
+        if (typeof window !== 'undefined') {
+          (window as any).__cbotActiveStream = streamToPass;
+        }
+
+        if (onStreamReadyRef.current) {
+          onStreamReadyRef.current(streamToPass);
         }
       }
     } catch (err: any) {

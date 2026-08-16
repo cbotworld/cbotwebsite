@@ -43,34 +43,43 @@ export async function POST(req: NextRequest) {
     const { data: publicData } = supabaseAdmin.storage.from('teams').getPublicUrl(data.path);
     const videoUrl = publicData.publicUrl;
 
-    // Attach recorded video URL to match stream record with 72-Hour Retention Expiry
-    const retention72h = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    // Calculate Day End Time (8:00 PM IST of the tournament day)
+    let dayEndTime = new Date();
+    const monMatch = matchId ? matchId.match(/monument_(\d+)/i) : null;
+    if (monMatch) {
+      const dayNum = parseInt(monMatch[1], 10);
+      dayEndTime = new Date(Date.UTC(2026, 7, 9 + dayNum, 14, 30, 0));
+    } else {
+      dayEndTime.setHours(20, 0, 0, 0);
+    }
+    const retention72h = new Date(dayEndTime.getTime() + 72 * 60 * 60 * 1000);
+
+    const streamUpdateData = {
+      youtubeUrl: videoUrl,
+      youtubeEmbedUrl: videoUrl,
+      status: 'ARCHIVED' as const,
+      streamEndedAt: new Date(),
+      recordedAt: new Date(),
+      expiresAt: retention72h,
+    };
 
     if (streamId) {
       await prisma.liveStream.update({
         where: { id: streamId },
-        data: {
-          youtubeUrl: videoUrl,
-          youtubeEmbedUrl: videoUrl,
-          status: 'ARCHIVED',
-          streamEndedAt: new Date(),
-          recordedAt: new Date(),
-          expiresAt: retention72h,
-        },
+        data: streamUpdateData,
       }).catch((e) => console.warn('Prisma liveStream update notice:', e));
     } else {
       await prisma.liveStream.updateMany({
         where: { matchId },
-        data: {
-          youtubeUrl: videoUrl,
-          youtubeEmbedUrl: videoUrl,
-          status: 'ARCHIVED',
-          streamEndedAt: new Date(),
-          recordedAt: new Date(),
-          expiresAt: retention72h,
-        },
+        data: streamUpdateData,
       }).catch((e) => console.warn('Prisma liveStream updateMany notice:', e));
     }
+
+    // Freeze match status as COMPLETED
+    await prisma.match.update({
+      where: { id: matchId },
+      data: { status: 'COMPLETED' },
+    }).catch(() => {});
 
     // Trigger Background YouTube API Upload (Permanent cloud archive)
     const targetStream = streamId 

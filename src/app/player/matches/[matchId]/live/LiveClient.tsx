@@ -243,9 +243,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         setStreamStatus('LIVE');
         setStreamStartedAt(new Date());
 
-        // Start in-browser recorder
-        if (canvasStreamRef.current) {
-          startRecorder(canvasStreamRef.current);
+        // Start in-browser recorder from canvas stream or global active camera stream
+        const streamToRecord = canvasStreamRef.current || (typeof window !== 'undefined' ? (window as any).__cbotActiveStream : null);
+        if (streamToRecord) {
+          canvasStreamRef.current = streamToRecord;
+          startRecorder(streamToRecord);
         }
       } else {
         setErrorMsg(res.error || 'Failed to start match stream.');
@@ -423,7 +425,11 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     const peerConnections = new Map<string, RTCPeerConnection>();
 
     const createPeerForViewer = async (viewerId: string) => {
-      if (!canvasStreamRef.current) return;
+      const stream = canvasStreamRef.current || (typeof window !== 'undefined' ? (window as any).__cbotActiveStream : null);
+      if (!stream) {
+        console.warn('Cannot create peer: stream not ready');
+        return;
+      }
       if (peerConnections.has(viewerId)) {
         peerConnections.get(viewerId)?.close();
         peerConnections.delete(viewerId);
@@ -433,15 +439,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
         ],
       });
       peerConnections.set(viewerId, pc);
 
-      // Add live canvas stream tracks
-      canvasStreamRef.current.getTracks().forEach((track) => {
-        if (canvasStreamRef.current) {
-          pc.addTrack(track, canvasStreamRef.current);
-        }
+      // Add live stream tracks
+      stream.getTracks().forEach((track: MediaStreamTrack) => {
+        pc.addTrack(track, stream);
       });
 
       pc.onicecandidate = (event) => {

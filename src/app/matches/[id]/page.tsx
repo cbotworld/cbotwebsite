@@ -90,13 +90,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {/* Center VS & Details */}
           <div className="space-y-2">
             <div className="text-xs font-black uppercase tracking-widest text-slate-400">Match ID: {matchId}</div>
-            {match?.status === 'COMPLETED' ? (
-              <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
-                {match.score1} : {match.score2}
-              </div>
-            ) : (
-              <div className="text-2xl sm:text-3xl font-black text-slate-600">VS</div>
-            )}
+            <div className="text-2xl sm:text-3xl font-black text-slate-500 font-mono">VS</div>
             {match?.tableNumber && (
               <Badge variant="outline" className="border-amber-500/30 text-amber-300/80 text-[11px] font-bold">
                 Table #{match.tableNumber}
@@ -250,25 +244,6 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
               </p>
             </div>
           )}
-        </div>
-
-        {/* Shareable Match Link Box */}
-        <MatchShareCard
-          matchId={matchId}
-          title={matchTitle}
-          isLive={stream?.status === 'LIVE'}
-          showWatchButton={false}
-        />
-
-        {/* Security & Authenticity Notice */}
-        <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4 text-xs text-slate-300 flex items-start gap-3">
-          <ShieldCheck className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">Official CBOT Match Verification</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">
-              Match recorded with official CBOT overlay certification. Stored on high-performance cloud storage with 72-hour retention starting from 8:00 PM of tournament day.
-            </div>
-          </div>
         </div>
 
       </div>

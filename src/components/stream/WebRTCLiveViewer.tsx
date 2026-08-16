@@ -64,7 +64,11 @@ export default function WebRTCLiveViewer({
         if (event.streams && event.streams[0]) {
           if (videoRef.current) {
             videoRef.current.srcObject = event.streams[0];
-            videoRef.current.play().catch(() => {});
+            videoRef.current.muted = true;
+            const playPromise = videoRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((e) => console.warn('AutoPlay play error:', e));
+            }
           }
           setHasStream(true);
           setConnectionStatus('connected');
