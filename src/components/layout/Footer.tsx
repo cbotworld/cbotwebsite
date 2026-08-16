@@ -1,7 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { VisitorCounter } from './VisitorCounter';
 
 export function Footer() {
+  const pathname = usePathname();
+  if (pathname?.includes('/live')) {
+    return null;
+  }
   const exploreLinks = [
     { label: '200th Edition Schedule', href: '/edition-200-schedule', live: true },
     { label: 'Tournament Editions', href: '/editions', live: false },

@@ -24,6 +24,10 @@ export function Navbar() {
   const [mounted, setMounted] = React.useState(false);
   const userMenuRef = React.useRef<HTMLDivElement>(null);
 
+  if (pathname?.includes('/live')) {
+    return null;
+  }
+
   React.useEffect(() => {
     setMounted(true);
   }, []);

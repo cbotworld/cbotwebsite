@@ -1,4 +1,7 @@
+'use client';
+
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 
 const WHATSAPP_NUMBER = '6594519986'; // +65 94519986 (no + or spaces)
 const WHATSAPP_MESSAGE = encodeURIComponent(
@@ -7,6 +10,10 @@ const WHATSAPP_MESSAGE = encodeURIComponent(
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`;
 
 export function WhatsAppButton() {
+  const pathname = usePathname();
+  if (pathname?.includes('/live')) {
+    return null;
+  }
   return (
     <a
       href={WHATSAPP_URL}

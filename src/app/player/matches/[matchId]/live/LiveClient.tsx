@@ -380,14 +380,23 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     };
   }, [streamStatus, matchDetails.matchId, totalScore, totalSlams]);
 
+  // Lock screen to landscape if supported on mobile devices
+  React.useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && 'screen' in window && (window.screen as any).orientation?.lock) {
+        (window.screen as any).orientation.lock('landscape').catch(() => {});
+      }
+    } catch (e) {}
+  }, []);
+
   return (
-    <div className="w-full min-h-[calc(100vh-5rem)] flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950 text-white select-none">
+    <div className="fixed inset-0 w-screen h-screen z-50 bg-black text-white select-none overflow-hidden flex items-center justify-center">
       
-      {/* Immersive Edge-to-Edge Studio Container */}
-      <div className="relative w-full max-w-6xl rounded-3xl overflow-hidden border-2 border-amber-500/40 bg-black aspect-video shadow-2xl flex items-center justify-center group">
+      {/* Immersive Edge-to-Edge Fullscreen Camera Studio Container */}
+      <div className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center group">
 
         {/* 1. Underlying High-Definition Video Canvas */}
-        <div className="absolute inset-0 w-full h-full">
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center">
           <CanvasOverlayRenderer
             playerName={matchDetails.playerName}
             editionTitle={matchDetails.editionTitle}
