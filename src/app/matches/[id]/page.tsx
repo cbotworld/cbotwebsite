@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Radio, Play, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video } from 'lucide-react';
+import { Radio, Play, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video, Youtube, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 

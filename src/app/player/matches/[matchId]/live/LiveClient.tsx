@@ -6,7 +6,7 @@ import CanvasOverlayRenderer from '@/components/stream/CanvasOverlayRenderer';
 import { createLiveStreamAction, startLiveStreamAction, stopLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check, Download, Loader2 } from 'lucide-react';
+import { Radio, Play, Square, AlertCircle, CheckCircle2, ArrowLeft, Clock, Monitor, Share2, Youtube, ExternalLink, Key, Server, Eye, EyeOff, Copy, Check, Download, Loader2, Plus, Minus, Trash2 } from 'lucide-react';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 import { uploadMatchVideoToSupabase } from '@/lib/supabase';
 
@@ -45,11 +45,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
   const recordedChunksRef = React.useRef<Blob[]>([]);
   const [copied, setCopied] = React.useState(false);
 
-  // Board-by-Board Scoring
+  // Board-by-Board Scoring (Board 1, Board 2, etc.)
   const [boards, setBoards] = React.useState([
     { boardNumber: 1, score: 0, slams: 0 },
     { boardNumber: 2, score: 0, slams: 0 },
-    { boardNumber: 3, score: 0, slams: 0 },
   ]);
 
   const totalScore = React.useMemo(() => boards.reduce((acc, b) => acc + (b.score || 0), 0), [boards]);
@@ -70,9 +69,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     setBoards((prev) =>
       prev.map((b) => {
         if (b.boardNumber === boardNum) {
-          const newSlams = Math.max(0, b.slams + delta);
-          const scoreDiff = delta > 0 ? 12 : (b.slams > 0 ? -12 : 0);
-          return { ...b, slams: newSlams, score: Math.max(0, b.score + scoreDiff) };
+          return { ...b, slams: Math.max(0, b.slams + delta) };
         }
         return b;
       })
@@ -84,6 +81,14 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
       ...prev,
       { boardNumber: prev.length + 1, score: 0, slams: 0 },
     ]);
+  };
+
+  const handleRemoveBoard = (boardNum: number) => {
+    setBoards((prev) => {
+      if (prev.length <= 1) return prev;
+      const filtered = prev.filter((b) => b.boardNumber !== boardNum);
+      return filtered.map((b, idx) => ({ ...b, boardNumber: idx + 1 }));
+    });
   };
 
   const effectiveYoutubeUrl = React.useMemo(() => {
@@ -399,77 +404,105 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           </div>
         </div>
 
-        {/* Real-time Board-by-Board Scorer (Player-Centric) */}
-        <div className="rounded-2xl bg-white/5 border border-amber-500/30 p-4 space-y-4">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        {/* Real-time Board-by-Board Scorer (Mobile-grade Web Scorer) */}
+        <div className="rounded-3xl bg-slate-900/90 border border-amber-500/30 p-4 sm:p-6 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3.5">
             <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Scorer</div>
-              <div className="text-base font-black text-amber-400">Player: {matchDetails.playerName}</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-amber-400">Match Scorer</div>
+              <div className="text-base sm:text-lg font-black text-white">{matchDetails.playerName} <span className="text-xs text-slate-400 font-normal">({matchDetails.teamName})</span></div>
             </div>
-            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/50 flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-400">TOTAL SCORE:</span>
-              <span className="text-sm font-black text-amber-400">{totalScore} pts</span>
-              {totalSlams > 0 && (
-                <span className="text-[10px] font-black text-sky-400 bg-sky-500/20 px-2 py-0.5 rounded-md">
-                  ⚡ {totalSlams} Slam
-                </span>
-              )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center gap-1.5">
+                <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider">Total Score:</span>
+                <span className="text-sm font-black text-amber-400">{totalScore} pts</span>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/40 flex items-center gap-1.5">
+                <span className="text-[10px] font-black text-sky-300 uppercase tracking-wider">Total Slams:</span>
+                <span className="text-sm font-black text-sky-400">⚡ {totalSlams}</span>
+              </div>
             </div>
           </div>
 
           {/* Board List */}
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {boards.map((board) => (
               <div
                 key={board.boardNumber}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-white/10 gap-3"
+                className="flex flex-col md:flex-row md:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-white/10 gap-3 hover:border-amber-500/40 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-black text-white min-w-[60px]">Board {board.boardNumber}</span>
-                  <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/15 px-2.5 py-1 rounded-lg">
-                    {board.score} pts
-                  </span>
-                  {board.slams > 0 && (
-                    <span className="text-[10px] font-bold text-sky-400 bg-sky-500/20 px-2 py-0.5 rounded-md">
-                      ⚡ {board.slams} Slam
+                {/* Board Label & Current Points */}
+                <div className="flex items-center justify-between md:justify-start gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-black uppercase tracking-wider text-white">
+                      Board {board.boardNumber}
                     </span>
-                  )}
+                    {boards.length > 2 && (
+                      <button
+                        onClick={() => handleRemoveBoard(board.boardNumber)}
+                        className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        title={`Remove Board ${board.boardNumber}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2.5 py-1 rounded-lg">
+                      {board.score} pts
+                    </span>
+                    {board.slams > 0 && (
+                      <span className="text-[11px] font-bold text-sky-400 bg-sky-500/20 border border-sky-500/30 px-2 py-0.5 rounded-lg">
+                        ⚡ {board.slams} {board.slams === 1 ? 'Slam' : 'Slams'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleModifyBoardScore(board.boardNumber, -1)}
-                    className="h-8 px-2.5 text-xs font-black rounded-lg border-white/20 hover:bg-white/10"
-                  >
-                    -1
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleModifyBoardScore(board.boardNumber, 1)}
-                    className="h-8 px-2.5 text-xs font-black rounded-lg bg-emerald-600/30 border-emerald-500/50 text-emerald-400 hover:bg-emerald-600/50"
-                  >
-                    +1
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleModifyBoardSlam(board.boardNumber, -1)}
-                    disabled={board.slams === 0}
-                    className="h-8 px-2 text-[11px] font-bold rounded-lg border-white/20 text-slate-400 disabled:opacity-40"
-                  >
-                    Slam -
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleModifyBoardSlam(board.boardNumber, 1)}
-                    className="h-8 px-2.5 text-[11px] font-black rounded-lg bg-amber-600/30 border-amber-500/50 text-amber-300 hover:bg-amber-600/50"
-                  >
-                    ⚡ Slam +
-                  </Button>
+                {/* Scoring Buttons (Score +1/-1 & Slam +1/-1) */}
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {/* Points Section */}
+                  <div className="flex items-center rounded-xl bg-slate-900 border border-white/10 p-1 gap-1">
+                    <span className="text-[10px] font-black uppercase text-slate-400 px-2">Pts</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleModifyBoardScore(board.boardNumber, -1)}
+                      disabled={board.score === 0}
+                      className="h-8 px-3 text-xs font-black rounded-lg hover:bg-white/10 text-slate-300 disabled:opacity-30"
+                    >
+                      -1
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleModifyBoardScore(board.boardNumber, 1)}
+                      className="h-8 px-3 text-xs font-black rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-400 border border-emerald-500/40"
+                    >
+                      +1
+                    </Button>
+                  </div>
+
+                  {/* Slams Section */}
+                  <div className="flex items-center rounded-xl bg-slate-900 border border-white/10 p-1 gap-1">
+                    <span className="text-[10px] font-black uppercase text-sky-400 px-2">Slam</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleModifyBoardSlam(board.boardNumber, -1)}
+                      disabled={board.slams === 0}
+                      className="h-8 px-3 text-xs font-black rounded-lg hover:bg-white/10 text-slate-400 disabled:opacity-30"
+                    >
+                      -1
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleModifyBoardSlam(board.boardNumber, 1)}
+                      className="h-8 px-3 text-xs font-black rounded-lg bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/40"
+                    >
+                      ⚡ +1
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -479,9 +512,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             variant="outline"
             size="sm"
             onClick={handleAddNewBoard}
-            className="w-full py-2.5 border-dashed border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs font-black rounded-xl"
+            className="w-full py-3 border-dashed border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:border-amber-400 text-xs font-black rounded-2xl transition-all gap-2"
           >
-            ➕ ADD NEW BOARD (BOARD {boards.length + 1})
+            <Plus className="h-4 w-4" /> ADD BOARD (BOARD {boards.length + 1})
           </Button>
         </div>
 
