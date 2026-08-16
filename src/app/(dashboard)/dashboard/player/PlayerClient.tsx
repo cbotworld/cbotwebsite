@@ -544,20 +544,18 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                         </div>
                       </div>
 
-                      {/* Streams list (Watch Later) */}
+                      {/* Streams list (Watch Replay) */}
                       {matchStreams.length > 0 && (
                         <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[10px]">
-                          <span className="text-muted-foreground font-semibold uppercase tracking-wider mr-1">🎥 Stream Recordings:</span>
+                          <span className="text-muted-foreground font-semibold uppercase tracking-wider mr-1">🎥 Match Replays:</span>
                           {matchStreams.map((stream: any, sIdx: number) => (
-                            <a
+                            <Link
                               key={stream.id}
-                              href={stream.youtubeUrl || `https://www.youtube.com/watch?v=${stream.youtubeVideoId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href={`/matches/${stream.matchId || match.id}`}
                               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-border text-amber-400 font-bold hover:text-amber-300 transition-colors"
                             >
-                              <PlayCircle className="h-3 w-3" /> Stream #{matchStreams.length - sIdx}
-                            </a>
+                              <PlayCircle className="h-3 w-3" /> Watch Match #{matchStreams.length - sIdx}
+                            </Link>
                           ))}
                         </div>
                       )}

@@ -473,7 +473,7 @@ export default function AdminPortalPage() {
                   <Radio className="h-5 w-5 text-rose-500 animate-pulse" /> Official CBOT Live Match Streams
                 </CardTitle>
                 <CardDescription>
-                  Monitor real-time player broadcasts, inspect YouTube streams, and manage 15-day retention expirations.
+                  Monitor real-time player broadcasts, watch live match streams, and manage 15-day video retention.
                 </CardDescription>
               </div>
               <Button
