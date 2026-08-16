@@ -147,6 +147,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
+          if (res.stream.youtubeUrl) {
+            setDownloadUrl(res.stream.youtubeUrl);
+          }
           if (res.attemptsCount) {
             setAttemptsCount(res.attemptsCount);
           }
@@ -236,6 +239,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           videoBlob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
           const localUrl = URL.createObjectURL(videoBlob);
           setDownloadUrl(localUrl);
+          setStreamStatus('ARCHIVED');
         }
       }
 
