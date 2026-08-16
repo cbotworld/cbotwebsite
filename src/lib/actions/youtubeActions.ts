@@ -831,6 +831,56 @@ export async function getAdminLiveStreamsAction() {
 }
 
 /**
+ * Server Action for Public/Players to fetch all live and recorded match videos
+ */
+export async function getPublicDaywiseVideosAction() {
+  noStore();
+  try {
+    const matches = await prisma.match.findMany({
+      orderBy: { scheduledTime: 'asc' },
+      include: {
+        edition: true,
+        team1: true,
+        team2: true,
+        winner: true,
+        liveStreams: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            player: { select: { id: true, name: true, username: true, image: true } },
+            team: { select: { id: true, name: true, tag: true, logo: true } },
+          }
+        }
+      }
+    });
+
+    const streams = await prisma.liveStream.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        player: { select: { id: true, name: true, username: true, image: true } },
+        team: { select: { id: true, name: true, tag: true, logo: true } },
+        edition: { select: { id: true, title: true, number: true } },
+        match: {
+          include: {
+            team1: true,
+            team2: true,
+            winner: true,
+          }
+        },
+      }
+    });
+
+    return {
+      success: true,
+      matches,
+      streams,
+    };
+  } catch (error: any) {
+    console.error('Error fetching public daywise videos:', error);
+    return { success: false, error: error.message || 'Failed to fetch match videos', matches: [], streams: [] };
+  }
+}
+
+/**
  * Server Action for Admin to manually expire a stream
  */
 export async function expireLiveStreamAction(streamId: string) {
