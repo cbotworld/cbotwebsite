@@ -190,7 +190,31 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
     const playerTeamName = isTeam1Member ? match.team1?.name : isTeam2Member ? match.team2?.name : 'Team';
     const opponentTeamName = isTeam1Member ? (match.team2?.name || 'Opponent') : (match.team1?.name || 'Opponent');
 
-    // 3. Check for an ACTIVE stream for this match (block duplicate live starts, allow replays)
+    // 3. Block simultaneous live streams: Player cannot go live in multiple matches at once
+    const activeStreamElsewhere = await prisma.liveStream.findFirst({
+      where: {
+        playerId: userId,
+        status: 'LIVE',
+        NOT: { matchId }
+      }
+    });
+
+    if (activeStreamElsewhere) {
+      return {
+        success: false,
+        error: `You are already live in another match (#${activeStreamElsewhere.matchId}). Please end your active broadcast before starting a new one.`
+      };
+    }
+
+    // 4. Max 3 Stream Attempts Limit per player for this match
+    const previousAttemptsCount = await prisma.liveStream.count({
+      where: {
+        matchId,
+        playerId: userId,
+        status: { in: ['ARCHIVED', 'LIVE'] }
+      }
+    });
+
     const existingActiveStream = await prisma.liveStream.findFirst({
       where: {
         matchId,
@@ -199,24 +223,28 @@ export async function createLiveStreamAction(matchId: string, replayComment?: st
       }
     });
 
-    // If an active stream already exists (not a replay), return it UNLESS it was a mock sandbox stream
+    if (!existingActiveStream && previousAttemptsCount >= 3) {
+      return {
+        success: false,
+        error: 'Maximum stream attempts reached (3/3). Each player is permitted a maximum of 3 live stream attempts per match.'
+      };
+    }
+
+    // If an active stream already exists for this match, return it
     if (existingActiveStream && !replayComment) {
-      if (existingActiveStream.youtubeVideoId?.startsWith('cbot_yt_') || existingActiveStream.youtubeBroadcastId?.startsWith('cbot_yt_')) {
-        await prisma.liveStream.delete({ where: { id: existingActiveStream.id } }).catch(() => {});
-      } else {
-        return {
-          success: true,
-          stream: existingActiveStream,
-          matchDetails: {
-            editionTitle: match.edition?.title || 'Edition #200',
-            editionNumber: match.edition?.number || 200,
-            matchId: match.id,
-            playerName: userName,
-            teamName: playerTeamName,
-            opponentName: opponentTeamName,
-          }
-        };
-      }
+      return {
+        success: true,
+        stream: existingActiveStream,
+        attemptsCount: Math.min(3, previousAttemptsCount + 1),
+        matchDetails: {
+          editionTitle: match.edition?.title || 'Edition #200',
+          editionNumber: match.edition?.number || 200,
+          matchId: match.id,
+          playerName: userName,
+          teamName: playerTeamName,
+          opponentName: opponentTeamName,
+        }
+      };
     }
 
     const { googleClientId, googleClientSecret, googleRefreshToken } = await getYouTubeOAuthCredentials();

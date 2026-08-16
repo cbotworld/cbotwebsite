@@ -109,6 +109,10 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  const [attemptsCount, setAttemptsCount] = React.useState<number>(1);
+  const [elapsedSeconds, setElapsedSeconds] = React.useState<number>(0);
+  const MAX_STREAM_SECONDS = 45 * 60; // 45 Minutes Cutoff (2700s)
+
   // Initialize stream session
   React.useEffect(() => {
     const init = async () => {
@@ -118,6 +122,9 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
         if (res.success && res.stream) {
           setStreamId(res.stream.id);
           setStreamStatus(res.stream.status as any);
+          if (res.attemptsCount) {
+            setAttemptsCount(res.attemptsCount);
+          }
           if (res.stream.streamStartedAt) {
             setStreamStartedAt(new Date(res.stream.streamStartedAt));
           }
@@ -251,7 +258,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
   };
 
-  // Elapsed Timer
+  // Elapsed Timer with 45-Minute Maximum Cutoff
   const [elapsed, setElapsed] = React.useState('00:00:00');
   React.useEffect(() => {
     if (streamStatus !== 'LIVE' || !streamStartedAt) {
@@ -259,10 +266,18 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
     }
     const interval = setInterval(() => {
       const diff = Math.floor((new Date().getTime() - streamStartedAt.getTime()) / 1000);
+      setElapsedSeconds(diff);
+
       const h = Math.floor(diff / 3600).toString().padStart(2, '0');
       const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
       const s = (diff % 60).toString().padStart(2, '0');
       setElapsed(`${h}:${m}:${s}`);
+
+      // 45-Minute Hard Cutoff Auto-Stop
+      if (diff >= MAX_STREAM_SECONDS) {
+        clearInterval(interval);
+        handleStopLive();
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [streamStatus, streamStartedAt]);
@@ -434,24 +449,34 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
         {/* 2. Floating Top Bar (Controls on Video) */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
-          <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
             <Link href="/dashboard/player">
               <Button size="sm" variant="ghost" className="h-9 px-3 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1.5 border border-white/10">
                 <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Dashboard</span>
               </Button>
             </Link>
             {streamStatus === 'LIVE' ? (
-              <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 animate-pulse shadow-lg shadow-rose-600/30">
-                <Radio className="h-3.5 w-3.5" /> 🔴 LIVE {elapsed}
-              </Badge>
+              <>
+                <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1.5 gap-1.5 animate-pulse shadow-lg shadow-rose-600/30">
+                  <Radio className="h-3.5 w-3.5" /> 🔴 LIVE {elapsed} <span className="opacity-80 text-[10px]">/ 45:00 max</span>
+                </Badge>
+                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-amber-400 border-amber-500/40 text-[11px] font-mono font-bold">
+                  Attempt {attemptsCount}/3
+                </Badge>
+              </>
             ) : streamStatus === 'ARCHIVED' ? (
               <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" /> RECORDING SAVED
               </Badge>
             ) : (
-              <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-amber-400 border-amber-500/50 font-black text-xs px-3 py-1.5">
-                {loading && !initialized ? 'INITIALIZING…' : 'READY TO GO LIVE'}
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-amber-400 border-amber-500/50 font-black text-xs px-3 py-1.5">
+                  {loading && !initialized ? 'INITIALIZING…' : 'READY TO GO LIVE'}
+                </Badge>
+                <Badge variant="outline" className="bg-black/60 backdrop-blur-md text-slate-300 border-white/10 text-[10px] font-mono font-bold">
+                  Attempt {attemptsCount}/3
+                </Badge>
+              </div>
             )}
           </div>
 
@@ -473,6 +498,44 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
             </a>
           </div>
         </div>
+
+        {/* 2.5 40-Minute Warning Banner (5 mins before 45-min hard cutoff) */}
+        {streamStatus === 'LIVE' && elapsedSeconds >= 2400 && (
+          <div className="absolute top-16 inset-x-4 max-w-md mx-auto bg-amber-500 text-slate-950 px-4 py-2 rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-2xl z-30 animate-bounce">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>45-Min Match Limit: Stream will auto-end in {Math.max(1, Math.ceil((MAX_STREAM_SECONDS - elapsedSeconds) / 60))} min</span>
+          </div>
+        )}
+
+        {/* 2.6 Error Modal (e.g. 3 attempts exceeded or active stream elsewhere) */}
+        {errorMsg && streamStatus !== 'LIVE' && (
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-6 z-40">
+            <div className="max-w-md w-full bg-slate-900 border border-rose-500/50 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+              <div className="h-14 w-14 rounded-full bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-black text-white uppercase">Streaming Notice</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">{errorMsg}</p>
+              </div>
+              <div className="flex gap-2 justify-center pt-2">
+                <Link href="/dashboard/player">
+                  <Button variant="outline" className="rounded-xl border-white/20 text-xs font-bold px-4 py-2">
+                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
+                  </Button>
+                </Link>
+                {attemptsCount < 3 && !errorMsg.includes('already live') && (
+                  <Button
+                    onClick={() => { setErrorMsg(null); handleStartLive(); }}
+                    className="rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black px-4 py-2"
+                  >
+                    Retry
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 3. Floating Center Action Buttons (Start / Saved state on video) */}
         {streamStatus !== 'LIVE' && streamStatus !== 'ARCHIVED' && (
