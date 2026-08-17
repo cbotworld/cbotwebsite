@@ -17,7 +17,12 @@ import {
   UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio, RotateCcw, AlertCircle, MessageSquare, Share2
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
-import { BICENTENNIAL_MONUMENTS, monumentStatus } from '@/lib/bicentennial-monuments';
+import { monumentStatus } from '@/lib/bicentennial-monuments';
+import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import {
+  buildOrganizerScheduleDays,
+  type OrganizerScheduleDay,
+} from '@/lib/organizer-schedule';
 import { ProfileTab } from '@/components/player/ProfileTab';
 
 
@@ -64,16 +69,57 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   const currentTeam = initialTeam || null;
   const teammates = initialTeammates.length > 0 ? initialTeammates : (currentTeam?.members?.map((m: any) => m.user) || []);
-  
-  // Build 200th Edition Monument schedule — ALWAYS shows all 7 days.
-  // Monument fixture data is kept in sync with 200th-schedule/page.tsx (the authoritative source).
-  // DB matches are merged by matching the scheduled date; remaining days use clock-based status.
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>(() => buildOrganizerScheduleDays());
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await get200thEditionCombisData();
+        if (!res.success || cancelled) return;
+        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
+        const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
+          (stage.matchPairings || []).map((p: any) => ({
+            dayNumber: p.dayNumber,
+            team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
+            team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
+          }))
+        );
+        let dayDates: Record<number, string> = {};
+        if (res.edition?.dayDates) {
+          try {
+            dayDates = JSON.parse(res.edition.dayDates);
+          } catch {}
+        }
+        setScheduleDays(
+          buildOrganizerScheduleDays({
+            totalDays: res.edition?.totalDays,
+            dayDates,
+            pairings,
+            stages: (res as any).stageConfig?.stages || [],
+          })
+        );
+        setNowMs(Date.now());
+      } catch (e) {
+        console.error('Failed to load organizer schedule for player matches:', e);
+      }
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  // Build this team's fixtures from the same organizer schedule used on Match Schedule.
+  // Status / Go Live follow the 8pm–8pm day window, not leftover DB LIVE flags.
   const personalSchedule = React.useMemo(() => {
     if (!currentTeam?.name) return [];
 
     const teamNameUpper = currentTeam.name.toUpperCase().trim();
 
-    // Filter DB matches that belong to this player's team
     const dbMatches = (initialMatches || []).filter(
       (m: any) =>
         m.team1Id === currentTeam?.id ||
@@ -82,7 +128,6 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         m.team2?.name?.toUpperCase() === teamNameUpper
     );
 
-    // Team logos — from Supabase storage (base64 stored in DB but use URL for thumbnails)
     const teamLogos: Record<string, string> = {
       'PLYWOOD PIONEERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
       'SUPERNOVA QUEEN':   'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
@@ -94,56 +139,64 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       'BORIC SPEEDSTERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
     };
 
-    const monuments = BICENTENNIAL_MONUMENTS.map((m) => ({
-      num: m.monumentNumber,
-      startIso: m.startIso,
-      endIso: m.endIso,
-      matches: m.matches.map((fix) => ({ t1: fix.team1, t2: fix.team2 })),
-    }));
+    const usedDbIds = new Set<string>();
 
-    const now = Date.now();
-
-    return monuments.map((m) => {
-      // Find this team's fixture in this monument
-      const fix = m.matches.find(
-        (f) => f.t1.toUpperCase() === teamNameUpper || f.t2.toUpperCase() === teamNameUpper
+    return scheduleDays.map((day) => {
+      const fix = day.matches.find(
+        (f) => f.team1 === teamNameUpper || f.team2 === teamNameUpper
       );
       if (!fix) return null;
-      const isT1 = fix.t1.toUpperCase() === teamNameUpper;
+      const isT1 = fix.team1 === teamNameUpper;
+      const oppName = isT1 ? fix.team2 : fix.team1;
+      const startMs = new Date(day.startIso).getTime();
+      const endMs = new Date(day.endIso).getTime();
 
-      // ── Prefer real DB match: match by scheduled date (startIso day) ────────
-      const startDate = m.startIso.slice(0, 10); // 'YYYY-MM-DD'
       const dbMatch = dbMatches.find((db: any) => {
+        if (usedDbIds.has(db.id)) return false;
+        const t1 = db.team1?.name?.toUpperCase().trim();
+        const t2 = db.team2?.name?.toUpperCase().trim();
+        const namesMatch =
+          (t1 === teamNameUpper && t2 === oppName) ||
+          (t2 === teamNameUpper && t1 === oppName);
+        if (!namesMatch) return false;
+        const t = new Date(db.scheduledTime).getTime();
         const dbDate = new Date(db.scheduledTime).toISOString().slice(0, 10);
-        return dbDate === startDate;
+        return (t >= startMs && t < endMs) || dbDate === day.calendarDate || db.round === day.dayNumber;
       });
-      if (dbMatch) {
-        return {
-          ...dbMatch,
-          matchNumber: m.num,
-          endIso: m.endIso,
-        };
-      }
+      if (dbMatch?.id) usedDbIds.add(dbMatch.id);
 
-      // ── Compute status from clock matching schedule-page logic ────────────────
-      const status = monumentStatus({ startIso: m.startIso, endIso: m.endIso }, now);
-      const computedStatus = status === 'completed' ? 'COMPLETED' : status === 'live' ? 'LIVE' : 'SCHEDULED';
+      const windowStatus = monumentStatus({ startIso: day.startIso, endIso: day.endIso }, nowMs);
+      const computedStatus = windowStatus === 'completed' ? 'COMPLETED' : windowStatus === 'live' ? 'LIVE' : 'SCHEDULED';
+
+      const t1Name = fix.team1;
+      const t2Name = fix.team2;
 
       return {
-        id: `monument_${m.num}_${teamNameUpper.replace(/\s+/g, '_')}`,
-        matchNumber: m.num,
-        scheduledTime: m.startIso,
-        endIso: m.endIso,
+        ...(dbMatch || {}),
+        id: dbMatch?.id || `schedule_${day.dayNumber}_${teamNameUpper.replace(/\s+/g, '_')}`,
+        matchNumber: day.dayNumber,
+        scheduledTime: day.startIso,
+        endIso: day.endIso,
+        calendarDate: day.calendarDate,
+        timeRange: day.timeRange,
         status: computedStatus,
-        tableNumber: 1,
-        team1Id: isT1 ? currentTeam.id : `t_${fix.t1.replace(/\s+/g, '_')}`,
-        team1: { id: isT1 ? currentTeam.id : `t_${fix.t1.replace(/\s+/g, '_')}`, name: fix.t1, logo: teamLogos[fix.t1] || currentTeam.logo },
-        team2Id: !isT1 ? currentTeam.id : `t_${fix.t2.replace(/\s+/g, '_')}`,
-        team2: { id: !isT1 ? currentTeam.id : `t_${fix.t2.replace(/\s+/g, '_')}`, name: fix.t2, logo: teamLogos[fix.t2] || '' },
+        tableNumber: dbMatch?.tableNumber || 1,
+        team1Id: isT1 ? currentTeam.id : dbMatch?.team1Id || `t_${t1Name.replace(/\s+/g, '_')}`,
+        team1: {
+          id: isT1 ? currentTeam.id : dbMatch?.team1?.id || `t_${t1Name.replace(/\s+/g, '_')}`,
+          name: t1Name,
+          logo: teamLogos[t1Name] || (isT1 ? currentTeam.logo : ''),
+        },
+        team2Id: !isT1 ? currentTeam.id : dbMatch?.team2Id || `t_${t2Name.replace(/\s+/g, '_')}`,
+        team2: {
+          id: !isT1 ? currentTeam.id : dbMatch?.team2?.id || `t_${t2Name.replace(/\s+/g, '_')}`,
+          name: t2Name,
+          logo: teamLogos[t2Name] || (!isT1 ? currentTeam.logo : ''),
+        },
       };
     }).filter(Boolean);
 
-  }, [initialMatches, currentTeam]);
+  }, [initialMatches, currentTeam, scheduleDays, nowMs]);
 
   const assignedPatterns = initialPatterns.length > 0 ? initialPatterns : [];
 
@@ -183,12 +236,19 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       if (isPastMatch(match)) {
         return { allowed: false, blockedByDay: null };
       }
+      const windowStatus = monumentStatus(
+        { startIso: match.scheduledTime, endIso: match.endIso },
+        Date.now()
+      );
+      if (windowStatus !== 'live') {
+        return { allowed: false, blockedByDay: null };
+      }
       if (matchIndex === 0) return { allowed: true, blockedByDay: null };
       for (let i = 0; i < matchIndex; i++) {
         const prev = sortedMatches[i];
         const isDone = prev.status === 'COMPLETED' || streamedMatchIds.has(prev.id);
         if (!isDone) {
-          return { allowed: false, blockedByDay: i + 1 };
+          return { allowed: false, blockedByDay: prev.matchNumber || i + 1 };
         }
       }
       return { allowed: true, blockedByDay: null };
@@ -202,10 +262,11 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     [personalSchedule]
   );
 
-  /** Navigate to live studio for a given match (with optional replay comment) */
-  const navigateToLive = (match: any, comment?: string) => {
-    const base = `/player/matches/${match.id}/live`;
-    const url = comment ? `${base}?replay=1&comment=${encodeURIComponent(comment)}` : base;
+  /** Open the Cbot YouTube live app — live video is not stored in the website DB. */
+  const openCbotLive = (dayNumber: number) => {
+    const name = currentPlayer?.name || currentPlayer?.username || 'Player';
+    const day = `Day ${dayNumber}`;
+    const url = `cbot://live?name=${encodeURIComponent(name)}&day=${encodeURIComponent(day)}`;
     window.location.href = url;
   };
 
@@ -213,19 +274,12 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
   const handleGoLiveClick = (match: any, matchIndex: number) => {
     const { allowed, blockedByDay } = canGoLive(matchIndex, sortedSchedule);
     if (!allowed) {
-      // Show inline error — day is locked
-      alert(`🔒 Complete Day ${blockedByDay} first before going live on Day ${matchIndex + 1}.`);
+      if (blockedByDay) {
+        alert(`Complete Day ${blockedByDay} first before going live on Day ${match.matchNumber || matchIndex + 1}.`);
+      }
       return;
     }
-    const isReplay = streamedMatchIds.has(match.id);
-    if (isReplay) {
-      // Open comment modal
-      setReplayComment('');
-      setReplayCommentError('');
-      setGoLiveModal({ open: true, match, isReplay: true });
-    } else {
-      navigateToLive(match);
-    }
+    openCbotLive(match.matchNumber || matchIndex + 1);
   };
 
   const handleReplaySubmit = () => {
@@ -234,7 +288,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       return;
     }
     setGoLiveLoading(goLiveModal.match?.id || 'loading');
-    navigateToLive(goLiveModal.match, replayComment);
+    openCbotLive(goLiveModal.match?.matchNumber || 1);
   };
 
   // Score & Live Stream Submission Modal State
@@ -378,16 +432,25 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 sortedSchedule.map((match: any, idx: number) => {
                   const { allowed, blockedByDay } = canGoLive(idx, sortedSchedule);
                   const isReplay = streamedMatchIds.has(match.id);
-                  const isCurrentlyLive = match.status === 'LIVE';
-                  const isCompleted = match.status === 'COMPLETED';
+                  const windowStatus = monumentStatus(
+                    { startIso: match.scheduledTime, endIso: match.endIso },
+                    nowMs
+                  );
+                  const isCurrentlyLive = windowStatus === 'live';
+                  const isCompleted = windowStatus === 'completed';
+                  const isUpcoming = windowStatus === 'upcoming';
                   const isMyTeam1 = match.team1Id === currentTeam.id ||
                     match.team1?.name?.toUpperCase() === currentTeam.name?.toUpperCase();
                   const myTeamName = isMyTeam1 ? (match.team1?.name || currentTeam.name) : (match.team2?.name || currentTeam.name);
                   const oppTeamName = isMyTeam1 ? (match.team2?.name || 'TBD') : (match.team1?.name || 'TBD');
                   const myTeamLogo = isMyTeam1 ? (match.team1?.logo || currentTeam.logo) : (match.team2?.logo || currentTeam.logo);
                   const oppTeamLogo = isMyTeam1 ? match.team2?.logo : match.team1?.logo;
-                  const dayNum = idx + 1;
+                  const dayNum = match.matchNumber || idx + 1;
                   const matchStreams = (initialStreams || []).filter((s: any) => s.matchId === match.id);
+                  const [, calMonth, calDay] = String(match.calendarDate || '').split('-');
+                  const shortDate = calMonth
+                    ? `${Number(calDay)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(calMonth) - 1]}`
+                    : new Date(match.scheduledTime).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
                   return (
                     <div
@@ -403,64 +466,61 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                       }`}
                     >
                       {/* Main Match Row */}
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        {/* Day tag + status */}
-                        <div className="flex items-center gap-3 min-w-[70px]">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Day</span>
-                            <span className={`text-2xl font-black leading-none ${
-                              isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : !allowed ? 'text-muted-foreground/40' : 'text-amber-400'
-                            }`}>{dayNum}</span>
+                      <div className="grid grid-cols-[4.25rem_minmax(0,1fr)_11rem] sm:grid-cols-[4.25rem_minmax(0,1fr)_11.5rem] items-center gap-3">
+                        {/* Day tag + status — fixed width so all days line up */}
+                        <div className="w-[4.25rem] shrink-0 flex flex-col items-center justify-center">
+                          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Day</span>
+                          <span className={`text-2xl font-black tabular-nums leading-none h-7 flex items-center ${
+                            isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : isUpcoming ? 'text-muted-foreground/50' : 'text-amber-400'
+                          }`}>{dayNum}</span>
+                          <div className="h-3.5 mt-1 flex items-center justify-center">
                             {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                            {!allowed && !isCompleted && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
+                            {isUpcoming && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
                             {isCurrentlyLive && <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />}
                           </div>
                         </div>
 
-                        {/* My Team */}
-                        <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
-                          {myTeamLogo ? (
-                            <img src={myTeamLogo} alt={myTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm">
-                              {myTeamName?.[0]}
-                            </div>
-                          )}
-                          <span className="text-[10px] font-black text-amber-400 text-center leading-tight truncate max-w-[80px]">{myTeamName}</span>
-                          <Badge variant="carrom" className="text-[8px] px-1.5 py-0">YOU</Badge>
-                        </div>
+                        {/* Teams + VS */}
+                        <div className="grid grid-cols-[minmax(0,1fr)_3.25rem_minmax(0,1fr)] items-center gap-2 min-w-0">
+                          <div className="flex flex-col items-center gap-1.5 min-w-0">
+                            {myTeamLogo ? (
+                              <img src={myTeamLogo} alt={myTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm">
+                                {myTeamName?.[0]}
+                              </div>
+                            )}
+                            <span className="text-[10px] font-black text-amber-400 text-center leading-tight truncate w-full">{myTeamName}</span>
+                            <Badge variant="carrom" className="text-[8px] px-1.5 py-0">YOU</Badge>
+                          </div>
 
-                        {/* VS */}
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-lg font-black text-muted-foreground/40">VS</span>
-                          <span className="text-[9px] text-muted-foreground/50 font-mono">
-                            {new Date(match.scheduledTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground/40">Tbl #{match.tableNumber || 1}</span>
-                        </div>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-lg font-black text-muted-foreground/40">VS</span>
+                            <span className="text-[9px] text-muted-foreground/50 font-mono whitespace-nowrap">{shortDate}</span>
+                            <span className="text-[9px] text-muted-foreground/40">Tbl #{match.tableNumber || 1}</span>
+                          </div>
 
-                        {/* Opponent */}
-                        <div className="flex flex-col items-center gap-1.5 min-w-[90px]">
-                          {oppTeamLogo ? (
-                            <img src={oppTeamLogo} alt={oppTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-sm">
-                              {oppTeamName?.[0] || '?'}
-                            </div>
-                          )}
-                          <span className="text-[10px] font-bold text-foreground text-center leading-tight truncate max-w-[80px]">{oppTeamName}</span>
-                          <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">OPP</Badge>
+                          <div className="flex flex-col items-center gap-1.5 min-w-0">
+                            {oppTeamLogo ? (
+                              <img src={oppTeamLogo} alt={oppTeamName} className="w-10 h-10 rounded-lg object-contain border border-border shadow-sm bg-background" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-slate-500/20 border border-slate-500/30 flex items-center justify-center font-black text-slate-400 text-sm">
+                                {oppTeamName?.[0] || '?'}
+                              </div>
+                            )}
+                            <span className="text-[10px] font-bold text-foreground text-center leading-tight truncate w-full">{oppTeamName}</span>
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">OPP</Badge>
+                          </div>
                         </div>
 
                         {/* Status + Go Live button */}
-                        <div className="flex flex-col items-center sm:items-end gap-2 w-full sm:w-auto sm:ml-auto">
-                          {/* Status badge + Copy Link */}
+                        <div className="flex flex-col items-end gap-2 w-[11rem] sm:w-[11.5rem] shrink-0">
                           <div className="flex items-center gap-1.5">
                             <Badge
                               variant={isCompleted ? 'success' : isCurrentlyLive ? 'warning' : 'outline'}
                               className="text-[9px]"
                             >
-                              {match.status}
+                              {isCurrentlyLive ? 'LIVE' : isCompleted ? 'COMPLETED' : 'SCHEDULED'}
                             </Badge>
                             {isReplay && (
                               <Badge className="text-[9px] bg-violet-500/20 text-violet-400 border-violet-500/20 border">
@@ -482,29 +542,28 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                             </Button>
                           </div>
 
-                          {/* Go Live button — 4 states */}
-                          {isPastMatch(match) ? (
+                          {isCompleted || isPastMatch(match) ? (
                             <Button
                               size="sm"
                               disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full sm:w-auto"
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full"
                             >
                               🔒 Closed
                             </Button>
-                          ) : isCurrentlyLive ? (
+                          ) : isUpcoming ? (
                             <Button
                               size="sm"
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 w-full sm:w-auto"
-                              onClick={() => handleGoLiveClick(match, idx)}
+                              disabled
+                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
                             >
-                              <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
-                              LIVE NOW
+                              <Lock className="h-3.5 w-3.5" />
+                              Opens Day {dayNum}
                             </Button>
                           ) : !allowed ? (
                             <Button
                               size="sm"
                               disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full sm:w-auto"
+                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
                               title={`Complete Day ${blockedByDay} first`}
                             >
                               <Lock className="h-3.5 w-3.5" />
@@ -513,21 +572,36 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                           ) : isReplay ? (
                             <Button
                               size="sm"
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20 w-full sm:w-auto"
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20 w-full"
                               onClick={() => handleGoLiveClick(match, idx)}
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
                               GO LIVE AGAIN
                             </Button>
+                          ) : match.status === 'LIVE' && isReplay === false && false ? (
+                            null
                           ) : (
                             <Button
-                              variant="carrom"
+                              variant={isCurrentlyLive ? undefined : 'carrom'}
                               size="sm"
-                              className="h-9 px-4 text-[11px] font-black gap-2 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all w-full sm:w-auto"
+                              className={
+                                isCurrentlyLive
+                                  ? 'h-9 px-4 text-[11px] font-black gap-2 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 w-full'
+                                  : 'h-9 px-4 text-[11px] font-black gap-2 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all w-full'
+                              }
                               onClick={() => handleGoLiveClick(match, idx)}
                             >
-                              <Radio className="h-3.5 w-3.5 animate-pulse" />
-                              🔴 GO LIVE
+                              {isCurrentlyLive ? (
+                                <>
+                                  <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
+                                  GO LIVE
+                                </>
+                              ) : (
+                                <>
+                                  <Radio className="h-3.5 w-3.5 animate-pulse" />
+                                  🔴 GO LIVE
+                                </>
+                              )}
                             </Button>
                           )}
                         </div>

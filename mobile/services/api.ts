@@ -8,21 +8,29 @@ export interface LoginResponse {
   user?: {
     id: string;
     name: string;
+    username?: string;
     email: string;
     role: string;
   };
+  team?: {
+    id: string;
+    name: string;
+    tag: string;
+    logo?: string | null;
+  } | null;
   token?: string;
   error?: string;
 }
 
 export interface MatchDetails {
-  matchId: string;
+  matchId?: string;
+  dayNumber: number;
+  label: string;
+  title: string;
+  timeRange: string;
   editionTitle: string;
   editionNumber: number;
-  round?: number;
-  matchNumber?: number;
-  stage?: string;
-  playerName: string;
+  playerName?: string;
   playerRole?: string;
   teamName: string;
   teamTag?: string;
@@ -30,13 +38,11 @@ export interface MatchDetails {
   opponentName: string;
   opponentTag?: string;
   opponentLogo: string | null;
-  score1?: number;
-  score2?: number;
-  queenStrikes1?: number;
-  queenStrikes2?: number;
   scheduledTime: string | null;
+  calendarDate?: string;
   tableNumber: number;
   status: string;
+  canGoLive: boolean;
 }
 
 export interface StreamSession {
@@ -62,12 +68,36 @@ export async function loginPlayer(username: string, pin: string): Promise<LoginR
   }
 }
 
-export async function getPlayerMatches(token: string): Promise<{ success: boolean; matches?: MatchDetails[]; error?: string }> {
+export async function getPlayerMatches(token: string): Promise<{ success: boolean; matches?: MatchDetails[]; error?: string; team?: LoginResponse['team'] }> {
   try {
-    const res = await fetch(`${API_BASE}/api/mobile/matches`, {
+    const res = await fetch(`${API_BASE}/api/mobile/schedule`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
-    return await res.json();
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Failed to load schedule' };
+    }
+    const matches: MatchDetails[] = (data.days || []).map((day: any) => ({
+      matchId: `day-${day.dayNumber}`,
+      dayNumber: day.dayNumber,
+      label: day.label || `Day ${day.dayNumber}`,
+      title: day.title || '',
+      timeRange: day.timeRange || '',
+      editionTitle: day.editionTitle || data.team?.name || 'CBOT 200th Edition',
+      editionNumber: day.editionNumber || 200,
+      teamName: day.teamName,
+      teamTag: day.teamTag,
+      teamLogo: day.teamLogo || data.team?.logo || null,
+      opponentName: day.opponentName,
+      opponentTag: day.opponentTag,
+      opponentLogo: day.opponentLogo || null,
+      scheduledTime: day.startIso || null,
+      calendarDate: day.calendarDate,
+      tableNumber: day.tableNumber || 1,
+      status: day.status === 'live' ? 'LIVE' : day.status === 'completed' ? 'COMPLETED' : 'SCHEDULED',
+      canGoLive: Boolean(day.canGoLive),
+    }));
+    return { success: true, matches, team: data.team };
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error' };
   }

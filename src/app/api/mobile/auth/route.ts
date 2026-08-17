@@ -100,6 +100,13 @@ export async function POST(request: NextRequest) {
     // Generate token
     const token = Buffer.from(`${foundUser.id}:${Date.now()}`).toString('base64');
 
+    const participation = await prisma.editionParticipant.findFirst({
+      where: { userId: foundUser.id },
+      include: { team: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const team = participation?.team;
+
     return NextResponse.json(
       {
         success: true,
@@ -110,6 +117,9 @@ export async function POST(request: NextRequest) {
           email: foundUser.email,
           role: foundUser.role,
         },
+        team: team
+          ? { id: team.id, name: team.name, tag: team.tag, logo: team.logo }
+          : null,
         token,
       },
       { headers: corsHeaders }

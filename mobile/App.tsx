@@ -11,8 +11,9 @@ import {
   ScrollView,
   SafeAreaView,
   Dimensions,
+  Image,
+  Linking,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import {
   loginPlayer,
   getPlayerMatches,
@@ -51,7 +52,6 @@ export default function App() {
         setPlayerName(name);
         setPlayerRole(res.user?.role || 'PLAYER');
 
-        // Fetch matches
         const matchRes = await getPlayerMatches(res.token);
         if (matchRes.success && matchRes.matches) {
           setMatches(matchRes.matches);
@@ -68,6 +68,13 @@ export default function App() {
   };
 
   const handleSelectMatch = (match: MatchDetails) => {
+    if (!match.canGoLive) {
+      Alert.alert(
+        match.status === 'COMPLETED' ? `${match.label} closed` : `${match.label} not open yet`,
+        match.timeRange || 'Follow the official 8pm–8pm match schedule.'
+      );
+      return;
+    }
     setSelectedMatch(match);
     setScreen('live');
   };
@@ -165,66 +172,93 @@ export default function App() {
           {matches.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
-              <Text style={styles.emptyText}>No tournament matches found.</Text>
+              <Text style={styles.emptyText}>No matches on the schedule for your team yet.</Text>
               <Text style={styles.emptySubtext}>
-                Scheduled tournament matches will appear here automatically.
+                Your fixtures appear here from the organizer match schedule after you log in.
               </Text>
             </View>
           ) : (
-            matches.map((match) => (
+            matches.map((match) => {
+              const isLive = match.status === 'LIVE';
+              const isDone = match.status === 'COMPLETED';
+              return (
               <TouchableOpacity
-                key={match.matchId}
-                style={styles.matchCard}
+                key={match.matchId || match.label}
+                style={[
+                  styles.matchCard,
+                  isLive && styles.matchCardLive,
+                  isDone && styles.matchCardDone,
+                ]}
                 onPress={() => handleSelectMatch(match)}
-                activeOpacity={0.85}
+                activeOpacity={isLive ? 0.85 : 1}
               >
                 <View style={styles.matchCardHeader}>
-                  <View style={styles.editionBadge}>
-                    <Text style={styles.matchEdition}>{match.editionTitle}</Text>
+                  <View style={styles.dayCol}>
+                    <Text style={styles.dayLabel}>DAY</Text>
+                    <Text style={[styles.dayNum, isLive && { color: '#ef4444' }, isDone && { color: '#34d399' }]}>
+                      {match.dayNumber}
+                    </Text>
                   </View>
-                  <View style={styles.stagePill}>
-                    <Text style={styles.stagePillText}>
-                      {match.stage || 'LEAGUE'} • R{match.round || 1}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.matchEdition}>{match.title || match.label}</Text>
+                    <Text style={styles.timeRangeText}>{match.timeRange}</Text>
+                  </View>
+                  <View style={[styles.stagePill, isLive && styles.stagePillLive, isDone && styles.stagePillDone]}>
+                    <Text style={[styles.stagePillText, isLive && { color: '#ef4444' }, isDone && { color: '#34d399' }]}>
+                      {match.status}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.teamsRow}>
                   <View style={styles.teamCol}>
-                    <View style={styles.teamAvatar}>
-                      <Text style={styles.teamAvatarText}>
-                        {(match.teamTag || match.teamName || 'T1').slice(0, 3).toUpperCase()}
-                      </Text>
-                    </View>
+                    {match.teamLogo ? (
+                      <Image source={{ uri: match.teamLogo }} style={styles.teamLogo} />
+                    ) : (
+                      <View style={styles.teamAvatar}>
+                        <Text style={styles.teamAvatarText}>
+                          {(match.teamTag || match.teamName || 'T1').slice(0, 3).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                     <Text style={styles.teamNameText} numberOfLines={1}>
                       {match.teamName}
                     </Text>
+                    <Text style={styles.youOpp}>YOU</Text>
                   </View>
 
                   <View style={styles.vsCenter}>
                     <Text style={styles.vsText}>VS</Text>
                     <View style={styles.tableBadge}>
-                      <Text style={styles.tableBadgeText}>TABLE #{match.tableNumber}</Text>
+                      <Text style={styles.tableBadgeText}>{match.label}</Text>
                     </View>
                   </View>
 
                   <View style={styles.teamCol}>
-                    <View style={[styles.teamAvatar, { backgroundColor: '#3b82f6' }]}>
-                      <Text style={styles.teamAvatarText}>
-                        {(match.opponentTag || match.opponentName || 'T2').slice(0, 3).toUpperCase()}
-                      </Text>
-                    </View>
+                    {match.opponentLogo ? (
+                      <Image source={{ uri: match.opponentLogo }} style={styles.teamLogo} />
+                    ) : (
+                      <View style={[styles.teamAvatar, { backgroundColor: '#3b82f6' }]}>
+                        <Text style={styles.teamAvatarText}>
+                          {(match.opponentTag || match.opponentName || 'T2').slice(0, 3).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
                     <Text style={styles.teamNameText} numberOfLines={1}>
                       {match.opponentName}
                     </Text>
+                    <Text style={styles.youOpp}>OPP</Text>
                   </View>
                 </View>
 
                 <View style={styles.goLiveRow}>
-                  <Text style={styles.goLiveText}>🔴 ENTER LIVE STUDIO & BROADCAST →</Text>
+                  <Text style={[styles.goLiveText, !isLive && { color: '#64748b' }]}>
+                    {isLive ? '🔴 GO LIVE ON YOUTUBE →' : isDone ? '🔒 CLOSED' : `🔒 OPENS ${match.label}`}
+                  </Text>
                 </View>
               </TouchableOpacity>
-            ))
+              );
+            })
           )}
         </ScrollView>
 
@@ -246,52 +280,47 @@ export default function App() {
   // SCREEN 3: EMBEDDED LIVE BROADCAST STUDIO (OPTION A)
   // Direct In-Browser Live Video Streaming to YouTube & Supabase
   // ==========================================
-  const studioUrl = `https://www.cbotworld.com/player/matches/${selectedMatch?.matchId}/live?token=${token}`;
+  const youtubeLiveUrl = `cbot://live?name=${encodeURIComponent(playerName)}&day=${encodeURIComponent(selectedMatch?.label || 'Day')}`;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      {/* Top Floating Native Header */}
       <View style={styles.liveNavHeader}>
         <TouchableOpacity
           style={styles.exitStudioBtn}
           onPress={() => setScreen('matches')}
           activeOpacity={0.8}
         >
-          <Text style={styles.exitStudioText}>← Exit Studio</Text>
+          <Text style={styles.exitStudioText}>← Back</Text>
         </TouchableOpacity>
 
         <View style={styles.liveNavCenter}>
           <Text style={styles.liveNavTitle} numberOfLines={1}>
-            {selectedMatch?.teamName} vs {selectedMatch?.opponentName}
+            {selectedMatch?.label} · {selectedMatch?.teamName} vs {selectedMatch?.opponentName}
           </Text>
         </View>
 
         <View style={styles.livePill}>
-          <Text style={styles.livePillText}>🔴 LIVE STUDIO</Text>
+          <Text style={styles.livePillText}>🔴 LIVE DAY</Text>
         </View>
       </View>
 
-      {/* Full Live Streaming Studio WebView with Camera Access */}
-      <View style={styles.webviewContainer}>
-        <WebView
-          source={{ uri: studioUrl }}
-          style={styles.webview}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          allowsInlineMediaPlayback={true}
-          mediaPlaybackRequiresUserAction={false}
-          cameraAccessAndroid={true}
-          microphoneAccessAndroid={true}
-          originWhitelist={['*']}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.webviewLoading}>
-              <ActivityIndicator size="large" color="#f59e0b" />
-              <Text style={styles.loadingText}>Initializing CBOT Live Broadcast Studio...</Text>
-            </View>
-          )}
-        />
+      <View style={styles.webviewLoading}>
+        <Text style={styles.emptyIcon}>📺</Text>
+        <Text style={styles.emptyText}>Go live as {playerName}</Text>
+        <Text style={styles.emptySubtext}>
+          {selectedMatch?.label} · {selectedMatch?.timeRange}
+          {'\n'}
+          Overlay will show your name and day. Video goes to the CBOT YouTube channel — not the website database.
+        </Text>
+        <TouchableOpacity
+          style={[styles.loginButton, { marginTop: 24, width: 280 }]}
+          onPress={() => Linking.openURL(youtubeLiveUrl).catch(() => {
+            Alert.alert('Open Cbot Live', 'Install the Cbot YouTube live app (com.cbotworld) to broadcast.');
+          })}
+        >
+          <Text style={styles.loginButtonText}>OPEN YOUTUBE LIVE</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -422,6 +451,57 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1.5,
     borderColor: '#1e293b',
+  },
+  matchCardLive: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  matchCardDone: {
+    borderColor: '#14532d',
+    backgroundColor: 'rgba(16,185,129,0.06)',
+  },
+  dayCol: {
+    width: 52,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  dayLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 1,
+  },
+  dayNum: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#f59e0b',
+    lineHeight: 30,
+  },
+  timeRangeText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  teamLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    marginBottom: 6,
+    backgroundColor: '#020617',
+  },
+  youOpp: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748b',
+    marginTop: 2,
+    letterSpacing: 1,
+  },
+  stagePillLive: {
+    backgroundColor: 'rgba(239,68,68,0.15)',
+  },
+  stagePillDone: {
+    backgroundColor: 'rgba(16,185,129,0.15)',
   },
   matchCardHeader: {
     flexDirection: 'row',
