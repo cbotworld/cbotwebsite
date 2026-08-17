@@ -1,11 +1,78 @@
 export type UserRole = 'ORGANIZER' | 'CAPTAIN' | 'PLAYER';
 
-export type TournamentFormat = 'SINGLE_ELIMINATION' | 'DOUBLE_ELIMINATION' | 'ROUND_ROBIN' | 'SWISS' | 'CBOT_HYBRID_PLAYOFFS';
+export type TournamentFormat = 'SINGLE_ELIMINATION' | 'DOUBLE_ELIMINATION' | 'ROUND_ROBIN' | 'SWISS' | 'CBOT_HYBRID_PLAYOFFS' | 'MULTI_STAGE';
 export type TournamentStatus = 'DRAFT' | 'REGISTRATION_OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'COMPLETED' | 'DISPUTED';
 export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type PlayerCategory = 'CATEGORY_A' | 'CATEGORY_B' | 'CATEGORY_C' | 'CATEGORY_D';
-export type MatchStage = 'ROUND_ROBIN' | 'QUALIFIER_1' | 'QUALIFIER_2' | 'GRAND_FINAL';
+export type MatchStage =
+  | 'ROUND_ROBIN'
+  | 'LEAGUE'
+  | 'LEAGUE_A'
+  | 'LEAGUE_B'
+  | 'LEAGUE_C'
+  | 'LEAGUE_D'
+  | 'LEAGUE2_A'
+  | 'LEAGUE2_B'
+  | 'LEAGUE2_C'
+  | 'LEAGUE2_D'
+  | 'LEAGUE3_A'
+  | 'LEAGUE3_B'
+  | 'LEAGUE3_C'
+  | 'LEAGUE3_D'
+  | 'QUALIFIER_1'
+  | 'QUALIFIER_2'
+  | 'QUALIFIER_3'
+  | 'QUALIFIER_4'
+  | 'GRAND_FINAL'
+  | 'THIRD_PLACE'
+  | 'FIFTH_PLACE'
+  | 'SEVENTH_PLACE';
+export type StageKind = 'ROUND_ROBIN' | 'LEAGUE' | 'QUALIFIER' | 'FINALS';
+export type StageSeeding = 'RR_STANDINGS_SNAKE' | 'RR_STANDINGS_SPLIT' | 'MANUAL';
+export type QualifierPairing = 'CROSS' | 'RANKED';
+export type ScheduleMode = 'DIVIDED' | 'SEQUENCE';
+
+export interface LeagueGroupConfig {
+  name: string;
+  key?: string;
+  teamIds: string[];
+}
+
+export interface TournamentStage {
+  id: string;
+  order: number;
+  kind: StageKind;
+  name: string;
+  teamCount?: number;
+  groupCount?: number;
+  teamsPerGroup?: number;
+  qualifyPerGroup?: number;
+  seeding?: StageSeeding;
+  groups?: LeagueGroupConfig[];
+  pairing?: QualifierPairing;
+  includeThirdPlace?: boolean;
+  startDay?: number;
+  durationDays?: number;
+  leagueIndex?: number;
+  matchPairings?: Array<{
+    stage: string;
+    label: string;
+    team1Id: string;
+    team2Id: string;
+    team1Name?: string;
+    team2Name?: string;
+    round?: number;
+    dayNumber?: number;
+    scheduledTime?: string;
+    tableNumber?: number;
+  }>;
+}
+
+export interface TournamentStageConfig {
+  stages: TournamentStage[];
+  scheduleMode?: ScheduleMode;
+}
 export type LineupStatus = 'DRAFT' | 'SUBMITTED' | 'LOCKED' | 'OVERRIDDEN';
 
 export interface BoardPattern {

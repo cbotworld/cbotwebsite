@@ -562,7 +562,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
 
     // Frame & score snapshot broadcast every 400ms as real-time stream backup
     const snapshotInterval = setInterval(() => {
-      const sourceCanvas = document.querySelector('canvas') as HTMLCanvasElement | null;
+      const sourceCanvas = document.getElementById('cbot-stream-canvas') as HTMLCanvasElement | null;
       if (sourceCanvas && sourceCanvas.width > 0 && sourceCanvas.height > 0 && offscreenCanvas && offscreenCtx) {
         try {
           offscreenCtx.drawImage(sourceCanvas, 0, 0, 640, 360);

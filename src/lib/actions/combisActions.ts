@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { unstable_noStore as noStore } from 'next/cache';
+import { stageConfigKey } from '@/lib/tournament-stages';
 
 export async function get200thEditionCombisData() {
   noStore();
@@ -19,6 +20,18 @@ export async function get200thEditionCombisData() {
     });
 
     const editionId = edition?.id;
+
+    let stageConfig = null;
+    if (editionId) {
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key: stageConfigKey(editionId) },
+      });
+      if (setting?.value) {
+        try {
+          stageConfig = JSON.parse(setting.value);
+        } catch {}
+      }
+    }
 
     // 2. Fetch all Teams under Edition 200 from Supabase
     const teams = await prisma.team.findMany({
@@ -71,6 +84,7 @@ export async function get200thEditionCombisData() {
     return {
       success: true,
       edition,
+      stageConfig,
       teams,
       matches,
     };

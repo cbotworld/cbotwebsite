@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Calendar, Clock, MapPin, Trophy, Shield, Filter, Search, ArrowRight, Video, Flame, Sparkles } from 'lucide-react';
-import { Match, MatchStage } from '@/types';
+import { Match } from '@/types';
+import { formatMatchStage } from '@/lib/tournament-stages';
 
 export default function FixturesClient({ initialMatches }: { initialMatches: any[] }) {
   const [stageFilter, setStageFilter] = React.useState<string>('ALL');
@@ -40,7 +41,7 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
             </div>
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight">Cornerstones of Carrom (Edition #200) Schedule</h1>
             <p className="text-muted-foreground text-sm max-w-2xl">
-              Inspect upcoming round-robin league matches, carrom table numbers, scheduled time slots, and playoff brackets.
+              Inspect upcoming round-robin, league group, qualifier, and finals fixtures, plus table numbers and time slots.
             </p>
           </div>
 
@@ -74,7 +75,7 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <span className="text-xs font-bold text-muted-foreground mr-1">Stage:</span>
-          {['ALL', 'ROUND_ROBIN', 'QUALIFIER_1', 'QUALIFIER_2', 'GRAND_FINAL'].map((stg) => (
+          {['ALL', 'ROUND_ROBIN', 'LEAGUE_A', 'LEAGUE_B', 'LEAGUE2_A', 'LEAGUE2_B', 'QUALIFIER_1', 'QUALIFIER_2', 'GRAND_FINAL', 'THIRD_PLACE', 'FIFTH_PLACE', 'SEVENTH_PLACE'].map((stg) => (
             <Button
               key={stg}
               size="sm"
@@ -82,7 +83,7 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
               onClick={() => setStageFilter(stg)}
               className="text-xs font-bold px-3 h-8"
             >
-              {stg.replace('_', ' ')}
+              {stg === 'ALL' ? 'ALL' : formatMatchStage(stg)}
             </Button>
           ))}
         </div>
@@ -120,7 +121,7 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
               {/* Match Stage & Title */}
               <div>
                 <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                  {m.stage ? m.stage.replace('_', ' ') : 'Round-Robin League'} • Match #{m.matchNumber}
+                  {m.stage ? formatMatchStage(m.stage) : 'Round-Robin League'} • Match #{m.matchNumber}
                 </div>
                 <h3 className="font-extrabold text-base mt-0.5">{m.team1?.name} vs {m.team2?.name}</h3>
               </div>

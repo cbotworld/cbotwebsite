@@ -81,13 +81,19 @@ export function TabsContent({
   value,
   children,
   className,
+  forceMount,
 }: {
   value: string;
   children: React.ReactNode;
   className?: string;
+  forceMount?: boolean;
 }) {
   const { activeTab } = React.useContext(TabsContext);
-  if (activeTab !== value) return null;
+  if (!forceMount && activeTab !== value) return null;
 
-  return <div className={cn('mt-4 focus-visible:outline-none', className)}>{children}</div>;
+  return (
+    <div className={cn('mt-4 focus-visible:outline-none', forceMount && activeTab !== value && 'hidden', className)}>
+      {children}
+    </div>
+  );
 }

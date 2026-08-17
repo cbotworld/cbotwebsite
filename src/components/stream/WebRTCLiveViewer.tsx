@@ -263,7 +263,6 @@ export default function WebRTCLiveViewer({
       {/* 1. Real-Time Live Camera Feed (Instant Snapshot & Seamless Video) */}
       {!finishedVideoUrl && (
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {/* Live WebRTC video stream */}
           <video
             ref={videoRef}
             autoPlay
@@ -271,7 +270,7 @@ export default function WebRTCLiveViewer({
             muted={isMuted}
             onLoadedData={() => setHasStream(true)}
             onPlaying={() => setHasStream(true)}
-            className={`absolute inset-0 h-full w-full object-contain bg-black ${hasStream ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute inset-0 h-full w-full object-contain ${hasStream ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'}`}
           />
 
           {/* Real-Time Live Frame stream (Instant preview with zero lag) */}
@@ -279,7 +278,7 @@ export default function WebRTCLiveViewer({
             <img
               src={latestSnapshot}
               alt="Live Match Feed"
-              className="absolute inset-0 h-full w-full object-contain bg-black z-[5]"
+              className="absolute inset-0 h-full w-full object-contain z-[5]"
             />
           )}
 

@@ -16,7 +16,10 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch } from 'lucide-react';
+import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
+import { isCalendarDayCompleted } from '@/lib/tournament-stages';
 
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[] }) {
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
@@ -257,6 +260,29 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     }
     return map;
   };
+
+  const handleDaysNeeded = React.useCallback((days: number) => {
+    if (days < 1) return;
+    setTotalDays((prev) => (days === prev ? prev : days));
+    setDayDatesMap((map) => {
+      const filled = generateDefaultDayDates(startDate, days, map);
+      const sameLen = Object.keys(filled).length === Object.keys(map).length;
+      const same = sameLen && Object.keys(filled).every((k) => filled[Number(k)] === map[Number(k)]);
+      return same ? map : filled;
+    });
+  }, [startDate]);
+
+  const handleStartDateChange = React.useCallback((date: string) => {
+    setStartDate(date);
+    setDayDatesMap((map) => {
+      const preserved: Record<number, string> = {};
+      Object.entries(map).forEach(([k, v]) => {
+        const day = Number(k);
+        if (isCalendarDayCompleted(day, map)) preserved[day] = v;
+      });
+      return generateDefaultDayDates(date, totalDays, preserved);
+    });
+  }, [totalDays]);
 
   const selectedEdition = editions.find((e) => e.id === selectedEditionId) || editions[0];
 
@@ -888,6 +914,23 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </Card>
       </div>
 
+      <Tabs defaultValue="players" className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto w-full gap-1 p-1.5 bg-card border border-border rounded-2xl">
+          <TabsTrigger value="players" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <KeyRound className="h-3.5 w-3.5" /> Players
+          </TabsTrigger>
+          <TabsTrigger value="teams" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Users className="h-3.5 w-3.5" /> Teams
+          </TabsTrigger>
+          <TabsTrigger value="stages" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <GitBranch className="h-3.5 w-3.5" /> Stage Designer
+          </TabsTrigger>
+          <TabsTrigger value="schedule" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Layers className="h-3.5 w-3.5" /> Days & Formats
+          </TabsTrigger>
+        </TabsList>
+
+      <TabsContent value="schedule" forceMount className="mt-4">
       {/* Rounds & Match Schedule Configuration Card */}
       <Card className="border-amber-500/30">
         <CardHeader className="border-b border-border pb-4">
@@ -897,7 +940,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 <Layers className="h-5 w-5 text-amber-500 animate-pulse" /> Tournament Days, Schedule &amp; Match Formats
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Set total event days, assign specific calendar dates for each day, and configure per-round match formats for <strong className="text-amber-500">{selectedEdition?.title || 'Active Edition'}</strong>.
+                Assign calendar dates for each event day and configure per-round match formats for <strong className="text-amber-500">{selectedEdition?.title || 'Active Edition'}</strong>. Start date and length come from the Stage Designer.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -914,43 +957,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <form onSubmit={handleSaveRoundsConfig} className="space-y-6">
             
             {/* Control Inputs Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
-              <div>
-                <label className="text-xs font-bold block mb-1">Total Event Days</label>
-                <Select
-                  value={totalDays.toString()}
-                  onChange={(e: any) => {
-                    const newDays = parseInt(e.target.value, 10);
-                    setTotalDays(newDays);
-                    setDayDatesMap(generateDefaultDayDates(startDate, newDays, dayDatesMap));
-                  }}
-                  className="text-xs font-bold"
-                >
-                  <option value="3">3 Days Event</option>
-                  <option value="5">5 Days Event</option>
-                  <option value="7">7 Days Event</option>
-                  <option value="10">10 Days Event</option>
-                  <option value="12">12 Days Event</option>
-                  <option value="15">15 Days Event</option>
-                  <option value="20">20 Days Event</option>
-                  <option value="30">30 Days Event</option>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold block mb-1">Event Start Date (Day 1)</label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e: any) => {
-                    const newStart = e.target.value;
-                    setStartDate(newStart);
-                    setDayDatesMap(generateDefaultDayDates(newStart, totalDays, {}));
-                  }}
-                  className="text-xs font-bold font-mono bg-background"
-                />
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
               <div>
                 <label className="text-xs font-bold block mb-1">Events per Day</label>
                 <Select value={roundCount.toString()} onChange={(e: any) => handleRoundCountChange(parseInt(e.target.value, 10))} className="text-xs font-bold">
@@ -964,6 +971,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   <option value="10">10 Events / Day</option>
                 </Select>
               </div>
+              <div className="flex flex-col justify-center">
+                <p className="text-[11px] text-muted-foreground font-medium">
+                  Day 1 starts {startDate || '—'} · {totalDays} days from the stage path.
+                </p>
+              </div>
             </div>
 
             {/* Daily Calendar Dates Schedule */}
@@ -976,24 +988,35 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNum) => (
-                  <div key={dayNum} className="bg-card p-3 rounded-xl border border-border/70 shadow-sm space-y-1.5">
+                {Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNum) => {
+                  const completed = isCalendarDayCompleted(dayNum, dayDatesMap);
+                  return (
+                  <div key={dayNum} className={`bg-card p-3 rounded-xl border shadow-sm space-y-1.5 ${completed ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border/70'}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-foreground">Day {dayNum}</span>
-                      <span className="text-[9.5px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                        {roundCount} Events
+                      <span className="text-xs font-extrabold text-foreground">
+                        Day {dayNum}{dayNum <= 7 ? ' · RR' : dayNum >= 8 && dayNum <= 10 ? ' · League' : ''}
                       </span>
+                      {completed ? (
+                        <span className="text-[9.5px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">Completed</span>
+                      ) : (
+                        <span className="text-[9.5px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                          {roundCount} Events
+                        </span>
+                      )}
                     </div>
                     <Input
                       type="date"
                       value={dayDatesMap[dayNum] || ''}
                       onChange={(e: any) => {
+                        if (completed) return;
                         setDayDatesMap({ ...dayDatesMap, [dayNum]: e.target.value });
                       }}
-                      className="text-xs font-bold font-mono h-8 bg-background"
+                      disabled={completed}
+                      className="text-xs font-bold font-mono h-8 bg-background disabled:opacity-60"
                     />
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -1047,13 +1070,33 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </form>
         </CardContent>
       </Card>
+      </TabsContent>
 
+      <TabsContent value="stages" forceMount className="mt-4">
+      <TournamentStageDesigner
+        editionId={selectedEditionId}
+        editionTitle={selectedEdition?.title || selectedEdition?.name || 'Active Edition'}
+        teams={(selectedEditionTeams.length ? selectedEditionTeams : teamsList).map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          tag: t.tag,
+        }))}
+        eventsPerDay={roundCount}
+        dayDates={dayDatesMap}
+        totalDays={totalDays}
+        startDate={startDate}
+        onStartDateChange={handleStartDateChange}
+        onDaysNeededChange={handleDaysNeeded}
+      />
+      </TabsContent>
+
+      <TabsContent value="teams" forceMount className="mt-4">
       {/* Teams Management */}
       <Card className="border-amber-500/30">
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-2">
           <div>
             <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Users className="h-5 w-5 text-amber-500" /> Teams — {selectedEdition?.title || 'Active Edition'}
+              <Users className="h-5 w-5 text-amber-500" /> Teams — Cornerstones of Carrom
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               Manage teams, assign captains and roster players for this edition.
@@ -1143,7 +1186,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </Table>
         </CardContent>
       </Card>
+      </TabsContent>
 
+      <TabsContent value="players" forceMount className="mt-4">
       {/* User Credentials Section */}
 
       {/* User Credentials & PIN Management Table */}
@@ -1270,8 +1315,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </Table>
         </CardContent>
       </Card>
-
-
+      </TabsContent>
+      </Tabs>
 
       {/* Generate Credentials Modal */}
       <Dialog open={genCredentialsModalOpen} onOpenChange={setGenCredentialsModalOpen}>

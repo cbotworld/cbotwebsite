@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
+import { stageSpanDays } from '@/lib/tournament-stages';
 import * as XLSX from 'xlsx';
 
 interface TeamInfo {
@@ -103,7 +105,9 @@ interface DayCombiFixture {
   dateStr: string;
   cutoffDateStr: string;
   startIso: string;
+  endIso: string;
   cutoffIso: string;
+  calendarDate: string;
   matches: MatchCombiData[];
 }
 
@@ -296,6 +300,172 @@ function getTeamCombiForDay(
   };
 }
 
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+function ordinal(n: number) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}TH`;
+  if (v % 10 === 1) return `${n}ST`;
+  if (v % 10 === 2) return `${n}ND`;
+  if (v % 10 === 3) return `${n}RD`;
+  return `${n}TH`;
+}
+
+function formatCutoffLabel(iso: string) {
+  const datePart = iso.slice(0, 10);
+  const [y, m, d] = datePart.split('-').map(Number);
+  return `9:30 PM IST, ${ordinal(d)} ${MONTHS[(m || 1) - 1]} ${y}`;
+}
+
+function formatDayRange(startIso: string, endIso: string) {
+  const fmt = (iso: string, withTime = true) => {
+    const [datePart, timePart] = iso.split('T');
+    const [y, m, d] = datePart.split('-').map(Number);
+    const hour = timePart ? parseInt(timePart.slice(0, 2), 10) : 20;
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour % 12 || 12;
+    return `${ordinal(d)} ${MONTHS[(m || 1) - 1]}${withTime ? ` ${h12} ${ampm}` : ''}`;
+  };
+  return `${fmt(startIso)} TO ${fmt(endIso)}`;
+}
+
+function addDaysIsoDate(dateStr: string, days: number) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + days));
+  return dt.toISOString().slice(0, 10);
+}
+
+function calendarDateForDay(
+  dayNumber: number,
+  dayDates?: Record<number, string> | Record<string, string>
+) {
+  const dates = (dayDates || {}) as Record<string | number, string>;
+  const raw = dates[dayNumber] ?? dates[String(dayNumber)];
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  return addDaysIsoDate('2026-08-10', dayNumber - 1);
+}
+
+function toCombiDay(
+  dayNumber: number,
+  title: string,
+  startIso: string,
+  endIso: string,
+  timeRange: string,
+  matches: Array<{ team1: string; team2: string }>,
+  calendarDate?: string
+): DayCombiFixture {
+  const cutoffDate = calendarDate || calendarDateForDay(dayNumber);
+  const cutoffIso = `${cutoffDate}T21:30:00+05:30`;
+  return {
+    dayNumber,
+    title,
+    dateStr: timeRange,
+    cutoffDateStr: formatCutoffLabel(cutoffIso),
+    startIso,
+    endIso,
+    cutoffIso,
+    calendarDate: cutoffDate,
+    matches: matches.map((m) => ({
+      team1Key: m.team1.toUpperCase().trim(),
+      team2Key: m.team2.toUpperCase().trim(),
+      events: [],
+    })),
+  };
+}
+
+function buildCombiSchedule(opts?: {
+  totalDays?: number;
+  dayDates?: Record<number, string> | Record<string, string>;
+  pairings?: Array<{ dayNumber?: number; team1Name?: string; team2Name?: string }>;
+  stages?: Array<{ startDay?: number; durationDays?: number; kind?: string; name?: string }>;
+}): DayCombiFixture[] {
+  const dates = opts?.dayDates;
+  const official = officialMatchDays().map((d) =>
+    toCombiDay(
+      d.dayNumber,
+      d.title,
+      d.startIso,
+      d.endIso,
+      d.timeRange,
+      d.matches,
+      calendarDateForDay(d.dayNumber, dates)
+    )
+  );
+  const byDay = new Map(official.map((d) => [d.dayNumber, d]));
+
+  (opts?.pairings || []).forEach((p) => {
+    const dayNumber = p.dayNumber;
+    if (!dayNumber || !p.team1Name || !p.team2Name) return;
+    const existing = byDay.get(dayNumber);
+    const match = {
+      team1Key: p.team1Name.toUpperCase().trim(),
+      team2Key: p.team2Name.toUpperCase().trim(),
+      events: [],
+    };
+    if (existing) {
+      const dup = existing.matches.some(
+        (m) =>
+          (m.team1Key === match.team1Key && m.team2Key === match.team2Key) ||
+          (m.team1Key === match.team2Key && m.team2Key === match.team1Key)
+      );
+      if (!dup) existing.matches.push(match);
+      return;
+    }
+    const dateStr = calendarDateForDay(dayNumber, opts?.dayDates);
+    const startIso = `${addDaysIsoDate(dateStr, -1)}T20:00:00+05:30`;
+    const endIso = `${dateStr}T20:00:00+05:30`;
+    const stage = (opts?.stages || []).find((s) => {
+      const start = s.startDay || 0;
+      const end = start + (s.durationDays || 1) - 1;
+      return dayNumber >= start && dayNumber <= end;
+    });
+    byDay.set(
+      dayNumber,
+      toCombiDay(
+        dayNumber,
+        stage?.name ? `${stage.name.toUpperCase()} · DAY ${dayNumber}` : `DAY ${dayNumber}`,
+        startIso,
+        endIso,
+        formatDayRange(startIso, endIso),
+        [{ team1: match.team1Key, team2: match.team2Key }],
+        dateStr
+      )
+    );
+  });
+
+  const officialMax = official.reduce((max, d) => Math.max(max, d.dayNumber), 7);
+  const stageMax = opts?.stages?.length ? stageSpanDays(opts.stages as any) : 0;
+  const totalDays = Math.max(officialMax, opts?.totalDays || 0, stageMax, 7);
+
+  const days: DayCombiFixture[] = [];
+  for (let n = 1; n <= totalDays; n += 1) {
+    if (byDay.has(n)) {
+      days.push(byDay.get(n)!);
+      continue;
+    }
+    const dateStr = calendarDateForDay(n, opts?.dayDates);
+    const startIso = `${addDaysIsoDate(dateStr, -1)}T20:00:00+05:30`;
+    const endIso = `${dateStr}T20:00:00+05:30`;
+    const stage = (opts?.stages || []).find((s) => {
+      const start = s.startDay || 0;
+      const end = start + (s.durationDays || 1) - 1;
+      return n >= start && n <= end;
+    });
+    days.push(
+      toCombiDay(
+        n,
+        stage?.name ? `${stage.name.toUpperCase()} · DAY ${n}` : `DAY ${n}`,
+        startIso,
+        endIso,
+        formatDayRange(startIso, endIso),
+        [],
+        dateStr
+      )
+    );
+  }
+  return days;
+}
+
 function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, teamsList: any[] = []): EventSlot[] {
   const c1 = getTeamCombiForDay(t1Key, dayNum, teamsList);
   const c2 = getTeamCombiForDay(t2Key, dayNum, teamsList);
@@ -313,112 +483,37 @@ function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, team
   ];
 }
 
-const SAMPLE_COMBIS_DATA: DayCombiFixture[] = [
-  {
-    dayNumber: 1,
-    title: 'BICENTENNIAL MONUMENT 1',
-    dateStr: '9TH AUG 9 PM TO 10TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 10TH AUG 2026',
-    startIso: '2026-08-09T21:00:00+05:30',
-    cutoffIso: '2026-08-10T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'SUPERNOVA QUEEN', events: [] },
-      { team1Key: 'POCKET DYNAMOS', team2Key: 'LUMEN PILLAR', events: [] },
-      { team1Key: 'VANILLA FALCONS', team2Key: 'VINTAGE STRIKERS', events: [] },
-      { team1Key: 'EBONY OVERLORDS', team2Key: 'BORIC SPEEDSTERS', events: [] },
-    ],
-  },
-  {
-    dayNumber: 2,
-    title: 'BICENTENNIAL MONUMENT 2',
-    dateStr: '11TH AUG 8 PM TO 12TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 11TH AUG 2026',
-    startIso: '2026-08-11T20:00:00+05:30',
-    cutoffIso: '2026-08-11T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'VINTAGE STRIKERS', events: [] },
-      { team1Key: 'LUMEN PILLAR', team2Key: 'BORIC SPEEDSTERS', events: [] },
-      { team1Key: 'SUPERNOVA QUEEN', team2Key: 'EBONY OVERLORDS', events: [] },
-      { team1Key: 'POCKET DYNAMOS', team2Key: 'VANILLA FALCONS', events: [] },
-    ],
-  },
-  {
-    dayNumber: 3,
-    title: 'BICENTENNIAL MONUMENT 3',
-    dateStr: '12TH AUG 8 PM TO 13TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 12TH AUG 2026',
-    startIso: '2026-08-12T20:00:00+05:30',
-    cutoffIso: '2026-08-12T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'EBONY OVERLORDS', events: [] },
-      { team1Key: 'BORIC SPEEDSTERS', team2Key: 'VANILLA FALCONS', events: [] },
-      { team1Key: 'VINTAGE STRIKERS', team2Key: 'POCKET DYNAMOS', events: [] },
-      { team1Key: 'LUMEN PILLAR', team2Key: 'SUPERNOVA QUEEN', events: [] },
-    ],
-  },
-  {
-    dayNumber: 4,
-    title: 'BICENTENNIAL MONUMENT 4',
-    dateStr: '13TH AUG 8 PM TO 14TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 13TH AUG 2026',
-    startIso: '2026-08-13T20:00:00+05:30',
-    cutoffIso: '2026-08-13T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'VANILLA FALCONS', events: [] },
-      { team1Key: 'EBONY OVERLORDS', team2Key: 'POCKET DYNAMOS', events: [] },
-      { team1Key: 'BORIC SPEEDSTERS', team2Key: 'SUPERNOVA QUEEN', events: [] },
-      { team1Key: 'VINTAGE STRIKERS', team2Key: 'LUMEN PILLAR', events: [] },
-    ],
-  },
-  {
-    dayNumber: 5,
-    title: 'BICENTENNIAL MONUMENT 5',
-    dateStr: '14TH AUG 8 PM TO 15TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 14TH AUG 2026',
-    startIso: '2026-08-14T20:00:00+05:30',
-    cutoffIso: '2026-08-14T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'LUMEN PILLAR', events: [] },
-      { team1Key: 'SUPERNOVA QUEEN', team2Key: 'VINTAGE STRIKERS', events: [] },
-      { team1Key: 'POCKET DYNAMOS', team2Key: 'BORIC SPEEDSTERS', events: [] },
-      { team1Key: 'VANILLA FALCONS', team2Key: 'EBONY OVERLORDS', events: [] },
-    ],
-  },
-  {
-    dayNumber: 6,
-    title: 'BICENTENNIAL MONUMENT 6',
-    dateStr: '15TH AUG 8 PM TO 16TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 15TH AUG 2026',
-    startIso: '2026-08-15T20:00:00+05:30',
-    cutoffIso: '2026-08-15T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'BORIC SPEEDSTERS', events: [] },
-      { team1Key: 'VINTAGE STRIKERS', team2Key: 'EBONY OVERLORDS', events: [] },
-      { team1Key: 'LUMEN PILLAR', team2Key: 'VANILLA FALCONS', events: [] },
-      { team1Key: 'SUPERNOVA QUEEN', team2Key: 'POCKET DYNAMOS', events: [] },
-    ],
-  },
-  {
-    dayNumber: 7,
-    title: 'BICENTENNIAL MONUMENT 7',
-    dateStr: '16TH AUG 8 PM TO 17TH AUG 8 PM',
-    cutoffDateStr: '9:30 PM IST, 16TH AUG 2026',
-    startIso: '2026-08-16T20:00:00+05:30',
-    cutoffIso: '2026-08-16T21:30:00+05:30',
-    matches: [
-      { team1Key: 'PLYWOOD PIONEERS', team2Key: 'POCKET DYNAMOS', events: [] },
-      { team1Key: 'VANILLA FALCONS', team2Key: 'SUPERNOVA QUEEN', events: [] },
-      { team1Key: 'EBONY OVERLORDS', team2Key: 'LUMEN PILLAR', events: [] },
-      { team1Key: 'BORIC SPEEDSTERS', team2Key: 'VINTAGE STRIKERS', events: [] },
-    ],
-  },
-];
-
 export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?: any[] }) {
   const [dbTeams, setDbTeams] = React.useState<any[]>(initialTeams);
-  const [selectedDayNum, setSelectedDayNum] = React.useState<number>(2);
+  const [selectedDayNum, setSelectedDayNum] = React.useState<number>(0);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
+  const [scheduleMeta, setScheduleMeta] = React.useState<{
+    totalDays?: number;
+    dayDates?: Record<number, string>;
+    pairings?: Array<{ dayNumber?: number; team1Name?: string; team2Name?: string }>;
+    stages?: Array<{ startDay?: number; durationDays?: number; kind?: string; name?: string }>;
+  }>({});
   const nowMs = new Date().getTime();
+
+  const scheduleDays = React.useMemo(
+    () =>
+      buildCombiSchedule({
+        totalDays: scheduleMeta.totalDays,
+        dayDates: scheduleMeta.dayDates,
+        pairings: scheduleMeta.pairings,
+        stages: scheduleMeta.stages,
+      }),
+    [scheduleMeta]
+  );
+
+  React.useEffect(() => {
+    if (!scheduleDays.length) return;
+    const now = Date.now();
+    const live = scheduleDays.find((d) => monumentStatus(d, now) === 'live');
+    const revealed = [...scheduleDays].reverse().find((d) => now >= new Date(d.cutoffIso).getTime());
+    const next = live?.dayNumber || revealed?.dayNumber || scheduleDays[0].dayNumber;
+    setSelectedDayNum((prev) => (prev && scheduleDays.some((d) => d.dayNumber === prev) ? prev : next));
+  }, [scheduleDays]);
 
   // Update captain names and sync teams
   React.useEffect(() => {
@@ -435,13 +530,35 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
     async function fetchSupabaseData() {
       try {
         const res = await get200thEditionCombisData();
-        if (res.success && res.teams && res.teams.length > 0) {
-          setDbTeams(res.teams);
-          res.teams.forEach((t: any) => {
-            const k = t.name.toUpperCase();
-            if (TEAMS_INFO[k] && t.captain?.name) {
-              TEAMS_INFO[k].captain = t.captain.name;
-            }
+        if (res.success) {
+          if (res.teams && res.teams.length > 0) {
+            setDbTeams(res.teams);
+            res.teams.forEach((t: any) => {
+              const k = t.name.toUpperCase();
+              if (TEAMS_INFO[k] && t.captain?.name) {
+                TEAMS_INFO[k].captain = t.captain.name;
+              }
+            });
+          }
+          const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
+          const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
+            (stage.matchPairings || []).map((p: any) => ({
+              dayNumber: p.dayNumber,
+              team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
+              team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
+            }))
+          );
+          let dayDates: Record<number, string> = {};
+          if (res.edition?.dayDates) {
+            try {
+              dayDates = JSON.parse(res.edition.dayDates);
+            } catch {}
+          }
+          setScheduleMeta({
+            totalDays: res.edition?.totalDays,
+            dayDates,
+            pairings,
+            stages: (res as any).stageConfig?.stages || [],
           });
         }
       } catch (e) {
@@ -451,7 +568,7 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
     fetchSupabaseData();
   }, [initialTeams]);
 
-  const activeDayFixture = SAMPLE_COMBIS_DATA.find((d) => d.dayNumber === selectedDayNum) || SAMPLE_COMBIS_DATA[0];
+  const activeDayFixture = scheduleDays.find((d) => d.dayNumber === selectedDayNum) || scheduleDays[0];
 
   // Cutoff calculation (9:30 PM IST on start date)
   const cutoffTimeMs = new Date(activeDayFixture.cutoffIso).getTime();
@@ -531,7 +648,7 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="CBOT Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <Badge variant="carrom" className="px-3.5 py-1 font-black text-xs uppercase tracking-widest bg-amber-500/20 text-amber-400 border-amber-500/40">
-                ✨ Official Combis & Lineups
+                Official Combis & Lineups
               </Badge>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
@@ -565,8 +682,8 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
 
         {/* DAY SELECTOR TABS & SEARCH & EXCEL DOWNLOAD */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative z-10 pt-1">
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {SAMPLE_COMBIS_DATA.map((d) => {
+          <div className="flex items-center gap-2 flex-wrap w-full pb-2 md:pb-0">
+            {scheduleDays.map((d) => {
               const isSelected = d.dayNumber === selectedDayNum;
               const dCutoff = new Date(d.cutoffIso).getTime();
               const dRevealed = nowMs >= dCutoff;
@@ -614,14 +731,14 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
           </div>
           <div className="space-y-1">
             <h2 className="text-xl sm:text-2xl font-black text-amber-400">
-              🔒 Day {selectedDayNum} Team Combis are Currently Locked
+              Day {selectedDayNum} Team Combis are Currently Locked
             </h2>
             <p className="text-sm font-bold text-muted-foreground max-w-lg mx-auto">
               Captains are currently saving their event match combinations. All combis for Day {selectedDayNum} will automatically publish on this website at <span className="text-amber-400 font-extrabold">{activeDayFixture.cutoffDateStr}</span>.
             </p>
           </div>
           <Badge variant="carrom" className="px-4 py-1.5 font-black text-xs uppercase tracking-wider">
-            ⏰ CUTOFF TIME: {activeDayFixture.cutoffDateStr}
+            CUTOFF TIME: {activeDayFixture.cutoffDateStr}
           </Badge>
         </div>
       ) : (
@@ -636,7 +753,7 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
                   Official Day {selectedDayNum} Combinations Spreadsheet
                 </h3>
                 <p className="text-xs text-muted-foreground font-medium">
-                  Download all 4 match fixtures & player lineups submitted by team captains in Excel format.
+                  {activeDayFixture.title} · {activeDayFixture.calendarDate} · {activeDayFixture.dateStr}
                 </p>
               </div>
             </div>
@@ -651,6 +768,11 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
 
           {/* MATCH CARDS GRID (2x2 LAYOUT TO FIT ALL 4 MATCHES IN FRAME) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {filteredMatches.length === 0 ? (
+            <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+              No matches scheduled for Day {selectedDayNum} yet.
+            </div>
+          ) : null}
           {filteredMatches.map((match, mIdx) => {
             const t1KeyUpper = match.team1Key?.trim().toUpperCase();
             const t2KeyUpper = match.team2Key?.trim().toUpperCase();

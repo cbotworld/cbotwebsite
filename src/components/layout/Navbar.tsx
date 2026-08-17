@@ -273,21 +273,6 @@ export function Navbar() {
               )}
             </Link>
 
-            {/* Sub-Tab 3: Match Videos & Live */}
-            <Link
-              href="/edition-200-videos"
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
-                isVideosActive
-                  ? 'text-amber-400 font-black'
-                  : 'hover:text-foreground'
-              }`}
-            >
-              <span>🎬</span>
-              <span>Match Videos &amp; Live</span>
-              {isVideosActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
-              )}
-            </Link>
 
           </div>
         </div>
@@ -313,7 +298,7 @@ export function Navbar() {
             <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
               🏆 200th Bicentennial Edition
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <Link
                 href="/edition-200-combis"
                 onClick={() => setMobileMenuOpen(false)}
@@ -335,17 +320,6 @@ export function Navbar() {
                 }`}
               >
                 <span>📅</span> Schedule
-              </Link>
-              <Link
-                href="/edition-200-videos"
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
-                  isVideosActive
-                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
-                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                }`}
-              >
-                <span>🎬</span> Videos
               </Link>
             </div>
           </div>

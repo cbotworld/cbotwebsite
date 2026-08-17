@@ -6,6 +6,16 @@ import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Cloc
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { monumentStatus } from '@/lib/bicentennial-monuments';
+import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import {
+  buildOrganizerScheduleDays,
+  formatCalendarDate,
+  liveFixtureTitle,
+  liveStageSummary,
+  pathSummary,
+  type OrganizerScheduleDay,
+} from '@/lib/organizer-schedule';
 
 const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; border: string; bg: string }> = {
   'PLYWOOD PIONEERS': {
@@ -66,140 +76,77 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
   },
 };
 
-interface MonumentFixture {
-  monumentNumber: number;
-  title: string;
-  timeRange: string;
-  startIso: string;
-  endIso: string;
-  matches: Array<{ team1: string; team2: string }>;
-}
-
-const MONUMENTS_DATA: MonumentFixture[] = [
-  {
-    monumentNumber: 1,
-    title: 'BICENTENNIAL MONUMENT 1',
-    timeRange: '9TH AUG 9 PM TO 10TH AUG 8 PM',
-    startIso: '2026-08-09T21:00:00+05:30',
-    endIso: '2026-08-10T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'SUPERNOVA QUEEN' },
-      { team1: 'POCKET DYNAMOS', team2: 'LUMEN PILLAR' },
-      { team1: 'VANILLA FALCONS', team2: 'VINTAGE STRIKERS' },
-      { team1: 'EBONY OVERLORDS', team2: 'BORIC SPEEDSTERS' },
-    ],
-  },
-  {
-    monumentNumber: 2,
-    title: 'BICENTENNIAL MONUMENT 2',
-    timeRange: '10TH AUG 8 PM TO 11TH AUG 8 PM',
-    startIso: '2026-08-10T20:00:00+05:30',
-    endIso: '2026-08-11T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'VINTAGE STRIKERS' },
-      { team1: 'LUMEN PILLAR', team2: 'BORIC SPEEDSTERS' },
-      { team1: 'SUPERNOVA QUEEN', team2: 'EBONY OVERLORDS' },
-      { team1: 'POCKET DYNAMOS', team2: 'VANILLA FALCONS' },
-    ],
-  },
-  {
-    monumentNumber: 3,
-    title: 'BICENTENNIAL MONUMENT 3',
-    timeRange: '11TH AUG 8 PM TO 12TH AUG 8 PM',
-    startIso: '2026-08-11T20:00:00+05:30',
-    endIso: '2026-08-12T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'EBONY OVERLORDS' },
-      { team1: 'BORIC SPEEDSTERS', team2: 'VANILLA FALCONS' },
-      { team1: 'VINTAGE STRIKERS', team2: 'POCKET DYNAMOS' },
-      { team1: 'LUMEN PILLAR', team2: 'SUPERNOVA QUEEN' },
-    ],
-  },
-  {
-    monumentNumber: 4,
-    title: 'BICENTENNIAL MONUMENT 4',
-    timeRange: '12TH AUG 8 PM TO 13TH AUG 8 PM',
-    startIso: '2026-08-12T20:00:00+05:30',
-    endIso: '2026-08-13T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'VANILLA FALCONS' },
-      { team1: 'EBONY OVERLORDS', team2: 'POCKET DYNAMOS' },
-      { team1: 'BORIC SPEEDSTERS', team2: 'SUPERNOVA QUEEN' },
-      { team1: 'VINTAGE STRIKERS', team2: 'LUMEN PILLAR' },
-    ],
-  },
-  {
-    monumentNumber: 5,
-    title: 'BICENTENNIAL MONUMENT 5',
-    timeRange: '13TH AUG 8 PM TO 14TH AUG 8 PM',
-    startIso: '2026-08-13T20:00:00+05:30',
-    endIso: '2026-08-14T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'LUMEN PILLAR' },
-      { team1: 'SUPERNOVA QUEEN', team2: 'VINTAGE STRIKERS' },
-      { team1: 'POCKET DYNAMOS', team2: 'BORIC SPEEDSTERS' },
-      { team1: 'VANILLA FALCONS', team2: 'EBONY OVERLORDS' },
-    ],
-  },
-  {
-    monumentNumber: 6,
-    title: 'BICENTENNIAL MONUMENT 6',
-    timeRange: '14TH AUG 8 PM TO 15TH AUG 8 PM',
-    startIso: '2026-08-14T20:00:00+05:30',
-    endIso: '2026-08-15T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'BORIC SPEEDSTERS' },
-      { team1: 'VINTAGE STRIKERS', team2: 'EBONY OVERLORDS' },
-      { team1: 'LUMEN PILLAR', team2: 'VANILLA FALCONS' },
-      { team1: 'SUPERNOVA QUEEN', team2: 'POCKET DYNAMOS' },
-    ],
-  },
-  {
-    monumentNumber: 7,
-    title: 'BICENTENNIAL MONUMENT 7',
-    timeRange: '15TH AUG 8 PM TO 16TH AUG 8 PM',
-    startIso: '2026-08-15T20:00:00+05:30',
-    endIso: '2026-08-16T20:00:00+05:30',
-    matches: [
-      { team1: 'PLYWOOD PIONEERS', team2: 'POCKET DYNAMOS' },
-      { team1: 'VANILLA FALCONS', team2: 'SUPERNOVA QUEEN' },
-      { team1: 'EBONY OVERLORDS', team2: 'LUMEN PILLAR' },
-      { team1: 'BORIC SPEEDSTERS', team2: 'VINTAGE STRIKERS' },
-    ],
-  },
-];
-
 export default function BicentennialSchedulePage() {
   const [selectedDay, setSelectedDay] = React.useState<number | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>(() => buildOrganizerScheduleDays());
+  const [stages, setStages] = React.useState<Array<{ order?: number; kind?: string; name?: string; startDay?: number; durationDays?: number }>>([]);
 
-  const nowMs = new Date().getTime();
+  const liveDayNum = React.useMemo(
+    () => scheduleDays.find((d) => monumentStatus(d, nowMs) === 'live')?.dayNumber ?? null,
+    [scheduleDays, nowMs]
+  );
 
-  // Find active monument day
-  const activeMonumentNum = React.useMemo(() => {
-    for (const m of MONUMENTS_DATA) {
-      const s = new Date(m.startIso).getTime();
-      const e = new Date(m.endIso).getTime();
-      if (nowMs >= s && nowMs < e) {
-        return m.monumentNumber;
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await get200thEditionCombisData();
+        if (!res.success || cancelled) return;
+        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
+        const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
+          (stage.matchPairings || []).map((p: any) => ({
+            dayNumber: p.dayNumber,
+            team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
+            team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
+          }))
+        );
+        let dayDates: Record<number, string> = {};
+        if (res.edition?.dayDates) {
+          try {
+            dayDates = JSON.parse(res.edition.dayDates);
+          } catch {}
+        }
+        const nextStages = (res as any).stageConfig?.stages || [];
+        setStages(nextStages);
+        setScheduleDays(
+          buildOrganizerScheduleDays({
+            totalDays: res.edition?.totalDays,
+            dayDates,
+            pairings,
+            stages: nextStages,
+          })
+        );
+        setNowMs(Date.now());
+      } catch (e) {
+        console.error('Failed to load organizer schedule:', e);
       }
-    }
-    return 2; // Default to Day 2
-  }, [nowMs]);
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
-  const filteredMonuments = MONUMENTS_DATA.filter((m) => {
-    if (selectedDay !== 'ALL' && m.monumentNumber !== selectedDay) return false;
-
+  const filteredDays = scheduleDays.filter((d) => {
+    if (selectedDay !== 'ALL' && d.dayNumber !== selectedDay) return false;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      const matchesTitle = m.title.toLowerCase().includes(term);
-      const matchesTeams = m.matches.some(
+      const matchesTitle = d.title.toLowerCase().includes(term) || d.stageLabel.toLowerCase().includes(term);
+      const matchesTeams = d.matches.some(
         (match) => match.team1.toLowerCase().includes(term) || match.team2.toLowerCase().includes(term)
       );
       return matchesTitle || matchesTeams;
     }
     return true;
   });
+
+  const headerStageLine = liveStageSummary(scheduleDays, stages, nowMs);
+  const headerPath = pathSummary(stages);
+  const headerTitle = liveFixtureTitle(scheduleDays, stages, nowMs);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -214,13 +161,15 @@ export default function BicentennialSchedulePage() {
             <div>
               <div className="text-xs font-black text-amber-500 uppercase tracking-widest">Carrom Balu Online Tournament</div>
               <div className="text-lg sm:text-xl font-black text-foreground">Official Match Fixtures</div>
+              <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mt-0.5">{headerStageLine}</div>
             </div>
           </div>
 
           <div className="text-center sm:text-right">
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 bg-clip-text text-transparent">
-              BICENTENNIAL MONUMENTS FIXTURE
+              {headerTitle}
             </h1>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">{headerPath}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -233,7 +182,7 @@ export default function BicentennialSchedulePage() {
         {/* SEARCH & DAY FILTER TABS */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-2 relative z-10">
           {/* Day Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex items-center gap-1.5 flex-wrap w-full md:flex-1 pb-2 md:pb-0">
             <button
               onClick={() => setSelectedDay('ALL')}
               className={`px-3 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all ${
@@ -244,23 +193,26 @@ export default function BicentennialSchedulePage() {
             >
               All Days
             </button>
-            {MONUMENTS_DATA.map((m) => {
-              const isActive = activeMonumentNum === m.monumentNumber;
-              const isSelected = selectedDay === m.monumentNumber;
+            {scheduleDays.map((d) => {
+              const isActive = liveDayNum === d.dayNumber;
+              const isSelected = selectedDay === d.dayNumber;
+              const status = monumentStatus(d, nowMs);
               return (
                 <button
-                  key={m.monumentNumber}
-                  onClick={() => setSelectedDay(m.monumentNumber)}
+                  key={d.dayNumber}
+                  onClick={() => setSelectedDay(d.dayNumber)}
                   className={`relative px-3 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                       : isActive
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                      : 'bg-card/80 text-muted-foreground hover:text-foreground border border-border/50'
+                      : status === 'completed'
+                      ? 'bg-card/80 text-muted-foreground hover:text-foreground border border-border/50'
+                      : 'bg-muted/40 text-muted-foreground hover:text-foreground border border-border/40'
                   }`}
                 >
                   {isActive && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />}
-                  Day {m.monumentNumber}
+                  Day {d.dayNumber}
                 </button>
               );
             })}
@@ -281,16 +233,20 @@ export default function BicentennialSchedulePage() {
 
       {/* SCHEDULE DAYS GRID */}
       <div className="space-y-8">
-        {filteredMonuments.map((m) => {
-          const isActiveDay = activeMonumentNum === m.monumentNumber;
-          const startMs = new Date(m.startIso).getTime();
-          const endMs = new Date(m.endIso).getTime();
-          const isCompleted = nowMs >= endMs;
-          const isUpcoming = nowMs < startMs;
+        {filteredDays.length === 0 && (
+          <div className="rounded-2xl border border-border/80 bg-card/80 px-6 py-12 text-center text-sm font-bold text-muted-foreground">
+            No fixtures match this filter.
+          </div>
+        )}
+        {filteredDays.map((d) => {
+          const status = monumentStatus(d, nowMs);
+          const isActiveDay = status === 'live';
+          const isCompleted = status === 'completed';
+          const isUpcoming = status === 'upcoming';
 
           return (
             <div
-              key={m.monumentNumber}
+              key={d.dayNumber}
               className={`rounded-2xl border transition-all duration-300 overflow-hidden shadow-lg ${
                 isActiveDay
                   ? 'border-emerald-500/70 bg-emerald-950/10 shadow-emerald-500/10 ring-1 ring-emerald-500/30'
@@ -316,8 +272,11 @@ export default function BicentennialSchedulePage() {
                     <Trophy className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground flex items-center gap-2">
-                      {m.title}
+                    <h3 className="text-base sm:text-lg font-black tracking-tight text-foreground flex items-center gap-2 flex-wrap">
+                      {d.title}
+                      <span className="text-[9.5px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                        {d.stageLabel}
+                      </span>
                       {isActiveDay && (
                         <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 flex items-center gap-1 animate-pulse">
                           <span className="h-1.5 w-1.5 rounded-full bg-white" /> Live Active Day
@@ -330,24 +289,30 @@ export default function BicentennialSchedulePage() {
                       )}
                       {isUpcoming && (
                         <span className="text-[9.5px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
-                          Upcoming
+                          Day {d.dayNumber}
                         </span>
                       )}
                     </h3>
-                    <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                      <Clock className="h-3.5 w-3.5 text-amber-500" /> {m.timeRange}
+                    <p className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <Clock className="h-3.5 w-3.5 text-amber-500" /> {d.timeRange}
+                      <span className="text-muted-foreground/70">· Calendar {formatCalendarDate(d.calendarDate)}</span>
                     </p>
                   </div>
                 </div>
 
                 <Badge variant="outline" className="font-mono text-xs border-amber-500/30 text-amber-400">
-                  4 Matches Scheduled
+                  {d.matches.length} {d.matches.length === 1 ? 'Match' : 'Matches'} Scheduled
                 </Badge>
               </div>
 
               {/* MATCH FIXTURES LIST */}
               <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {m.matches.map((match, matchIdx) => {
+                {d.matches.length === 0 && (
+                  <div className="md:col-span-2 rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center text-xs font-bold text-muted-foreground">
+                    Fixtures will appear here when the organizer publishes this day's pairings.
+                  </div>
+                )}
+                {d.matches.map((match, matchIdx) => {
                   const t1KeyUpper = match.team1?.trim().toUpperCase();
                   const t2KeyUpper = match.team2?.trim().toUpperCase();
                   const t1 = TEAMS_INFO[t1KeyUpper] || { logo: '/logo.png', tag: 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };

@@ -17,6 +17,7 @@ import {
   UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio, RotateCcw, AlertCircle, MessageSquare, Share2
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
+import { BICENTENNIAL_MONUMENTS, monumentStatus } from '@/lib/bicentennial-monuments';
 import { ProfileTab } from '@/components/player/ProfileTab';
 
 
@@ -93,23 +94,12 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       'BORIC SPEEDSTERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
     };
 
-    // ── Fixture data — must stay in sync with editions/200th-schedule/page.tsx ─
-    const monuments = [
-      { num: 1, startIso: '2026-08-09T21:00:00+05:30', endIso: '2026-08-10T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'POCKET DYNAMOS', t2: 'LUMEN PILLAR' }, { t1: 'VANILLA FALCONS', t2: 'VINTAGE STRIKERS' }, { t1: 'EBONY OVERLORDS', t2: 'BORIC SPEEDSTERS' }] },
-      { num: 2, startIso: '2026-08-10T20:00:00+05:30', endIso: '2026-08-11T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VINTAGE STRIKERS' }, { t1: 'LUMEN PILLAR', t2: 'BORIC SPEEDSTERS' }, { t1: 'SUPERNOVA QUEEN', t2: 'EBONY OVERLORDS' }, { t1: 'POCKET DYNAMOS', t2: 'VANILLA FALCONS' }] },
-      { num: 3, startIso: '2026-08-11T20:00:00+05:30', endIso: '2026-08-12T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'EBONY OVERLORDS' }, { t1: 'BORIC SPEEDSTERS', t2: 'VANILLA FALCONS' }, { t1: 'VINTAGE STRIKERS', t2: 'POCKET DYNAMOS' }, { t1: 'LUMEN PILLAR', t2: 'SUPERNOVA QUEEN' }] },
-      { num: 4, startIso: '2026-08-12T20:00:00+05:30', endIso: '2026-08-13T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'VANILLA FALCONS' }, { t1: 'EBONY OVERLORDS', t2: 'POCKET DYNAMOS' }, { t1: 'BORIC SPEEDSTERS', t2: 'SUPERNOVA QUEEN' }, { t1: 'VINTAGE STRIKERS', t2: 'LUMEN PILLAR' }] },
-      { num: 5, startIso: '2026-08-13T20:00:00+05:30', endIso: '2026-08-14T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'LUMEN PILLAR' }, { t1: 'SUPERNOVA QUEEN', t2: 'VINTAGE STRIKERS' }, { t1: 'POCKET DYNAMOS', t2: 'BORIC SPEEDSTERS' }, { t1: 'VANILLA FALCONS', t2: 'EBONY OVERLORDS' }] },
-      { num: 6, startIso: '2026-08-14T20:00:00+05:30', endIso: '2026-08-15T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'BORIC SPEEDSTERS' }, { t1: 'VINTAGE STRIKERS', t2: 'EBONY OVERLORDS' }, { t1: 'LUMEN PILLAR', t2: 'VANILLA FALCONS' }, { t1: 'SUPERNOVA QUEEN', t2: 'POCKET DYNAMOS' }] },
-      { num: 7, startIso: '2026-08-15T20:00:00+05:30', endIso: '2026-08-16T20:00:00+05:30',
-        matches: [{ t1: 'PLYWOOD PIONEERS', t2: 'POCKET DYNAMOS' }, { t1: 'VANILLA FALCONS', t2: 'SUPERNOVA QUEEN' }, { t1: 'EBONY OVERLORDS', t2: 'LUMEN PILLAR' }, { t1: 'BORIC SPEEDSTERS', t2: 'VINTAGE STRIKERS' }] },
-    ];
+    const monuments = BICENTENNIAL_MONUMENTS.map((m) => ({
+      num: m.monumentNumber,
+      startIso: m.startIso,
+      endIso: m.endIso,
+      matches: m.matches.map((fix) => ({ t1: fix.team1, t2: fix.team2 })),
+    }));
 
     const now = Date.now();
 
@@ -136,9 +126,8 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       }
 
       // ── Compute status from clock matching schedule-page logic ────────────────
-      const startMs = new Date(m.startIso).getTime();
-      const endMs   = new Date(m.endIso).getTime();
-      const computedStatus = now >= endMs ? 'COMPLETED' : now >= startMs ? 'SCHEDULED' : 'SCHEDULED';
+      const status = monumentStatus({ startIso: m.startIso, endIso: m.endIso }, now);
+      const computedStatus = status === 'completed' ? 'COMPLETED' : status === 'live' ? 'LIVE' : 'SCHEDULED';
 
       return {
         id: `monument_${m.num}_${teamNameUpper.replace(/\s+/g, '_')}`,

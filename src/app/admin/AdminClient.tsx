@@ -8,7 +8,8 @@ import { createEdition } from '@/lib/actions/tournamentActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { generateUserCredentials, resetUserPin, updatePlayer, togglePlayerActivation, deletePlayer } from '@/lib/actions/userActions';
 import { calculatePlayerCategoriesForDraft, autoGenerateBalancedTeams, publishFinalizedTeams, updateTeamCaptain } from '@/lib/actions/teamManagementActions';
-import { generateRoundRobinFixtures, calculateLeagueStandings, generatePlayoffFixtures, rescheduleFixture } from '@/lib/actions/schedulerActions';
+import { generateRoundRobinFixtures, calculateLeagueStandings, generatePlayoffFixtures, rescheduleFixture, saveScheduledMatches } from '@/lib/actions/schedulerActions';
+import * as XLSX from 'xlsx';
 import { lockMatchLineup, overrideMatchLineup } from '@/lib/actions/lineupActions';
 import { getAdminLiveStreamsAction, expireLiveStreamAction } from '@/lib/actions/youtubeActions';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +83,68 @@ export default function AdminPortalPage() {
   const [captainSelections, setCaptainSelections] = React.useState<Record<string, string>>({});
   const [captainSaving, setCaptainSaving] = React.useState<Record<string, boolean>>({});
   const [captainSaved, setCaptainSaved] = React.useState<Record<string, boolean>>({});
+
+  // Scheduler state
+  const [excelFile, setExcelFile] = React.useState<File | null>(null);
+  const [manualMatch, setManualMatch] = React.useState({ day: '8', team1Id: '', team2Id: '', stage: 'LEAGUE' });
+  
+  const handleExcelUpload = async () => {
+    if (!excelFile) return;
+    setIsSubmitting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet);
+        
+        // Map Excel columns to match structure (Day, Team 1, Team 2, Stage)
+        const matchesData = json.map((row: any) => ({
+          day: row['Day']?.toString() || '8',
+          team1Id: row['Team 1'] || row['Team1'] || '',
+          team2Id: row['Team 2'] || row['Team2'] || '',
+          stage: row['Stage'] || 'LEAGUE'
+        }));
+        
+        // Note: For a real app we'd map team names to IDs here, but for simplicity we'll pass it to backend
+        // Assuming the admin selects an active edition from the list
+        const activeEdition = editionsList[0]?.id;
+        if (activeEdition) {
+          const res = await saveScheduledMatches(activeEdition, matchesData);
+          if (res.success) {
+            alert(`Successfully scheduled ${res.count} matches from Excel!`);
+          } else {
+            alert(`Error: ${res.error}`);
+          }
+        }
+      } catch (error) {
+        console.error('Excel parse error:', error);
+        alert('Failed to parse Excel file.');
+      }
+      setIsSubmitting(false);
+    };
+    reader.readAsBinaryString(excelFile);
+  };
+
+  const handleManualSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const activeEdition = editionsList[0]?.id;
+    if (activeEdition && manualMatch.team1Id && manualMatch.team2Id) {
+      const res = await saveScheduledMatches(activeEdition, [manualMatch]);
+      if (res.success) {
+        alert('Match successfully scheduled!');
+        // Keep Day and Stage, reset teams
+        setManualMatch({ ...manualMatch, team1Id: '', team2Id: '' });
+      } else {
+        alert(`Error: ${res.error}`);
+      }
+    }
+    setIsSubmitting(false);
+  };
+
 
   if (currentRole !== 'ORGANIZER') {
     return (
@@ -192,6 +255,9 @@ export default function AdminPortalPage() {
           </TabsTrigger>
           <TabsTrigger value="streams" className="text-xs font-bold gap-1.5 px-3 py-2 text-rose-400">
             <Radio className="h-3.5 w-3.5 animate-pulse" /> Live Streams
+          </TabsTrigger>
+          <TabsTrigger value="scheduler" className="text-xs font-bold gap-1.5 px-3 py-2 text-emerald-400">
+            <Calendar className="h-3.5 w-3.5" /> Match Scheduler
           </TabsTrigger>
         </TabsList>
 
@@ -561,6 +627,169 @@ export default function AdminPortalPage() {
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
                         No match live streams recorded in system yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* MATCH SCHEDULER */}
+        <TabsContent value="scheduler" className="space-y-6">
+          <Card className="border-amber-500/30">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <CardTitle className="text-xl font-black text-emerald-400 flex items-center gap-2">
+                <Calendar className="h-5 w-5" /> Phase 2 Match Scheduler (Day 8+)
+              </CardTitle>
+              <CardDescription>
+                Schedule upcoming matches by uploading an Excel file or manually adding match details.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Excel Upload Section */}
+                <div className="p-4 border rounded-xl bg-card space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-amber-500" />
+                    <h3 className="font-bold text-sm">Bulk Excel Upload</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Upload an `.xlsx` file with columns: <strong>Day, Team 1, Team 2, Stage</strong>. Note: For bulk upload, Team 1 and Team 2 should exactly match the team ID.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept=".xlsx, .xls"
+                      onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
+                      className="text-xs"
+                    />
+                    <Button
+                      onClick={handleExcelUpload}
+                      disabled={!excelFile || isSubmitting}
+                      className="text-xs font-bold gap-1.5"
+                    >
+                      <Download className="h-4 w-4" /> Upload
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Manual Entry Section */}
+                <div className="p-4 border rounded-xl bg-card space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Edit className="h-5 w-5 text-amber-500" />
+                    <h3 className="font-bold text-sm">Manual Match Entry</h3>
+                  </div>
+                  <form onSubmit={handleManualSchedule} className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-1 block">Day / Round</label>
+                        <Input
+                          type="number"
+                          value={manualMatch.day}
+                          onChange={(e) => setManualMatch({ ...manualMatch, day: e.target.value })}
+                          required
+                          min="1"
+                          className="h-8 text-xs bg-background"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-1 block">Stage</label>
+                        <Select
+                          value={manualMatch.stage}
+                          onChange={(e: any) => setManualMatch({ ...manualMatch, stage: e.target.value })}
+                          className="h-8 text-xs bg-background"
+                        >
+                          <option value="LEAGUE">LEAGUE</option>
+                          <option value="QUALIFIER_1">QUALIFIER 1</option>
+                          <option value="QUALIFIER_2">QUALIFIER 2</option>
+                          <option value="ELIMINATOR">ELIMINATOR</option>
+                          <option value="SEMI_FINAL">SEMI FINAL</option>
+                          <option value="FINAL">FINAL</option>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-1 block text-emerald-400">Team 1</label>
+                        <Select
+                          value={manualMatch.team1Id}
+                          onChange={(e: any) => setManualMatch({ ...manualMatch, team1Id: e.target.value })}
+                          required
+                          className="h-8 text-xs bg-background"
+                        >
+                          <option value="">Select Team...</option>
+                          {teamsList.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold uppercase mb-1 block text-rose-400">Team 2</label>
+                        <Select
+                          value={manualMatch.team2Id}
+                          onChange={(e: any) => setManualMatch({ ...manualMatch, team2Id: e.target.value })}
+                          required
+                          className="h-8 text-xs bg-background"
+                        >
+                          <option value="">Select Team...</option>
+                          {teamsList.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting || !manualMatch.team1Id || !manualMatch.team2Id}
+                      className="w-full text-xs font-bold gap-1.5 mt-2"
+                      variant="carrom"
+                    >
+                      <Plus className="h-4 w-4" /> Add Match to Schedule
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Phase 1 Matches (Read-Only) */}
+          <Card className="border-amber-500/30">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <CardTitle className="text-xl font-black text-amber-500 flex items-center gap-2">
+                <History className="h-5 w-5" /> Scheduled Matches
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Day/Round</TableHead>
+                    <TableHead>Match #</TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead>Team 1</TableHead>
+                    <TableHead>Team 2</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {matchesList.slice().sort((a, b) => a.matchNumber - b.matchNumber).map(match => (
+                    <TableRow key={match.id}>
+                      <TableCell className="font-mono font-bold text-xs">Day {match.round}</TableCell>
+                      <TableCell className="text-xs">#{match.matchNumber}</TableCell>
+                      <TableCell className="text-xs"><Badge variant="outline">{match.stage}</Badge></TableCell>
+                      <TableCell className="font-bold text-emerald-400 text-xs">{match.team1?.name || match.team1Id || '-'}</TableCell>
+                      <TableCell className="font-bold text-rose-400 text-xs">{match.team2?.name || match.team2Id || '-'}</TableCell>
+                      <TableCell className="text-xs"><Badge>{match.status}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                  {matchesList.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4 text-xs text-muted-foreground">
+                        No matches scheduled yet.
                       </TableCell>
                     </TableRow>
                   )}

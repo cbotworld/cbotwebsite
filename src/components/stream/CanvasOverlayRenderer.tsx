@@ -541,6 +541,7 @@ export default function CanvasOverlayRenderer({
       {/* Main Responsive Stream Canvas Box */}
       <div ref={containerRef} className="relative overflow-hidden bg-black w-full h-full flex items-center justify-center">
         <canvas
+          id="cbot-stream-canvas"
           ref={canvasRef}
           width={1280}
           height={720}
