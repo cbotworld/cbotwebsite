@@ -39,10 +39,17 @@ export async function POST(request: NextRequest) {
       const dayNum = parseInt(day.replace(/\D/g, ''), 10);
       const days = (schedule?.days || []).filter(Boolean) as any[];
       const playableUntil = schedule?.playableUntilDay ?? 0;
+      const playableFrom = schedule?.currentDay ?? 0;
+      if (Number.isFinite(dayNum) && dayNum > 0 && playableFrom > 0 && dayNum < playableFrom) {
+        return NextResponse.json(
+          { error: `Day ${dayNum} is closed. You can play Days ${playableFrom}–${playableUntil || playableFrom}.` },
+          { status: 403, headers: broadcastCorsHeaders },
+        );
+      }
       if (Number.isFinite(dayNum) && dayNum > 0 && playableUntil > 0 && dayNum > playableUntil) {
         return NextResponse.json(
           {
-            error: `Day ${dayNum} is not playable yet. You can play Days 1–${playableUntil} in any order.`,
+            error: `Day ${dayNum} is not playable yet. You can play Days ${playableFrom || 1}–${playableUntil} in any order.`,
           },
           { status: 403, headers: broadcastCorsHeaders },
         );

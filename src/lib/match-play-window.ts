@@ -1,12 +1,14 @@
+import { eventDayWindows, monumentStatus } from '@/lib/bicentennial-monuments';
+
 /**
- * Players may play match days in any order inside a rolling unlock window.
+ * Players may play match days in any order inside a forward unlock window.
  *
- * At any point they can play 4 days including the current tournament day
- * (today + the next 3). Earlier unlocked days stay open, so the ceiling grows:
- *   Day 1 → days 1–4
- *   Day 2 → days 1–7
- *   Day 3 → days 1–10
- * Formula: maxPlayable = min(totalDays, 1 + 3 * currentDay)
+ * Past days are closed. From the current tournament day they can play today
+ * plus the next 3, and as days complete more future days unlock:
+ *   Day 1 → days 1–4 (not 5+)
+ *   Day 2 → days 2–7 (day 1 closed)
+ *   Day 9 → days 9–10 when the event only has 10 days
+ * Formula: currentDay <= day <= min(totalDays, 1 + 3 * currentDay)
  */
 
 export const MATCH_LOOKAHEAD_DAYS = 3;
@@ -41,5 +43,29 @@ export function maxPlayableDayNumber(currentDay: number, totalDays: number) {
 
 export function isDayPlayable(dayNumber: number, currentDay: number, totalDays: number) {
   if (dayNumber < 1) return false;
+  if (dayNumber < currentDay) return false;
   return dayNumber <= maxPlayableDayNumber(currentDay, totalDays);
+}
+
+/** Current day + playable ceiling from official 8pm IST windows, not organizer date overrides. */
+export function tournamentPlayWindow(nowMs = Date.now(), extraTotalDays = 0) {
+  const official = eventDayWindows();
+  const currentDay = currentPlayDayNumber(
+    official.map((window) => ({
+      dayNumber: window.dayNumber,
+      status: monumentStatus(window, nowMs),
+    })),
+  );
+  const totalDays = Math.max(
+    extraTotalDays || 0,
+    ...official.map((window) => window.dayNumber),
+    currentDay,
+    1,
+  );
+  return {
+    currentDay,
+    totalDays,
+    playableFromDay: currentDay,
+    playableUntilDay: maxPlayableDayNumber(currentDay, totalDays),
+  };
 }

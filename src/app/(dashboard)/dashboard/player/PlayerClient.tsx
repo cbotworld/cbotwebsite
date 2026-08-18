@@ -18,11 +18,7 @@ import {
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
-import {
-  currentPlayDayNumber,
-  isDayPlayable,
-  maxPlayableDayNumber,
-} from '@/lib/match-play-window';
+import { isDayPlayable, tournamentPlayWindow } from '@/lib/match-play-window';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
 import {
   buildOrganizerScheduleDays,
@@ -228,18 +224,14 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     [personalSchedule]
   );
 
-  const currentDay = React.useMemo(
+  const { currentDay, totalDays, playableUntilDay } = React.useMemo(
     () =>
-      currentPlayDayNumber(
-        scheduleDays.map((d) => ({
-          dayNumber: d.dayNumber,
-          status: monumentStatus(d, nowMs),
-        })),
+      tournamentPlayWindow(
+        nowMs,
+        Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
       ),
     [scheduleDays, nowMs]
   );
-  const totalDays = Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 1);
-  const playableUntilDay = maxPlayableDayNumber(currentDay, totalDays);
 
   /**
    * Players can play any day from 1 through playableUntilDay, without sequence.
@@ -275,14 +267,17 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   /** Main Go Live click handler — called from each row's button */
   const handleGoLiveClick = (match: any, matchIndex: number) => {
-    const { allowed, playableUntil } = canGoLive(match);
+    const { allowed } = canGoLive(match);
+    const dayNum = match.matchNumber || matchIndex + 1;
     if (!allowed) {
-      alert(
-        `You can play Days 1–${playableUntil} now, in any order (today plus the next 3 days; earlier unlocked days stay open). Day ${match.matchNumber || matchIndex + 1} unlocks as the tournament advances.`,
-      );
+      if (dayNum < currentDay) {
+        alert(`Day ${dayNum} is closed. You can play Days ${currentDay}–${playableUntilDay} in any order.`);
+      } else {
+        alert(`Day ${dayNum} is not open yet. You can play Days ${currentDay}–${playableUntilDay} in any order.`);
+      }
       return;
     }
-    openCbotLive(match, match.matchNumber || matchIndex + 1);
+    openCbotLive(match, dayNum);
   };
 
   const handleReplaySubmit = () => {
@@ -544,7 +539,15 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                             </Button>
                           </div>
 
-                          {!allowed ? (
+                          {!allowed && dayNum < currentDay ? (
+                            <Button
+                              size="sm"
+                              disabled
+                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full"
+                            >
+                              🔒 Closed
+                            </Button>
+                          ) : !allowed ? (
                             <Button
                               size="sm"
                               disabled
