@@ -87,6 +87,8 @@ export async function getPlayerMatchSchedule(userId: string) {
         calendarDate: day.calendarDate,
         status,
         canGoLive: status === 'live',
+        stageName: day.stageName || day.title,
+        stageLabel: day.stageLabel || day.title,
         teamName: myName,
         teamTag: myTeam?.tag || team?.tag || myName.slice(0, 3),
         teamLogo: myTeam?.logo || team?.logo || null,

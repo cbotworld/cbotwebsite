@@ -263,11 +263,20 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
   );
 
   /** Open the Cbot YouTube live app — live video is not stored in the website DB. */
-  const openCbotLive = (dayNumber: number) => {
+  const openCbotLive = (match: any, dayNumber: number) => {
     const name = currentPlayer?.name || currentPlayer?.username || 'Player';
     const day = `Day ${dayNumber}`;
-    const url = `cbot://live?name=${encodeURIComponent(name)}&day=${encodeURIComponent(day)}`;
-    window.location.href = url;
+    const params = new URLSearchParams({ name, day });
+    const team1 = match?.team1?.name || '';
+    const team2 = match?.team2?.name || '';
+    if (team1) params.set('teamName', team1);
+    if (team2) params.set('opponentName', team2);
+    const dayInfo = scheduleDays.find((d) => d.dayNumber === dayNumber);
+    if (dayInfo?.stageName || dayInfo?.title) params.set('stage', dayInfo.stageName || dayInfo.title);
+    if (dayInfo?.timeRange) params.set('timeRange', dayInfo.timeRange);
+    if (dayInfo?.endIso) params.set('endIso', dayInfo.endIso);
+    params.set('editionTitle', 'CBOT 200th Edition');
+    window.location.href = `cbot://live?${params.toString()}`;
   };
 
   /** Main Go Live click handler — called from each row's button */
@@ -279,7 +288,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       }
       return;
     }
-    openCbotLive(match.matchNumber || matchIndex + 1);
+    openCbotLive(match, match.matchNumber || matchIndex + 1);
   };
 
   const handleReplaySubmit = () => {
@@ -288,7 +297,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       return;
     }
     setGoLiveLoading(goLiveModal.match?.id || 'loading');
-    openCbotLive(goLiveModal.match?.matchNumber || 1);
+    openCbotLive(goLiveModal.match, goLiveModal.match?.matchNumber || 1);
   };
 
   // Score & Live Stream Submission Modal State

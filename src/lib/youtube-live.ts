@@ -74,9 +74,103 @@ function ytHeaders(accessToken: string) {
   };
 }
 
-export async function createLiveSession(name: string, day: string): Promise<CreateBroadcastResult> {
+export type BroadcastDetails = {
+  name: string;
+  day: string;
+  teamName?: string;
+  opponentName?: string;
+  teamTag?: string;
+  opponentTag?: string;
+  stage?: string;
+  editionTitle?: string;
+  timeRange?: string;
+  endIso?: string;
+};
+
+function formatIst(date: Date) {
+  const formatted = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(date);
+  return `${formatted} IST`;
+}
+
+function shortIstTime(date: Date) {
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+    .format(date)
+    .replace(/\s/g, '')
+    .toLowerCase();
+  return `${time} IST`;
+}
+
+function firstFittingTitle(candidates: string[]) {
+  const fit = candidates.find((value) => value.length > 0 && value.length <= 100);
+  return (fit || candidates[candidates.length - 1] || 'CBOT Live').slice(0, 100);
+}
+
+function buildBroadcastCopy(details: BroadcastDetails) {
+  const name = details.name.trim();
+  const day = details.day.trim();
+  const teamName = details.teamName?.trim() || '';
+  const opponentName = details.opponentName?.trim() || '';
+  const teamTag = details.teamTag?.trim() || '';
+  const opponentTag = details.opponentTag?.trim() || '';
+  const stage = details.stage?.trim() || '';
+  const editionTitle = details.editionTitle?.trim() || 'CBOT 200th Edition';
+  const timeRange = details.timeRange?.trim() || '';
+  const matchLine = teamName && opponentName ? `${teamName} vs ${opponentName}` : teamName || opponentName;
+  const shortMatch =
+    teamTag && opponentTag ? `${teamTag} vs ${opponentTag}` : matchLine;
+
+  const startedAt = new Date();
+  const startedStamp = formatIst(startedAt);
+  const startedShort = shortIstTime(startedAt);
+  const dayEnd = details.endIso ? new Date(details.endIso) : null;
+  const dayEndValid = dayEnd && !Number.isNaN(dayEnd.getTime()) ? dayEnd : null;
+  const beforeCutoff = dayEndValid ? startedAt.getTime() < dayEndValid.getTime() : null;
+
+  const title = firstFittingTitle(
+    [
+      `${editionTitle} • ${name} • ${matchLine} • ${day} • ${startedShort}`,
+      `${name} • ${matchLine} • ${day} • ${startedShort}`,
+      `${name} • ${shortMatch} • ${day} • ${startedShort}`,
+      `${name} • ${day} • ${startedShort}`,
+    ].filter((value, index, all) => all.indexOf(value) === index),
+  );
+
+  const description = [
+    editionTitle,
+    '',
+    `Player: ${name}`,
+    matchLine ? `Match: ${matchLine}` : null,
+    stage ? `Stage: ${stage}` : null,
+    `Day: ${day}`,
+    timeRange ? `Window: ${timeRange}` : null,
+    '',
+    `Started: ${startedStamp}`,
+    dayEndValid ? `Day ends: ${formatIst(dayEndValid)}` : null,
+    beforeCutoff === null ? null : `Before 8pm cutoff: ${beforeCutoff ? 'YES' : 'NO'}`,
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  return { title, description, matchLine, beforeCutoff };
+}
+
+export async function createLiveSession(details: BroadcastDetails): Promise<CreateBroadcastResult> {
   const accessToken = await getAccessToken();
-  const title = `${name} - ${day}`.slice(0, 95);
+  const { title, description } = buildBroadcastCopy(details);
   const scheduledStartTime = new Date().toISOString();
 
   const broadcastRes = await fetch(
@@ -85,7 +179,7 @@ export async function createLiveSession(name: string, day: string): Promise<Crea
       method: 'POST',
       headers: ytHeaders(accessToken),
       body: JSON.stringify({
-        snippet: { title, scheduledStartTime },
+        snippet: { title, description, scheduledStartTime },
         status: {
           privacyStatus: 'public',
           selfDeclaredMadeForKids: false,
