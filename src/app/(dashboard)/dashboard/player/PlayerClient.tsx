@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
+import {
+  currentPlayDayNumber,
+  isDayPlayable,
+  maxPlayableDayNumber,
+} from '@/lib/match-play-window';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
 import {
   buildOrganizerScheduleDays,
@@ -217,49 +222,38 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
   const [replayCommentError, setReplayCommentError] = React.useState('');
   const [goLiveLoading, setGoLiveLoading] = React.useState<string | null>(null);
 
-  // Helper: check if a match is in the past (yesterday or earlier)
-  const isPastMatch = React.useCallback((match: any) => {
-    if (!match) return false;
-    const now = Date.now();
-    const endMs = match.endIso ? new Date(match.endIso).getTime() : new Date(match.scheduledTime).getTime() + 24 * 60 * 60 * 1000;
-    return now >= endMs;
-  }, []);
-
-  /**
-   * Returns whether a player can go live on the match at the given sorted index.
-   * Enforcement: Day N is unlocked only when all Days 1..N-1 are "done".
-   * "Done" = match.status === 'COMPLETED' OR a liveStream record exists for this player+match.
-   */
-  const canGoLive = React.useCallback(
-    (matchIndex: number, sortedMatches: any[]): { allowed: boolean; blockedByDay: number | null } => {
-      const match = sortedMatches[matchIndex];
-      if (isPastMatch(match)) {
-        return { allowed: false, blockedByDay: null };
-      }
-      const windowStatus = monumentStatus(
-        { startIso: match.scheduledTime, endIso: match.endIso },
-        Date.now()
-      );
-      if (windowStatus !== 'live') {
-        return { allowed: false, blockedByDay: null };
-      }
-      if (matchIndex === 0) return { allowed: true, blockedByDay: null };
-      for (let i = 0; i < matchIndex; i++) {
-        const prev = sortedMatches[i];
-        const isDone = prev.status === 'COMPLETED' || streamedMatchIds.has(prev.id);
-        if (!isDone) {
-          return { allowed: false, blockedByDay: prev.matchNumber || i + 1 };
-        }
-      }
-      return { allowed: true, blockedByDay: null };
-    },
-    [streamedMatchIds, isPastMatch]
-  );
-
   /** Sorted schedule (ascending by matchNumber / scheduledTime) */
   const sortedSchedule = React.useMemo(
     () => [...personalSchedule].sort((a: any, b: any) => (a.matchNumber || 0) - (b.matchNumber || 0)),
     [personalSchedule]
+  );
+
+  const currentDay = React.useMemo(
+    () =>
+      currentPlayDayNumber(
+        scheduleDays.map((d) => ({
+          dayNumber: d.dayNumber,
+          status: monumentStatus(d, nowMs),
+        })),
+      ),
+    [scheduleDays, nowMs]
+  );
+  const totalDays = Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 1);
+  const playableUntilDay = maxPlayableDayNumber(currentDay, totalDays);
+
+  /**
+   * Players can play any day from 1 through playableUntilDay, without sequence.
+   * Current day + next 3 stay open; as days complete the ceiling stacks (1→4, 2→7).
+   */
+  const canGoLive = React.useCallback(
+    (match: any): { allowed: boolean; playableUntil: number } => {
+      const dayNum = match?.matchNumber || 0;
+      return {
+        allowed: isDayPlayable(dayNum, currentDay, totalDays),
+        playableUntil: playableUntilDay,
+      };
+    },
+    [currentDay, totalDays, playableUntilDay]
   );
 
   /** Open the Cbot YouTube live app — live video is not stored in the website DB. */
@@ -281,11 +275,11 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   /** Main Go Live click handler — called from each row's button */
   const handleGoLiveClick = (match: any, matchIndex: number) => {
-    const { allowed, blockedByDay } = canGoLive(matchIndex, sortedSchedule);
+    const { allowed, playableUntil } = canGoLive(match);
     if (!allowed) {
-      if (blockedByDay) {
-        alert(`Complete Day ${blockedByDay} first before going live on Day ${match.matchNumber || matchIndex + 1}.`);
-      }
+      alert(
+        `You can play Days 1–${playableUntil} now, in any order (today plus the next 3 days; earlier unlocked days stay open). Day ${match.matchNumber || matchIndex + 1} unlocks as the tournament advances.`,
+      );
       return;
     }
     openCbotLive(match, match.matchNumber || matchIndex + 1);
@@ -439,7 +433,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 </div>
               ) : (
                 sortedSchedule.map((match: any, idx: number) => {
-                  const { allowed, blockedByDay } = canGoLive(idx, sortedSchedule);
+                  const { allowed, playableUntil } = canGoLive(match);
                   const isReplay = streamedMatchIds.has(match.id);
                   const windowStatus = monumentStatus(
                     { startIso: match.scheduledTime, endIso: match.endIso },
@@ -447,7 +441,6 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                   );
                   const isCurrentlyLive = windowStatus === 'live';
                   const isCompleted = windowStatus === 'completed';
-                  const isUpcoming = windowStatus === 'upcoming';
                   const isMyTeam1 = match.team1Id === currentTeam.id ||
                     match.team1?.name?.toUpperCase() === currentTeam.name?.toUpperCase();
                   const myTeamName = isMyTeam1 ? (match.team1?.name || currentTeam.name) : (match.team2?.name || currentTeam.name);
@@ -480,12 +473,12 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                         <div className="w-[4.25rem] shrink-0 flex flex-col items-center justify-center">
                           <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Day</span>
                           <span className={`text-2xl font-black tabular-nums leading-none h-7 flex items-center ${
-                            isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : isUpcoming ? 'text-muted-foreground/50' : 'text-amber-400'
+                            isCurrentlyLive ? 'text-red-400' : isCompleted ? 'text-emerald-400' : allowed ? 'text-amber-400' : 'text-muted-foreground/50'
                           }`}>{dayNum}</span>
                           <div className="h-3.5 mt-1 flex items-center justify-center">
                             {isCompleted && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                            {isUpcoming && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
-                            {isCurrentlyLive && <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />}
+                            {!allowed && <Lock className="h-3.5 w-3.5 text-muted-foreground/40" />}
+                            {allowed && isCurrentlyLive && <span className="h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />}
                           </div>
                         </div>
 
@@ -551,32 +544,15 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                             </Button>
                           </div>
 
-                          {isCompleted || isPastMatch(match) ? (
-                            <Button
-                              size="sm"
-                              disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full"
-                            >
-                              🔒 Closed
-                            </Button>
-                          ) : isUpcoming ? (
+                          {!allowed ? (
                             <Button
                               size="sm"
                               disabled
                               className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
+                              title={`Playable through Day ${playableUntil}`}
                             >
                               <Lock className="h-3.5 w-3.5" />
-                              Opens Day {dayNum}
-                            </Button>
-                          ) : !allowed ? (
-                            <Button
-                              size="sm"
-                              disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
-                              title={`Complete Day ${blockedByDay} first`}
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                              Day {blockedByDay} First
+                              After Day {playableUntil}
                             </Button>
                           ) : isReplay ? (
                             <Button

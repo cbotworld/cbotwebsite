@@ -133,26 +133,28 @@ export async function GET(request: NextRequest) {
       slots: slotsForFormat(format),
     }));
 
+    const canEdit = canEditCombis(user.role, team.captainId, user.id);
     const days = Array.from({ length: totalDays }, (_, i) => {
       const dayNumber = i + 1;
       const calendarDate = dayDates[String(dayNumber)] || dayDates[dayNumber as any] || '';
       const cutoffIso = calendarDate ? `${calendarDate}T21:30:00+05:30` : null;
-      const locked = cutoffIso ? now >= new Date(cutoffIso).getTime() : false;
+      const revealed = cutoffIso ? now >= new Date(cutoffIso).getTime() : false;
       const entry = saved[String(dayNumber)] || saved[dayNumber as any];
       return {
         dayNumber,
         calendarDate,
         cutoffIso,
-        locked,
-        submittedAt: entry?.submittedAt || null,
-        rounds: entry?.rounds || [],
+        revealed,
+        locked: revealed,
+        submittedAt: revealed || canEdit ? entry?.submittedAt || null : null,
+        rounds: revealed || canEdit ? entry?.rounds || [] : [],
       };
-    });
+    }).filter((day) => canEdit || day.revealed);
 
     return NextResponse.json(
       {
         success: true,
-        canEdit: canEditCombis(user.role, team.captainId, user.id),
+        canEdit,
         team: { id: team.id, name: team.name, tag: team.tag, logo: team.logo },
         members: Array.from(memberMap.values()),
         roundFormats,

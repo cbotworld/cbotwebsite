@@ -1,5 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
+import {
+  currentPlayDayNumber,
+  isDayPlayable,
+  maxPlayableDayNumber,
+} from '@/lib/match-play-window';
 import { buildOrganizerScheduleDays } from '@/lib/organizer-schedule';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
@@ -64,6 +69,18 @@ export async function getPlayerMatchSchedule(userId: string) {
 
   const now = Date.now();
   const teamNameUpper = (team?.name || '').toUpperCase().trim();
+  const tournamentDays = scheduleDays.map((day) => ({
+    dayNumber: day.dayNumber,
+    status: monumentStatus(day, now),
+  }));
+  const currentDay = currentPlayDayNumber(tournamentDays);
+  const totalDays = Math.max(
+    edition?.totalDays || 0,
+    scheduleDays.length,
+    ...scheduleDays.map((d) => d.dayNumber),
+    1,
+  );
+  const playableUntilDay = maxPlayableDayNumber(currentDay, totalDays);
 
   const days = scheduleDays
     .map((day) => {
@@ -86,7 +103,7 @@ export async function getPlayerMatchSchedule(userId: string) {
         endIso: day.endIso,
         calendarDate: day.calendarDate,
         status,
-        canGoLive: status === 'live',
+        canGoLive: isDayPlayable(day.dayNumber, currentDay, totalDays),
         stageName: day.stageName || day.title,
         stageLabel: day.stageLabel || day.title,
         teamName: myName,
@@ -121,6 +138,8 @@ export async function getPlayerMatchSchedule(userId: string) {
       : null,
     liveDay: live?.dayNumber ?? null,
     liveLabel: live?.label ?? null,
+    currentDay,
+    playableUntilDay,
     warning,
     days,
   };

@@ -38,6 +38,15 @@ export async function POST(request: NextRequest) {
       const schedule = await getPlayerMatchSchedule(user.id);
       const dayNum = parseInt(day.replace(/\D/g, ''), 10);
       const days = (schedule?.days || []).filter(Boolean) as any[];
+      const playableUntil = schedule?.playableUntilDay ?? 0;
+      if (Number.isFinite(dayNum) && dayNum > 0 && playableUntil > 0 && dayNum > playableUntil) {
+        return NextResponse.json(
+          {
+            error: `Day ${dayNum} is not playable yet. You can play Days 1–${playableUntil} in any order.`,
+          },
+          { status: 403, headers: broadcastCorsHeaders },
+        );
+      }
       const row =
         days.find((d) => d.dayNumber === dayNum) ||
         days.find((d) => d.status === 'live') ||
