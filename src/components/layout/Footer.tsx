@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { VisitorCounter } from './VisitorCounter';
 
 export function Footer() {
   const pathname = usePathname();
@@ -33,9 +32,6 @@ export function Footer() {
             <p className="text-muted-foreground text-xs leading-relaxed max-w-sm">
               Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.
             </p>
-            <div className="pt-2">
-              <VisitorCounter />
-            </div>
           </div>
 
           {/* Explore — Coming Soon */}

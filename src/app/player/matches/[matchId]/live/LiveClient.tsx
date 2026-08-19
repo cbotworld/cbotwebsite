@@ -312,27 +312,6 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           console.warn('Direct Supabase upload error:', directErr);
         }
 
-        // Fallback to server route handler
-        if (!uploadedUrl) {
-          try {
-            const fd = new FormData();
-            fd.append('video', videoBlob, `match_${matchDetails.matchId}.webm`);
-            fd.append('matchId', matchDetails.matchId);
-            if (streamId) fd.append('streamId', streamId);
-
-            const upRes = await fetch('/api/stream/upload-recording', {
-              method: 'POST',
-              body: fd,
-            });
-            const upData = await upRes.json();
-            if (upData.success && upData.url) {
-              uploadedUrl = upData.url;
-            }
-          } catch (uploadErr) {
-            console.warn('Server recording upload error:', uploadErr);
-          }
-        }
-
         if (uploadedUrl) {
           setDownloadUrl(uploadedUrl);
         }

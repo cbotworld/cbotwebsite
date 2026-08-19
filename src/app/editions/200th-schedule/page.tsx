@@ -124,7 +124,7 @@ export default function BicentennialSchedulePage() {
       }
     };
     load();
-    const id = setInterval(load, 30000);
+    const id = setInterval(load, 300000); // 5 min — schedule data rarely changes mid-session
     return () => {
       cancelled = true;
       clearInterval(id);

@@ -222,7 +222,6 @@ export function Navbar() {
 
         {/* Mobile Toggle & Header Controls */}
         <div className="flex items-center gap-2 md:hidden">
-          <VisitorCounter />
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all"

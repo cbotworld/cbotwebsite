@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import DailyCombisClient from '../editions/200th-combis/DailyCombisClient';
 
-export const revalidate = 0;
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
 export default async function Edition200CombisPage() {
   let teams: any[] = [];

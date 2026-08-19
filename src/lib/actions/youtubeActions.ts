@@ -3,7 +3,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { unstable_noStore as noStore } from 'next/cache';
+import { unstable_noStore as noStore, unstable_cache } from 'next/cache';
 
 const RETENTION_HOURS = 72; // 72 Hours Retention Window from Day End
 
@@ -859,8 +859,7 @@ export async function getAdminLiveStreamsAction() {
 /**
  * Server Action for Public/Players to fetch all live and recorded match videos
  */
-export async function getPublicDaywiseVideosAction() {
-  noStore();
+async function fetchPublicDaywiseVideos() {
   try {
     const matches = await prisma.match.findMany({
       orderBy: { scheduledTime: 'asc' },
@@ -904,6 +903,12 @@ export async function getPublicDaywiseVideosAction() {
     console.error('Error fetching public daywise videos:', error);
     return { success: false, error: error.message || 'Failed to fetch match videos', matches: [], streams: [] };
   }
+}
+
+export async function getPublicDaywiseVideosAction() {
+  return unstable_cache(fetchPublicDaywiseVideos, ['public-daywise-videos'], {
+    revalidate: 300,
+  })();
 }
 
 /**

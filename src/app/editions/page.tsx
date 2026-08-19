@@ -1,7 +1,7 @@
 import { getEditions } from '@/lib/actions/tournamentActions';
 import EditionsClient from './EditionsClient';
 
-export const revalidate = 0; // Disable cache so live data is always shown
+export const revalidate = 3600;
 
 export default async function EditionsPage() {
   const res = await getEditions();

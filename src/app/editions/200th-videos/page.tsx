@@ -2,7 +2,7 @@ import * as React from 'react';
 import { getPublicDaywiseVideosAction } from '@/lib/actions/youtubeActions';
 import VideosClient from './VideosClient';
 
-export const revalidate = 0; // Real-time match videos
+export const revalidate = 300; // 5 min — videos update occasionally, not every request
 
 export const metadata = {
   title: 'Live & Recorded Match Videos | CBOT 200th Bicentennial Edition',

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
 
+export const revalidate = 60;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -33,6 +35,6 @@ export async function GET() {
       liveLabel: live?.label ?? null,
       days,
     },
-    { headers: corsHeaders }
+    { headers: { ...corsHeaders, 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
   );
 }

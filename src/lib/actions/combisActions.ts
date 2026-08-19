@@ -1,11 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { unstable_noStore as noStore } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
-export async function get200thEditionCombisData() {
-  noStore();
+async function fetch200thEditionCombisData() {
   try {
     // 1. Fetch active Edition 200
     const edition = await prisma.edition.findFirst({
@@ -97,4 +96,10 @@ export async function get200thEditionCombisData() {
       matches: [],
     };
   }
+}
+
+export async function get200thEditionCombisData() {
+  return unstable_cache(fetch200thEditionCombisData, ['edition-200-combis-data'], {
+    revalidate: 300,
+  })();
 }
