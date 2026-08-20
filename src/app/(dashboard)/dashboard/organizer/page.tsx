@@ -48,6 +48,9 @@ export default async function OrganizerPage() {
           members: {
             include: { user: true }
           },
+          spocMembers: {
+            include: { user: true }
+          },
           leagueStandings: true
         },
         orderBy: { createdAt: 'desc' }

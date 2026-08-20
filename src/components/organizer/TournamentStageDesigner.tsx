@@ -31,6 +31,7 @@ import {
   suggestQualifierPairings,
   nextQualifierPairing,
   nextFinalsPairing,
+  nextSpocExhibitionPairing,
   assignScheduleSlots,
   pairingsAlreadyScheduled,
   hasTeamPlayingTwiceOnSameDay,
@@ -228,6 +229,7 @@ export default function TournamentStageDesigner({
   editionId,
   editionTitle,
   teams,
+  spocTeams = [],
   eventsPerDay = 4,
   dayDates = {},
   totalDays = 15,
@@ -238,6 +240,7 @@ export default function TournamentStageDesigner({
   editionId: string;
   editionTitle: string;
   teams: TeamLite[];
+  spocTeams?: TeamLite[];
   eventsPerDay?: number;
   dayDates?: Record<number, string>;
   totalDays?: number;
@@ -255,6 +258,7 @@ export default function TournamentStageDesigner({
 
   const stages = config.stages;
   const active = stages[activeIndex] || stages[0];
+  const activeStageTeams = active?.kind === 'SPOC_EXHIBITION' ? spocTeams : teams;
   const daysNeeded = React.useMemo(() => Math.max(1, stageSpanDays(stages)), [stages]);
 
   React.useEffect(() => {
@@ -567,6 +571,12 @@ export default function TournamentStageDesigner({
     });
   };
 
+  const [spocPairings, setSpocPairings] = React.useState<SuggestedPairing[]>([]);
+  const applySpocPairings = (next: SuggestedPairing[]) => {
+    setSpocPairings(next);
+    updateStage({ matchPairings: next });
+  };
+
   React.useEffect(() => {
     if (active?.kind !== 'QUALIFIER') return;
     if (active.matchPairings?.length) {
@@ -599,6 +609,16 @@ export default function TournamentStageDesigner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.kind, active?.id]);
 
+  React.useEffect(() => {
+    if (active?.kind !== 'SPOC_EXHIBITION') return;
+    if (active.matchPairings?.length) {
+      setSpocPairings(active.matchPairings);
+      return;
+    }
+    applySpocPairings([nextSpocExhibitionPairing([])]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.kind, active?.id]);
+
   const stagedConfig = (): TournamentStageConfig => ({
     scheduleMode,
     stages: config.stages.map((s, idx) => {
@@ -606,6 +626,7 @@ export default function TournamentStageDesigner({
       if (s.kind === 'LEAGUE') return { ...s, matchPairings: leaguePairings };
       if (s.kind === 'QUALIFIER') return { ...s, matchPairings: qualifierPairings };
       if (s.kind === 'FINALS') return { ...s, matchPairings: finalsPairings };
+      if (s.kind === 'SPOC_EXHIBITION') return { ...s, matchPairings: spocPairings };
       return s;
     }),
   });
@@ -723,6 +744,11 @@ export default function TournamentStageDesigner({
                     <Plus className="h-3.5 w-3.5" /> Add final
                   </Button>
                 ) : null}
+                {!stages.some((s) => s.kind === 'SPOC_EXHIBITION') ? (
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-[11px] font-bold border-violet-500/40 text-violet-300" onClick={() => addStage('SPOC_EXHIBITION')}>
+                    <Plus className="h-3.5 w-3.5" /> Spoc exhibition
+                  </Button>
+                ) : null}
               </div>
               </div>
             </div>
@@ -814,10 +840,12 @@ export default function TournamentStageDesigner({
                     {active?.kind === 'LEAGUE' && 'Put teams into groups. Each team plays one game per day.'}
                     {active?.kind === 'QUALIFIER' && 'Knockout matches after the last group stage.'}
                     {active?.kind === 'FINALS' && 'Grand Final. Optional 3rd place.'}
+                    {active?.kind === 'SPOC_EXHIBITION' && 'Exhibition matches only — pick Spoc teams and schedule on any day (qualifier, final, etc.).'}
                   </p>
                 </div>
               </div>
 
+              {active?.kind !== 'SPOC_EXHIBITION' && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
                 <div>
                   <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">Starts on event day</label>
@@ -860,6 +888,16 @@ export default function TournamentStageDesigner({
                   </p>
                 </div>
               </div>
+              )}
+
+              {active?.kind === 'SPOC_EXHIBITION' && (
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 text-[11px] text-muted-foreground font-medium">
+                  Spoc exhibition is separate from the main tournament. Assign each match to any event day below — qualifier day, final day, or any other day.
+                  {spocTeams.length === 0 ? (
+                    <span className="block mt-1 text-rose-400 font-bold">Create Spoc exhibition teams under the Teams tab first.</span>
+                  ) : null}
+                </div>
+              )}
 
               {active?.kind === 'ROUND_ROBIN' && (
                 <div className="space-y-3">
@@ -1178,7 +1216,7 @@ export default function TournamentStageDesigner({
                       label={pair.label || `Finals match ${idx + 1}`}
                       team1Id={pair.team1Id}
                       team2Id={pair.team2Id}
-                      teams={teams}
+                      teams={activeStageTeams}
                       meta={formatPairingSlot(pair)}
                       dayNumber={pair.dayNumber}
                       dayOptions={dayOptions}
@@ -1200,6 +1238,54 @@ export default function TournamentStageDesigner({
                         applyFinalsPairings(copy);
                       }}
                       onRemove={() => applyFinalsPairings(finalsPairings.filter((_, i) => i !== idx))}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {active?.kind === 'SPOC_EXHIBITION' && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      Exhibition matches between Spoc teams. Pick the event day for each match.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] font-bold h-9 border-violet-500/40"
+                      onClick={() => applySpocPairings([...spocPairings, nextSpocExhibitionPairing(spocPairings)])}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add match
+                    </Button>
+                  </div>
+                  {(spocPairings.length ? spocPairings : [nextSpocExhibitionPairing([])]).map((pair, idx) => (
+                    <EditablePairingRow
+                      key={`${pair.stage}-${idx}`}
+                      label={pair.label || `Spoc match ${idx + 1}`}
+                      team1Id={pair.team1Id}
+                      team2Id={pair.team2Id}
+                      teams={activeStageTeams}
+                      meta={formatPairingSlot(pair)}
+                      dayNumber={pair.dayNumber}
+                      dayOptions={dayOptions}
+                      locked={false}
+                      onDay={(day) => {
+                        const copy = [...spocPairings];
+                        copy[idx] = retargetPairingDay(copy[idx], day, dayDates);
+                        applySpocPairings(copy);
+                      }}
+                      onTeam1={(id) => {
+                        const copy = [...spocPairings];
+                        copy[idx] = { ...copy[idx], team1Id: id };
+                        applySpocPairings(copy);
+                      }}
+                      onTeam2={(id) => {
+                        const copy = [...spocPairings];
+                        copy[idx] = { ...copy[idx], team2Id: id };
+                        applySpocPairings(copy);
+                      }}
+                      onRemove={() => applySpocPairings(spocPairings.filter((_, i) => i !== idx))}
                     />
                   ))}
                 </div>
@@ -1249,8 +1335,8 @@ export default function TournamentStageDesigner({
                             scheduledTime: match.scheduledTime ? String(match.scheduledTime) : undefined,
                           }) || '—'}
                         </TableCell>
-                        <TableCell className="text-xs font-bold text-emerald-400">{match.team1?.name || teamLabel(teams, match.team1Id)}</TableCell>
-                        <TableCell className="text-xs font-bold text-rose-400">{match.team2?.name || teamLabel(teams, match.team2Id)}</TableCell>
+                        <TableCell className="text-xs font-bold text-emerald-400">{match.team1?.name || teamLabel(activeStageTeams, match.team1Id)}</TableCell>
+                        <TableCell className="text-xs font-bold text-rose-400">{match.team2?.name || teamLabel(activeStageTeams, match.team2Id)}</TableCell>
                         <TableCell className="text-xs">
                           <Badge variant={match.status === 'COMPLETED' ? 'success' : match.status === 'LIVE' ? 'warning' : 'outline'}>
                             {match.status === 'COMPLETED' && <CheckCircle2 className="h-3 w-3 mr-1" />}

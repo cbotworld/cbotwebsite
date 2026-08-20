@@ -133,6 +133,7 @@ export function matchesStageKind(stage: string | undefined | null, kind: StageKi
       value.startsWith('PLACE_')
     );
   }
+  if (kind === 'SPOC_EXHIBITION') return value === 'SPOC_EXHIBITION' || value.startsWith('SPOC_EXHIBITION_');
   return false;
 }
 
@@ -144,6 +145,7 @@ export function formatMatchStage(stage?: string | null): string {
   if (value === 'THIRD_PLACE') return '3rd Place';
   if (value === 'FIFTH_PLACE') return '5th Place';
   if (value === 'SEVENTH_PLACE') return '7th Place';
+  if (value === 'SPOC_EXHIBITION' || value.startsWith('SPOC_EXHIBITION_')) return 'Spoc Exhibition';
   const league = parseLeagueGroup(value);
   if (league) {
     const numbered = /^LEAGUE(\d+)_/i.exec(value);
@@ -609,6 +611,7 @@ export function defaultDurationForKind(kind: StageKind): number {
   if (kind === 'ROUND_ROBIN') return 7;
   if (kind === 'LEAGUE') return 3;
   if (kind === 'QUALIFIER') return 2;
+  if (kind === 'SPOC_EXHIBITION') return 0;
   return 1;
 }
 
@@ -649,6 +652,16 @@ export function createTournamentStage(
   if (kind === 'FINALS') {
     return { id, order, kind, name: 'Finals', includeThirdPlace: false, durationDays: 1 };
   }
+  if (kind === 'SPOC_EXHIBITION') {
+    return {
+      id,
+      order,
+      kind,
+      name: 'Spoc Exhibition',
+      durationDays: 0,
+      matchPairings: [],
+    };
+  }
   return { id, order, kind, name: 'Round Robin', teamCount, startDay: 1, durationDays: defaultDurationForKind('ROUND_ROBIN') };
 }
 
@@ -688,6 +701,9 @@ export function pathIdForStages(stages: TournamentStage[]): string | null {
 export function layoutStageDays(stages: TournamentStage[], lastDoneDay = 0): TournamentStage[] {
   let cursor = Math.max(1, lastDoneDay + 1);
   return stages.map((stage, idx) => {
+    if (stage.kind === 'SPOC_EXHIBITION') {
+      return { ...stage, order: idx + 1, durationDays: 0 };
+    }
     const durationDays = stage.durationDays || defaultDurationForKind(stage.kind);
     const kept = (stage.startDay || 0) > 0 && (stage.startDay || 0) <= lastDoneDay;
     const startDay = kept ? stage.startDay! : Math.max(cursor, lastDoneDay + 1);
@@ -698,6 +714,7 @@ export function layoutStageDays(stages: TournamentStage[], lastDoneDay = 0): Tou
 
 export function stageSpanDays(stages: TournamentStage[]): number {
   return stages.reduce((max, stage) => {
+    if (stage.kind === 'SPOC_EXHIBITION') return max;
     const start = stage.startDay || 1;
     const duration = stage.durationDays || defaultDurationForKind(stage.kind);
     return Math.max(max, start + duration - 1);
@@ -996,11 +1013,25 @@ export function stageMatchStages(stage: TournamentStage): string[] {
     ]);
   }
   if (stage.kind === 'QUALIFIER') return unique(['QUALIFIER_1', 'QUALIFIER_2', ...extra]);
+  if (stage.kind === 'SPOC_EXHIBITION') return unique(['SPOC_EXHIBITION', ...extra]);
   return unique([
     'GRAND_FINAL',
     ...(stage.includeThirdPlace ? ['THIRD_PLACE'] : []),
     ...extra,
   ]);
+}
+
+export function nextSpocExhibitionPairing(existing: SuggestedPairing[]): SuggestedPairing {
+  const n = existing.length + 1;
+  return {
+    stage: n === 1 ? 'SPOC_EXHIBITION' : `SPOC_EXHIBITION_${n}`,
+    label: `Spoc Match ${n}`,
+    team1Id: '',
+    team2Id: '',
+    team1Name: '',
+    team2Name: '',
+    round: n,
+  };
 }
 
 export function nextQualifierPairing(existing: SuggestedPairing[]): SuggestedPairing {

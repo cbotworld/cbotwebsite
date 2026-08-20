@@ -27,8 +27,10 @@ export type MatchStage =
   | 'GRAND_FINAL'
   | 'THIRD_PLACE'
   | 'FIFTH_PLACE'
-  | 'SEVENTH_PLACE';
-export type StageKind = 'ROUND_ROBIN' | 'LEAGUE' | 'QUALIFIER' | 'FINALS';
+  | 'SEVENTH_PLACE'
+  | 'SPOC_EXHIBITION';
+export type TeamType = 'MAIN' | 'SPOC_EXHIBITION';
+export type StageKind = 'ROUND_ROBIN' | 'LEAGUE' | 'QUALIFIER' | 'FINALS' | 'SPOC_EXHIBITION';
 export type StageSeeding = 'RR_STANDINGS_SNAKE' | 'RR_STANDINGS_SPLIT' | 'MANUAL';
 export type QualifierPairing = 'CROSS' | 'RANKED';
 export type ScheduleMode = 'DIVIDED' | 'SEQUENCE';

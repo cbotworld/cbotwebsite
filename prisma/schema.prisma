@@ -45,6 +45,7 @@ model User {
   
   // Relations
   editionParticipants EditionParticipant[]
+  spocTeamMemberships SpocTeamMember[]
   captainedTeams      Team[]                 @relation("CaptainRelation")
   organizedEditions   Edition[]              @relation("OrganizerRelation")
   scoreReports        ScoreReport[]
@@ -126,6 +127,7 @@ model Edition {
   teams                 Team[]
   matches               Match[]
   participants          EditionParticipant[]
+  spocTeamMembers       SpocTeamMember[]
   patterns              EditionBoardPattern[]
   
   rankingSnapshots      PlayerRankingSnapshot[]
@@ -167,13 +169,16 @@ model Team {
   
   captainId   String?
   captain     User?    @relation("CaptainRelation", fields: [captainId], references: [id])
-  
+
+  teamType    String   @default("MAIN") // MAIN | SPOC_EXHIBITION
+
   savedLineups String?
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   members     EditionParticipant[]
+  spocMembers SpocTeamMember[]
   homeMatches Match[]  @relation("HomeTeam")
   awayMatches Match[]  @relation("AwayTeam")
   wonMatches  Match[]  @relation("WonTeam")
@@ -183,6 +188,20 @@ model Team {
   
   @@unique([editionId, name])
   @@unique([editionId, tag])
+}
+
+model SpocTeamMember {
+  id        String   @id @default(cuid())
+  editionId String
+  edition   Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([editionId, userId])
+  @@unique([teamId, userId])
 }
 
 model BoardPattern {

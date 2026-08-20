@@ -19,8 +19,10 @@ import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe } from 'lucide-react';
 import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
+import SpocExhibitionTeamsPanel from '@/components/organizer/SpocExhibitionTeamsPanel';
 import WebsiteCmsPanel from '@/components/organizer/WebsiteCmsPanel';
 import { isCalendarDayCompleted } from '@/lib/tournament-stages';
+import { filterMainTeams, filterSpocTeams, isMainTournamentTeam } from '@/lib/spoc-teams';
 import type { WebsiteCmsContent } from '@/lib/website-cms';
 
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
@@ -76,6 +78,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const assignedTeamMap = React.useMemo(() => {
     const map: Record<string, { teamId: string; teamName: string }> = {};
     teamsList.forEach((team) => {
+      if (!isMainTournamentTeam(team)) return;
       if (team.members && Array.isArray(team.members) && team.members.length > 0) {
         team.members.forEach((m: any) => {
           const uId = m.userId || (m.user && m.user.id) || m.id;
@@ -352,7 +355,12 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setIsSubmitting(false);
   };
 
-  const selectedEditionTeams = teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id));
+  const selectedEditionTeams = filterMainTeams(
+    teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id))
+  );
+  const selectedEditionSpocTeams = filterSpocTeams(
+    teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id))
+  );
 
   const activeEditions = editions.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REGISTRATION_OPEN');
   const pendingReports = scoreReports.filter((r) => r.status === 'PENDING');
@@ -907,7 +915,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
         <Card className="p-5 border-violet-500/30 bg-violet-500/5">
           <div className="text-xs font-bold text-violet-400 uppercase">Teams</div>
-          <div className="text-3xl font-black text-foreground mt-1">{teamsList.length}</div>
+          <div className="text-3xl font-black text-foreground mt-1">{selectedEditionTeams.length}</div>
         </Card>
 
         <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
@@ -1081,7 +1089,12 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       <TournamentStageDesigner
         editionId={selectedEditionId}
         editionTitle={selectedEdition?.title || selectedEdition?.name || 'Active Edition'}
-        teams={(selectedEditionTeams.length ? selectedEditionTeams : teamsList).map((t: any) => ({
+        spocTeams={selectedEditionSpocTeams.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          tag: t.tag,
+        }))}
+        teams={(selectedEditionTeams.length ? selectedEditionTeams : filterMainTeams(teamsList)).map((t: any) => ({
           id: t.id,
           name: t.name,
           tag: t.tag,
@@ -1124,7 +1137,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {teamsList.map((team) => {
+              {selectedEditionTeams.map((team) => {
                 const captain = usersList.find(
                   (u) =>
                     u.id === team.captainId ||
@@ -1180,10 +1193,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   </TableRow>
                 );
               })}
-              {teamsList.length === 0 && (
+              {selectedEditionTeams.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-xs font-medium">
-                    No teams yet for this edition. Click <strong className="text-amber-400">"+ Add Team"</strong> to create the first team.
+                    No main tournament teams yet for this edition. Click <strong className="text-amber-400">"+ Add Team"</strong> to create the first team.
                   </TableCell>
                 </TableRow>
               )}
@@ -1191,6 +1204,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </Table>
         </CardContent>
       </Card>
+
+      <SpocExhibitionTeamsPanel
+        editionId={selectedEditionId}
+        teams={selectedEditionSpocTeams}
+        allTeams={teamsList}
+        usersList={usersList}
+        onTeamsChange={setTeamsList}
+      />
       </TabsContent>
 
       <TabsContent value="players" forceMount className="mt-4">

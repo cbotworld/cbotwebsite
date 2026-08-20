@@ -28,6 +28,7 @@ import {
   normalizeDayDates,
 } from '@/lib/tournament-stages';
 import type { ScheduleMode, TournamentStage, TournamentStageConfig } from '@/types';
+import { filterMainTeams, filterSpocTeams } from '@/lib/spoc-teams';
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -361,6 +362,7 @@ export async function getEditionStageSnapshot(editionId: string): Promise<
       success: true;
       edition: { id: string; title: string; totalDays: number; dayDates: string | null; tournamentStartDate: Date | null };
       teams: Array<{ id: string; name: string; tag: string }>;
+      spocTeams: Array<{ id: string; name: string; tag: string }>;
       matches: any[];
       config: TournamentStageConfig;
       rrStandings: ReturnType<typeof computeStandings>;
@@ -373,7 +375,7 @@ export async function getEditionStageSnapshot(editionId: string): Promise<
   }
 
   try {
-    const [edition, teams, matches] = await Promise.all([
+    const [edition, allTeams, matches] = await Promise.all([
       prisma.edition.findUnique({ where: { id: editionId }, select: { id: true, title: true, totalDays: true, dayDates: true, tournamentStartDate: true } }),
       prisma.team.findMany({ where: { editionId }, orderBy: { createdAt: 'asc' } }),
       prisma.match.findMany({
@@ -385,6 +387,8 @@ export async function getEditionStageSnapshot(editionId: string): Promise<
 
     if (!edition) return { success: false, error: 'Edition not found.' };
 
+    const teams = filterMainTeams(allTeams);
+    const spocTeams = filterSpocTeams(allTeams);
     const config = await loadStageConfig(editionId, teams.length || 8);
     const rrStandings = computeStandings(teams, matches, (stage) => matchesStageKind(stage, 'ROUND_ROBIN'));
 
@@ -402,7 +406,8 @@ export async function getEditionStageSnapshot(editionId: string): Promise<
     return {
       success: true,
       edition,
-      teams,
+      teams: teams.map((t) => ({ id: t.id, name: t.name, tag: t.tag })),
+      spocTeams: spocTeams.map((t) => ({ id: t.id, name: t.name, tag: t.tag })),
       matches,
       config,
       rrStandings,
@@ -479,15 +484,19 @@ export async function generateStageFixtures(
   }
 
   try {
-    const teams = await prisma.team.findMany({ where: { editionId }, orderBy: { createdAt: 'asc' } });
+    const allTeams = await prisma.team.findMany({ where: { editionId }, orderBy: { createdAt: 'asc' } });
+    const mainTeams = filterMainTeams(allTeams);
+    const spocTeams = filterSpocTeams(allTeams);
     const matches = await prisma.match.findMany({
       where: { editionId },
       include: { team1: true, team2: true, winner: true },
       orderBy: { matchNumber: 'asc' },
     });
-    const config = await loadStageConfig(editionId, teams.length || 8);
+    const config = await loadStageConfig(editionId, mainTeams.length || 8);
     const stage = config.stages.find((s) => s.id === stageId);
     if (!stage) return { success: false, error: 'Stage not found in the saved tournament design.' };
+
+    const teams = stage.kind === 'SPOC_EXHIBITION' ? spocTeams : mainTeams;
 
     const existingForStage = matches.filter((m) => stageMatchStages(stage).includes(m.stage));
     if (existingForStage.length > 0 && !payload?.regenerate) {
@@ -664,6 +673,16 @@ async function createMatchesForStage(
         tableNumber: p.tableNumber,
       });
     });
+  } else if (stage.kind === 'SPOC_EXHIBITION') {
+    const pairings = opts.pairings?.length ? opts.pairings : stage.matchPairings || [];
+    if (!pairings.length) {
+      return { success: false, error: 'Add Spoc exhibition match pairings before generating fixtures.' };
+    }
+    const incomplete = pairings.find((p) => !p.team1Id || !p.team2Id || p.team1Id === p.team2Id);
+    if (incomplete) {
+      return { success: false, error: 'Every Spoc exhibition match needs two different teams.' };
+    }
+    pushPairings(pairings);
   }
 
   if (!rows.length) return { success: false, error: 'No fixtures to generate for this stage.' };
