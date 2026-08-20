@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import HomeClient from './HomeClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
+import { sanitizeCmsImages, safePublicImageUrl, withSafeTeamLogo } from '@/lib/safe-image-url';
 
 export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
@@ -43,32 +44,34 @@ export default async function HomePage() {
       getWebsiteCmsContent(),
     ]);
 
-    const currentEditionTeams = currentEdition?.teams ?? [];
+    // Drop base64 / oversized logos so ISR HTML stays under Vercel's ~19MB limit.
+    const currentEditionTeams = (currentEdition?.teams ?? []).map(withSafeTeamLogo);
+    const slimAllTeams = allTeams.map(withSafeTeamLogo);
     const currentEditionName = currentEdition
       ? `${currentEdition.title} (Edition #${currentEdition.number})`
       : null;
+    const safeCms = sanitizeCmsImages(websiteCms);
 
-    // Safely serialize and pass only the necessary properties to the client component
     return (
       <HomeClient
-        teams={JSON.parse(JSON.stringify(currentEditionTeams))}
-        allTeams={JSON.parse(JSON.stringify(allTeams))}
+        teams={currentEditionTeams}
+        allTeams={slimAllTeams}
         players={[]}
         matches={[]}
         currentEditionName={currentEditionName}
-        editionPosterUrl={currentEdition?.posterUrl ?? null}
+        editionPosterUrl={safePublicImageUrl(currentEdition?.posterUrl) ?? null}
         currentEdition={currentEdition ? {
           id: currentEdition.id,
           title: currentEdition.title,
           theme: currentEdition.theme ?? null,
-          bannerImage: currentEdition.bannerImage ?? null,
-          posterUrl: currentEdition.posterUrl ?? null,
+          bannerImage: safePublicImageUrl(currentEdition.bannerImage),
+          posterUrl: safePublicImageUrl(currentEdition.posterUrl),
           number: currentEdition.number,
           tournamentStartDate: currentEdition.tournamentStartDate ? currentEdition.tournamentStartDate.toISOString() : null,
           dayDates: currentEdition.dayDates ?? null,
           totalDays: currentEdition.totalDays ?? 15,
         } : null}
-        websiteCms={JSON.parse(JSON.stringify(websiteCms))}
+        websiteCms={safeCms}
       />
     );
   } catch (error) {
