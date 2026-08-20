@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
-import { isDayPlayable, tournamentPlayWindow } from '@/lib/match-play-window';
+import {
+  isDayUnlockedByYoutubeSequence,
+  summarizePlayerDayStreams,
+  tournamentPlayWindow,
+  unlockPrerequisiteDay,
+} from '@/lib/match-play-window';
 import { buildOrganizerScheduleDays } from '@/lib/organizer-schedule';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
@@ -46,7 +51,7 @@ export async function getPlayerMatchSchedule(userId: string) {
       dayNumber: p.dayNumber,
       team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
       team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
-    }))
+    })),
   );
 
   let dayDates: Record<number, string> = {};
@@ -65,10 +70,41 @@ export async function getPlayerMatchSchedule(userId: string) {
 
   const now = Date.now();
   const teamNameUpper = (team?.name || '').toUpperCase().trim();
-  const { currentDay, totalDays, playableUntilDay } = tournamentPlayWindow(
+  const { currentDay, totalDays } = tournamentPlayWindow(
     now,
     Math.max(edition?.totalDays || 0, scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
   );
+
+  const playerStreams = await prisma.liveStream.findMany({
+    where: {
+      playerId: userId,
+      ...(edition?.id ? { editionId: edition.id } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      matchId: true,
+      youtubeUrl: true,
+      youtubeVideoId: true,
+      youtubeEmbedUrl: true,
+      status: true,
+      createdAt: true,
+      recordedAt: true,
+      match: { select: { round: true, matchNumber: true } },
+    },
+  });
+  const streamSummary = summarizePlayerDayStreams(playerStreams);
+  const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
+
+  const fixtureDays = scheduleDays
+    .map((day) => {
+      const fix = teamNameUpper
+        ? day.matches.find((m) => m.team1 === teamNameUpper || m.team2 === teamNameUpper)
+        : null;
+      if (!fix) return null;
+      return day.dayNumber;
+    })
+    .filter((n): n is number => typeof n === 'number' && n > 0);
 
   const days = scheduleDays
     .map((day) => {
@@ -82,6 +118,9 @@ export async function getPlayerMatchSchedule(userId: string) {
       const myTeam = teamByName.get(myName);
       const oppTeam = teamByName.get(oppName);
       const status = monumentStatus(day, now);
+      const canGoLive = isDayUnlockedByYoutubeSequence(day.dayNumber, fixtureDays, daysWithYoutube);
+      const latest = streamSummary.latestByDay[day.dayNumber] || null;
+      const prerequisiteDay = unlockPrerequisiteDay(day.dayNumber, fixtureDays);
       return {
         dayNumber: day.dayNumber,
         label: `Day ${day.dayNumber}`,
@@ -91,7 +130,17 @@ export async function getPlayerMatchSchedule(userId: string) {
         endIso: day.endIso,
         calendarDate: day.calendarDate,
         status,
-        canGoLive: isDayPlayable(day.dayNumber, currentDay, totalDays),
+        canGoLive,
+        lockedReason: canGoLive
+          ? null
+          : prerequisiteDay
+            ? `Save at least one YouTube link for Day ${prerequisiteDay} before Day ${day.dayNumber} unlocks.`
+            : 'This day is not on your schedule.',
+        prerequisiteDay,
+        hasYoutube: Boolean(latest),
+        latestYoutubeUrl: latest?.youtubeUrl || null,
+        latestYoutubeVideoId: latest?.youtubeVideoId || null,
+        streamCount: streamSummary.streamCountByDay[day.dayNumber] || 0,
         stageName: day.stageName || day.title,
         stageLabel: day.stageLabel || day.title,
         teamName: myName,
@@ -127,8 +176,9 @@ export async function getPlayerMatchSchedule(userId: string) {
     liveDay: live?.dayNumber ?? null,
     liveLabel: live?.label ?? null,
     currentDay,
-    playableFromDay: currentDay,
-    playableUntilDay,
+    playableFromDay: 1,
+    playableUntilDay: totalDays,
+    daysWithYoutube: streamSummary.daysWithYoutube,
     warning,
     days,
   };

@@ -18,7 +18,11 @@ import {
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
-import { isDayPlayable, tournamentPlayWindow } from '@/lib/match-play-window';
+import {
+  isDayUnlockedByYoutubeSequence,
+  summarizePlayerDayStreams,
+  unlockPrerequisiteDay,
+} from '@/lib/match-play-window';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
 import {
   buildOrganizerScheduleDays,
@@ -201,12 +205,19 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   const assignedPatterns = initialPatterns.length > 0 ? initialPatterns : [];
 
-  // ── GO LIVE — Sequential enforcement & replay comment state ──────────────
-  // Build a Set of matchIds that already have at least one stream (for this player)
+  // ── GO LIVE — sequential unlock by YouTube saves; re-live keeps latest link ─
+  const streamSummary = React.useMemo(
+    () => summarizePlayerDayStreams(initialStreams || []),
+    [initialStreams],
+  );
   const streamedMatchIds = React.useMemo(() => {
     const streams = initialStreams || [];
     return new Set<string>(streams.map((s: any) => s.matchId));
   }, [initialStreams]);
+  const daysWithYoutube = React.useMemo(
+    () => new Set(streamSummary.daysWithYoutube),
+    [streamSummary],
+  );
 
   // GoLive Comment Modal (for replays)
   const [goLiveModal, setGoLiveModal] = React.useState<{
@@ -224,28 +235,24 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     [personalSchedule]
   );
 
-  const { currentDay, totalDays, playableUntilDay } = React.useMemo(
-    () =>
-      tournamentPlayWindow(
-        nowMs,
-        Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
-      ),
-    [scheduleDays, nowMs]
+  const scheduledDayNumbers = React.useMemo(
+    () => sortedSchedule.map((m: any) => m.matchNumber || 0).filter((n: number) => n > 0),
+    [sortedSchedule],
   );
 
   /**
-   * Players can play any day from 1 through playableUntilDay, without sequence.
-   * Current day + next 3 stay open; as days complete the ceiling stacks (1→4, 2→7).
+   * First scheduled day is always open. Later days unlock only after the previous
+   * scheduled day has ≥1 real YouTube link. Unlocked days stay open for re-live.
    */
   const canGoLive = React.useCallback(
-    (match: any): { allowed: boolean; playableUntil: number } => {
+    (match: any): { allowed: boolean; prerequisiteDay: number | null } => {
       const dayNum = match?.matchNumber || 0;
       return {
-        allowed: isDayPlayable(dayNum, currentDay, totalDays),
-        playableUntil: playableUntilDay,
+        allowed: isDayUnlockedByYoutubeSequence(dayNum, scheduledDayNumbers, daysWithYoutube),
+        prerequisiteDay: unlockPrerequisiteDay(dayNum, scheduledDayNumbers),
       };
     },
-    [currentDay, totalDays, playableUntilDay]
+    [scheduledDayNumbers, daysWithYoutube]
   );
 
   /** Open the Cbot YouTube live app — live video is not stored in the website DB. */
@@ -267,14 +274,14 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
 
   /** Main Go Live click handler — called from each row's button */
   const handleGoLiveClick = (match: any, matchIndex: number) => {
-    const { allowed } = canGoLive(match);
+    const { allowed, prerequisiteDay } = canGoLive(match);
     const dayNum = match.matchNumber || matchIndex + 1;
     if (!allowed) {
-      if (dayNum < currentDay) {
-        alert(`Day ${dayNum} is closed. You can play Days ${currentDay}–${playableUntilDay} in any order.`);
-      } else {
-        alert(`Day ${dayNum} is not open yet. You can play Days ${currentDay}–${playableUntilDay} in any order.`);
-      }
+      alert(
+        prerequisiteDay
+          ? `Day ${dayNum} unlocks after you save at least one YouTube link for Day ${prerequisiteDay}. You can still go live again on Day ${prerequisiteDay}.`
+          : `Day ${dayNum} is not available on your schedule yet.`,
+      );
       return;
     }
     openCbotLive(match, dayNum);
@@ -397,13 +404,13 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
               </div>
               <div className="flex flex-wrap gap-2 text-[10px]">
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/20">
-                  <Radio className="h-3 w-3" /> GO LIVE — First stream
+                  <Radio className="h-3 w-3" /> GO LIVE — open once unlocked
                 </span>
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/15 text-violet-400 font-bold border border-violet-500/20">
-                  <RotateCcw className="h-3 w-3" /> GO LIVE AGAIN — Replay
+                  <RotateCcw className="h-3 w-3" /> GO LIVE AGAIN — latest YouTube link kept
                 </span>
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/40 text-muted-foreground font-bold border border-border">
-                  <Lock className="h-3 w-3" /> Locked — complete prev day first
+                  <Lock className="h-3 w-3" /> Next day unlocks after prior day has ≥1 YouTube save
                 </span>
               </div>
             </div>
@@ -428,8 +435,8 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 </div>
               ) : (
                 sortedSchedule.map((match: any, idx: number) => {
-                  const { allowed, playableUntil } = canGoLive(match);
-                  const isReplay = streamedMatchIds.has(match.id);
+                  const { allowed, prerequisiteDay } = canGoLive(match);
+                  const isReplay = streamedMatchIds.has(match.id) || Boolean(streamSummary.latestByDay[match.matchNumber || 0]);
                   const windowStatus = monumentStatus(
                     { startIso: match.scheduledTime, endIso: match.endIso },
                     nowMs
@@ -444,6 +451,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                   const oppTeamLogo = isMyTeam1 ? match.team2?.logo : match.team1?.logo;
                   const dayNum = match.matchNumber || idx + 1;
                   const matchStreams = (initialStreams || []).filter((s: any) => s.matchId === match.id);
+                  const latestDayLink = streamSummary.latestByDay[dayNum] || null;
                   const [, calMonth, calDay] = String(match.calendarDate || '').split('-');
                   const shortDate = calMonth
                     ? `${Number(calDay)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(calMonth) - 1]}`
@@ -539,23 +547,19 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                             </Button>
                           </div>
 
-                          {!allowed && dayNum < currentDay ? (
-                            <Button
-                              size="sm"
-                              disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed w-full"
-                            >
-                              🔒 Closed
-                            </Button>
-                          ) : !allowed ? (
+                          {!allowed ? (
                             <Button
                               size="sm"
                               disabled
                               className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
-                              title={`Playable through Day ${playableUntil}`}
+                              title={
+                                prerequisiteDay
+                                  ? `Save a YouTube link for Day ${prerequisiteDay} first`
+                                  : 'Not available'
+                              }
                             >
                               <Lock className="h-3.5 w-3.5" />
-                              After Day {playableUntil}
+                              {prerequisiteDay ? `Need Day ${prerequisiteDay} YT` : 'Locked'}
                             </Button>
                           ) : isReplay ? (
                             <Button
@@ -566,8 +570,6 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                               <RotateCcw className="h-3.5 w-3.5" />
                               GO LIVE AGAIN
                             </Button>
-                          ) : match.status === 'LIVE' && isReplay === false && false ? (
-                            null
                           ) : (
                             <Button
                               variant={isCurrentlyLive ? undefined : 'carrom'}
@@ -594,6 +596,28 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                           )}
                         </div>
                       </div>
+
+                      {/* Latest YouTube link for this day */}
+                      {latestDayLink?.youtubeUrl ? (
+                        <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-center sm:justify-start gap-2 text-[10px]">
+                          <span className="text-muted-foreground font-semibold uppercase tracking-wider mr-1">
+                            📺 Latest YouTube:
+                          </span>
+                          <a
+                            href={latestDayLink.youtubeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 text-red-300 font-bold hover:text-red-200 transition-colors"
+                          >
+                            <PlayCircle className="h-3 w-3" /> Open latest stream
+                          </a>
+                          {(streamSummary.streamCountByDay[dayNum] || 0) > 1 ? (
+                            <span className="text-muted-foreground font-medium">
+                              {streamSummary.streamCountByDay[dayNum]} saves · showing newest
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       {/* Streams list (Watch Replay) */}
                       {matchStreams.length > 0 && (

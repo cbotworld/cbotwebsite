@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -58,8 +59,11 @@ export function DashboardScreen({ navigation }: Props) {
   const onGoLive = (match: MatchDetails) => {
     if (!match.canGoLive) {
       Alert.alert(
-        match.status === 'COMPLETED' ? `${match.label} closed` : `${match.label} not open yet`,
-        match.timeRange || 'Follow the official 8pm to 8pm match schedule.',
+        `${match.label} locked`,
+        match.lockedReason ||
+          (match.prerequisiteDay
+            ? `Save at least one YouTube link for Day ${match.prerequisiteDay} first.`
+            : 'This match day is not unlocked yet.'),
       );
       return;
     }
@@ -145,13 +149,35 @@ export function DashboardScreen({ navigation }: Props) {
                 </View>
 
                 <Pressable
-                  style={[styles.goLive, !isLive && styles.goLiveOff]}
+                  style={[styles.goLive, !match.canGoLive && styles.goLiveOff]}
                   onPress={() => onGoLive(match)}
                 >
-                  <Text style={[styles.goLiveText, !isLive && { color: '#64748b' }]}>
-                    {isLive ? 'GO LIVE' : isDone ? 'CLOSED' : `OPENS ${match.label}`}
+                  <Text style={[styles.goLiveText, !match.canGoLive && { color: '#64748b' }]}>
+                    {!match.canGoLive
+                      ? match.prerequisiteDay
+                        ? `NEED DAY ${match.prerequisiteDay} YT`
+                        : 'LOCKED'
+                      : match.hasYoutube
+                        ? 'GO LIVE AGAIN'
+                        : isLive
+                          ? 'GO LIVE'
+                          : 'GO LIVE'}
                   </Text>
                 </Pressable>
+                {match.latestYoutubeUrl ? (
+                  <Pressable
+                    style={styles.ytBtn}
+                    onPress={() => {
+                      Linking.openURL(match.latestYoutubeUrl!).catch(() =>
+                        Alert.alert('Error', 'Could not open YouTube.'),
+                      );
+                    }}
+                  >
+                    <Text style={styles.ytBtnText}>
+                      Latest YouTube{(match.streamCount || 0) > 1 ? ` · ${match.streamCount} saves` : ''}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}
@@ -248,6 +274,16 @@ const styles = StyleSheet.create({
   },
   goLiveOff: { backgroundColor: '#1e293b' },
   goLiveText: { color: '#fff', fontWeight: '900', letterSpacing: 1 },
+  ytBtn: {
+    marginTop: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  ytBtnText: { color: '#fca5a5', fontWeight: '800', fontSize: 11 },
   logout: {
     margin: 14,
     paddingVertical: 12,

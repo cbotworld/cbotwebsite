@@ -147,14 +147,26 @@ export default async function CaptainPage() {
     orderBy: { scheduledTime: 'asc' },
   }) : [];
 
-  const captainLiveStreams = captainUser ? await prisma.liveStream.findMany({
-    where: {
-      playerId: captainUser.id,
-      matchId: { in: captainPlayerMatches.map((m) => m.id) },
-    },
-    select: { id: true, matchId: true, status: true, createdAt: true, youtubeUrl: true },
-    orderBy: { createdAt: 'desc' },
-  }) : [];
+  const captainLiveStreams = captainUser
+    ? await prisma.liveStream.findMany({
+        where: {
+          playerId: captainUser.id,
+          ...(activeEdition?.id ? { editionId: activeEdition.id } : {}),
+        },
+        select: {
+          id: true,
+          matchId: true,
+          status: true,
+          createdAt: true,
+          recordedAt: true,
+          youtubeUrl: true,
+          youtubeVideoId: true,
+          youtubeEmbedUrl: true,
+          match: { select: { round: true, matchNumber: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
 
   const boardPatterns = await prisma.boardPattern.findMany({ take: 5 });
 

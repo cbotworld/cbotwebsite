@@ -38,26 +38,33 @@ export async function POST(request: NextRequest) {
       const schedule = await getPlayerMatchSchedule(user.id);
       const dayNum = parseInt(day.replace(/\D/g, ''), 10);
       const days = (schedule?.days || []).filter(Boolean) as any[];
-      const playableUntil = schedule?.playableUntilDay ?? 0;
-      const playableFrom = schedule?.currentDay ?? 0;
-      if (Number.isFinite(dayNum) && dayNum > 0 && playableFrom > 0 && dayNum < playableFrom) {
-        return NextResponse.json(
-          { error: `Day ${dayNum} is closed. You can play Days ${playableFrom}–${playableUntil || playableFrom}.` },
-          { status: 403, headers: broadcastCorsHeaders },
-        );
-      }
-      if (Number.isFinite(dayNum) && dayNum > 0 && playableUntil > 0 && dayNum > playableUntil) {
-        return NextResponse.json(
-          {
-            error: `Day ${dayNum} is not playable yet. You can play Days ${playableFrom || 1}–${playableUntil} in any order.`,
-          },
-          { status: 403, headers: broadcastCorsHeaders },
-        );
-      }
       const row =
         days.find((d) => d.dayNumber === dayNum) ||
         days.find((d) => d.status === 'live') ||
         null;
+
+      if (Number.isFinite(dayNum) && dayNum > 0) {
+        if (row && row.canGoLive === false) {
+          return NextResponse.json(
+            {
+              error:
+                row.lockedReason ||
+                `Day ${dayNum} is locked. Save a YouTube link for the previous match day first.`,
+            },
+            { status: 403, headers: broadcastCorsHeaders },
+          );
+        }
+        if (!row) {
+          const scheduled = days.map((d) => d.dayNumber).filter(Boolean);
+          if (scheduled.length && !scheduled.includes(dayNum)) {
+            return NextResponse.json(
+              { error: `Day ${dayNum} is not on your match schedule.` },
+              { status: 403, headers: broadcastCorsHeaders },
+            );
+          }
+        }
+      }
+
       if (!name) name = schedule?.user?.name || user.name || user.username || '';
       if (row) {
         if (!day) day = row.label || `Day ${row.dayNumber}`;

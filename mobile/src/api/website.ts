@@ -33,6 +33,12 @@ export type MatchDetails = {
   tableNumber: number;
   status: string;
   canGoLive: boolean;
+  lockedReason?: string | null;
+  prerequisiteDay?: number | null;
+  hasYoutube?: boolean;
+  latestYoutubeUrl?: string | null;
+  latestYoutubeVideoId?: string | null;
+  streamCount?: number;
 };
 
 type Session = {
@@ -102,6 +108,12 @@ export async function fetchPlayerSchedule() {
     tableNumber: day.tableNumber || 1,
     status: day.status === 'live' ? 'LIVE' : day.status === 'completed' ? 'COMPLETED' : 'SCHEDULED',
     canGoLive: Boolean(day.canGoLive),
+    lockedReason: day.lockedReason || null,
+    prerequisiteDay: day.prerequisiteDay ?? null,
+    hasYoutube: Boolean(day.hasYoutube),
+    latestYoutubeUrl: day.latestYoutubeUrl || null,
+    latestYoutubeVideoId: day.latestYoutubeVideoId || null,
+    streamCount: day.streamCount || 0,
   }));
   return {
     matches,
@@ -146,5 +158,38 @@ export async function fetchPlayerCombis() {
         opponentPlayers: string;
       }>;
     }>;
+  };
+}
+
+export async function fetchChannelVideos(opts?: { player?: string; day?: number | 'ALL' | null }) {
+  const current = getSession();
+  if (!current?.token) {
+    throw new Error('Please log in.');
+  }
+  const params = new URLSearchParams();
+  if (opts?.player) params.set('player', opts.player);
+  if (opts?.day && opts.day !== 'ALL') params.set('day', String(opts.day));
+  const qs = params.toString();
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/videos${qs ? `?${qs}` : ''}`, {
+    headers: { Authorization: `Bearer ${current.token}` },
+  });
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to load videos.');
+  }
+  return data as {
+    success: true;
+    days: number[];
+    videos: Array<{
+      id: string;
+      dayNumber: number;
+      playerName: string;
+      teamName: string;
+      isLive: boolean;
+      youtubeUrl: string | null;
+      thumbnailUrl?: string | null;
+      title: string;
+    }>;
+    count: number;
   };
 }

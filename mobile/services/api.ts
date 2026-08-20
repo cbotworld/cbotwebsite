@@ -43,6 +43,12 @@ export interface MatchDetails {
   tableNumber: number;
   status: string;
   canGoLive: boolean;
+  lockedReason?: string | null;
+  prerequisiteDay?: number | null;
+  hasYoutube?: boolean;
+  latestYoutubeUrl?: string | null;
+  latestYoutubeVideoId?: string | null;
+  streamCount?: number;
 }
 
 export interface StreamSession {
@@ -96,6 +102,12 @@ export async function getPlayerMatches(token: string): Promise<{ success: boolea
       tableNumber: day.tableNumber || 1,
       status: day.status === 'live' ? 'LIVE' : day.status === 'completed' ? 'COMPLETED' : 'SCHEDULED',
       canGoLive: Boolean(day.canGoLive),
+      lockedReason: day.lockedReason || null,
+      prerequisiteDay: day.prerequisiteDay ?? null,
+      hasYoutube: Boolean(day.hasYoutube),
+      latestYoutubeUrl: day.latestYoutubeUrl || null,
+      latestYoutubeVideoId: day.latestYoutubeVideoId || null,
+      streamCount: day.streamCount || 0,
     }));
     return { success: true, matches, team: data.team };
   } catch (err: any) {
@@ -135,6 +147,45 @@ export async function getPlayerCombis(token: string): Promise<{
 }> {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/combis`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
+  }
+}
+
+export async function getChannelVideos(
+  token: string,
+  opts?: { player?: string; day?: number | 'ALL' | null },
+): Promise<{
+  success: boolean;
+  videos?: Array<{
+    id: string;
+    dayNumber: number;
+    playerName: string;
+    playerUsername?: string | null;
+    teamName: string;
+    teamTag?: string | null;
+    teamLogo?: string | null;
+    status: string;
+    isLive: boolean;
+    youtubeUrl: string | null;
+    youtubeVideoId?: string | null;
+    thumbnailUrl?: string | null;
+    title: string;
+    recordedAt?: string | null;
+  }>;
+  days?: number[];
+  count?: number;
+  error?: string;
+}> {
+  try {
+    const params = new URLSearchParams();
+    if (opts?.player) params.set('player', opts.player);
+    if (opts?.day && opts.day !== 'ALL') params.set('day', String(opts.day));
+    const qs = params.toString();
+    const res = await fetch(`${API_BASE}/api/mobile/videos${qs ? `?${qs}` : ''}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return await res.json();

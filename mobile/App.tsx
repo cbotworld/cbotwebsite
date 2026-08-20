@@ -18,14 +18,60 @@ import {
   loginPlayer,
   getPlayerMatches,
   getPlayerCombis,
+  getChannelVideos,
   MatchDetails,
 } from './services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type Screen = 'login' | 'matches' | 'combis' | 'live';
+type Screen = 'login' | 'matches' | 'combis' | 'videos' | 'live';
 
 type CombiDay = NonNullable<Awaited<ReturnType<typeof getPlayerCombis>>['days']>[number];
+type ChannelVideo = NonNullable<Awaited<ReturnType<typeof getChannelVideos>>['videos']>[number];
+
+const LOCKED_PLAYER_LABELS = new Set([
+  'not submitted yet',
+  '—',
+  '-',
+  'locked until 9:30 pm ist',
+  'player 1',
+  'player 2',
+  'player 3',
+  'player 4',
+]);
+
+function splitPlayerNames(raw: string): string[] {
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s && !LOCKED_PLAYER_LABELS.has(s.toLowerCase()));
+}
+
+function TabBar({
+  active,
+  onMatches,
+  onCombis,
+  onVideos,
+}: {
+  active: Screen;
+  onMatches: () => void;
+  onCombis: () => void;
+  onVideos: () => void;
+}) {
+  return (
+    <View style={styles.tabRow}>
+      <TouchableOpacity style={[styles.tabBtn, active === 'matches' && styles.tabBtnActive]} onPress={onMatches}>
+        <Text style={[styles.tabText, active === 'matches' && styles.tabTextActive]}>MATCHES</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.tabBtn, active === 'combis' && styles.tabBtnActive]} onPress={onCombis}>
+        <Text style={[styles.tabText, active === 'combis' && styles.tabTextActive]}>COMBIS</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.tabBtn, active === 'videos' && styles.tabBtnActive]} onPress={onVideos}>
+        <Text style={[styles.tabText, active === 'videos' && styles.tabTextActive]}>VIDEOS</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function App() {
   // Navigation & Auth State
@@ -46,6 +92,12 @@ export default function App() {
   const [combiDays, setCombiDays] = useState<CombiDay[]>([]);
   const [selectedCombiDay, setSelectedCombiDay] = useState<number | null>(null);
   const [combisLoading, setCombisLoading] = useState(false);
+  const [videos, setVideos] = useState<ChannelVideo[]>([]);
+  const [videoDays, setVideoDays] = useState<number[]>([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videoPlayerFilter, setVideoPlayerFilter] = useState('');
+  const [videoDayFilter, setVideoDayFilter] = useState<number | 'ALL'>('ALL');
+  const [videoSearchDraft, setVideoSearchDraft] = useState('');
 
   // Login State
   const [username, setUsername] = useState('');
@@ -70,6 +122,70 @@ export default function App() {
     } finally {
       setCombisLoading(false);
     }
+  };
+
+  const loadVideos = async (
+    authToken: string,
+    opts?: { player?: string; day?: number | 'ALL' },
+  ) => {
+    setVideosLoading(true);
+    try {
+      const player = opts?.player ?? videoPlayerFilter;
+      const day = opts?.day ?? videoDayFilter;
+      const res = await getChannelVideos(authToken, {
+        player: player.trim() || undefined,
+        day,
+      });
+      if (res.success) {
+        setVideos(res.videos || []);
+        setVideoDays(res.days || []);
+      }
+    } finally {
+      setVideosLoading(false);
+    }
+  };
+
+  const openVideosForPlayer = (player: string, day?: number | null) => {
+    const cleaned = player.trim();
+    if (!cleaned) return;
+    setVideoPlayerFilter(cleaned);
+    setVideoSearchDraft(cleaned);
+    setVideoDayFilter(day && day > 0 ? day : 'ALL');
+    setScreen('videos');
+    if (token) {
+      void loadVideos(token, { player: cleaned, day: day && day > 0 ? day : 'ALL' });
+    }
+  };
+
+  const renderTappablePlayers = (raw: string, dayNumber: number, align: 'left' | 'right') => {
+    const names = splitPlayerNames(raw);
+    if (!names.length) {
+      return (
+        <Text
+          style={[align === 'left' ? styles.combiPlayersLeft : styles.combiPlayersRight, { opacity: 0.7 }]}
+          numberOfLines={3}
+        >
+          {raw || '—'}
+        </Text>
+      );
+    }
+    return (
+      <View style={align === 'left' ? styles.combiPlayersWrapLeft : styles.combiPlayersWrapRight}>
+        {names.map((name, idx) => (
+          <TouchableOpacity key={`${name}-${idx}`} onPress={() => openVideosForPlayer(name, dayNumber)} activeOpacity={0.7}>
+            <Text
+              style={[
+                align === 'left' ? styles.combiPlayersLeft : styles.combiPlayersRight,
+                styles.combiPlayerLink,
+              ]}
+              numberOfLines={2}
+            >
+              {name}{idx < names.length - 1 ? ',' : ''}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
   const handleLogin = async () => {
@@ -107,8 +223,11 @@ export default function App() {
   const handleSelectMatch = (match: MatchDetails) => {
     if (!match.canGoLive) {
       Alert.alert(
-        match.status === 'COMPLETED' ? `${match.label} closed` : `${match.label} not open yet`,
-        match.timeRange || 'Follow the official 8pm–8pm match schedule.'
+        `${match.label} locked`,
+        match.lockedReason ||
+          (match.prerequisiteDay
+            ? `Save at least one YouTube link for Day ${match.prerequisiteDay} first. You can still go live again on that day.`
+            : 'This match day is not unlocked yet.'),
       );
       return;
     }
@@ -205,14 +324,15 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.tabRow}>
-          <TouchableOpacity style={[styles.tabBtn, styles.tabBtnActive]} onPress={() => setScreen('matches')}>
-            <Text style={[styles.tabText, styles.tabTextActive]}>MATCHES</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.tabBtn} onPress={() => setScreen('combis')}>
-            <Text style={styles.tabText}>COMBIS</Text>
-          </TouchableOpacity>
-        </View>
+        <TabBar
+          active="matches"
+          onMatches={() => setScreen('matches')}
+          onCombis={() => setScreen('combis')}
+          onVideos={() => {
+            setScreen('videos');
+            if (token) void loadVideos(token);
+          }}
+        />
 
         <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
           {matches.length === 0 ? (
@@ -298,10 +418,45 @@ export default function App() {
                 </View>
 
                 <View style={styles.goLiveRow}>
-                  <Text style={[styles.goLiveText, !isLive && { color: '#64748b' }]}>
-                    {isLive ? '🔴 GO LIVE ON YOUTUBE →' : isDone ? '🔒 CLOSED' : `🔒 OPENS ${match.label}`}
+                  <Text
+                    style={[
+                      styles.goLiveText,
+                      match.canGoLive
+                        ? match.hasYoutube
+                          ? { color: '#a78bfa' }
+                          : isLive
+                            ? { color: '#ef4444' }
+                            : { color: '#f59e0b' }
+                        : { color: '#64748b' },
+                    ]}
+                  >
+                    {!match.canGoLive
+                      ? match.prerequisiteDay
+                        ? `🔒 NEED DAY ${match.prerequisiteDay} YOUTUBE FIRST`
+                        : '🔒 LOCKED'
+                      : match.hasYoutube
+                        ? '🔁 GO LIVE AGAIN →'
+                        : isLive
+                          ? '🔴 GO LIVE ON YOUTUBE →'
+                          : '🔴 GO LIVE →'}
                   </Text>
                 </View>
+
+                {match.latestYoutubeUrl ? (
+                  <TouchableOpacity
+                    style={styles.ytLinkRow}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      Linking.openURL(match.latestYoutubeUrl!).catch(() =>
+                        Alert.alert('Error', 'Could not open YouTube.'),
+                      );
+                    }}
+                  >
+                    <Text style={styles.ytLinkText} numberOfLines={1}>
+                      📺 Latest YouTube{(match.streamCount || 0) > 1 ? ` · ${match.streamCount} saves` : ''} →
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </TouchableOpacity>
               );
             })
@@ -349,14 +504,15 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.tabRow}>
-          <TouchableOpacity style={styles.tabBtn} onPress={() => setScreen('matches')}>
-            <Text style={styles.tabText}>MATCHES</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tabBtn, styles.tabBtnActive]} onPress={() => setScreen('combis')}>
-            <Text style={[styles.tabText, styles.tabTextActive]}>COMBIS</Text>
-          </TouchableOpacity>
-        </View>
+        <TabBar
+          active="combis"
+          onMatches={() => setScreen('matches')}
+          onCombis={() => setScreen('combis')}
+          onVideos={() => {
+            setScreen('videos');
+            if (token) void loadVideos(token, { player: videoPlayerFilter, day: videoDayFilter });
+          }}
+        />
 
         <ScrollView
           horizontal
@@ -455,15 +611,14 @@ export default function App() {
               ) : null}
 
               <View style={styles.combiEvents}>
+                <Text style={styles.combiTapHint}>Tap a player name to find their YouTube videos for this day</Text>
                 {(activeDay.events || []).map((evt) => {
                   const fmt = (evt.format || evt.name || '').toUpperCase();
                   const isDoubles = fmt.includes('DOUBLE');
                   const isTriples = fmt.includes('TRIPLE');
                   return (
                     <View key={evt.index} style={styles.combiEventRow}>
-                      <Text style={styles.combiPlayersLeft} numberOfLines={3}>
-                        {evt.myPlayers}
-                      </Text>
+                      {renderTappablePlayers(evt.myPlayers, activeDay.dayNumber, 'left')}
                       <View
                         style={[
                           styles.combiEventBadge,
@@ -480,9 +635,7 @@ export default function App() {
                           {evt.name}
                         </Text>
                       </View>
-                      <Text style={styles.combiPlayersRight} numberOfLines={3}>
-                        {evt.opponentPlayers}
-                      </Text>
+                      {renderTappablePlayers(evt.opponentPlayers, activeDay.dayNumber, 'right')}
                     </View>
                   );
                 })}
@@ -498,6 +651,187 @@ export default function App() {
             setToken('');
             setMatches([]);
             setCombiDays([]);
+            setVideos([]);
+            setMyTeam(null);
+          }}
+        >
+          <Text style={styles.logoutText}>SIGN OUT</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // SCREEN 2c: YOUTUBE CHANNEL VIDEOS
+  // ==========================================
+  if (screen === 'videos') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>📺 CHANNEL VIDEOS</Text>
+            <Text style={styles.headerSubtitle}>
+              Search by player name · filter by day · tap to watch on YouTube
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerRefreshBtn}
+            onPress={() => token && loadVideos(token, { player: videoPlayerFilter, day: videoDayFilter })}
+          >
+            <Text style={styles.headerRefreshText}>🔄 Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TabBar
+          active="videos"
+          onMatches={() => setScreen('matches')}
+          onCombis={() => setScreen('combis')}
+          onVideos={() => setScreen('videos')}
+        />
+
+        <View style={styles.videoSearchRow}>
+          <TextInput
+            style={styles.videoSearchInput}
+            placeholder="Search player name..."
+            placeholderTextColor="#64748b"
+            value={videoSearchDraft}
+            onChangeText={setVideoSearchDraft}
+            autoCapitalize="characters"
+            returnKeyType="search"
+            onSubmitEditing={() => {
+              const next = videoSearchDraft.trim();
+              setVideoPlayerFilter(next);
+              if (token) void loadVideos(token, { player: next, day: videoDayFilter });
+            }}
+          />
+          <TouchableOpacity
+            style={styles.videoSearchBtn}
+            onPress={() => {
+              const next = videoSearchDraft.trim();
+              setVideoPlayerFilter(next);
+              if (token) void loadVideos(token, { player: next, day: videoDayFilter });
+            }}
+          >
+            <Text style={styles.videoSearchBtnText}>SEARCH</Text>
+          </TouchableOpacity>
+        </View>
+
+        {(videoPlayerFilter || videoDayFilter !== 'ALL') && (
+          <View style={styles.activeFilterRow}>
+            <Text style={styles.activeFilterText} numberOfLines={1}>
+              {videoPlayerFilter ? `Player: ${videoPlayerFilter}` : 'All players'}
+              {videoDayFilter !== 'ALL' ? ` · Day ${videoDayFilter}` : ''}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setVideoPlayerFilter('');
+                setVideoSearchDraft('');
+                setVideoDayFilter('ALL');
+                if (token) void loadVideos(token, { player: '', day: 'ALL' });
+              }}
+            >
+              <Text style={styles.clearFilterText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.dayChipsScroll}
+          contentContainerStyle={styles.dayChipsContent}
+        >
+          <TouchableOpacity
+            style={[styles.dayChip, videoDayFilter === 'ALL' && styles.dayChipActive]}
+            onPress={() => {
+              setVideoDayFilter('ALL');
+              if (token) void loadVideos(token, { player: videoPlayerFilter, day: 'ALL' });
+            }}
+          >
+            <Text style={[styles.dayChipText, videoDayFilter === 'ALL' && styles.dayChipTextActive]}>All Days</Text>
+          </TouchableOpacity>
+          {videoDays.map((d) => {
+            const selected = videoDayFilter === d;
+            return (
+              <TouchableOpacity
+                key={d}
+                style={[styles.dayChip, selected && styles.dayChipActive]}
+                onPress={() => {
+                  setVideoDayFilter(d);
+                  if (token) void loadVideos(token, { player: videoPlayerFilter, day: d });
+                }}
+              >
+                <Text style={[styles.dayChipText, selected && styles.dayChipTextActive]}>Day {d}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
+          {videosLoading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color="#f59e0b" />
+              <Text style={styles.emptySubtext}>Loading YouTube videos…</Text>
+            </View>
+          ) : videos.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🎬</Text>
+              <Text style={styles.emptyText}>No videos found</Text>
+              <Text style={styles.emptySubtext}>
+                Try another player name or day. Videos appear after players go live on the CBOT channel.
+              </Text>
+            </View>
+          ) : (
+            videos.map((v) => (
+              <TouchableOpacity
+                key={v.id}
+                style={[styles.videoCard, v.isLive && styles.videoCardLive]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (!v.youtubeUrl) {
+                    Alert.alert('Video', 'YouTube link not available yet for this stream.');
+                    return;
+                  }
+                  Linking.openURL(v.youtubeUrl).catch(() =>
+                    Alert.alert('Error', 'Could not open YouTube.'),
+                  );
+                }}
+              >
+                <View style={styles.videoThumbWrap}>
+                  {v.thumbnailUrl ? (
+                    <Image source={{ uri: v.thumbnailUrl }} style={styles.videoThumb} />
+                  ) : (
+                    <View style={[styles.videoThumb, styles.videoThumbFallback]}>
+                      <Text style={styles.videoThumbEmoji}>▶️</Text>
+                    </View>
+                  )}
+                  {v.isLive ? (
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.videoMeta}>
+                  <Text style={styles.videoPlayerName} numberOfLines={1}>{v.playerName}</Text>
+                  <Text style={styles.videoTeamLine} numberOfLines={1}>
+                    {v.teamName} · Day {v.dayNumber || '?'}
+                  </Text>
+                  <Text style={styles.videoWatchHint}>Tap to watch on YouTube →</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            setScreen('login');
+            setToken('');
+            setMatches([]);
+            setCombiDays([]);
+            setVideos([]);
             setMyTeam(null);
           }}
         >
@@ -832,6 +1166,21 @@ const styles = StyleSheet.create({
     color: '#f59e0b',
     letterSpacing: 1,
   },
+  ytLinkRow: {
+    marginTop: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.35)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  ytLinkText: {
+    color: '#fca5a5',
+    fontWeight: '800',
+    fontSize: 11,
+    textAlign: 'center',
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -1021,6 +1370,13 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 6,
   },
+  combiTapHint: {
+    textAlign: 'center',
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
   combiEventRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1049,6 +1405,140 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     paddingLeft: 6,
   },
+  combiPlayersWrapLeft: {
+    flex: 1,
+    alignItems: 'flex-end',
+    paddingRight: 6,
+    gap: 2,
+  },
+  combiPlayersWrapRight: {
+    flex: 1,
+    alignItems: 'flex-start',
+    paddingLeft: 6,
+    gap: 2,
+  },
+  combiPlayerLink: {
+    color: '#fbbf24',
+    textDecorationLine: 'underline',
+    flex: 0,
+    paddingRight: 0,
+    paddingLeft: 0,
+  },
+  videoSearchRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  videoSearchInput: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    color: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  videoSearchBtn: {
+    backgroundColor: '#f59e0b',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+  },
+  videoSearchBtnText: {
+    color: '#0f172a',
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  activeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 6,
+    gap: 10,
+  },
+  activeFilterText: {
+    flex: 1,
+    color: '#c4b5fd',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  clearFilterText: {
+    color: '#f59e0b',
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  videoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#0f172a',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  videoCardLive: {
+    borderColor: '#ef4444',
+  },
+  videoThumbWrap: {
+    width: 120,
+    height: 78,
+    backgroundColor: '#020617',
+  },
+  videoThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  videoThumbFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoThumbEmoji: {
+    fontSize: 22,
+  },
+  liveBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: '#ef4444',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  liveBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  videoMeta: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  videoPlayerName: {
+    color: '#f8fafc',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  videoTeamLine: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  videoWatchHint: {
+    color: '#f59e0b',
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+
   combiEventBadge: {
     minWidth: 72,
     alignItems: 'center',

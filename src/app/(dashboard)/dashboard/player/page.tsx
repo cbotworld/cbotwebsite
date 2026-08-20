@@ -75,15 +75,27 @@ export default async function PlayerPage() {
 
   const patterns = await prisma.boardPattern.findMany({ take: 5 });
 
-  // Fetch liveStreams for this player so client knows which matches already have recordings
-  const liveStreams = player ? await prisma.liveStream.findMany({
-    where: {
-      playerId: player.id,
-      matchId: { in: matches.map((m) => m.id) },
-    },
-    select: { id: true, matchId: true, status: true, createdAt: true, youtubeUrl: true },
-    orderBy: { createdAt: 'desc' },
-  }) : [];
+  // All of this player's streams for the edition (includes day-N / schedule_* match ids)
+  const liveStreams = player
+    ? await prisma.liveStream.findMany({
+        where: {
+          playerId: player.id,
+          ...(activeEdition?.id ? { editionId: activeEdition.id } : {}),
+        },
+        select: {
+          id: true,
+          matchId: true,
+          status: true,
+          createdAt: true,
+          recordedAt: true,
+          youtubeUrl: true,
+          youtubeVideoId: true,
+          youtubeEmbedUrl: true,
+          match: { select: { round: true, matchNumber: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
 
   return (
     <PlayerClient
