@@ -17,11 +17,13 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe } from 'lucide-react';
 import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
+import WebsiteCmsPanel from '@/components/organizer/WebsiteCmsPanel';
 import { isCalendarDayCompleted } from '@/lib/tournament-stages';
+import type { WebsiteCmsContent } from '@/lib/website-cms';
 
-export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[] }) {
+export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
   const [scoreReports, setScoreReports] = React.useState(initialScoreReports);
   const [usersList, setUsersList] = React.useState(initialUsersList);
@@ -928,6 +930,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <TabsTrigger value="schedule" className="text-xs font-bold gap-1.5 px-3 py-2">
             <Layers className="h-3.5 w-3.5" /> Days & Formats
           </TabsTrigger>
+          <TabsTrigger value="website-cms" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Globe className="h-3.5 w-3.5" /> Website CMS
+          </TabsTrigger>
         </TabsList>
 
       <TabsContent value="schedule" forceMount className="mt-4">
@@ -1315,6 +1320,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </Table>
         </CardContent>
       </Card>
+      </TabsContent>
+
+      <TabsContent value="website-cms" className="mt-4">
+        <WebsiteCmsPanel
+          initialCms={initialWebsiteCms}
+          currentEditionId={selectedEditionId || initialEditions[0]?.id}
+        />
       </TabsContent>
       </Tabs>
 

@@ -8,6 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getTeamPosterUrl } from '@/lib/supabase';
+import {
+  sponsorAccentClasses,
+  specialSponsorAccentClasses,
+  statColorClass,
+  type WebsiteCmsContent,
+} from '@/lib/website-cms';
+import { SponsorAvatar } from '@/components/layout/SponsorAvatar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -40,6 +47,7 @@ export default function HomeClient({
   currentEditionName,
   editionPosterUrl,
   currentEdition,
+  websiteCms,
 }: {
   teams: any[];
   allTeams: any[];
@@ -58,14 +66,25 @@ export default function HomeClient({
     dayDates?: string | null;
     totalDays?: number;
   } | null;
+  websiteCms: WebsiteCmsContent;
 }) {
-  const legacyVideos = [
-    { id: '_VRKmVVM-00', title: '200th Edition Launch Video', label: '200th Launch' },
-    { id: 'mFV8W5HdJ3A', title: 'CBOT Intro', label: 'CBOT Intro' },
-    { id: 'szimIRoO0jI', title: '25th Edition Closing Video', label: '25th Closing' },
-    { id: '9i3_S7JpN74', title: '50th Edition Closing Video', label: '50th Closing' },
-    { id: 'eMnF5vIAlPw', title: '100th Centenary Closing Video', label: '100th Centenary' },
-  ];
+  const hero = websiteCms.hero;
+  const sponsorsCms = websiteCms.sponsors;
+  const specialSponsorsCms = websiteCms.specialSponsors;
+  const goldSponsorsCms = websiteCms.goldSponsors;
+  const legacyCms = websiteCms.legacy;
+  const heroPosterUrl = hero.posterUrl || editionPosterUrl || '/edition-poster.jpg';
+  const heroBannerImage = hero.bannerImage || currentEdition?.bannerImage || null;
+
+  const legacyVideos = React.useMemo(
+    () =>
+      [...legacyCms.videos]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((v) => ({ id: v.youtubeId, title: v.title, label: v.label })),
+    [legacyCms.videos]
+  );
+
+  const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
 
   const currentDayNumber = React.useMemo(() => {
     const now = new Date();
@@ -118,8 +137,8 @@ export default function HomeClient({
     return Math.min(Math.max(dayIndex, 1), currentEdition?.totalDays || 15);
   }, [currentEdition]);
 
-  const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
   const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
+  const [activeSponsorPoster, setActiveSponsorPoster] = React.useState<string | null>(null);
   const activeVideo = legacyVideos[activeVideoIndex];
 
   const prevIndex = (activeVideoIndex - 1 + legacyVideos.length) % legacyVideos.length;
@@ -141,10 +160,10 @@ export default function HomeClient({
 
       {/* HERO */}
       <section id="hero" className="relative pt-16 pb-24 lg:pt-24 lg:pb-32 carrom-grid-pattern overflow-hidden">
-        {currentEdition?.bannerImage && (
+        {heroBannerImage && (
           <div
             className="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none"
-            style={{ backgroundImage: `url(${currentEdition.bannerImage})` }}
+            style={{ backgroundImage: `url(${heroBannerImage})` }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background pointer-events-none" />
@@ -161,31 +180,27 @@ export default function HomeClient({
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-bold text-amber-500 backdrop-blur-md">
                 <Crown className="h-4 w-4 text-amber-400" />
-                <span>Celebrating 200th Edition</span>
+                <span>{hero.badgeText}</span>
               </div>
 
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
-                World's Premier Online<br />
-                Carrom Arena.{' '}
+                {hero.headlineLine1}
+                <br />
+                {hero.headlineLine2}{' '}
                 <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent block mt-2">
-                  200th Edition.
+                  {hero.headlineAccent}
                 </span>
               </h1>
 
               <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.
+                {hero.description}
               </p>
 
               {/* Stats ticker */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-border/50">
-                {[
-                  { val: '200th', label: 'Edition Milestone', color: 'text-amber-500' },
-                  { val: '12,000+', label: 'Matches Played', color: 'text-foreground' },
-                  { val: '2,000+', label: 'Slams', color: 'text-pink-500' },
-                  { val: '100+', label: 'Active Participants', color: 'text-emerald-500' },
-                ].map(s => (
+                {hero.stats.map((s) => (
                   <div key={s.label}>
-                    <div className={`text-2xl sm:text-3xl font-black ${s.color}`}>{s.val}</div>
+                    <div className={`text-2xl sm:text-3xl font-black ${statColorClass(s.color)}`}>{s.value}</div>
                     <div className="text-xs text-muted-foreground font-medium mt-0.5">{s.label}</div>
                   </div>
                 ))}
@@ -202,7 +217,7 @@ export default function HomeClient({
               <div className="relative mx-auto max-w-md flex flex-col gap-3">
                 <div className="flex items-center justify-between px-1">
                   <Badge variant="carrom" className="px-3 py-1.5 font-extrabold text-[10px] uppercase tracking-widest shadow-lg">
-                    Current Edition
+                    {hero.currentEditionBadge}
                   </Badge>
                   <div className="flex items-center gap-1.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full shadow-lg">
                     <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping inline-block" />
@@ -215,7 +230,7 @@ export default function HomeClient({
                   <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500/70 to-amber-600 blur-sm opacity-70 pointer-events-none" />
                   <div className="relative rounded-2xl overflow-hidden border-2 border-amber-400/80 shadow-2xl shadow-amber-500/40 ring-2 ring-amber-500/30">
                     <img
-                      src={editionPosterUrl || '/edition-poster.jpg'}
+                      src={heroPosterUrl}
                       alt="Current Edition Poster"
                       className="w-full h-auto object-cover"
                       style={{ display: 'block' }}
@@ -224,9 +239,9 @@ export default function HomeClient({
                 </div>
 
                 <div className="pt-1">
-                  <Link href="/edition-200-schedule">
+                  <Link href={hero.ctaButtonLink || '/edition-200-schedule'}>
                     <Button variant="carrom" className="w-full font-black text-xs h-10 shadow-lg shadow-amber-500/20 gap-2 border border-amber-400">
-                      <span>📅</span> View Bicentennial Monuments Schedule (200th Edition)
+                      <span>📅</span> {hero.ctaButtonText}
                     </Button>
                   </Link>
                 </div>
@@ -296,100 +311,70 @@ export default function HomeClient({
           {/* Section Header */}
           <div className="space-y-3">
             <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
-              💎 Official Elite Sponsors
+              {sponsorsCms.sectionBadge}
             </Badge>
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-amber-400 via-emerald-400 to-amber-500 bg-clip-text text-transparent">
-              Powering CBOT 200th Edition
+              {sponsorsCms.sectionTitle}
             </h2>
             <p className="text-muted-foreground text-sm max-w-2xl mx-auto font-medium">
-              Our elite sponsors make this milestone tournament possible — supporting communities, sports talent, &amp; cultural empowerment.
+              {sponsorsCms.sectionDescription}
             </p>
           </div>
 
           {/* Shared Thank You Banner */}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10">
-              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
-              <span className="text-sm font-black text-amber-300 tracking-wide">
-                Special Thank you to Muthu Kumar Sir
-              </span>
-              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
-            </div>
-            <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10">
-              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
-              <span className="text-sm font-black text-amber-300 tracking-wide">
-                Special Thank you to Lalit
-              </span>
-              <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
-            </div>
+            {sponsorsCms.specialThanks.map((chip) => (
+              <div
+                key={chip.id}
+                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10"
+              >
+                <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+                <span className="text-sm font-black text-amber-300 tracking-wide">{chip.text}</span>
+                <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+              </div>
+            ))}
           </div>
 
-          {/* Three-sponsor grid */}
+          {/* Elite sponsor grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-center">
+            {[...sponsorsCms.eliteSponsors]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((sponsor) => {
+                const accent = sponsorAccentClasses(sponsor.accent);
+                const handleClick = () => {
+                  if (sponsor.posterUrl) {
+                    setActiveSponsorPoster(sponsor.posterUrl);
+                    setSponsorModalOpen(true);
+                  } else if (sponsor.websiteUrl) {
+                    window.open(sponsor.websiteUrl, '_blank', 'noopener,noreferrer');
+                  }
+                };
 
-            {/* 1. ── Neelamani Foundation (Left Corner) ── */}
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSponsorModalOpen(true)}
-              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
-            >
-              <div className="flex flex-col items-center justify-center gap-4 w-full">
-                <div className="h-36 w-36 sm:h-40 sm:w-40 rounded-full border-4 border-emerald-500/50 p-1 bg-slate-950 shadow-2xl shadow-emerald-500/30 group-hover:scale-105 group-hover:border-emerald-400 transition-all duration-300 flex items-center justify-center">
-                  <img
-                    src="/sponsors/neelamani-logo.jpg"
-                    alt="Neelamani Foundation Logo"
-                    className="w-full h-full object-contain rounded-full drop-shadow-md"
-                  />
-                </div>
-                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-emerald-500/40 text-center shadow-lg group-hover:border-emerald-400 transition-colors">
-                  <span className="text-sm sm:text-base font-extrabold text-emerald-400 tracking-wide">Neelamani Foundation</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* 2. ── SYNCO (Center) ── */}
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => window.open('https://syncoshop.com/', '_blank', 'noopener,noreferrer')}
-              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
-            >
-              <div className="flex flex-col items-center justify-center gap-4 w-full">
-                <div className="h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 border-rose-400/50 p-3 bg-white shadow-2xl shadow-rose-500/30 group-hover:scale-105 group-hover:border-rose-400 transition-all duration-300 flex items-center justify-center">
-                  <img
-                    src="/sponsors/synco-logo.png"
-                    alt="SYNCO Logo"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-rose-500/40 text-center shadow-lg group-hover:border-rose-400 transition-colors">
-                  <span className="text-sm sm:text-base font-extrabold text-rose-400 tracking-wide">SYNCO Sports</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* 3. ── SISCAA (Right Corner) ── */}
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => window.open('https://siscaasports.com/', '_blank', 'noopener,noreferrer')}
-              className="group relative cursor-pointer flex flex-col items-center justify-center p-4"
-            >
-              <div className="flex flex-col items-center justify-center gap-4 w-full">
-                <div className="h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 border-sky-400/50 p-3 bg-black shadow-2xl shadow-sky-500/30 group-hover:scale-105 group-hover:border-sky-400 transition-all duration-300 flex items-center justify-center">
-                  <img
-                    src="/sponsors/siscaa-logo.png"
-                    alt="SISCAA Logo"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="py-2 px-5 rounded-xl bg-slate-950/90 border border-sky-500/40 text-center shadow-lg group-hover:border-sky-400 transition-colors">
-                  <span className="text-sm sm:text-base font-extrabold text-sky-400 tracking-wide">SISCAA Carrom</span>
-                </div>
-              </div>
-            </motion.div>
-
+                return (
+                  <motion.div
+                    key={sponsor.id}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleClick}
+                    className={`group relative flex flex-col items-center justify-center p-4 ${sponsor.websiteUrl || sponsor.posterUrl ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="flex flex-col items-center justify-center gap-4 w-full">
+                      {sponsor.layout === 'round' ? (
+                        <div className={`h-36 w-36 sm:h-40 sm:w-40 rounded-full border-4 ${accent.border} p-1 bg-slate-950 shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
+                          <img src={sponsor.logoUrl} alt={`${sponsor.name} Logo`} className="w-full h-full object-contain rounded-full drop-shadow-md" />
+                        </div>
+                      ) : (
+                        <div className={`h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 ${accent.border} p-3 bg-white shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
+                          <img src={sponsor.logoUrl} alt={`${sponsor.name} Logo`} className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <div className={`py-2 px-5 rounded-xl bg-slate-950/90 border ${accent.labelBorder} text-center shadow-lg transition-colors`}>
+                        <span className={`text-sm sm:text-base font-extrabold ${accent.labelText} tracking-wide`}>{sponsor.name}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
           </div>{/* /grid */}
         </div>
       </section>
@@ -399,62 +384,42 @@ export default function HomeClient({
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center space-y-10">
           <div className="space-y-3">
             <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-emerald-500/20 text-emerald-400 border-emerald-500/40">
-              🌟 Special Sponsor
+              {specialSponsorsCms.sectionBadge}
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 bg-clip-text text-transparent">
-              360° Support to CBOT
+              {specialSponsorsCms.sectionTitle}
             </h2>
             <p className="text-sm sm:text-base font-semibold text-emerald-400/80 max-w-lg mx-auto">
-              Thank you for your incredible 360-degree support to the CBOT community.
+              {specialSponsorsCms.sectionDescription}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-10 sm:gap-20">
-            {/* Srikranthi */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="flex flex-col items-center gap-4 group"
-            >
-              <div className="relative">
-                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-emerald-500/50 overflow-hidden shadow-2xl shadow-emerald-500/20 group-hover:scale-110 group-hover:border-emerald-400 group-hover:shadow-emerald-400/30 transition-all duration-500">
-                  <img
-                    src="/sponsors/srikranthi.jpg"
-                    alt="Srikranthi - Special Sponsor"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-emerald-400/20 via-teal-400/15 to-emerald-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
-              </div>
-              <div className="text-center mt-1">
-                <h3 className="text-xl sm:text-2xl font-black text-emerald-400 leading-tight group-hover:text-emerald-300 transition-colors">Srikranthi</h3>
-              </div>
-            </motion.div>
-
-            {/* AK Chari */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="flex flex-col items-center gap-4 group"
-            >
-              <div className="relative">
-                <div className="h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 border-teal-500/50 overflow-hidden shadow-2xl shadow-teal-500/20 group-hover:scale-110 group-hover:border-teal-400 group-hover:shadow-teal-400/30 transition-all duration-500">
-                  <img
-                    src="/sponsors/ak-chari.jpg"
-                    alt="AK Chari - Special Sponsor"
-                    className="h-full w-full object-cover object-top"
-                  />
-                </div>
-                <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-teal-400/20 via-emerald-400/15 to-teal-400/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" />
-              </div>
-              <div className="text-center mt-1">
-                <h3 className="text-xl sm:text-2xl font-black text-teal-400 leading-tight group-hover:text-teal-300 transition-colors">AK Chari</h3>
-              </div>
-            </motion.div>
+            {[...specialSponsorsCms.sponsors]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((sponsor, idx) => {
+                const accent = specialSponsorAccentClasses(sponsor.accent);
+                return (
+                  <motion.div
+                    key={sponsor.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: idx * 0.1 }}
+                    className="flex flex-col items-center gap-4 group"
+                  >
+                    <div className="relative">
+                      <div className={`h-28 w-28 sm:h-36 sm:w-36 rounded-full border-4 ${accent.ring} overflow-hidden shadow-2xl ${accent.shadow} group-hover:scale-110 transition-all duration-500 flex items-center justify-center bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-emerald-600/10`}>
+                        <SponsorAvatar name={sponsor.name} imageUrl={sponsor.imageUrl} />
+                      </div>
+                      <div className={`absolute -inset-4 rounded-full bg-gradient-to-r ${accent.glow} blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10`} />
+                    </div>
+                    <div className="text-center mt-1">
+                      <h3 className={`text-xl sm:text-2xl font-black leading-tight transition-colors ${accent.text}`}>{sponsor.name}</h3>
+                    </div>
+                  </motion.div>
+                );
+              })}
           </div>
         </div>
       </section>
@@ -462,91 +427,52 @@ export default function HomeClient({
 
       {/* GOLD SPONSORS SECTION */}
       <section id="gold-sponsors" className="py-16 relative overflow-hidden">
-        {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/8 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-yellow-500/6 rounded-full blur-3xl" />
         </div>
 
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 text-center space-y-10">
-          {/* Header */}
           <div className="space-y-3">
             <Badge variant="carrom" className="px-4 py-1.5 font-extrabold text-xs tracking-widest uppercase shadow-lg bg-amber-500/20 text-amber-400 border-amber-500/40">
-              🥇 Gold Sponsors
+              {goldSponsorsCms.sectionBadge}
             </Badge>
             <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
-              Our Gold Sponsors
+              {goldSponsorsCms.sectionTitle}
             </h2>
             <p className="text-muted-foreground text-sm max-w-xl mx-auto font-medium">
-              Proud supporters powering CBOT 200th Edition. Thank you for your generous contributions!
+              {goldSponsorsCms.sectionDescription}
             </p>
           </div>
 
-          {/* Sponsor Grid */}
           <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-8">
-
-            {/* Scrapplique Galore — Logo sponsor */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="flex flex-col items-center gap-2 group"
-            >
-              <div className="relative">
-                <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/70 p-1 bg-white shadow-xl shadow-amber-500/20 group-hover:scale-110 group-hover:border-amber-400 transition-all duration-300">
-                  <img
-                    src="/sponsors/scrapplique-galore-logo.png"
-                    alt="Scrapplique Galore"
-                    className="w-full h-full object-contain rounded-full"
-                  />
-                </div>
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/30 via-yellow-400/20 to-amber-400/30 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
-              </div>
-              <span className="text-xs font-bold text-amber-300 max-w-[90px] text-center leading-tight">Scrapplique Galore</span>
-            </motion.div>
-
-            {/* Individual sponsors with initials */}
-            {[
-              { name: 'Packiya',        initials: 'PK' },
-              { name: 'Abhijit',        initials: 'AB' },
-              { name: 'Manoj PS',       initials: 'MA' },
-              { name: 'Mahesh TN',      initials: 'MA' },
-              { name: 'Kumar A',        initials: 'KA' },
-              { name: 'Ramesh',         initials: 'RA' },
-              { name: 'Vinod',          initials: 'VI' },
-              { name: 'Din',            initials: 'DI' },
-              { name: 'Krishnamurthy',  initials: 'KR' },
-              { name: 'Rakesh',         initials: 'RA' },
-              { name: 'Srivishnu',      initials: 'SR' },
-              { name: 'Neela',          initials: 'NE' },
-              { name: 'Lalit',          initials: 'LA' },
-              { name: 'Lalit Friends',  initials: 'LF' },
-              { name: 'UMESH N',         initials: 'UM' },
-              { name: 'Roopa',          initials: 'RO' },
-              { name: 'Praveen',        initials: 'PR' },
-            ].map((sponsor, idx) => (
-              <motion.div
-                key={sponsor.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: idx * 0.04 }}
-                className="flex flex-col items-center gap-2 group"
-              >
-                <div className="relative">
-                  <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 overflow-hidden bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
-                    <span className="text-xl sm:text-2xl font-black bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent select-none tracking-wide">
-                      {sponsor.initials}
-                    </span>
+            {[...goldSponsorsCms.sponsors]
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((sponsor, idx) => (
+                <motion.div
+                  key={sponsor.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: idx * 0.04 }}
+                  className="flex flex-col items-center gap-2 group"
+                >
+                  <div className="relative">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 overflow-hidden bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
+                      <SponsorAvatar
+                        name={sponsor.name}
+                        imageUrl={sponsor.imageUrl}
+                        size="gold"
+                        imageClassName="object-contain rounded-full p-1 bg-white"
+                      />
+                    </div>
+                    <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/20 via-yellow-400/15 to-amber-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
                   </div>
-                  <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/20 via-yellow-400/15 to-amber-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
-                </div>
-                <span className="text-xs font-bold text-amber-300/80 max-w-[80px] text-center leading-tight group-hover:text-amber-300 transition-colors">
-                  {sponsor.name}
-                </span>
-              </motion.div>
-            ))}
+                  <span className="text-xs font-bold text-amber-300/80 max-w-[90px] text-center leading-tight group-hover:text-amber-300 transition-colors">
+                    {sponsor.name}
+                  </span>
+                </motion.div>
+              ))}
           </div>
         </div>
       </section>
@@ -555,9 +481,9 @@ export default function HomeClient({
       <Section id="history">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-10">
           <SectionHeader
-            badge="CBOT - Carrom Balu Online Tournament"
-            title="The Legacy Since 2020"
-            sub="With a thought of 1 tournament, CBOT continued with back-to-back non-stop editions driven by huge response and demand - crossing 50th, 100th, and 150th edition milestones to reach the monumental 200th edition with support from sponsors, players, and brands."
+            badge={legacyCms.sectionBadge}
+            title={legacyCms.sectionTitle}
+            sub={legacyCms.sectionDescription}
           />
 
           {/* 3D Video Carousel Stage */}
@@ -693,8 +619,8 @@ export default function HomeClient({
           {/* Full poster image only */}
           <div className="flex-1 overflow-y-auto p-2 sm:p-4 flex items-center justify-center">
             <img
-              src="/sponsors/neelamani-poster.jpg"
-              alt="Neelamani Foundation Official Sponsor Poster"
+              src={activeSponsorPoster || '/sponsors/neelamani-poster.jpg'}
+              alt="Sponsor poster"
               className="w-full max-w-2xl h-auto object-contain max-h-[85vh] rounded-xl shadow-2xl"
             />
           </div>

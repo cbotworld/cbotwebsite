@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import OrganizerClient from './OrganizerClient';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@/lib/mock-data';
 
 export const revalidate = 0;
@@ -25,8 +26,10 @@ export default async function OrganizerPage() {
   let users: any[] = [];
   let dbTeams: any[] = [];
 
+  let websiteCms = await getWebsiteCmsContent();
+
   try {
-    [editions, users, dbTeams] = await Promise.all([
+    [editions, users, dbTeams, websiteCms] = await Promise.all([
       prisma.edition.findMany({
         orderBy: { number: 'desc' },
         include: {
@@ -49,6 +52,7 @@ export default async function OrganizerPage() {
         },
         orderBy: { createdAt: 'desc' }
       }),
+      getWebsiteCmsContent(),
     ]);
   } catch (e) {
     console.error('Database connection error in OrganizerPage fallback to mocks', e);
@@ -72,6 +76,7 @@ export default async function OrganizerPage() {
       initialUsersList={usersList}
       initialScoreReports={MOCK_SCORE_REPORTS}
       initialTeams={teams}
+      initialWebsiteCms={JSON.parse(JSON.stringify(websiteCms))}
     />
   );
 }
