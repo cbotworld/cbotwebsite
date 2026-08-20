@@ -94,13 +94,24 @@ export default function BicentennialSchedulePage() {
       try {
         const res = await get200thEditionCombisData();
         if (!res.success || cancelled) return;
-        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
+        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t]));
         const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
-          (stage.matchPairings || []).map((p: any) => ({
-            dayNumber: p.dayNumber,
-            team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
-            team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
-          }))
+          (stage.matchPairings || []).map((p: any) => {
+            const t1 = teamsById.get(p.team1Id);
+            const t2 = teamsById.get(p.team2Id);
+            const isSpoc = stage.kind === 'SPOC_EXHIBITION';
+            return {
+              dayNumber: p.dayNumber,
+              team1Name: p.team1Name || t1?.name || '',
+              team2Name: p.team2Name || t2?.name || '',
+              team1Logo: t1?.logo || undefined,
+              team2Logo: t2?.logo || undefined,
+              team1Tag: t1?.tag || undefined,
+              team2Tag: t2?.tag || undefined,
+              isSpocExhibition: isSpoc,
+              matchLabel: p.label || (isSpoc ? 'Spoc Exhibition Match' : undefined),
+            };
+          })
         );
         let dayDates: Record<number, string> = {};
         if (res.edition?.dayDates) {
@@ -287,9 +298,14 @@ export default function BicentennialSchedulePage() {
                           ✓ Completed
                         </span>
                       )}
-                      {isUpcoming && (
+                      {isUpcoming && !d.isSpocDay && (
                         <span className="text-[9.5px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
                           Day {d.dayNumber}
+                        </span>
+                      )}
+                      {d.isSpocDay && (
+                        <span className="text-[9.5px] font-bold text-violet-300 bg-violet-500/15 px-2 py-0.5 rounded-full border border-violet-500/40">
+                          ✨ Spoc Exhibition
                         </span>
                       )}
                     </h3>
@@ -315,8 +331,13 @@ export default function BicentennialSchedulePage() {
                 {d.matches.map((match, matchIdx) => {
                   const t1KeyUpper = match.team1?.trim().toUpperCase();
                   const t2KeyUpper = match.team2?.trim().toUpperCase();
-                  const t1 = TEAMS_INFO[t1KeyUpper] || { logo: '/logo.png', tag: 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
-                  const t2 = TEAMS_INFO[t2KeyUpper] || { logo: '/logo.png', tag: 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const isSpoc = !!match.isSpocExhibition;
+                  const t1 = match.team1Logo
+                    ? { logo: match.team1Logo, tag: match.team1Tag || 'T1', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
+                    : TEAMS_INFO[t1KeyUpper] || { logo: '/logo.png', tag: match.team1Tag || 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const t2 = match.team2Logo
+                    ? { logo: match.team2Logo, tag: match.team2Tag || 'T2', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
+                    : TEAMS_INFO[t2KeyUpper] || { logo: '/logo.png', tag: match.team2Tag || 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
 
                   const isMatchHighlighted = searchTerm.trim() && (
                     match.team1.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
@@ -326,23 +347,39 @@ export default function BicentennialSchedulePage() {
                   return (
                     <div
                       key={matchIdx}
-                      className={`p-4 sm:p-5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                      className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                        isSpoc ? 'md:col-span-2' : ''
+                      } ${
                         isMatchHighlighted
                           ? 'border-amber-400 bg-amber-500/15 shadow-md shadow-amber-500/20'
+                          : isSpoc
+                          ? 'border-violet-500/50 bg-violet-950/20 hover:border-violet-400/60'
                           : 'border-border/70 bg-card/90 hover:border-amber-500/40 hover:bg-card'
                       }`}
                     >
+                      {isSpoc && (
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                          <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-violet-500/50 text-violet-300 bg-violet-500/10 px-3 py-1">
+                            <Sparkles className="h-3 w-3 mr-1 inline" />
+                            Spoc Exhibition Match
+                          </Badge>
+                          {match.matchLabel && match.matchLabel !== 'Spoc Exhibition Match' ? (
+                            <span className="text-[10px] font-bold text-violet-300/80">{match.matchLabel}</span>
+                          ) : null}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-3">
                       {/* Team 1 */}
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                        <div className={`${isSpoc ? 'h-24 w-20 sm:h-32 sm:w-24' : 'h-14 w-14 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
                           <img
                             src={t1.logo}
                             alt={match.team1}
-                            className="h-full w-full object-contain"
+                            className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
                           />
                         </div>
                         <div className="min-w-0">
-                          <span className={`text-xs sm:text-sm font-black truncate block ${t1.color}`} title={match.team1}>
+                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t1.color}`} title={match.team1}>
                             {match.team1}
                           </span>
                           <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
@@ -353,7 +390,11 @@ export default function BicentennialSchedulePage() {
 
                       {/* VS Divider */}
                       <div className="flex flex-col items-center justify-center shrink-0 px-2">
-                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg shadow-sm">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm ${
+                          isSpoc
+                            ? 'text-violet-300 bg-violet-500/15 border border-violet-500/40'
+                            : 'text-amber-500 bg-amber-500/10 border border-amber-500/30'
+                        }`}>
                           VS
                         </span>
                       </div>
@@ -361,20 +402,21 @@ export default function BicentennialSchedulePage() {
                       {/* Team 2 */}
                       <div className="flex items-center justify-end gap-3 flex-1 min-w-0 text-right">
                         <div className="min-w-0">
-                          <span className={`text-xs sm:text-sm font-black truncate block ${t2.color}`} title={match.team2}>
+                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t2.color}`} title={match.team2}>
                             {match.team2}
                           </span>
                           <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
                             {t2.tag}
                           </span>
                         </div>
-                        <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                        <div className={`${isSpoc ? 'h-24 w-20 sm:h-32 sm:w-24' : 'h-14 w-14 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
                           <img
                             src={t2.logo}
                             alt={match.team2}
-                            className="h-full w-full object-contain"
+                            className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
                           />
                         </div>
+                      </div>
                       </div>
                     </div>
                   );

@@ -17,12 +17,15 @@ import {
 import {
   loginPlayer,
   getPlayerMatches,
+  getPlayerCombis,
   MatchDetails,
 } from './services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type Screen = 'login' | 'matches' | 'live';
+type Screen = 'login' | 'matches' | 'combis' | 'live';
+
+type CombiDay = NonNullable<Awaited<ReturnType<typeof getPlayerCombis>>['days']>[number];
 
 export default function App() {
   // Navigation & Auth State
@@ -32,11 +35,42 @@ export default function App() {
   const [playerRole, setPlayerRole] = useState<string>('PLAYER');
   const [matches, setMatches] = useState<MatchDetails[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<MatchDetails | null>(null);
+  const [myTeam, setMyTeam] = useState<{
+    id: string;
+    name: string;
+    tag: string;
+    logo?: string | null;
+    captainName?: string | null;
+  } | null>(null);
+  const [isSpocCombiTeam, setIsSpocCombiTeam] = useState(false);
+  const [combiDays, setCombiDays] = useState<CombiDay[]>([]);
+  const [selectedCombiDay, setSelectedCombiDay] = useState<number | null>(null);
+  const [combisLoading, setCombisLoading] = useState(false);
 
   // Login State
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const loadCombis = async (authToken: string) => {
+    setCombisLoading(true);
+    try {
+      const res = await getPlayerCombis(authToken);
+      if (res.success) {
+        if (res.team) setMyTeam(res.team);
+        setIsSpocCombiTeam(Boolean((res as any).isSpocTeam));
+        const days = res.days || [];
+        setCombiDays(days);
+        setSelectedCombiDay((prev) => {
+          if (prev && days.some((d) => d.dayNumber === prev)) return prev;
+          const revealed = [...days].reverse().find((d) => d.revealed);
+          return revealed?.dayNumber || days[0]?.dayNumber || null;
+        });
+      }
+    } finally {
+      setCombisLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!username || !pin) {
@@ -51,11 +85,14 @@ export default function App() {
         const name = res.user?.name || res.user?.username || username;
         setPlayerName(name);
         setPlayerRole(res.user?.role || 'PLAYER');
+        if (res.team) setMyTeam(res.team);
 
         const matchRes = await getPlayerMatches(res.token);
         if (matchRes.success && matchRes.matches) {
           setMatches(matchRes.matches);
+          if (matchRes.team) setMyTeam((prev) => ({ ...(prev || matchRes.team!), ...matchRes.team! }));
         }
+        await loadCombis(res.token);
         setScreen('matches');
       } else {
         Alert.alert('Login Failed', res.error || 'Invalid credentials');
@@ -168,6 +205,15 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.tabRow}>
+          <TouchableOpacity style={[styles.tabBtn, styles.tabBtnActive]} onPress={() => setScreen('matches')}>
+            <Text style={[styles.tabText, styles.tabTextActive]}>MATCHES</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabBtn} onPress={() => setScreen('combis')}>
+            <Text style={styles.tabText}>COMBIS</Text>
+          </TouchableOpacity>
+        </View>
+
         <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
           {matches.length === 0 ? (
             <View style={styles.emptyState}>
@@ -268,6 +314,191 @@ export default function App() {
             setScreen('login');
             setToken('');
             setMatches([]);
+            setCombiDays([]);
+            setMyTeam(null);
+          }}
+        >
+          <Text style={styles.logoutText}>SIGN OUT</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // ==========================================
+  // SCREEN 2b: DAILY COMBIS (YOU vs OPPONENT)
+  // ==========================================
+  if (screen === 'combis') {
+    const activeDay = combiDays.find((d) => d.dayNumber === selectedCombiDay) || combiDays[0] || null;
+    const opp = activeDay?.opponent;
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>{isSpocCombiTeam ? '✨ SPOC COMBIS' : '⚔️ DAILY COMBIS'}</Text>
+            <Text style={styles.headerSubtitle}>
+              {(myTeam?.name || 'Your team') + (isSpocCombiTeam ? ' · Spoc exhibition vs opponent' : " vs that day's opponent")}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerRefreshBtn}
+            onPress={() => token && loadCombis(token)}
+          >
+            <Text style={styles.headerRefreshText}>🔄 Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tabRow}>
+          <TouchableOpacity style={styles.tabBtn} onPress={() => setScreen('matches')}>
+            <Text style={styles.tabText}>MATCHES</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, styles.tabBtnActive]} onPress={() => setScreen('combis')}>
+            <Text style={[styles.tabText, styles.tabTextActive]}>COMBIS</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.dayChipsScroll}
+          contentContainerStyle={styles.dayChipsContent}
+        >
+          {combiDays.map((d) => {
+            const selected = d.dayNumber === (activeDay?.dayNumber || selectedCombiDay);
+            return (
+              <TouchableOpacity
+                key={d.dayNumber}
+                style={[styles.dayChip, selected && styles.dayChipActive]}
+                onPress={() => setSelectedCombiDay(d.dayNumber)}
+              >
+                <Text style={[styles.dayChipText, selected && styles.dayChipTextActive]}>
+                  Day {d.dayNumber}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
+          {combisLoading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color="#f59e0b" />
+              <Text style={styles.emptySubtext}>Loading combis…</Text>
+            </View>
+          ) : !activeDay ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.emptyText}>No combis available yet.</Text>
+              <Text style={styles.emptySubtext}>
+                Combis publish after 9:30 PM IST on each match day.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.combiCard, isSpocCombiTeam && { borderColor: '#8b5cf688' }]}>
+              {isSpocCombiTeam ? (
+                <View style={styles.spocCombiBadgeRow}>
+                  <Text style={styles.spocCombiBadge}>Spoc Exhibition Match</Text>
+                </View>
+              ) : null}
+              <View style={styles.combiHeader}>
+                <View style={styles.combiTeamCol}>
+                  {myTeam?.logo ? (
+                    <Image source={{ uri: myTeam.logo }} style={styles.combiLogo} />
+                  ) : (
+                    <View style={styles.combiLogoFallback}>
+                      <Text style={styles.combiLogoText}>{(myTeam?.tag || 'YOU').slice(0, 3)}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.combiTeamName} numberOfLines={2}>
+                    {myTeam?.name || 'Your Team'}
+                  </Text>
+                  <Text style={styles.combiTeamMeta}>
+                    ({myTeam?.tag || 'YOU'})
+                  </Text>
+                  {myTeam?.captainName ? (
+                    <Text style={styles.combiCapt}>Capt: {myTeam.captainName}</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.combiVs}>
+                  <View style={styles.combiVsBadge}>
+                    <Text style={styles.combiVsText}>VS</Text>
+                  </View>
+                  <Text style={styles.combiDayLabel}>Day {activeDay.dayNumber}</Text>
+                </View>
+
+                <View style={styles.combiTeamCol}>
+                  {opp?.logo ? (
+                    <Image source={{ uri: opp.logo }} style={styles.combiLogo} />
+                  ) : (
+                    <View style={[styles.combiLogoFallback, { backgroundColor: '#3b82f6' }]}>
+                      <Text style={styles.combiLogoText}>{(opp?.tag || 'OPP').slice(0, 3)}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.combiTeamName, { color: '#fb923c' }]} numberOfLines={2}>
+                    {opp?.name || 'TBD'}
+                  </Text>
+                  <Text style={styles.combiTeamMeta}>
+                    ({opp?.tag || 'OPP'})
+                  </Text>
+                  {opp?.captainName ? (
+                    <Text style={styles.combiCapt}>Capt: {opp.captainName}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {!opp ? (
+                <Text style={styles.combiLockedNote}>
+                  No opponent fixture found for Day {activeDay.dayNumber} yet.
+                </Text>
+              ) : null}
+
+              <View style={styles.combiEvents}>
+                {(activeDay.events || []).map((evt) => {
+                  const fmt = (evt.format || evt.name || '').toUpperCase();
+                  const isDoubles = fmt.includes('DOUBLE');
+                  const isTriples = fmt.includes('TRIPLE');
+                  return (
+                    <View key={evt.index} style={styles.combiEventRow}>
+                      <Text style={styles.combiPlayersLeft} numberOfLines={3}>
+                        {evt.myPlayers}
+                      </Text>
+                      <View
+                        style={[
+                          styles.combiEventBadge,
+                          isDoubles && styles.combiEventDoubles,
+                          isTriples && styles.combiEventTriples,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.combiEventBadgeText,
+                            isTriples && { color: '#fff' },
+                          ]}
+                        >
+                          {evt.name}
+                        </Text>
+                      </View>
+                      <Text style={styles.combiPlayersRight} numberOfLines={3}>
+                        {evt.opponentPlayers}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            setScreen('login');
+            setToken('');
+            setMatches([]);
+            setCombiDays([]);
+            setMyTeam(null);
           }}
         >
           <Text style={styles.logoutText}>SIGN OUT</Text>
@@ -634,6 +865,226 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#64748b',
     letterSpacing: 2,
+  },
+
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  tabBtnActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: '#f59e0b',
+  },
+  tabText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748b',
+    letterSpacing: 1,
+  },
+  tabTextActive: {
+    color: '#f59e0b',
+  },
+  dayChipsScroll: {
+    maxHeight: 44,
+    marginBottom: 4,
+  },
+  dayChipsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  dayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  dayChipActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
+  },
+  dayChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94a3b8',
+  },
+  dayChipTextActive: {
+    color: '#0f172a',
+  },
+  combiCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#f59e0b55',
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  combiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    backgroundColor: '#020617',
+  },
+  combiTeamCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  combiLogo: {
+    width: 64,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: '#020617',
+    borderWidth: 2,
+    borderColor: '#f59e0b66',
+  },
+  combiLogoFallback: {
+    width: 64,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: '#ea580c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  combiLogoText: {
+    color: '#fff',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  combiTeamName: {
+    color: '#facc15',
+    fontWeight: '900',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  combiTeamMeta: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  combiCapt: {
+    color: '#e2e8f0',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  combiVs: {
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  combiVsBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  combiVsText: {
+    color: '#f59e0b',
+    fontWeight: '900',
+    fontSize: 11,
+  },
+  combiDayLabel: {
+    marginTop: 6,
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  combiLockedNote: {
+    textAlign: 'center',
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  combiEvents: {
+    padding: 10,
+    gap: 6,
+  },
+  combiEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#020617',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  combiPlayersLeft: {
+    flex: 1,
+    textAlign: 'right',
+    color: '#f8fafc',
+    fontWeight: '800',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    paddingRight: 6,
+  },
+  combiPlayersRight: {
+    flex: 1,
+    textAlign: 'left',
+    color: '#f8fafc',
+    fontWeight: '800',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    paddingLeft: 6,
+  },
+  combiEventBadge: {
+    minWidth: 72,
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#facc15',
+  },
+  combiEventDoubles: {
+    backgroundColor: '#2dd4bf',
+  },
+  combiEventTriples: {
+    backgroundColor: '#a855f7',
+  },
+  combiEventBadgeText: {
+    color: '#0f172a',
+    fontSize: 8,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  spocCombiBadgeRow: {
+    alignItems: 'center',
+    paddingTop: 10,
+  },
+  spocCombiBadge: {
+    color: '#c4b5fd',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    backgroundColor: 'rgba(139,92,246,0.15)',
+    borderWidth: 1,
+    borderColor: '#8b5cf666',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
 
   // LIVE STUDIO SCREEN (OPTION A WEBVIEW)

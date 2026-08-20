@@ -3,6 +3,15 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import CaptainClient from './CaptainClient';
+import { stageConfigKey } from '@/lib/tournament-stages';
+import {
+  isSpocExhibitionTeam,
+  spocEventFormatsFromStage,
+  spocExhibitionStage,
+  spocMatchDaysForTeam,
+  spocTeamMembersFromTeam,
+  TEAM_TYPE_SPOC,
+} from '@/lib/spoc-teams';
 
 export const revalidate = 0;
 
@@ -54,8 +63,22 @@ export default async function CaptainPage() {
 
   const roundsPerDay = savedRoundFormats.length > 0 ? savedRoundFormats.length : 5;
 
-  // Execute team queries in parallel
-  const [team, allTeams] = await Promise.all([
+  // Execute team queries in parallel — prefer Spoc exhibition team when user captains one
+  const [spocCaptainTeam, mainCaptainTeam, allTeams, stageSetting] = await Promise.all([
+    captainUser && activeEdition
+      ? prisma.team.findFirst({
+          where: {
+            captainId: captainUser.id,
+            editionId: activeEdition.id,
+            teamType: TEAM_TYPE_SPOC,
+          },
+          include: {
+            captain: true,
+            members: { include: { user: true } },
+            spocMembers: { include: { user: true } },
+          },
+        })
+      : Promise.resolve(null),
     captainUser
       ? prisma.team.findFirst({
           where: {
@@ -66,27 +89,50 @@ export default async function CaptainPage() {
                   some: {
                     userId: captainUser.id,
                     editionId: activeEdition?.id ?? undefined,
-                  }
-                }
-              }
+                  },
+                },
+              },
             ],
-            ...(activeEdition ? { editionId: activeEdition.id } : {})
+            ...(activeEdition ? { editionId: activeEdition.id } : {}),
+            NOT: { teamType: TEAM_TYPE_SPOC },
           },
           include: {
             captain: true,
-            members: { include: { user: true } }
-          }
+            members: { include: { user: true } },
+            spocMembers: { include: { user: true } },
+          },
         })
       : Promise.resolve(null),
     prisma.team.findMany({
       where: activeEdition ? { editionId: activeEdition.id } : {},
       include: {
         captain: true,
-        members: { include: { user: true } }
-      }
+        members: { include: { user: true } },
+        spocMembers: { include: { user: true } },
+      },
     }),
+    activeEdition
+      ? prisma.systemSetting.findUnique({ where: { key: stageConfigKey(activeEdition.id) } })
+      : Promise.resolve(null),
   ]);
-  const members = team?.members?.map((m: any) => m.user) || [];
+
+  const team = spocCaptainTeam || mainCaptainTeam;
+  const isSpocTeam = isSpocExhibitionTeam(team);
+  const members = isSpocTeam ? spocTeamMembersFromTeam(team) : team?.members?.map((m: any) => m.user) || [];
+
+  let stageConfig: { stages?: any[] } | null = null;
+  if (stageSetting?.value) {
+    try {
+      stageConfig = JSON.parse(stageSetting.value);
+    } catch {}
+  }
+
+  const spocStage = spocExhibitionStage(stageConfig?.stages);
+  const spocRoundFormats = spocEventFormatsFromStage(spocStage);
+  const teamsById = new Map(allTeams.map((t) => [t.id, { name: t.name, tag: t.tag }]));
+  const spocMatchDays = team && isSpocTeam
+    ? spocMatchDaysForTeam(team.id, stageConfig?.stages, teamsById)
+    : [];
 
   // ── PLAYER DATA for the embedded player dashboard panel ─────────────────
   // Captains are also players — fetch all the same data PlayerClient needs
@@ -122,6 +168,9 @@ export default async function CaptainPage() {
         ...activeEdition,
         roundsPerDay,
         roundFormats: savedRoundFormats,
+        spocRoundFormats,
+        spocMatchDays,
+        isSpocTeam,
       }}
       initialPlayer={captainUser || { ...sessionUser, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
       initialPlayerMatches={captainPlayerMatches as any}

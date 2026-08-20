@@ -103,6 +103,46 @@ export async function getPlayerMatches(token: string): Promise<{ success: boolea
   }
 }
 
+export async function getPlayerCombis(token: string): Promise<{
+  success: boolean;
+  canEdit?: boolean;
+  team?: LoginResponse['team'] & { captainName?: string | null };
+  days?: Array<{
+    dayNumber: number;
+    calendarDate?: string;
+    revealed: boolean;
+    locked: boolean;
+    submittedAt?: string | null;
+    rounds: Array<{ name?: string; players?: string[]; format?: string }>;
+    opponent: {
+      id: string;
+      name: string;
+      tag: string;
+      logo?: string | null;
+      captainName?: string | null;
+    } | null;
+    opponentRounds: Array<{ name?: string; players?: string[]; format?: string }>;
+    events: Array<{
+      index: number;
+      name: string;
+      format: string;
+      myPlayers: string;
+      opponentPlayers: string;
+    }>;
+  }>;
+  warning?: string;
+  error?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/api/mobile/combis`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
+  }
+}
+
 export async function createStreamSession(matchId: string, token: string): Promise<{ success: boolean; stream?: StreamSession; matchDetails?: MatchDetails; error?: string }> {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/stream/start`, {

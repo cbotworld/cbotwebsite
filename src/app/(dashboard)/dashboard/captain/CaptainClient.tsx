@@ -64,14 +64,24 @@ export default function CaptainClient({
   const currentTeam = initialTeam || MOCK_TEAMS[0];
   const teamMembers = (initialMembers && initialMembers.length > 0)
     ? initialMembers
-    : (currentTeam.members?.map((m: any) => m.user) || []);
+    : (currentTeam.spocMembers?.map((m: any) => m.user).filter(Boolean)
+      || currentTeam.members?.map((m: any) => m.user)
+      || []);
 
   const allTeams = (initialAllTeams && initialAllTeams.length > 0) ? initialAllTeams : MOCK_TEAMS;
 
-  // Round formats from organiser — e.g. ["SINGLES","DOUBLES","TRIPLES","SINGLES","SINGLES"]
-  const editionRoundFormats: string[] = (initialActiveEdition?.roundFormats && initialActiveEdition.roundFormats.length > 0)
-    ? initialActiveEdition.roundFormats
-    : ['SINGLES', 'SINGLES', 'SINGLES', 'SINGLES', 'SINGLES'];
+  // Round formats from organiser — main tournament or Spoc exhibition stage
+  const isSpocTeam = Boolean(initialActiveEdition?.isSpocTeam) || currentTeam?.teamType === 'SPOC_EXHIBITION';
+  const spocMatchDays: Array<{ dayNumber: number; opponentName?: string; opponentTag?: string }> =
+    initialActiveEdition?.spocMatchDays || [];
+
+  const editionRoundFormats: string[] = isSpocTeam
+    ? (initialActiveEdition?.spocRoundFormats?.length
+        ? initialActiveEdition.spocRoundFormats
+        : ['SINGLES', 'DOUBLES', 'SINGLES'])
+    : (initialActiveEdition?.roundFormats && initialActiveEdition.roundFormats.length > 0)
+      ? initialActiveEdition.roundFormats
+      : ['SINGLES', 'SINGLES', 'SINGLES', 'SINGLES', 'SINGLES'];
 
   const roundsPerDay: number = editionRoundFormats.length;
 
@@ -106,7 +116,12 @@ export default function CaptainClient({
   const [rosterViewMode, setRosterViewMode] = React.useState<'MY_TEAM' | 'ALL_TEAMS'>('MY_TEAM');
 
   // Day lineup state
-  const [selectedDayNumber, setSelectedDayNumber] = React.useState<number>(1);
+  const [selectedDayNumber, setSelectedDayNumber] = React.useState<number>(() => {
+    if (initialActiveEdition?.isSpocTeam && initialActiveEdition?.spocMatchDays?.length) {
+      return initialActiveEdition.spocMatchDays[0].dayNumber;
+    }
+    return 1;
+  });
   const [dayLineupModalOpen, setDayLineupModalOpen] = React.useState(false);
   const [roundLineups, setRoundLineups] = React.useState<Array<{ playerIds: string[] }>>([]);
   const [savedDayLineups, setSavedDayLineups] = React.useState<Record<number, any>>({});
@@ -138,6 +153,15 @@ export default function CaptainClient({
   }, [initialActiveEdition]);
 
   const totalEventDays = initialActiveEdition?.totalDays || 15;
+  const combiDayNumbers: number[] = isSpocTeam
+    ? (spocMatchDays.length ? spocMatchDays.map((d) => d.dayNumber) : [])
+    : Array.from({ length: totalEventDays }, (_, i) => i + 1);
+
+  const spocDayMeta = React.useMemo(() => {
+    const map = new Map<number, { opponentName?: string; opponentTag?: string }>();
+    spocMatchDays.forEach((d) => map.set(d.dayNumber, d));
+    return map;
+  }, [spocMatchDays]);
 
   React.useEffect(() => {
     if (currentTeam?.savedLineups) {
@@ -261,10 +285,15 @@ export default function CaptainClient({
             <Badge variant="carrom" className="font-bold">
               <Crown className="h-3.5 w-3.5 mr-1" /> Captain Dashboard
             </Badge>
+            {isSpocTeam ? (
+              <Badge variant="outline" className="text-violet-300 border-violet-500/40 bg-violet-500/10 font-bold">
+                <Sparkles className="h-3 w-3 mr-1" /> Spoc Exhibition
+              </Badge>
+            ) : null}
           </div>
           <h1 className="text-3xl font-black">{teamName}</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Captain Dashboard
+            {isSpocTeam ? 'Spoc Exhibition Team Captain' : 'Captain Dashboard'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -325,27 +354,53 @@ export default function CaptainClient({
       </Card>
 
       {/* SECTION 2: DAY COMBI SUBMISSION */}
-      <Card className="border-amber-500/40">
+      <Card className={isSpocTeam ? 'border-violet-500/40' : 'border-amber-500/40'}>
         <CardHeader className="border-b border-border pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-amber-500" /> Day 1 to Day {totalEventDays} Combi Submission
+                {isSpocTeam ? (
+                  <>
+                    <Sparkles className="h-5 w-5 text-violet-400" /> Spoc Exhibition Combi Submission
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-5 w-5 text-amber-500" /> Day 1 to Day {totalEventDays} Combi Submission
+                  </>
+                )}
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Select your combi for {roundsPerDay} events per day before <strong className="text-rose-400">9:30 PM IST</strong>.
+                {isSpocTeam ? (
+                  <>
+                    Submit your Spoc match combi using <strong className="text-violet-300">Spoc team players only</strong> —{' '}
+                    {roundsPerDay} exhibition events per scheduled match day, before{' '}
+                    <strong className="text-rose-400">9:30 PM IST</strong>.
+                  </>
+                ) : (
+                  <>
+                    Select your combi for {roundsPerDay} events per day before{' '}
+                    <strong className="text-rose-400">9:30 PM IST</strong>.
+                  </>
+                )}
               </CardDescription>
             </div>
-            <Badge variant="carrom" className="font-bold text-xs px-3 py-1 self-start sm:self-auto">
+            <Badge variant="carrom" className={`font-bold text-xs px-3 py-1 self-start sm:self-auto ${isSpocTeam ? 'bg-violet-500/15 text-violet-300 border-violet-500/40' : ''}`}>
               Current Active: Day {selectedDayNumber}
             </Badge>
           </div>
         </CardHeader>
 
         <CardContent className="p-6 space-y-6">
+          {isSpocTeam && combiDayNumbers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-violet-500/40 bg-violet-500/5 p-6 text-center text-sm text-muted-foreground">
+              No Spoc exhibition match days scheduled for your team yet. Ask the organizer to add pairings in the{' '}
+              <strong className="text-violet-300">Spoc Exhibition</strong> stage.
+            </div>
+          ) : null}
+
           {/* Dynamic Event Days Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {Array.from({ length: totalEventDays }, (_, i) => i + 1).map((dayNum) => {
+            {combiDayNumbers.map((dayNum) => {
               const isSaved = !!savedDayLineups[dayNum];
               const isSelected = dayNum === selectedDayNumber;
               const isLocked = isDayLocked(dayNum, dayDatesMap);
@@ -356,6 +411,7 @@ export default function CaptainClient({
               const formattedDateFull = rawDate && !isNaN(new Date(rawDate).getTime())
                 ? new Date(rawDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
                 : '';
+              const spocMeta = spocDayMeta.get(dayNum);
 
               return (
                 <button
@@ -366,20 +422,35 @@ export default function CaptainClient({
                     isLocked
                       ? 'border-rose-500/40 bg-rose-500/10'
                       : isSaved
-                      ? 'border-emerald-500/50 bg-emerald-500/10'
+                      ? isSpocTeam
+                        ? 'border-violet-500/50 bg-violet-500/10'
+                        : 'border-emerald-500/50 bg-emerald-500/10'
                       : isSelected
-                      ? 'border-amber-500/60 bg-amber-500/10'
+                      ? isSpocTeam
+                        ? 'border-violet-500/60 bg-violet-500/10'
+                        : 'border-amber-500/60 bg-amber-500/10'
                       : 'border-border bg-card hover:border-amber-500/30'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">DAY {dayNum}</span>
+                    <span className={`text-[10px] font-black uppercase tracking-wider ${isSpocTeam ? 'text-violet-400' : 'text-amber-500'}`}>
+                      {isSpocTeam ? 'SPOC DAY' : 'DAY'} {dayNum}
+                    </span>
                     {formattedDate && (
-                      <span className="text-[10px] font-extrabold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-md border border-amber-500/30 font-mono">
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md border font-mono ${
+                        isSpocTeam
+                          ? 'text-violet-300 bg-violet-500/15 border-violet-500/30'
+                          : 'text-amber-400 bg-amber-500/15 border-amber-500/30'
+                      }`}>
                         {formattedDate}
                       </span>
                     )}
                   </div>
+                  {isSpocTeam && spocMeta?.opponentName ? (
+                    <div className="text-[10px] font-bold text-violet-200/90 mt-1 truncate" title={`vs ${spocMeta.opponentName}`}>
+                      vs {spocMeta.opponentName}
+                    </div>
+                  ) : null}
                   <div className="text-xs font-extrabold text-foreground/90 mt-1.5 flex items-center justify-between">
                     <span>{formattedDateFull}</span>
                     {isLocked && <span className="text-xs" title="Locked (Past 9:30 PM IST)">🔒</span>}
@@ -390,7 +461,7 @@ export default function CaptainClient({
                         🔒 Locked (Past 9:30 PM)
                       </span>
                     ) : isSaved ? (
-                      <span className="text-[9.5px] font-bold text-emerald-400 flex items-center gap-1">
+                      <span className={`text-[9.5px] font-bold flex items-center gap-1 ${isSpocTeam ? 'text-violet-300' : 'text-emerald-400'}`}>
                         ✓ Saved · {savedDayLineups[dayNum].submittedAt}
                       </span>
                     ) : (
@@ -499,8 +570,21 @@ export default function CaptainClient({
           <div className="px-6 pt-6 pb-4 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-20 flex items-start justify-between gap-4">
             <div className="flex flex-col space-y-1.5 text-left pr-6">
               <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
-                <Send className="h-5 w-5 text-amber-500" /> Day {selectedDayNumber} Combi {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime()) ? `(${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})` : ''} — {roundsPerDay} events
+                <Send className={`h-5 w-5 ${isSpocTeam ? 'text-violet-400' : 'text-amber-500'}`} />
+                {isSpocTeam ? 'Spoc Exhibition' : 'Day'} {selectedDayNumber} Combi
+                {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime())
+                  ? ` (${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})`
+                  : ''}{' '}
+                — {roundsPerDay} events
               </h2>
+              {isSpocTeam && spocDayMeta.get(selectedDayNumber)?.opponentName ? (
+                <p className="text-sm font-bold text-violet-300 mt-1">
+                  vs {spocDayMeta.get(selectedDayNumber)?.opponentName}
+                  {spocDayMeta.get(selectedDayNumber)?.opponentTag
+                    ? ` (${spocDayMeta.get(selectedDayNumber)?.opponentTag})`
+                    : ''}
+                </p>
+              ) : null}
               <p className="text-sm text-muted-foreground mt-0.5">
                 Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
               </p>

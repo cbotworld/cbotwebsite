@@ -1040,6 +1040,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   👑 Per-Event Match Formats ({roundCount} Events)
                 </span>
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Main tournament only. Spoc exhibition matches use separate event formats configured in the <strong className="text-violet-300">Spoc Exhibition</strong> stage under Stages.
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {roundFormats.map((format, idx) => (
                   <div key={idx} className="bg-card p-4 rounded-xl border border-border shadow-md space-y-3">

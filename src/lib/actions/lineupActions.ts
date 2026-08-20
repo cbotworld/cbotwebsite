@@ -274,8 +274,24 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
     }
 
     const team = await prisma.team.findUnique({
-      where: { id: teamId }
+      where: { id: teamId },
+      include: {
+        spocMembers: { select: { userId: true } },
+      },
     });
+
+    if (!team) {
+      return { success: false, error: 'Team not found.' };
+    }
+
+    if (team.teamType === 'SPOC_EXHIBITION') {
+      const allowed = new Set((team.spocMembers || []).map((m) => m.userId));
+      if (team.captainId) allowed.add(team.captainId);
+      const invalid = rounds.flatMap((r: any) => (r.playerIds || []).filter(Boolean)).find((pid: string) => !allowed.has(pid));
+      if (invalid) {
+        return { success: false, error: 'Spoc combi can only include players from your Spoc exhibition roster.' };
+      }
+    }
 
     let lineupsObj: any = {};
     if (team?.savedLineups) {

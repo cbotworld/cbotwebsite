@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { userFromBearer } from '@/lib/mobile-session';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { resolveEditionAndTeam } from '@/lib/mobile-team';
+import { stageConfigKey } from '@/lib/tournament-stages';
+import {
+  isSpocExhibitionTeam,
+  spocEventFormatsFromStage,
+  spocExhibitionStage,
+  spocMatchDaysForTeam,
+} from '@/lib/spoc-teams';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,14 +66,53 @@ function parseDayDates(raw?: string | null) {
   }
 }
 
+function playersLabel(round: any, fallback = 'Not Submitted Yet') {
+  if (!round) return fallback;
+  if (Array.isArray(round.players) && round.players.length > 0) {
+    const names = round.players.map((p: any) => String(p || '').trim()).filter(Boolean);
+    if (names.length) return names.join(', ');
+  }
+  return fallback;
+}
+
 async function loadFullTeam(teamId: string) {
   return prisma.team.findUnique({
     where: { id: teamId },
     include: {
       captain: { select: { id: true, name: true, username: true } },
       members: { include: { user: { select: { id: true, name: true, username: true, role: true } } } },
+      spocMembers: { include: { user: { select: { id: true, name: true, username: true, role: true } } } },
     },
   });
+}
+
+async function loadStageConfig(editionId: string | undefined) {
+  if (!editionId) return { stages: [] as any[] };
+  const setting = await prisma.systemSetting.findUnique({ where: { key: stageConfigKey(editionId) } });
+  if (!setting?.value) return { stages: [] as any[] };
+  try {
+    return JSON.parse(setting.value) as { stages?: any[] };
+  } catch {
+    return { stages: [] as any[] };
+  }
+}
+
+async function loadStagePairings(editionId: string | undefined, spocOnly = false) {
+  const config = await loadStageConfig(editionId);
+  const stages = config.stages || [];
+  const source = spocOnly
+    ? stages.filter((stage: any) => stage.kind === 'SPOC_EXHIBITION')
+    : stages.filter((stage: any) => stage.kind !== 'SPOC_EXHIBITION');
+
+  return source.flatMap((stage: any) =>
+    (stage.matchPairings || []).map((p: any) => ({
+      dayNumber: Number(p.dayNumber) || 0,
+      team1Id: p.team1Id,
+      team2Id: p.team2Id,
+      team1Name: p.team1Name,
+      team2Name: p.team2Name,
+    })),
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -76,7 +122,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
 
-    const { edition, team: baseTeam } = await resolveEditionAndTeam(user.id);
+    const { edition, team: baseTeam } = await resolveEditionAndTeam(user.id, { preferSpoc: true });
     if (!baseTeam) {
       return NextResponse.json(
         {
@@ -101,9 +147,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const formats: string[] =
-      edition?.patterns?.map((bp) => bp.matchFormat || 'SINGLES').filter(Boolean) || [];
-    const roundFormats = formats.length ? formats : ['SINGLES', 'SINGLES', 'SINGLES', 'SINGLES', 'SINGLES'];
+    const isSpocTeam = isSpocExhibitionTeam(team);
+    const stageConfig = await loadStageConfig(edition?.id);
+    const spocStage = spocExhibitionStage(stageConfig.stages);
+
+    const formats: string[] = isSpocTeam
+      ? spocEventFormatsFromStage(spocStage)
+      : edition?.patterns?.map((bp) => bp.matchFormat || 'SINGLES').filter(Boolean) || [];
+    const roundFormats = formats.length
+      ? formats
+      : isSpocTeam
+        ? ['SINGLES', 'DOUBLES', 'SINGLES']
+        : ['SINGLES', 'SINGLES', 'SINGLES', 'SINGLES', 'SINGLES'];
     const dayDates = parseDayDates(edition?.dayDates);
     const saved = parseLineups(team.savedLineups);
     const totalDays = edition?.totalDays || 10;
@@ -117,7 +172,8 @@ export async function GET(request: NextRequest) {
         username: team.captain.username,
       });
     }
-    for (const m of team.members) {
+    const roster = isSpocTeam ? team.spocMembers : team.members;
+    for (const m of roster) {
       if (!m.user) continue;
       memberMap.set(m.user.id, {
         id: m.user.id,
@@ -133,21 +189,99 @@ export async function GET(request: NextRequest) {
       slots: slotsForFormat(format),
     }));
 
+    const editionTeams = edition?.id
+      ? await prisma.team.findMany({
+          where: { editionId: edition.id },
+          select: {
+            id: true,
+            name: true,
+            tag: true,
+            logo: true,
+            savedLineups: true,
+            captain: { select: { name: true, username: true } },
+          },
+        })
+      : [];
+    const teamsById = new Map(editionTeams.map((t) => [t.id, t]));
+    const teamsByName = new Map(editionTeams.map((t) => [t.name.toUpperCase().trim(), t]));
+    const pairings = await loadStagePairings(edition?.id, isSpocTeam);
+    const opponentByDay = new Map<number, (typeof editionTeams)[number]>();
+    const myNameUpper = team.name.toUpperCase().trim();
+
+    for (const p of pairings) {
+      if (!p.dayNumber) continue;
+      const t1Name = (p.team1Name || teamsById.get(p.team1Id || '')?.name || '').toUpperCase().trim();
+      const t2Name = (p.team2Name || teamsById.get(p.team2Id || '')?.name || '').toUpperCase().trim();
+      let opp: (typeof editionTeams)[number] | undefined;
+      if (p.team1Id === team.id || t1Name === myNameUpper) {
+        opp = (p.team2Id && teamsById.get(p.team2Id)) || teamsByName.get(t2Name);
+      } else if (p.team2Id === team.id || t2Name === myNameUpper) {
+        opp = (p.team1Id && teamsById.get(p.team1Id)) || teamsByName.get(t1Name);
+      }
+      if (opp) opponentByDay.set(p.dayNumber, opp);
+    }
+
+    const spocScheduledDays = isSpocTeam
+      ? spocMatchDaysForTeam(team.id, stageConfig.stages, teamsById).map((d) => d.dayNumber)
+      : [];
+
+    const dayNumbers = isSpocTeam
+      ? (spocScheduledDays.length ? spocScheduledDays : [])
+      : Array.from({ length: totalDays }, (_, i) => i + 1);
+
     const canEdit = canEditCombis(user.role, team.captainId, user.id);
-    const days = Array.from({ length: totalDays }, (_, i) => {
-      const dayNumber = i + 1;
+    const days = dayNumbers.map((dayNumber) => {
       const calendarDate = dayDates[String(dayNumber)] || dayDates[dayNumber as any] || '';
       const cutoffIso = calendarDate ? `${calendarDate}T21:30:00+05:30` : null;
       const revealed = cutoffIso ? now >= new Date(cutoffIso).getTime() : false;
       const entry = saved[String(dayNumber)] || saved[dayNumber as any];
+      const showMine = revealed || canEdit;
+      const myRounds = showMine ? entry?.rounds || [] : [];
+
+      const oppTeam = opponentByDay.get(dayNumber) || null;
+      const oppSaved = oppTeam ? parseLineups(oppTeam.savedLineups) : {};
+      const oppEntry = oppSaved[String(dayNumber)] || oppSaved[dayNumber as any];
+      // Opponent lineup only after public reveal (same rule as website)
+      const showOpp = Boolean(revealed && oppTeam);
+      const oppRounds = showOpp ? oppEntry?.rounds || [] : [];
+
+      const eventCount = Math.max(roundsMeta.length, myRounds.length, oppRounds.length);
+      const events = Array.from({ length: eventCount }, (_, idx) => {
+        const meta = roundsMeta[idx];
+        const myRound = myRounds[idx];
+        const oppRound = oppRounds[idx];
+        const format = meta?.format || myRound?.format || 'SINGLES';
+        const name = meta?.name || myRound?.name || oppRound?.name || `Event ${idx + 1}`;
+        return {
+          index: idx,
+          name,
+          format,
+          myPlayers: showMine ? playersLabel(myRound, revealed ? 'Not Submitted Yet' : '—') : '—',
+          opponentPlayers: showOpp ? playersLabel(oppRound, 'Not Submitted Yet') : revealed ? 'Not Submitted Yet' : 'Locked until 9:30 PM IST',
+        };
+      });
+
       return {
         dayNumber,
         calendarDate,
         cutoffIso,
         revealed,
         locked: revealed,
-        submittedAt: revealed || canEdit ? entry?.submittedAt || null : null,
-        rounds: revealed || canEdit ? entry?.rounds || [] : [],
+        submittedAt: showMine ? entry?.submittedAt || null : null,
+        rounds: myRounds,
+        isSpocExhibition: isSpocTeam,
+        opponent: oppTeam
+          ? {
+              id: oppTeam.id,
+              name: oppTeam.name,
+              tag: oppTeam.tag,
+              logo: oppTeam.logo,
+              captainName: oppTeam.captain?.name || oppTeam.captain?.username || null,
+            }
+          : null,
+        opponentSubmittedAt: showOpp ? oppEntry?.submittedAt || null : null,
+        opponentRounds: oppRounds,
+        events,
       };
     }).filter((day) => canEdit || day.revealed);
 
@@ -155,7 +289,14 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         canEdit,
-        team: { id: team.id, name: team.name, tag: team.tag, logo: team.logo },
+        isSpocTeam,
+        team: {
+          id: team.id,
+          name: team.name,
+          tag: team.tag,
+          logo: team.logo,
+          captainName: team.captain?.name || team.captain?.username || null,
+        },
         members: Array.from(memberMap.values()),
         roundFormats,
         roundsMeta,
@@ -179,7 +320,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
 
-    const { edition, team } = await resolveEditionAndTeam(user.id);
+    const { edition, team } = await resolveEditionAndTeam(user.id, { preferSpoc: true });
     if (!team) {
       return NextResponse.json({ success: false, error: 'No team found.' }, { status: 404, headers: mobileCorsHeaders });
     }

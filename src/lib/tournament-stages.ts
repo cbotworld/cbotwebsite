@@ -659,6 +659,8 @@ export function createTournamentStage(
       kind,
       name: 'Spoc Exhibition',
       durationDays: 0,
+      spocEventCount: 3,
+      spocEventFormats: ['SINGLES', 'DOUBLES', 'SINGLES'],
       matchPairings: [],
     };
   }

@@ -11,6 +11,17 @@ export interface OrganizerScheduleStage {
   durationDays?: number;
 }
 
+export interface OrganizerScheduleMatch {
+  team1: string;
+  team2: string;
+  isSpocExhibition?: boolean;
+  team1Logo?: string;
+  team2Logo?: string;
+  team1Tag?: string;
+  team2Tag?: string;
+  matchLabel?: string;
+}
+
 export interface OrganizerScheduleDay {
   dayNumber: number;
   title: string;
@@ -22,7 +33,8 @@ export interface OrganizerScheduleDay {
   stageKind: string;
   stageOrder: number;
   stageLabel: string;
-  matches: Array<{ team1: string; team2: string }>;
+  isSpocDay?: boolean;
+  matches: OrganizerScheduleMatch[];
 }
 
 function ordinal(n: number) {
@@ -75,6 +87,7 @@ function kindShort(kind?: string, name?: string) {
   if (kind === 'LEAGUE') return name || 'League';
   if (kind === 'QUALIFIER') return 'Qualifiers';
   if (kind === 'FINALS') return 'Finals';
+  if (kind === 'SPOC_EXHIBITION') return 'Spoc Exhibition';
   return name || kind || 'Stage';
 }
 
@@ -139,7 +152,19 @@ export function formatCalendarDate(dateStr: string) {
 export function buildOrganizerScheduleDays(opts?: {
   totalDays?: number;
   dayDates?: Record<number, string> | Record<string, string>;
-  pairings?: Array<{ dayNumber?: number; team1Name?: string; team2Name?: string }>;
+  pairings?: Array<{
+    dayNumber?: number;
+    team1Name?: string;
+    team2Name?: string;
+    team1Logo?: string;
+    team2Logo?: string;
+    team1Tag?: string;
+    team2Tag?: string;
+    isSpocExhibition?: boolean;
+    matchLabel?: string;
+    stageKind?: string;
+    stageName?: string;
+  }>;
   stages?: OrganizerScheduleStage[];
 }): OrganizerScheduleDay[] {
   const dates = opts?.dayDates;
@@ -152,54 +177,89 @@ export function buildOrganizerScheduleDays(opts?: {
     startIso: string,
     endIso: string,
     timeRange: string,
-    matches: Array<{ team1: string; team2: string }>
+    matches: OrganizerScheduleMatch[]
   ) => {
     const stage = stageForDay(dayNumber, stages);
+    const allSpoc = matches.length > 0 && matches.every((m) => m.isSpocExhibition);
     const calendarDate = calendarDateForDay(dayNumber, dates);
     byDay.set(dayNumber, {
       dayNumber,
-      title,
+      title: allSpoc ? `SPOC EXHIBITION · DAY ${dayNumber}` : title,
       timeRange,
       startIso,
       endIso,
       calendarDate,
-      stageName: stage?.name || kindShort(stage?.kind),
-      stageKind: stage?.kind || '',
+      stageName: allSpoc ? 'Spoc Exhibition' : stage?.name || kindShort(stage?.kind),
+      stageKind: allSpoc ? 'SPOC_EXHIBITION' : stage?.kind || '',
       stageOrder: stage?.order || 1,
-      stageLabel: stageChipLabel(stage, dayNumber),
+      stageLabel: allSpoc ? 'Spoc Exhibition' : stageChipLabel(stage, dayNumber),
+      isSpocDay: allSpoc,
       matches: matches.map((m) => ({
         team1: m.team1.toUpperCase().trim(),
         team2: m.team2.toUpperCase().trim(),
+        isSpocExhibition: m.isSpocExhibition,
+        team1Logo: m.team1Logo,
+        team2Logo: m.team2Logo,
+        team1Tag: m.team1Tag,
+        team2Tag: m.team2Tag,
+        matchLabel: m.matchLabel,
       })),
     });
   };
 
   officialMatchDays().forEach((d) => {
-    pushDay(d.dayNumber, d.title, d.startIso, d.endIso, d.timeRange, d.matches);
+    pushDay(d.dayNumber, d.title, d.startIso, d.endIso, d.timeRange, d.matches.map((m) => ({ ...m, isSpocExhibition: false })));
   });
 
-  const pairingsByDay = new Map<number, Array<{ team1: string; team2: string }>>();
+  const pairingsByDay = new Map<number, OrganizerScheduleMatch[]>();
   (opts?.pairings || []).forEach((p) => {
     const dayNumber = p.dayNumber;
     if (!dayNumber || !p.team1Name || !p.team2Name) return;
     const list = pairingsByDay.get(dayNumber) || [];
-    list.push({ team1: p.team1Name.toUpperCase().trim(), team2: p.team2Name.toUpperCase().trim() });
+    list.push({
+      team1: p.team1Name.toUpperCase().trim(),
+      team2: p.team2Name.toUpperCase().trim(),
+      isSpocExhibition: p.isSpocExhibition,
+      team1Logo: p.team1Logo,
+      team2Logo: p.team2Logo,
+      team1Tag: p.team1Tag,
+      team2Tag: p.team2Tag,
+      matchLabel: p.matchLabel,
+    });
     pairingsByDay.set(dayNumber, list);
   });
 
   pairingsByDay.forEach((matches, dayNumber) => {
     const existing = byDay.get(dayNumber);
     if (existing) {
-      existing.matches = matches;
+      const spocMatches = matches.filter((m) => m.isSpocExhibition);
+      const mainMatches = existing.matches.filter((m) => !m.isSpocExhibition);
+      existing.matches = [...mainMatches, ...spocMatches];
+      if (spocMatches.length && mainMatches.length === 0) {
+        existing.isSpocDay = true;
+        existing.stageKind = 'SPOC_EXHIBITION';
+        existing.stageName = 'Spoc Exhibition';
+        existing.stageLabel = 'Spoc Exhibition';
+        existing.title = `SPOC EXHIBITION · DAY ${dayNumber}`;
+      } else if (spocMatches.length && mainMatches.length) {
+        existing.title = `${existing.title} + SPOC EXHIBITION`;
+      }
       return;
     }
     const calendarDate = calendarDateForDay(dayNumber, dates);
     const startIso = `${addDaysIsoDate(calendarDate, -1)}T20:00:00+05:30`;
     const endIso = `${calendarDate}T20:00:00+05:30`;
-    const stage = stageForDay(dayNumber, stages);
+    const allSpoc = matches.every((m) => m.isSpocExhibition);
+    const stage = allSpoc
+      ? { order: 99, kind: 'SPOC_EXHIBITION', name: 'Spoc Exhibition', startDay: dayNumber, durationDays: 1 }
+      : stageForDay(dayNumber, stages);
     pushDay(
       dayNumber,
-      stage?.name ? `${stage.name.toUpperCase()} · DAY ${dayNumber}` : `DAY ${dayNumber}`,
+      allSpoc
+        ? `SPOC EXHIBITION · DAY ${dayNumber}`
+        : stage?.name
+          ? `${stage.name.toUpperCase()} · DAY ${dayNumber}`
+          : `DAY ${dayNumber}`,
       startIso,
       endIso,
       formatDayRange(startIso, endIso),

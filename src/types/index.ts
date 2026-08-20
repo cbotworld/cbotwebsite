@@ -57,6 +57,9 @@ export interface TournamentStage {
   startDay?: number;
   durationDays?: number;
   leagueIndex?: number;
+  /** Spoc exhibition only — separate from main tournament event formats */
+  spocEventCount?: number;
+  spocEventFormats?: string[];
   matchPairings?: Array<{
     stage: string;
     label: string;

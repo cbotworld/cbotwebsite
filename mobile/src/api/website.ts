@@ -109,3 +109,42 @@ export async function fetchPlayerSchedule() {
     warning: (data.warning as string | undefined) || undefined,
   };
 }
+
+export async function fetchPlayerCombis() {
+  const current = getSession();
+  if (!current?.token) {
+    throw new Error('Please log in.');
+  }
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/combis`, {
+    headers: { Authorization: `Bearer ${current.token}` },
+  });
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to load combis.');
+  }
+  return data as {
+    success: true;
+    canEdit: boolean;
+    team: MobileTeam & { captainName?: string | null };
+    days: Array<{
+      dayNumber: number;
+      calendarDate?: string;
+      revealed: boolean;
+      locked: boolean;
+      opponent: {
+        id: string;
+        name: string;
+        tag: string;
+        logo?: string | null;
+        captainName?: string | null;
+      } | null;
+      events: Array<{
+        index: number;
+        name: string;
+        format: string;
+        myPlayers: string;
+        opponentPlayers: string;
+      }>;
+    }>;
+  };
+}

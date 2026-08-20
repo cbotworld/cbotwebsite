@@ -573,8 +573,21 @@ export default function TournamentStageDesigner({
 
   const [spocPairings, setSpocPairings] = React.useState<SuggestedPairing[]>([]);
   const applySpocPairings = (next: SuggestedPairing[]) => {
-    setSpocPairings(next);
-    updateStage({ matchPairings: next });
+    const enriched = next.map((p) => ({
+      ...p,
+      team1Name: spocTeams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
+      team2Name: spocTeams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
+    }));
+    setSpocPairings(enriched);
+    updateStage({ matchPairings: enriched });
+  };
+
+  const handleSpocEventCountChange = (count: number) => {
+    const formats = [...(active?.spocEventFormats || ['SINGLES', 'DOUBLES', 'SINGLES'])];
+    const cycle = ['SINGLES', 'DOUBLES', 'SINGLES', 'DOUBLES', 'TRIPLES'];
+    while (formats.length < count) formats.push(cycle[formats.length % cycle.length]);
+    formats.length = count;
+    updateStage({ spocEventCount: count, spocEventFormats: formats });
   };
 
   React.useEffect(() => {
@@ -1245,6 +1258,48 @@ export default function TournamentStageDesigner({
 
               {active?.kind === 'SPOC_EXHIBITION' && (
                 <div className="space-y-4">
+                  <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-black text-violet-300 uppercase tracking-wider">
+                          Spoc Exhibition Event Formats
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Separate from main tournament events — configure how many boards/events each Spoc match has.
+                        </p>
+                      </div>
+                      <Select
+                        value={String(active.spocEventCount || 3)}
+                        onChange={(e) => handleSpocEventCountChange(parseInt(e.target.value, 10))}
+                        className="h-9 w-36 text-xs font-bold"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                          <option key={n} value={n}>{n} Events</option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {(active.spocEventFormats || ['SINGLES', 'DOUBLES', 'SINGLES']).map((format, idx) => (
+                        <div key={idx} className="rounded-lg border border-violet-500/20 bg-card/80 p-3 space-y-1.5">
+                          <div className="text-[10px] font-black text-violet-400 uppercase">Event {idx + 1}</div>
+                          <Select
+                            value={format}
+                            onChange={(e) => {
+                              const copy = [...(active.spocEventFormats || ['SINGLES', 'DOUBLES', 'SINGLES'])];
+                              copy[idx] = e.target.value;
+                              updateStage({ spocEventFormats: copy });
+                            }}
+                            className="h-8 text-xs font-bold w-full"
+                          >
+                            <option value="SINGLES">Singles (1v1)</option>
+                            <option value="DOUBLES">Doubles (2v2)</option>
+                            <option value="TRIPLES">Triples (3v3)</option>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[11px] text-muted-foreground font-medium">
                       Exhibition matches between Spoc teams. Pick the event day for each match.
