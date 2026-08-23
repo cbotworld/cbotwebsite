@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { MOCK_TEAMS, MOCK_PATTERN_LIBRARY } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +73,10 @@ export default function CaptainClient({
   const hasSpocCaptainDesk = Boolean(initialActiveEdition?.hasSpocCaptainDesk) || Boolean(spocTeam);
   const hasBothCaptainDesks = hasMainCaptainDesk && hasSpocCaptainDesk;
   const [activeDesk, setActiveDesk] = React.useState<'main' | 'spoc'>(hasMainCaptainDesk ? 'main' : 'spoc');
+  React.useEffect(() => {
+    const desk = new URLSearchParams(window.location.search).get('desk');
+    if (desk === 'spoc' || desk === 'main') setActiveDesk(desk);
+  }, []);
 
   // Active Team & Roster Context
   const currentTeam =
@@ -363,6 +368,14 @@ export default function CaptainClient({
             <p className="text-xs text-violet-300/90 mt-2">
               You captain both teams. Use <strong>Main team</strong> as usual, then switch to{' '}
               <strong>Spoc exhibition</strong> to submit that match combi.
+            </p>
+          ) : null}
+          {hasSpocCaptainDesk && !hasMainCaptainDesk && initialPlayerTeam ? (
+            <p className="text-xs text-violet-300/90 mt-2">
+              You play for <strong>{initialPlayerTeam.name}</strong> and captain this Spoc team.{' '}
+              <Link href="/dashboard/player" className="underline font-bold">
+                Open player portal
+              </Link>
             </p>
           ) : null}
         </div>

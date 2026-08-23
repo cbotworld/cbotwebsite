@@ -12,6 +12,7 @@ type RecordArgs = {
   rtmpIngestionUrl?: string | null;
   streamKey?: string | null;
   status?: string;
+  playMode?: string;
 };
 
 async function ensureDayMatch(opts: {
@@ -77,6 +78,8 @@ export async function recordMobileLiveStream(args: RecordArgs) {
     opponentTeamId = opp?.id || null;
   }
 
+  const bonus =
+    args.playMode === 'tiebreak' || args.playMode === 'practice' ? args.playMode : null;
   const match = await ensureDayMatch({
     editionId: edition.id,
     dayNumber: args.dayNumber,
@@ -86,7 +89,10 @@ export async function recordMobileLiveStream(args: RecordArgs) {
 
   const youtubeUrl = args.youtubeUrl;
   const youtubeVideoId = args.youtubeVideoId || args.youtubeBroadcastId;
-  const embed = `https://www.youtube.com/embed/${youtubeVideoId}`;
+  // Tag bonus streams in the embed URL so they do not unlock the next official day.
+  const embed = bonus
+    ? `https://www.youtube.com/embed/${youtubeVideoId}?cbot=${bonus}`
+    : `https://www.youtube.com/embed/${youtubeVideoId}`;
 
   const existing = await prisma.liveStream.findFirst({
     where: { youtubeBroadcastId: args.youtubeBroadcastId },

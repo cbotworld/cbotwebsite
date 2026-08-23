@@ -12,6 +12,7 @@ import {
   spocTeamMembersFromTeam,
   TEAM_TYPE_SPOC,
 } from '@/lib/spoc-teams';
+import { listCaptainDesks } from '@/lib/mobile-team';
 
 export const revalidate = 0;
 
@@ -24,8 +25,12 @@ export default async function CaptainPage() {
 
   const sessionUser = session.user as any;
   const role = sessionUser.role;
-  if (role !== 'CAPTAIN' && role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
-    redirect('/dashboard/player');
+  const allowedByRole = role === 'CAPTAIN' || role === 'ORGANIZER' || role === 'SUPER_ADMIN';
+  if (!allowedByRole && !sessionUser.hasCaptainDesk) {
+    const desks = await listCaptainDesks(sessionUser.id);
+    if (!desks.length) {
+      redirect('/dashboard/player');
+    }
   }
 
   const userId = sessionUser.id;

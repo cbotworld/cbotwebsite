@@ -20,7 +20,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
-    const payload = await getPlayerMatchSchedule(user.id);
+    const view = request.nextUrl.searchParams.get('view');
+    const teamId = request.nextUrl.searchParams.get('teamId') || undefined;
+    const payload = await getPlayerMatchSchedule(user.id, {
+      teamId,
+      view: view === 'SPOC' || view === 'MAIN' ? view : undefined,
+    });
     if (!payload) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 401, headers: corsHeaders });
     }

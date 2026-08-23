@@ -57,15 +57,16 @@ export async function uploadImageToSupabase(file: File, bucket = 'teams'): Promi
       });
 
     if (error) {
-      console.warn('Supabase storage upload error, using compressed data URL fallback:', error.message);
-      return await blobToDataUrl(compressed);
+      throw new Error(error.message);
     }
 
     const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
-    return publicUrlData.publicUrl;
+    const publicUrl = publicUrlData?.publicUrl;
+    if (!publicUrl) throw new Error('No public URL returned from storage');
+    return `${publicUrl}?v=${Date.now()}`;
   } catch (err) {
-    console.warn('Supabase storage upload exception:', err);
-    return await blobToDataUrl(compressed);
+    const message = err instanceof Error ? err.message : 'Storage upload failed';
+    throw new Error(message);
   }
 }
 
@@ -141,15 +142,6 @@ export async function normalizeUploadedImageValue(value: string): Promise<string
   } catch {
     return trimmed;
   }
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = (e) => reject(e);
-    reader.readAsDataURL(blob);
-  });
 }
 
 /**

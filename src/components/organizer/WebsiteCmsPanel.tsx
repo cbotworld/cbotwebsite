@@ -74,7 +74,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
     setSavingHero(true);
     const res = await updateWebsiteHeroCms(hero, currentEditionId || undefined);
     setSavingHero(false);
-    showMessage(res.success ? 'Hero section saved. Homepage will update within an hour or on next visit.' : res.error || 'Save failed');
+    showMessage(res.success ? 'Hero section saved. Refresh the homepage to see the new poster.' : res.error || 'Save failed');
   };
 
   const saveSponsors = async () => {

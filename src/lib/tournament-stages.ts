@@ -9,6 +9,8 @@ import type {
   TournamentStageConfig,
 } from '@/types';
 import {
+  eventDayWindow,
+  eventDayWindows,
   isMonumentDayCompleted,
   lastCompletedMonumentDay,
   seedRoyalCarromLeaguePairings,
@@ -579,18 +581,44 @@ export function normalizeDayDates(
   return out;
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** 8pm IST cutoff on a YYYY-MM-DD calendar date. */
+function calendarDateEndMs(dateStr: string): number {
+  const ymd = dateStr.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return NaN;
+  return new Date(`${ymd}T20:00:00+05:30`).getTime();
+}
+
+/**
+ * Official 8pm–8pm IST window end, chained past Days 1–10 so Day 15
+ * still runs 23 Aug 8pm → 24 Aug 8pm even if its calendar date was set early.
+ */
+function sequentialPlayEndMs(dayNumber: number): number | null {
+  const official = eventDayWindow(dayNumber);
+  if (official) return new Date(official.endIso).getTime();
+  const prior = eventDayWindows()
+    .filter((window) => window.dayNumber < dayNumber)
+    .sort((a, b) => b.dayNumber - a.dayNumber)[0];
+  if (!prior) return null;
+  return new Date(prior.endIso).getTime() + (dayNumber - prior.dayNumber) * MS_PER_DAY;
+}
+
 export function lastCompletedDay(
   dayDates: Record<number, string> | Record<string, string>,
   today = new Date()
 ): number {
   const dates = normalizeDayDates(dayDates);
-  const todayStr = today.toISOString().slice(0, 10);
-  let last = lastCompletedMonumentDay(today);
-  Object.entries(dates).forEach(([day, dateStr]) => {
-    const dayNum = parseInt(day, 10);
-    if (isMonumentDayCompleted(dayNum, today) !== null) return;
-    if (dateStr < todayStr) last = Math.max(last, dayNum);
-  });
+  const maxDay = Math.max(
+    lastCompletedMonumentDay(today),
+    ...Object.keys(dates).map((key) => parseInt(key, 10)).filter((n) => n > 0),
+    0
+  );
+  let last = 0;
+  for (let day = 1; day <= maxDay; day += 1) {
+    if (!isCalendarDayCompleted(day, dates, today)) break;
+    last = day;
+  }
   return last;
 }
 
@@ -603,8 +631,15 @@ export function isCalendarDayCompleted(
   if (monumentDone !== null) return monumentDone;
   const dates = normalizeDayDates(dayDates);
   const dateStr = dates[dayNumber];
-  if (!dateStr) return false;
-  return dateStr < today.toISOString().slice(0, 10);
+  const sequentialEnd = sequentialPlayEndMs(dayNumber);
+  const calendarEnd = dateStr ? calendarDateEndMs(dateStr) : NaN;
+  const ends = [sequentialEnd, calendarEnd].filter(
+    (ms): ms is number => typeof ms === 'number' && Number.isFinite(ms)
+  );
+  if (!ends.length) return false;
+  // Lock only after BOTH the 8pm–8pm sequence and the scheduled date have ended.
+  // An early calendar date (e.g. Day 15 on 22 Aug) must not lock the current live day.
+  return today.getTime() >= Math.max(...ends);
 }
 
 export function defaultDurationForKind(kind: StageKind): number {

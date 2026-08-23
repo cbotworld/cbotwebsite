@@ -79,7 +79,7 @@ export default async function OrganizerPage() {
       initialUsersList={usersList}
       initialScoreReports={MOCK_SCORE_REPORTS}
       initialTeams={teams}
-      initialWebsiteCms={JSON.parse(JSON.stringify(websiteCms))}
+      initialWebsiteCms={websiteCms}
     />
   );
 }

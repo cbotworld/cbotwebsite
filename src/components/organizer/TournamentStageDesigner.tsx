@@ -344,8 +344,10 @@ export default function TournamentStageDesigner({
 
   const skipLeagueAutoSeed = React.useRef(false);
   const lastDoneDay = lastCompletedDay(dayDates);
+  const currentEventDay = lastDoneDay + 1;
 
-  const isDayLocked = (day?: number) => !!day && isCalendarDayCompleted(day, dayDates);
+  const isDayLocked = (day?: number) =>
+    !!day && day !== currentEventDay && isCalendarDayCompleted(day, dayDates);
 
   const isStageLocked = (stage: TournamentStage) => {
     const keys = stageMatchStages(stage);
@@ -717,9 +719,9 @@ export default function TournamentStageDesigner({
       Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => ({
         day,
         date: dayDates[day],
-        completed: isCalendarDayCompleted(day, dayDates),
+        completed: day !== currentEventDay && isCalendarDayCompleted(day, dayDates),
       })),
-    [totalDays, dayDates]
+    [totalDays, dayDates, currentEventDay]
   );
 
   if (!editionId) return null;

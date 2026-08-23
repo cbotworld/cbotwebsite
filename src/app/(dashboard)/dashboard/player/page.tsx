@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import PlayerClient from './PlayerClient';
+import { TEAM_TYPE_SPOC, spocTeamMembersFromTeam } from '@/lib/spoc-teams';
 
 export const revalidate = 0;
 
@@ -59,6 +60,39 @@ export default async function PlayerPage() {
   const team = editionParticipant?.team || null;
   const teammates = team?.members?.map((m: any) => m.user) || [];
 
+  const [spocMembership, spocCaptainTeam] = player
+    ? await Promise.all([
+        prisma.spocTeamMember.findFirst({
+          where: { userId: player.id, editionId: activeEdition?.id },
+          include: {
+            team: {
+              include: {
+                captain: true,
+                members: { include: { user: true } },
+                spocMembers: { include: { user: true } },
+              },
+            },
+          },
+        }),
+        prisma.team.findFirst({
+          where: {
+            captainId: player.id,
+            teamType: TEAM_TYPE_SPOC,
+            ...(activeEdition?.id ? { editionId: activeEdition.id } : {}),
+          },
+          include: {
+            captain: true,
+            members: { include: { user: true } },
+            spocMembers: { include: { user: true } },
+          },
+        }),
+      ])
+    : [null, null];
+
+  const spocTeam = spocCaptainTeam || spocMembership?.team || null;
+  const spocMembers = spocTeam ? spocTeamMembersFromTeam(spocTeam) : [];
+  const hasSpocCaptainDesk = Boolean(spocCaptainTeam);
+
   const matches = team ? await prisma.match.findMany({
     where: {
       OR: [
@@ -105,6 +139,9 @@ export default async function PlayerPage() {
       initialMatches={matches as any}
       initialPatterns={patterns as any}
       initialStreams={liveStreams as any}
+      initialSpocTeam={spocTeam}
+      initialSpocMembers={spocMembers}
+      hasSpocCaptainDesk={hasSpocCaptainDesk}
     />
   );
 }

@@ -59,12 +59,13 @@ export function Navbar() {
   }, []);
 
   const userRole: UserRole = (session?.user as any)?.role || 'PLAYER';
+  const hasCaptainDesk = Boolean((session?.user as any)?.hasCaptainDesk);
 
   const getDashboardHref = (role: UserRole) => {
     switch (role) {
       case 'ORGANIZER': return '/dashboard/organizer';
       case 'CAPTAIN':   return '/dashboard/captain';
-      case 'PLAYER':    return '/dashboard/player';
+      case 'PLAYER':    return hasCaptainDesk ? '/dashboard/captain' : '/dashboard/player';
       default:          return '/dashboard/player';
     }
   };
@@ -192,7 +193,7 @@ export function Navbar() {
                     onClick={() => {
                       setUserMenuOpen(false);
                       const target = getDashboardHref(userRole);
-                      if (pathname === target || pathname.startsWith('/dashboard')) return;
+                      if (pathname === target) return;
                       setIsNavigating(true);
                     }}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold hover:bg-muted transition-colors"
@@ -343,7 +344,7 @@ export function Navbar() {
                 onClick={() => {
                   setMobileMenuOpen(false);
                   const target = getDashboardHref(userRole);
-                  if (pathname === target || pathname.startsWith('/dashboard')) return;
+                  if (pathname === target) return;
                   setIsNavigating(true);
                 }}
                 className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 transition-all"

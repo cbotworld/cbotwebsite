@@ -15,6 +15,7 @@ import {
   type WebsiteCmsContent,
 } from '@/lib/website-cms';
 import { SponsorAvatar } from '@/components/layout/SponsorAvatar';
+import { withImageCacheBust } from '@/lib/safe-image-url';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -73,7 +74,7 @@ export default function HomeClient({
   const specialSponsorsCms = websiteCms.specialSponsors;
   const goldSponsorsCms = websiteCms.goldSponsors;
   const legacyCms = websiteCms.legacy;
-  const heroPosterUrl = hero.posterUrl || editionPosterUrl || '/edition-poster.jpg';
+  const heroPosterUrl = withImageCacheBust(hero.posterUrl || editionPosterUrl || '/edition-poster.jpg');
   const heroBannerImage = hero.bannerImage || currentEdition?.bannerImage || null;
 
   const legacyVideos = React.useMemo(
@@ -515,7 +516,7 @@ export default function HomeClient({
             {/* 3D Stacking Video Frame Container with Smooth Motion Animations */}
             <div className="relative w-full flex items-center justify-center min-h-[260px] sm:min-h-[420px] lg:min-h-[500px] py-6 overflow-visible">
               
-              <AnimatePresence mode="wait">
+              <AnimatePresence>
                 {/* Previous Video Card (Left Behind with Full Title) */}
                 <motion.div
                   key={`prev-${prevVideo.id}`}

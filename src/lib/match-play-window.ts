@@ -38,6 +38,13 @@ export function maxPlayableDayNumber(_currentDay: number, totalDays: number) {
   return Math.max(1, totalDays || 1);
 }
 
+/** Practice / tie-break streams must not unlock the next official match day. */
+export function isBonusPlayRef(opts: { matchId?: string | null; label?: string | null; extra?: string | null }) {
+  return /practice|tie[\s._-]*break|cbot=(practice|tiebreak)/i.test(
+    `${opts.matchId || ''} ${opts.label || ''} ${opts.extra || ''}`,
+  );
+}
+
 export function dayNumberFromMatchRef(opts: {
   matchId?: string | null;
   round?: number | null;
@@ -134,12 +141,23 @@ export function summarizePlayerDayStreams(
       matchId: s.matchId,
       round: s.match?.round,
       matchNumber: s.match?.matchNumber,
+      label: typeof (s as { title?: string }).title === 'string' ? (s as { title?: string }).title : null,
     });
     if (day < 1) continue;
     streamCountByDay[day] = (streamCountByDay[day] || 0) + 1;
     const url = resolveYoutubeWatchUrl(s);
     if (!url) continue;
-    daysWithYoutubeSet.add(day);
+    const bonusLabel =
+      typeof (s as { title?: string }).title === 'string' ? (s as { title?: string }).title : null;
+    if (
+      !isBonusPlayRef({
+        matchId: s.matchId,
+        label: bonusLabel,
+        extra: `${s.youtubeUrl || ''} ${s.youtubeEmbedUrl || ''}`,
+      })
+    ) {
+      daysWithYoutubeSet.add(day);
+    }
     if (!latestByDay[day]) {
       latestByDay[day] = {
         youtubeUrl: url,

@@ -11,6 +11,64 @@ export type CaptainDesk = {
   kind: CaptainDeskKind;
 };
 
+export type PlayerTeamView = {
+  id: string;
+  name: string;
+  tag: string;
+  logo?: string | null;
+  kind: CaptainDeskKind;
+  isCaptain: boolean;
+};
+
+export async function listPlayerTeams(userId: string, editionId?: string): Promise<PlayerTeamView[]> {
+  const views: PlayerTeamView[] = [];
+
+  const participation = await prisma.editionParticipant.findFirst({
+    where: editionId ? { userId, editionId } : { userId },
+    include: { team: { select: { id: true, name: true, tag: true, logo: true, teamType: true, captainId: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (participation?.team && participation.team.teamType !== TEAM_TYPE_SPOC) {
+    views.push({
+      id: participation.team.id,
+      name: participation.team.name,
+      tag: participation.team.tag,
+      logo: participation.team.logo,
+      kind: 'MAIN',
+      isCaptain: participation.team.captainId === userId,
+    });
+  }
+
+  const [spocMembership, spocCaptainTeam] = await Promise.all([
+    prisma.spocTeamMember.findFirst({
+      where: editionId ? { userId, editionId } : { userId },
+      include: { team: { select: { id: true, name: true, tag: true, logo: true, captainId: true } } },
+    }),
+    prisma.team.findFirst({
+      where: {
+        captainId: userId,
+        teamType: TEAM_TYPE_SPOC,
+        ...(editionId ? { editionId } : {}),
+      },
+      select: { id: true, name: true, tag: true, logo: true, captainId: true },
+    }),
+  ]);
+
+  const spocTeam = spocMembership?.team || spocCaptainTeam;
+  if (spocTeam && !views.some((v) => v.id === spocTeam.id)) {
+    views.push({
+      id: spocTeam.id,
+      name: spocTeam.name,
+      tag: spocTeam.tag,
+      logo: spocTeam.logo,
+      kind: 'SPOC',
+      isCaptain: spocTeam.captainId === userId,
+    });
+  }
+
+  return views;
+}
+
 export async function listCaptainDesks(userId: string, editionId?: string): Promise<CaptainDesk[]> {
   const teams = await prisma.team.findMany({
     where: {

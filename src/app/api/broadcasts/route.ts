@@ -33,6 +33,11 @@ export async function POST(request: NextRequest) {
     let editionTitle = asText(body.editionTitle);
     let timeRange = asText(body.timeRange);
     let endIso = asText(body.endIso);
+    const playMode = asText(body.playMode).toLowerCase();
+    const isBonusPlay =
+      playMode === 'tiebreak' ||
+      playMode === 'practice' ||
+      /practice|tie[\s._-]*break/i.test(day);
 
     const user = await userFromBearer(request);
     let teamId: string | null = null;
@@ -46,7 +51,7 @@ export async function POST(request: NextRequest) {
         days.find((d) => d.status === 'live') ||
         null;
 
-      if (Number.isFinite(dayNum) && dayNum > 0) {
+      if (Number.isFinite(dayNum) && dayNum > 0 && !isBonusPlay) {
         if (row && row.canGoLive === false) {
           return NextResponse.json(
             {
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
         if (!stage) stage = row.stageName || row.stageLabel || row.title || '';
         if (!editionTitle) editionTitle = row.editionTitle || '';
         if (!timeRange) timeRange = row.timeRange || '';
-        if (!endIso) endIso = row.endIso || '';
+        if (!endIso && !isBonusPlay) endIso = row.endIso || '';
       }
       if (!editionTitle) editionTitle = 'CBOT 200th Edition';
     }
@@ -112,6 +117,11 @@ export async function POST(request: NextRequest) {
             dayNumber: dayNum,
             teamId,
             opponentName,
+            playMode: isBonusPlay
+              ? playMode === 'practice' || /practice/i.test(day)
+                ? 'practice'
+                : 'tiebreak'
+              : 'match',
             youtubeBroadcastId: session.broadcastId,
             youtubeStreamId: session.streamId,
             youtubeVideoId: session.broadcastId,

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -29,13 +29,7 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMsg('');
 
-    const cleanInput = username.trim().toLowerCase();
-    
-    // Pre-calculate target route for instant transit without extra fetch latency
-    let targetRoute = '/dashboard/captain';
-    if (['balumaster', 'carrombalu', 'balu', 'carrom_balu'].includes(cleanInput)) {
-      targetRoute = '/dashboard/organizer';
-    }
+    const cleanInput = username.trim().toLowerCase().replace(/\s+/g, '');
 
     const res = await signIn('credentials', {
       username,
@@ -44,6 +38,16 @@ export default function LoginPage() {
     });
 
     if (res?.ok) {
+      const session = await getSession();
+      const role = (session?.user as any)?.role || '';
+      const hasCaptainDesk = Boolean((session?.user as any)?.hasCaptainDesk);
+      const isKnownOrganizer = ['balumaster', 'carrombalu', 'balu', 'carrom_balu'].includes(cleanInput);
+      let targetRoute = '/dashboard/player';
+      if (role === 'ORGANIZER' || role === 'SUPER_ADMIN' || isKnownOrganizer) {
+        targetRoute = '/dashboard/organizer';
+      } else if (role === 'CAPTAIN' || hasCaptainDesk) {
+        targetRoute = '/dashboard/captain';
+      }
       router.replace(targetRoute);
     } else {
       setErrorMsg('Invalid Username or 4-Digit PIN. Please verify your credentials and try again.');

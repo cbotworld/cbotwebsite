@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -105,7 +106,13 @@ export async function POST(request: NextRequest) {
       include: { team: true },
       orderBy: { createdAt: 'desc' },
     });
-    const team = participation?.team;
+    const [playerTeams, captainDesks] = await Promise.all([
+      listPlayerTeams(foundUser.id),
+      listCaptainDesks(foundUser.id),
+    ]);
+    const team = participation?.team || (playerTeams[0]
+      ? { id: playerTeams[0].id, name: playerTeams[0].name, tag: playerTeams[0].tag, logo: playerTeams[0].logo }
+      : null);
 
     return NextResponse.json(
       {
@@ -135,6 +142,8 @@ export async function POST(request: NextRequest) {
         team: team
           ? { id: team.id, name: team.name, tag: team.tag, logo: team.logo }
           : null,
+        playerTeams,
+        captainDesks,
         token,
       },
       { headers: corsHeaders }

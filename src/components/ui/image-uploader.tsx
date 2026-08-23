@@ -2,7 +2,8 @@
 
 import React, { useState, useRef } from 'react';
 import { Upload, RefreshCw, Trash2, Link as LinkIcon, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
-import { uploadImageToSupabase, normalizeUploadedImageValue } from '@/lib/supabase';
+import { uploadImageToSupabase, normalizeUploadedImageValue, compressImageFile } from '@/lib/supabase';
+import { uploadPublicImage } from '@/lib/actions/imageUploadActions';
 import { Button } from './button';
 import { Input } from './input';
 
@@ -49,13 +50,42 @@ export function ImageUploader({
 
     try {
       const beforeKb = Math.round(file.size / 1024);
-      const publicUrl = await uploadImageToSupabase(file, bucket);
+      const compressed = await compressImageFile(file, {
+        maxEdge: 1000,
+        quality: 0.78,
+        maxBytes: 350_000,
+      });
+      const jpegFile = new File([compressed], `${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      let publicUrl = '';
+      try {
+        publicUrl = await uploadImageToSupabase(jpegFile, bucket);
+      } catch (clientErr) {
+        console.warn('Browser storage upload failed, trying server upload:', clientErr);
+      }
+
+      if (!publicUrl || publicUrl.startsWith('data:')) {
+        const formData = new FormData();
+        formData.append('file', jpegFile);
+        formData.append('bucket', bucket);
+        const res = await uploadPublicImage(formData);
+        if (!res.success || !res.url) {
+          throw new Error(res.error || 'Could not upload image to public storage');
+        }
+        publicUrl = res.url;
+      }
+
       onChange(publicUrl);
       setUploadStatus('success');
       setLastSizeNote(`Compressed from ${beforeKb}KB · auto-optimized JPEG`);
     } catch (err) {
       console.error('Failed to upload image:', err);
       setUploadStatus('error');
+      setLastSizeNote(
+        err instanceof Error
+          ? err.message
+          : 'Upload failed. The website cannot show inline images — try again.'
+      );
     } finally {
       setIsUploading(false);
     }
@@ -66,13 +96,32 @@ export function ImageUploader({
     setIsUploading(true);
     try {
       const normalized = await normalizeUploadedImageValue(value);
-      if (normalized !== value) {
+      if (normalized && !normalized.startsWith('data:')) {
         onChange(normalized);
         setUploadStatus('success');
         setLastSizeNote('Pasted image compressed & uploaded');
+        return;
       }
+      const res = await fetch(value);
+      const blob = await res.blob();
+      const compressed = await compressImageFile(blob);
+      const jpegFile = new File([compressed], `pasted-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const formData = new FormData();
+      formData.append('file', jpegFile);
+      formData.append('bucket', bucket);
+      const uploaded = await uploadPublicImage(formData);
+      if (!uploaded.success || !uploaded.url) {
+        throw new Error(uploaded.error || 'Could not upload pasted image');
+      }
+      onChange(uploaded.url);
+      setUploadStatus('success');
+      setLastSizeNote('Pasted image compressed & uploaded');
     } catch (err) {
       console.error('Failed to normalize pasted image:', err);
+      setUploadStatus('error');
+      setLastSizeNote(
+        err instanceof Error ? err.message : 'Pasted image could not be uploaded to public storage'
+      );
     } finally {
       setIsUploading(false);
     }
@@ -181,18 +230,31 @@ export function ImageUploader({
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-amber-400 truncate">Poster Loaded</span>
-                    {uploadStatus === 'success' && (
+                    {uploadStatus === 'success' && !value.startsWith('data:') && (
                       <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                         <CheckCircle2 className="h-3 w-3" /> Compressed & uploaded
                       </span>
                     )}
+                    {uploadStatus === 'error' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-rose-400 font-semibold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                        <AlertCircle className="h-3 w-3" /> Upload failed
+                      </span>
+                    )}
                   </div>
                   {lastSizeNote ? (
-                    <p className="text-[10px] text-emerald-400/90 font-medium">{lastSizeNote}</p>
+                    <p className={`text-[10px] font-medium ${uploadStatus === 'error' ? 'text-rose-400' : 'text-emerald-400/90'}`}>
+                      {lastSizeNote}
+                    </p>
                   ) : null}
-                  <p className="text-[11px] text-muted-foreground truncate font-mono bg-black/20 px-2 py-1 rounded border border-border/40">
-                    {value.startsWith('data:') ? 'Inline image (compressed)' : value}
-                  </p>
+                  {value.startsWith('data:') ? (
+                    <p className="text-[11px] text-rose-400 font-semibold">
+                      Inline preview only — the website will not show this. Click Replace Image, then Save.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground truncate font-mono bg-black/20 px-2 py-1 rounded border border-border/40">
+                      {value}
+                    </p>
+                  )}
 
                   <div className="flex items-center gap-2 pt-1">
                     <Button

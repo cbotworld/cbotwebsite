@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS } from '@/lib/mock-data';
-import { createEdition, addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction } from '@/lib/actions/tournamentActions';
+import { addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction } from '@/lib/actions/tournamentActions';
 import { sendFinalDailyLineupSummaryAction } from '@/lib/actions/lineupActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { finalizeEditionRankings } from '@/lib/actions/rankingActions';
@@ -48,13 +48,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setTeamsList(initialTeams);
   }, [initialTeams]);
 
-  // Edition Control Scope State
-  const [selectedEditionId, setSelectedEditionId] = React.useState<string>(
-    initialEditions[0]?.id || ''
-  );
-
   // Modals
-  const [createModalOpen, setCreateModalOpen] = React.useState(false);
   const [editModalOpen, setEditModalOpen] = React.useState(false);
   const [genCredentialsModalOpen, setGenCredentialsModalOpen] = React.useState(false);
   const [addTeamModalOpen, setAddTeamModalOpen] = React.useState(false);
@@ -289,7 +283,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     });
   }, [totalDays]);
 
-  const selectedEdition = editions.find((e) => e.id === selectedEditionId) || editions[0];
+  const selectedEdition =
+    editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0];
+  const selectedEditionId = selectedEdition?.id || '';
 
   React.useEffect(() => {
     if (selectedEdition) {
@@ -505,20 +501,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             : t
         )
       );
-    }
-    setIsSubmitting(false);
-  };
-
-  const handleCreateEdition = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(e.currentTarget);
-    formData.append('roundFormats', JSON.stringify(roundFormats));
-    formData.append('roundRules', JSON.stringify(roundRules));
-    const res = await createEdition(formData, 'usr_organizer_1');
-    if (res.success && res.edition) {
-      setEditions([res.edition, ...editions]);
-      setCreateModalOpen(false);
     }
     setIsSubmitting(false);
   };
@@ -848,14 +830,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </div>
           <h1 className="text-3xl font-black">Tournament Director Dashboard</h1>
           <p className="text-muted-foreground text-sm">
-            Manage CBOT cups, generate player credentials, reset PINs, and audit match score reports.
+            Manage the current CBOT cup, generate player credentials, reset PINs, and audit match score reports.
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="carrom" onClick={() => setCreateModalOpen(true)} className="font-bold text-xs">
-            <Plus className="h-4 w-4 mr-1.5" /> Create New Tournament
-          </Button>
         </div>
       </div>
 
@@ -886,23 +862,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <p className="text-xs text-muted-foreground font-medium">
             <strong className="text-foreground">Theme:</strong> {selectedEdition?.theme || selectedEdition?.themeDescription || 'Standard Carrom Theme'}
           </p>
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="w-full sm:w-72">
-            <label className="text-[11px] font-bold text-muted-foreground block mb-1">Switch View Edition</label>
-            <Select
-              value={selectedEditionId}
-              onChange={(e: any) => setSelectedEditionId(e.target.value)}
-              className="text-xs font-bold bg-background h-10 border-amber-500/40"
-            >
-              {editions.map((ed) => (
-                <option key={ed.id} value={ed.id}>
-                  {ed.title || ed.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Cups run one after another on this same edition. Use Edit Edition to update the next tournament instead of creating a new record.
+          </p>
         </div>
       </div>
 
@@ -1879,119 +1841,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </form>
       </Dialog>
 
-      {/* Create Tournament Dialog */}
-      <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-amber-500" /> Create New CBOT Tournament
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleCreateEdition} className="space-y-4 py-2">
-          <div>
-            <label className="text-xs font-bold block mb-1">Edition Title</label>
-            <Input name="title" required placeholder="e.g. CBOT Edition #206" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold block mb-1">Edition Theme</label>
-              <Input name="theme" defaultValue="CBOT Championship Theme" placeholder="e.g. Balu Master Special / Weekend Blitz" />
-            </div>
-            <div>
-              <label className="text-xs font-bold block mb-1">Max Teams</label>
-              <Input name="maxTeams" type="number" defaultValue="16" min="4" max="64" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold block mb-1">Prize Pool</label>
-              <Input name="prizePool" defaultValue="₹1,00,000 INR" />
-            </div>
-            <div>
-              <label className="text-xs font-bold block mb-1">Number of Rounds</label>
-              <Select value={roundCount.toString()} onChange={(e: any) => handleRoundCountChange(parseInt(e.target.value, 10))}>
-                <option value="3">3 Rounds</option>
-                <option value="4">4 Rounds</option>
-                <option value="5">5 Rounds</option>
-                <option value="6">6 Rounds</option>
-                <option value="7">7 Rounds</option>
-                <option value="8">8 Rounds</option>
-                <option value="9">9 Rounds</option>
-                <option value="10">10 Rounds</option>
-              </Select>
-            </div>
-          </div>
-
-          {/* Multi-Format Round & Rules Breakdown */}
-          <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-amber-500/25">
-            <div className="flex items-center justify-between pb-2 border-b border-border/40">
-              <div className="space-y-0.5">
-                <label className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Match Format
-                </label>
-                <p className="text-[11px] text-muted-foreground font-medium">Set the match format for each round.</p>
-              </div>
-              <Badge variant="carrom" className="text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wider">
-                {roundCount} Rounds Configured
-              </Badge>
-            </div>
-
-            <div className="space-y-3 pt-1">
-              {roundFormats.map((format, idx) => (
-                <div key={idx} className="bg-card p-4 rounded-xl border border-border/80 shadow-md space-y-3">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
-                    <span className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                      👑 Round {idx + 1} Configuration
-                    </span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Stage {idx + 1}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="text-[11px] font-bold text-muted-foreground block mb-1">
-                        Match Format
-                      </label>
-                      <Select
-                        value={format}
-                        onChange={(e: any) => {
-                          const copy = [...roundFormats];
-                          copy[idx] = e.target.value;
-                          setRoundFormats(copy);
-                        }}
-                        className="text-xs h-9 font-bold bg-background"
-                      >
-                        <option value="SINGLES">Singles (1v1)</option>
-                        <option value="DOUBLES">Doubles (2v2)</option>
-                        <option value="TRIPLES">Triples (3v3)</option>
-                        <option value="QUADRUPLES">Quadruples (4v4)</option>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold block mb-1">Description</label>
-            <Input name="description" required placeholder="Brief description of tournament stakes..." />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="carrom" disabled={isSubmitting}>
-              {isSubmitting ? 'Publishing...' : 'Publish Tournament'}
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
       {/* Edit Tournament Edition Dialog */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogHeader>
@@ -1999,7 +1848,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Edit3 className="h-5 w-5 text-amber-500" /> Edit Edition: {selectedEdition?.title || selectedEdition?.name || 'Selected Edition'}
           </DialogTitle>
           <DialogDescription>
-            Update edition title, theme, prize pool, team limits, and per-round directives.
+            Update this edition for the next cup — title, theme, prize pool, dates, and rounds. Teams stay on this record.
           </DialogDescription>
         </DialogHeader>
 

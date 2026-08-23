@@ -11,6 +11,15 @@ export function safePublicImageUrl(value?: string | null): string | null {
   return trimmed;
 }
 
+/** Stable cache-buster so a new poster URL is not stuck behind a CDN/browser cache. */
+export function withImageCacheBust(url: string): string {
+  if (!url || url.startsWith('data:') || url.startsWith('/')) return url;
+  if (/[?&]v=/.test(url)) return url;
+  let hash = 0;
+  for (let i = 0; i < url.length; i += 1) hash = (hash * 31 + url.charCodeAt(i)) | 0;
+  return `${url}${url.includes('?') ? '&' : '?'}v=${Math.abs(hash)}`;
+}
+
 export function withSafeTeamLogo<T extends { logo?: string | null }>(team: T): T {
   return { ...team, logo: safePublicImageUrl(team.logo) };
 }

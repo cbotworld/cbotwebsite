@@ -7,11 +7,15 @@ import {
   tournamentPlayWindow,
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
-import { buildOrganizerScheduleDays, resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { buildOrganizerScheduleDays, calendarDateForDay, addDaysIsoDate, formatDayRange, resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
-export async function getPlayerMatchSchedule(userId: string) {
+export async function getPlayerMatchSchedule(
+  userId: string,
+  opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' },
+) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
@@ -26,7 +30,23 @@ export async function getPlayerMatchSchedule(userId: string) {
     orderBy: { createdAt: 'desc' },
   });
 
-  const team = participation?.team || null;
+  const playerTeams = await listPlayerTeams(userId, edition?.id);
+  const captainDesks = await listCaptainDesks(userId, edition?.id);
+  const requested =
+    (opts?.teamId && playerTeams.find((t) => t.id === opts.teamId)) ||
+    (opts?.view === 'SPOC' && playerTeams.find((t) => t.kind === 'SPOC')) ||
+    (opts?.view === 'MAIN' && playerTeams.find((t) => t.kind === 'MAIN')) ||
+    playerTeams.find((t) => t.kind === 'MAIN') ||
+    playerTeams[0] ||
+    null;
+  const team = requested
+    ? {
+        id: requested.id,
+        name: requested.name,
+        tag: requested.tag,
+        logo: requested.logo,
+      }
+    : participation?.team || null;
 
   let stageConfig: { stages?: any[] } | null = null;
   if (edition?.id) {
@@ -87,7 +107,14 @@ export async function getPlayerMatchSchedule(userId: string) {
   );
   // Prefer the live schedule day so past official days never constrain today.
   const currentDay = liveScheduleDay || scheduleCurrentDay || officialWindow.currentDay || 1;
-  const totalDays = Math.max(officialWindow.totalDays, currentDay);
+  const totalDays = Math.max(
+    officialWindow.totalDays,
+    edition?.totalDays || 0,
+    scheduleDays.length,
+    ...scheduleDays.map((d) => d.dayNumber),
+    currentDay,
+    1,
+  );
 
   const playerStreams = await prisma.liveStream.findMany({
     where: {
@@ -110,74 +137,86 @@ export async function getPlayerMatchSchedule(userId: string) {
   const streamSummary = summarizePlayerDayStreams(playerStreams);
   const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
 
-  const fixtureDays = scheduleDays
-    .map((day) => {
-      const fix = teamNameUpper ? matchForTeam(day) : null;
-      if (!fix) return null;
-      return day.dayNumber;
-    })
-    .filter((n): n is number => typeof n === 'number' && n > 0);
+  const daysByNumber = new Map(scheduleDays.map((d) => [d.dayNumber, d]));
+  const fixtureDays = Array.from({ length: totalDays }, (_, i) => i + 1);
 
-  const days = scheduleDays
-    .map((day) => {
-      const fix = teamNameUpper ? matchForTeam(day) : null;
-      if (!fix) return null;
-      const isT1 =
-        fix.team1 === teamNameUpper || (!!teamTag && fix.team1Tag === teamTag);
-      const myName = isT1 ? fix.team1 : fix.team2;
-      const oppName = isT1 ? fix.team2 : fix.team1;
+  const days = !team
+    ? []
+    : fixtureDays.map((dayNumber) => {
+      const scheduled = daysByNumber.get(dayNumber);
+      const calendarDate = scheduled?.calendarDate || calendarDateForDay(dayNumber, dayDates);
+      const startIso = scheduled?.startIso || `${addDaysIsoDate(calendarDate, -1)}T20:00:00+05:30`;
+      const endIso = scheduled?.endIso || `${calendarDate}T20:00:00+05:30`;
+      const timeRange = scheduled?.timeRange || formatDayRange(startIso, endIso);
+      const title = scheduled?.title || `DAY ${dayNumber}`;
+      const fix = teamNameUpper && scheduled ? matchForTeam(scheduled) : null;
+      const isT1 = fix
+        ? fix.team1 === teamNameUpper || (!!teamTag && fix.team1Tag === teamTag)
+        : true;
+      const oppNameRaw = fix ? (isT1 ? fix.team2 : fix.team1) : '';
+      const oppMissing = !oppNameRaw || /^tbd$/i.test(oppNameRaw);
       const myFace = resolveTeamFace({
-        name: myName,
-        tag: teamByName.get(myName)?.tag || team?.tag,
-        logo: teamByName.get(myName)?.logo || team?.logo,
-        id: teamByName.get(myName)?.id || team?.id,
+        name: team?.name || 'Your team',
+        tag: team?.tag,
+        logo: team?.logo,
+        id: team?.id,
         teams,
       });
-      const oppFace = resolveTeamFace({
-        name: oppName,
-        tag: teamByName.get(oppName)?.tag,
-        logo: teamByName.get(oppName)?.logo,
-        id: teamByName.get(oppName)?.id,
-        teams,
-      });
-      const status = monumentStatus(day, now);
+      const oppFace = oppMissing
+        ? { name: 'TBD', tag: 'TBD', logo: null as string | null }
+        : resolveTeamFace({
+            name: oppNameRaw,
+            tag: teamByName.get(oppNameRaw)?.tag,
+            logo: teamByName.get(oppNameRaw)?.logo,
+            id: teamByName.get(oppNameRaw)?.id,
+            teams,
+          });
+      const status = scheduled
+        ? monumentStatus(scheduled, now)
+        : dayNumber < currentDay
+          ? 'completed'
+          : dayNumber === currentDay
+            ? 'live'
+            : 'upcoming';
       const isLiveDay = status === 'live';
-      const isCurrent = isLiveDay || day.dayNumber === currentDay;
-      const isPast = !isCurrent && day.dayNumber < currentDay;
-      const isFuture = day.dayNumber > currentDay && !isLiveDay;
+      const isCurrent = isLiveDay || dayNumber === currentDay;
+      const isPast = !isCurrent && dayNumber < currentDay;
+      const isFuture = dayNumber > currentDay && !isLiveDay;
       const canGoLive = isPast
         ? false
         : isCurrent
           ? true
-          : isDayUnlockedByYoutubeSequence(day.dayNumber, fixtureDays, daysWithYoutube, currentDay);
-      const latest = streamSummary.latestByDay[day.dayNumber] || null;
+          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDay);
+      const latest = streamSummary.latestByDay[dayNumber] || null;
       const prerequisiteDay = isFuture
-        ? unlockPrerequisiteDay(day.dayNumber, fixtureDays, currentDay)
+        ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDay)
         : null;
       return {
-        dayNumber: day.dayNumber,
-        label: `Day ${day.dayNumber}`,
-        title: day.title,
-        timeRange: day.timeRange,
-        startIso: day.startIso,
-        endIso: day.endIso,
-        calendarDate: day.calendarDate,
+        dayNumber,
+        label: `Day ${dayNumber}`,
+        title,
+        timeRange,
+        startIso,
+        endIso,
+        calendarDate,
         status,
         canGoLive,
+        canPracticeGoLive: true,
+        canTieBreakGoLive: true,
         lockedReason: canGoLive
           ? null
           : isPast
-            ? 'This match day is over. Watch the saved YouTube video instead.'
+            ? 'This match day is completed. Watch the saved YouTube video, or use Practice / Tie Breaker.'
             : prerequisiteDay
-              ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${day.dayNumber} unlocks.`
-              : 'This day is not on your schedule.',
+              ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${dayNumber} unlocks.`
+              : 'This day is not unlocked yet.',
         prerequisiteDay,
         hasYoutube: Boolean(latest),
         latestYoutubeUrl: latest?.youtubeUrl || null,
         latestYoutubeVideoId: latest?.youtubeVideoId || null,
-        streamCount: streamSummary.streamCountByDay[day.dayNumber] || 0,
-        stageName: day.stageName || day.title,
-        stageLabel: day.stageLabel || day.title,
+        streamCount: streamSummary.streamCountByDay[dayNumber] || 0,
+        stageName: scheduled?.stageName || title,
+        stageLabel: scheduled?.stageLabel || title,
         teamName: myFace.name,
         teamTag: myFace.tag,
         teamLogo: myFace.logo,
@@ -188,15 +227,12 @@ export async function getPlayerMatchSchedule(userId: string) {
         editionTitle: edition?.title || 'CBOT 200th Edition',
         editionNumber: edition?.number || 200,
       };
-    })
-    .filter(Boolean);
+    });
 
   const live = days.find((d) => d && d.status === 'live') || null;
   const warning = !team
     ? 'Your account is not assigned to a team yet.'
-    : days.length === 0
-      ? 'No fixtures found for your team on the organizer schedule.'
-      : undefined;
+    : undefined;
 
   return {
     user: {
@@ -208,6 +244,8 @@ export async function getPlayerMatchSchedule(userId: string) {
     team: team
       ? { id: team.id, name: team.name, tag: team.tag, logo: team.logo }
       : null,
+    playerTeams,
+    captainDesks,
     liveDay: live?.dayNumber ?? null,
     liveLabel: live?.label ?? null,
     currentDay,

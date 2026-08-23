@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Share2
+  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Share2, Sparkles
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
@@ -35,7 +35,27 @@ import {
 import { ProfileTab } from '@/components/player/ProfileTab';
 
 
-export default function PlayerClient({ initialPlayer, initialTeam, initialTeammates, initialMatches, initialPatterns, initialStreams }: { initialPlayer: any, initialTeam: any, initialTeammates: any[], initialMatches: any[], initialPatterns: any[], initialStreams?: any[] }) {
+export default function PlayerClient({
+  initialPlayer,
+  initialTeam,
+  initialTeammates,
+  initialMatches,
+  initialPatterns,
+  initialStreams,
+  initialSpocTeam,
+  initialSpocMembers = [],
+  hasSpocCaptainDesk = false,
+}: {
+  initialPlayer: any;
+  initialTeam: any;
+  initialTeammates: any[];
+  initialMatches: any[];
+  initialPatterns: any[];
+  initialStreams?: any[];
+  initialSpocTeam?: any;
+  initialSpocMembers?: any[];
+  hasSpocCaptainDesk?: boolean;
+}) {
   const { data: session } = useSession();
 
   const [copiedMatchId, setCopiedMatchId] = React.useState<string | null>(null);
@@ -76,8 +96,18 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     };
   }, [sessionUser, initialPlayer]);
 
-  const currentTeam = initialTeam || null;
-  const teammates = initialTeammates.length > 0 ? initialTeammates : (currentTeam?.members?.map((m: any) => m.user) || []);
+  const hasBothPlayerTeams = Boolean(initialTeam && initialSpocTeam);
+  const [playerView, setPlayerView] = React.useState<'main' | 'spoc'>(
+    initialTeam ? 'main' : initialSpocTeam ? 'spoc' : 'main',
+  );
+  const currentTeam =
+    playerView === 'spoc' && initialSpocTeam ? initialSpocTeam : initialTeam || null;
+  const teammates =
+    playerView === 'spoc' && initialSpocMembers.length
+      ? initialSpocMembers
+      : initialTeammates.length > 0
+        ? initialTeammates
+        : currentTeam?.members?.map((m: any) => m.user) || [];
   const [nowMs, setNowMs] = React.useState(() => Date.now());
   const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>(() => buildOrganizerScheduleDays());
 
@@ -346,12 +376,52 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 <Badge variant="secondary" className="font-extrabold px-3 py-0.5">
                   <UserCheck className="h-3.5 w-3.5 mr-1" /> Player Portal
                 </Badge>
-                <Badge variant="carrom" className="font-bold">{currentTeam.name}</Badge>
+                {currentTeam?.name ? (
+                  <Badge variant={playerView === 'spoc' ? 'outline' : 'carrom'} className={`font-bold ${playerView === 'spoc' ? 'text-violet-300 border-violet-500/40 bg-violet-500/10' : ''}`}>
+                    {currentTeam.name}
+                  </Badge>
+                ) : null}
               </div>
               <h1 className="text-3xl font-black tracking-tight">{currentPlayer.name}</h1>
               <p className="text-muted-foreground text-xs font-mono">
                 @{currentPlayer.username} • PIN: ••••
               </p>
+              {hasBothPlayerTeams ? (
+                <div className="mt-3 inline-flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPlayerView('main')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                      playerView === 'main'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Main team
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlayerView('spoc')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                      playerView === 'spoc'
+                        ? 'bg-violet-500 text-white shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Spoc team
+                  </button>
+                </div>
+              ) : null}
+              {hasSpocCaptainDesk ? (
+                <Link
+                  href="/dashboard/captain?desk=spoc"
+                  className="mt-3 inline-flex items-center h-8 rounded-md px-3 text-xs font-black bg-violet-600 hover:bg-violet-500 text-white"
+                >
+                  <Crown className="h-3.5 w-3.5 mr-1.5" />
+                  Login as Spoc captain
+                  <Sparkles className="h-3.5 w-3.5 ml-1.5" />
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>

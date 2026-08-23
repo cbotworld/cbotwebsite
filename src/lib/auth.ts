@@ -123,6 +123,19 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.username = (user as any).username;
         token.isActivated = (user as any).isActivated;
+        token.hasCaptainDesk = false;
+        const role = String((user as any).role || '');
+        if (token.id && role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+          try {
+            const desk = await prisma.team.findFirst({
+              where: { captainId: String(token.id) },
+              select: { id: true },
+            });
+            token.hasCaptainDesk = Boolean(desk);
+          } catch {
+            token.hasCaptainDesk = false;
+          }
+        }
       }
       return token;
     },
@@ -132,6 +145,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id;
         (session.user as any).username = token.username;
         (session.user as any).isActivated = token.isActivated;
+        (session.user as any).hasCaptainDesk = Boolean(token.hasCaptainDesk);
       }
       return session;
     },

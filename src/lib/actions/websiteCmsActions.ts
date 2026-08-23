@@ -17,6 +17,7 @@ import {
   type WebsiteFooterCms,
 } from '@/lib/website-cms';
 import { updateEditionBranding } from '@/lib/actions/tournamentActions';
+import { safePublicImageUrl } from '@/lib/safe-image-url';
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -43,7 +44,8 @@ async function saveWebsiteCms(content: WebsiteCmsContent) {
     create: { key: WEBSITE_CMS_KEY, value: JSON.stringify(content) },
     update: { value: JSON.stringify(content) },
   });
-  revalidatePath('/');
+  revalidatePath('/', 'layout');
+  revalidatePath('/editions');
   revalidatePath('/dashboard/organizer');
 }
 
@@ -52,14 +54,26 @@ export async function updateWebsiteHeroCms(data: WebsiteHeroCms, editionId?: str
   if (!auth.ok) return { success: false, error: auth.error };
 
   try {
+    if ((data.posterUrl || '').startsWith('data:')) {
+      return {
+        success: false,
+        error:
+          'The tournament poster is still an inline preview. Click Replace Image, wait for a public URL (not “Inline image”), then save.',
+      };
+    }
+
     const current = await getWebsiteCmsContent();
-    const hero = { ...current.hero, ...data };
+    const posterUrl = safePublicImageUrl(data.posterUrl) || '';
+    const bannerImage = (data.bannerImage || '').startsWith('data:')
+      ? current.hero.bannerImage
+      : data.bannerImage || '';
+    const hero = { ...current.hero, ...data, posterUrl, bannerImage };
     await saveWebsiteCms({ ...current, hero });
 
     if (editionId) {
       await updateEditionBranding(editionId, {
-        bannerImage: hero.bannerImage || undefined,
-        posterUrl: hero.posterUrl || undefined,
+        bannerImage: safePublicImageUrl(bannerImage) || undefined,
+        posterUrl: posterUrl || undefined,
       });
     }
 

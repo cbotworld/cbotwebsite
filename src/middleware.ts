@@ -11,8 +11,14 @@ export default withAuth(
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     
-    // RBAC: Captain Dashboard Protection
-    if (path.startsWith("/dashboard/captain") && token?.role !== "CAPTAIN" && token?.role !== "ORGANIZER" && token?.role !== "SUPER_ADMIN") {
+    // RBAC: Captain Dashboard Protection (also allow main-team players who captain a Spoc team)
+    if (
+      path.startsWith("/dashboard/captain") &&
+      token?.role !== "CAPTAIN" &&
+      token?.role !== "ORGANIZER" &&
+      token?.role !== "SUPER_ADMIN" &&
+      !token?.hasCaptainDesk
+    ) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     

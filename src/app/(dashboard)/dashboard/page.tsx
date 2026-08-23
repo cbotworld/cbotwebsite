@@ -17,10 +17,11 @@ export default function DashboardRedirectPage() {
     }
 
     const userRole = (session?.user as any)?.role || 'PLAYER';
+    const hasCaptainDesk = Boolean((session?.user as any)?.hasCaptainDesk);
 
     if (userRole === 'ORGANIZER' || (userRole as string) === 'SUPER_ADMIN') {
       router.replace('/dashboard/organizer');
-    } else if (userRole === 'CAPTAIN') {
+    } else if (userRole === 'CAPTAIN' || hasCaptainDesk) {
       router.replace('/dashboard/captain');
     } else {
       router.replace('/dashboard/player');
