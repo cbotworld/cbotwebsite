@@ -8,6 +8,7 @@ import {
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
 import { buildOrganizerScheduleDays, resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
 export async function getPlayerMatchSchedule(userId: string) {
@@ -60,10 +61,19 @@ export async function getPlayerMatchSchedule(userId: string) {
     dayDates,
     pairings,
     stages: stageConfig?.stages || [],
+    teams,
   });
 
   const now = Date.now();
   const teamNameUpper = (team?.name || '').toUpperCase().trim();
+  const teamTag = (team?.tag || '').toUpperCase().trim();
+  const matchForTeam = (day: (typeof scheduleDays)[number]) =>
+    day.matches.find(
+      (m) =>
+        m.team1 === teamNameUpper ||
+        m.team2 === teamNameUpper ||
+        (!!teamTag && (m.team1Tag === teamTag || m.team2Tag === teamTag)),
+    );
   const officialWindow = tournamentPlayWindow(
     now,
     Math.max(edition?.totalDays || 0, scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
@@ -102,9 +112,7 @@ export async function getPlayerMatchSchedule(userId: string) {
 
   const fixtureDays = scheduleDays
     .map((day) => {
-      const fix = teamNameUpper
-        ? day.matches.find((m) => m.team1 === teamNameUpper || m.team2 === teamNameUpper)
-        : null;
+      const fix = teamNameUpper ? matchForTeam(day) : null;
       if (!fix) return null;
       return day.dayNumber;
     })
@@ -112,15 +120,26 @@ export async function getPlayerMatchSchedule(userId: string) {
 
   const days = scheduleDays
     .map((day) => {
-      const fix = teamNameUpper
-        ? day.matches.find((m) => m.team1 === teamNameUpper || m.team2 === teamNameUpper)
-        : null;
+      const fix = teamNameUpper ? matchForTeam(day) : null;
       if (!fix) return null;
-      const isT1 = fix.team1 === teamNameUpper;
+      const isT1 =
+        fix.team1 === teamNameUpper || (!!teamTag && fix.team1Tag === teamTag);
       const myName = isT1 ? fix.team1 : fix.team2;
       const oppName = isT1 ? fix.team2 : fix.team1;
-      const myTeam = teamByName.get(myName);
-      const oppTeam = teamByName.get(oppName);
+      const myFace = resolveTeamFace({
+        name: myName,
+        tag: teamByName.get(myName)?.tag || team?.tag,
+        logo: teamByName.get(myName)?.logo || team?.logo,
+        id: teamByName.get(myName)?.id || team?.id,
+        teams,
+      });
+      const oppFace = resolveTeamFace({
+        name: oppName,
+        tag: teamByName.get(oppName)?.tag,
+        logo: teamByName.get(oppName)?.logo,
+        id: teamByName.get(oppName)?.id,
+        teams,
+      });
       const status = monumentStatus(day, now);
       const isLiveDay = status === 'live';
       const isCurrent = isLiveDay || day.dayNumber === currentDay;
@@ -159,12 +178,12 @@ export async function getPlayerMatchSchedule(userId: string) {
         streamCount: streamSummary.streamCountByDay[day.dayNumber] || 0,
         stageName: day.stageName || day.title,
         stageLabel: day.stageLabel || day.title,
-        teamName: myName,
-        teamTag: myTeam?.tag || team?.tag || myName.slice(0, 3),
-        teamLogo: myTeam?.logo || team?.logo || null,
-        opponentName: oppName,
-        opponentTag: oppTeam?.tag || oppName.slice(0, 3),
-        opponentLogo: oppTeam?.logo || null,
+        teamName: myFace.name,
+        teamTag: myFace.tag,
+        teamLogo: myFace.logo,
+        opponentName: oppFace.name,
+        opponentTag: oppFace.tag,
+        opponentLogo: oppFace.logo,
         tableNumber: 1,
         editionTitle: edition?.title || 'CBOT 200th Edition',
         editionNumber: edition?.number || 200,

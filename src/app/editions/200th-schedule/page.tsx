@@ -17,6 +17,7 @@ import {
   resolveOrganizerPairings,
   type OrganizerScheduleDay,
 } from '@/lib/organizer-schedule';
+import { coherentMatchSides } from '@/lib/team-identity';
 
 const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; border: string; bg: string }> = {
   'PLYWOOD PIONEERS': {
@@ -110,6 +111,7 @@ export default function BicentennialSchedulePage() {
             dayDates,
             pairings,
             stages: nextStages,
+            teams: res.teams || [],
           })
         );
         setNowMs(Date.now());
@@ -138,7 +140,11 @@ export default function BicentennialSchedulePage() {
       const term = searchTerm.toLowerCase().trim();
       const matchesTitle = d.title.toLowerCase().includes(term) || d.stageLabel.toLowerCase().includes(term);
       const matchesTeams = d.matches.some(
-        (match) => match.team1.toLowerCase().includes(term) || match.team2.toLowerCase().includes(term)
+        (match) =>
+          match.team1.toLowerCase().includes(term) ||
+          match.team2.toLowerCase().includes(term) ||
+          (match.team1Tag || '').toLowerCase().includes(term) ||
+          (match.team2Tag || '').toLowerCase().includes(term)
       );
       return matchesTitle || matchesTeams;
     }
@@ -319,25 +325,24 @@ export default function BicentennialSchedulePage() {
                   </div>
                 )}
                 {d.matches.map((match, matchIdx) => {
-                  const t1KeyUpper = match.team1?.trim().toUpperCase();
-                  const t2KeyUpper = match.team2?.trim().toUpperCase();
                   const isSpoc = !!match.isSpocExhibition;
-                  const t1Info = TEAMS_INFO[t1KeyUpper];
-                  const t2Info = TEAMS_INFO[t2KeyUpper];
-                  const t1 = t1Info
-                    ? { ...t1Info }
-                    : match.team1Logo
-                      ? { logo: match.team1Logo, tag: match.team1Tag || 'T1', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
-                      : { logo: '/logo.png', tag: match.team1Tag || 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
-                  const t2 = t2Info
-                    ? { ...t2Info }
-                    : match.team2Logo
-                      ? { logo: match.team2Logo, tag: match.team2Tag || 'T2', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
-                      : { logo: '/logo.png', tag: match.team2Tag || 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const { team1: t1Face, team2: t2Face } = coherentMatchSides(match);
+                  const t1 = {
+                    ...t1Face,
+                    color: t1Face.color || TEAMS_INFO[t1Face.name]?.color || 'text-foreground',
+                    border: t1Face.border || TEAMS_INFO[t1Face.name]?.border || 'border-border',
+                    bg: t1Face.bg || TEAMS_INFO[t1Face.name]?.bg || 'bg-muted',
+                  };
+                  const t2 = {
+                    ...t2Face,
+                    color: t2Face.color || TEAMS_INFO[t2Face.name]?.color || 'text-foreground',
+                    border: t2Face.border || TEAMS_INFO[t2Face.name]?.border || 'border-border',
+                    bg: t2Face.bg || TEAMS_INFO[t2Face.name]?.bg || 'bg-muted',
+                  };
 
                   const isMatchHighlighted = searchTerm.trim() && (
-                    match.team1.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
-                    match.team2.toLowerCase().includes(searchTerm.toLowerCase().trim())
+                    t1.name.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+                    t2.name.toLowerCase().includes(searchTerm.toLowerCase().trim())
                   );
 
                   return (
@@ -370,13 +375,13 @@ export default function BicentennialSchedulePage() {
                         <div className={`${isSpoc ? 'h-24 w-20 sm:h-32 sm:w-24' : 'h-14 w-14 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
                           <img
                             src={t1.logo}
-                            alt={match.team1}
+                            alt={t1.name}
                             className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
                           />
                         </div>
                         <div className="min-w-0">
-                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t1.color}`} title={match.team1}>
-                            {match.team1}
+                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t1.color}`} title={t1.name}>
+                            {t1.name}
                           </span>
                           <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
                             {t1.tag}
@@ -398,8 +403,8 @@ export default function BicentennialSchedulePage() {
                       {/* Team 2 */}
                       <div className="flex items-center justify-end gap-3 flex-1 min-w-0 text-right">
                         <div className="min-w-0">
-                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t2.color}`} title={match.team2}>
-                            {match.team2}
+                          <span className={`text-xs sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t2.color}`} title={t2.name}>
+                            {t2.name}
                           </span>
                           <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-80">
                             {t2.tag}
@@ -408,7 +413,7 @@ export default function BicentennialSchedulePage() {
                         <div className={`${isSpoc ? 'h-24 w-20 sm:h-32 sm:w-24' : 'h-14 w-14 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
                           <img
                             src={t2.logo}
-                            alt={match.team2}
+                            alt={t2.name}
                             className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
                           />
                         </div>

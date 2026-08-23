@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resolveTeamFace } from '@/lib/team-identity';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +100,18 @@ export async function GET(request: NextRequest) {
       const isTeam1 = teamIds.includes(match.team1Id || '');
       const playerTeam = isTeam1 ? match.team1 : match.team2;
       const opponentTeam = isTeam1 ? match.team2 : match.team1;
+      const mine = resolveTeamFace({
+        id: playerTeam?.id,
+        name: playerTeam?.name,
+        tag: playerTeam?.tag,
+        logo: playerTeam?.logo,
+      });
+      const opp = resolveTeamFace({
+        id: opponentTeam?.id,
+        name: opponentTeam?.name,
+        tag: opponentTeam?.tag,
+        logo: opponentTeam?.logo,
+      });
 
       return {
         matchId: match.id,
@@ -109,12 +122,12 @@ export async function GET(request: NextRequest) {
         stage: match.stage || 'LEAGUE',
         playerName: user.name || user.username || 'Player',
         playerRole: user.role || 'PLAYER',
-        teamName: playerTeam?.name || match.team1?.name || 'Team 1',
-        teamTag: playerTeam?.tag || match.team1?.tag || 'T1',
-        teamLogo: playerTeam?.logo || match.team1?.logo || null,
-        opponentName: opponentTeam?.name || match.team2?.name || 'Team 2',
-        opponentTag: opponentTeam?.tag || match.team2?.tag || 'T2',
-        opponentLogo: opponentTeam?.logo || match.team2?.logo || null,
+        teamName: mine.name,
+        teamTag: mine.tag,
+        teamLogo: mine.logo,
+        opponentName: opp.name,
+        opponentTag: opp.tag,
+        opponentLogo: opp.logo,
         score1: match.score1 || 0,
         score2: match.score2 || 0,
         queenStrikes1: match.queenStrikes1 || 0,

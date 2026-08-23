@@ -1,4 +1,5 @@
 import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
+import { coherentMatchSides, resolveTeamFace, type TeamCatalogEntry } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -15,11 +16,43 @@ export interface OrganizerScheduleMatch {
   team1: string;
   team2: string;
   isSpocExhibition?: boolean;
+  team1Id?: string;
+  team2Id?: string;
   team1Logo?: string;
   team2Logo?: string;
   team1Tag?: string;
   team2Tag?: string;
   matchLabel?: string;
+}
+
+function sanitizeSides(
+  match: {
+    team1?: string;
+    team2?: string;
+    team1Tag?: string | null;
+    team2Tag?: string | null;
+    team1Logo?: string | null;
+    team2Logo?: string | null;
+    team1Id?: string | null;
+    team2Id?: string | null;
+    isSpocExhibition?: boolean;
+    matchLabel?: string;
+  },
+  teams?: TeamCatalogEntry[],
+): OrganizerScheduleMatch {
+  const sides = coherentMatchSides(match, teams);
+  return {
+    team1: sides.team1.name,
+    team2: sides.team2.name,
+    isSpocExhibition: match.isSpocExhibition,
+    team1Id: match.team1Id || undefined,
+    team2Id: match.team2Id || undefined,
+    team1Logo: sides.team1.logo,
+    team2Logo: sides.team2.logo,
+    team1Tag: sides.team1.tag,
+    team2Tag: sides.team2.tag,
+    matchLabel: match.matchLabel,
+  };
 }
 
 export interface OrganizerScheduleDay {
@@ -111,12 +144,15 @@ export function resolveOrganizerPairings(
     dayNumber: number;
     team1Name: string;
     team2Name: string;
+    team1Id?: string;
+    team2Id?: string;
     team1Logo?: string;
     team2Logo?: string;
     team1Tag?: string;
     team2Tag?: string;
     isSpocExhibition?: boolean;
     matchLabel?: string;
+    stageName?: string;
   }> = [];
 
   const allStages = stages || [];
@@ -139,21 +175,36 @@ export function resolveOrganizerPairings(
 
       const t1 = p.team1Id ? teamsById.get(p.team1Id) : undefined;
       const t2 = p.team2Id ? teamsById.get(p.team2Id) : undefined;
-      const team1Name = (t1?.name || p.team1Name || '').trim();
-      const team2Name = (t2?.name || p.team2Name || '').trim();
-      if (!team1Name || !team2Name) continue;
-      if (team1Name.toUpperCase() === team2Name.toUpperCase()) continue;
+      const face1 = resolveTeamFace({
+        id: p.team1Id,
+        name: t1?.name || p.team1Name,
+        tag: t1?.tag,
+        logo: t1?.logo,
+        teams,
+      });
+      const face2 = resolveTeamFace({
+        id: p.team2Id,
+        name: t2?.name || p.team2Name,
+        tag: t2?.tag,
+        logo: t2?.logo,
+        teams,
+      });
+      if (!face1.name || !face2.name) continue;
+      if (face1.name === face2.name) continue;
 
       resolved.push({
         dayNumber,
-        team1Name,
-        team2Name,
-        team1Logo: t1?.logo || undefined,
-        team2Logo: t2?.logo || undefined,
-        team1Tag: t1?.tag || undefined,
-        team2Tag: t2?.tag || undefined,
+        team1Name: face1.name,
+        team2Name: face2.name,
+        team1Id: p.team1Id,
+        team2Id: p.team2Id,
+        team1Logo: face1.logo,
+        team2Logo: face2.logo,
+        team1Tag: face1.tag,
+        team2Tag: face2.tag,
         isSpocExhibition: isSpoc,
         matchLabel: p.label || (isSpoc ? 'Spoc Exhibition Match' : undefined),
+        stageName: stage.name,
       });
     }
   }
@@ -239,10 +290,13 @@ export function formatCalendarDate(dateStr: string) {
 export function buildOrganizerScheduleDays(opts?: {
   totalDays?: number;
   dayDates?: Record<number, string> | Record<string, string>;
+  teams?: TeamCatalogEntry[];
   pairings?: Array<{
     dayNumber?: number;
     team1Name?: string;
     team2Name?: string;
+    team1Id?: string;
+    team2Id?: string;
     team1Logo?: string;
     team2Logo?: string;
     team1Tag?: string;
@@ -256,6 +310,7 @@ export function buildOrganizerScheduleDays(opts?: {
 }): OrganizerScheduleDay[] {
   const dates = opts?.dayDates;
   const stages = opts?.stages || [];
+  const teams = opts?.teams;
   const byDay = new Map<number, OrganizerScheduleDay>();
 
   const pushDay = (
@@ -281,16 +336,7 @@ export function buildOrganizerScheduleDays(opts?: {
       stageOrder: stage?.order || 1,
       stageLabel: allSpoc ? 'Spoc Exhibition' : stageChipLabel(stage, dayNumber),
       isSpocDay: allSpoc,
-      matches: matches.map((m) => ({
-        team1: m.team1.toUpperCase().trim(),
-        team2: m.team2.toUpperCase().trim(),
-        isSpocExhibition: m.isSpocExhibition,
-        team1Logo: m.team1Logo,
-        team2Logo: m.team2Logo,
-        team1Tag: m.team1Tag,
-        team2Tag: m.team2Tag,
-        matchLabel: m.matchLabel,
-      })),
+      matches: matches.map((m) => sanitizeSides(m, teams)),
     });
   };
 
@@ -303,16 +349,23 @@ export function buildOrganizerScheduleDays(opts?: {
     const dayNumber = p.dayNumber;
     if (!dayNumber || !p.team1Name || !p.team2Name) return;
     const list = pairingsByDay.get(dayNumber) || [];
-    list.push({
-      team1: p.team1Name.toUpperCase().trim(),
-      team2: p.team2Name.toUpperCase().trim(),
-      isSpocExhibition: p.isSpocExhibition,
-      team1Logo: p.team1Logo,
-      team2Logo: p.team2Logo,
-      team1Tag: p.team1Tag,
-      team2Tag: p.team2Tag,
-      matchLabel: p.matchLabel,
-    });
+    list.push(
+      sanitizeSides(
+        {
+          team1: p.team1Name,
+          team2: p.team2Name,
+          team1Id: p.team1Id,
+          team2Id: p.team2Id,
+          isSpocExhibition: p.isSpocExhibition,
+          team1Logo: p.team1Logo,
+          team2Logo: p.team2Logo,
+          team1Tag: p.team1Tag,
+          team2Tag: p.team2Tag,
+          matchLabel: p.matchLabel,
+        },
+        teams,
+      ),
+    );
     pairingsByDay.set(dayNumber, list);
   });
 
@@ -325,7 +378,7 @@ export function buildOrganizerScheduleDays(opts?: {
       const officialSpoc = existing.matches.filter((m) => m.isSpocExhibition);
       const mainMatches = organizerMain.length ? organizerMain : officialMain;
       const spocMatches = organizerSpoc.length ? organizerSpoc : officialSpoc;
-      existing.matches = [...mainMatches, ...spocMatches];
+      existing.matches = [...mainMatches, ...spocMatches].map((m) => sanitizeSides(m, teams));
       const stage = stageForDay(dayNumber, stages);
       if (organizerMain.length && stage?.name) {
         existing.stageName = stage.name;

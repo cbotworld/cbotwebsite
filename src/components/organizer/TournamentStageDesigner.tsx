@@ -36,6 +36,7 @@ import {
   pairingsAlreadyScheduled,
   hasTeamPlayingTwiceOnSameDay,
   retargetPairingDay,
+  teamIdsBookedOnDay,
   type SuggestedPairing,
 } from '@/lib/tournament-stages';
 import type { QualifierPairing, ScheduleMode, StageKind, StageSeeding, TournamentStage, TournamentStageConfig } from '@/types';
@@ -89,16 +90,23 @@ function teamsPlayingTwiceOnDay(
 ): string | undefined {
   const pair = pairings[idx];
   if (!pair?.dayNumber) return undefined;
-  const used = new Set<string>();
-  pairings.forEach((p, i) => {
-    if (i === idx || p.dayNumber !== pair.dayNumber) return;
-    if (p.team1Id) used.add(p.team1Id);
-    if (p.team2Id) used.add(p.team2Id);
-  });
+  const used = teamIdsBookedOnDay(pairings, pair.dayNumber, idx);
   const clashes = [pair.team1Id, pair.team2Id].filter((id) => id && used.has(id)) as string[];
   if (!clashes.length) return undefined;
   const names = clashes.map((id) => teams.find((t) => t.id === id)?.name || 'A team').join(' and ');
   return `${names} already ${clashes.length > 1 ? 'play' : 'plays'} another game on this day.`;
+}
+
+function setPairingTeam(
+  pair: SuggestedPairing,
+  side: 1 | 2,
+  id: string,
+  teams: TeamLite[],
+): SuggestedPairing {
+  const name = teams.find((t) => t.id === id)?.name || '';
+  return side === 1
+    ? { ...pair, team1Id: id, team1Name: name }
+    : { ...pair, team2Id: id, team2Name: name };
 }
 
 function TeamSlotSelect({
@@ -107,28 +115,38 @@ function TeamSlotSelect({
   onChange,
   includeTag = false,
   locked = false,
+  takenIds,
 }: {
   value: string;
   teams: TeamLite[];
   onChange: (id: string) => void;
   includeTag?: boolean;
   locked?: boolean;
+  takenIds?: Set<string>;
 }) {
   return (
     <div className="flex items-center gap-1">
       <Select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value;
+          if (next && takenIds?.has(next) && next !== value) return;
+          onChange(next);
+        }}
         disabled={locked}
         className="h-9 text-xs font-bold flex-1 min-w-0"
       >
         <option value="">Select team…</option>
-        {teams.map((team) => (
-          <option key={team.id} value={team.id}>
-            {team.name}
-            {includeTag && team.tag ? ` (${team.tag})` : ''}
-          </option>
-        ))}
+        {teams.map((team) => {
+          const taken = Boolean(takenIds?.has(team.id) && team.id !== value);
+          return (
+            <option key={team.id} value={team.id} disabled={taken}>
+              {team.name}
+              {includeTag && team.tag ? ` (${team.tag})` : ''}
+              {taken ? ' — already plays this day' : ''}
+            </option>
+          );
+        })}
       </Select>
       <Button
         type="button"
@@ -166,6 +184,7 @@ function EditablePairingRow({
   onRemove,
   warning,
   locked = false,
+  takenIds,
 }: {
   label: string;
   team1Id: string;
@@ -180,6 +199,7 @@ function EditablePairingRow({
   onRemove?: () => void;
   warning?: string;
   locked?: boolean;
+  takenIds?: Set<string>;
 }) {
   return (
     <div className={`rounded-xl border p-4 space-y-2 ${locked ? 'border-border/60 bg-muted/20 opacity-90' : 'border-border bg-card'}`}>
@@ -207,12 +227,12 @@ function EditablePairingRow({
       ) : null}
       <div>
         <label className="text-[10px] font-bold uppercase text-emerald-400 block mb-1">{label} · Team 1</label>
-        <TeamSlotSelect value={team1Id} teams={teams} onChange={onTeam1} locked={locked} />
+        <TeamSlotSelect value={team1Id} teams={teams} onChange={onTeam1} locked={locked} takenIds={takenIds} />
       </div>
       <div className="text-center text-[10px] font-black text-muted-foreground pb-2">VS</div>
       <div>
         <label className="text-[10px] font-bold uppercase text-rose-400 block mb-1">Team 2</label>
-        <TeamSlotSelect value={team2Id} teams={teams} onChange={onTeam2} locked={locked} />
+        <TeamSlotSelect value={team2Id} teams={teams} onChange={onTeam2} locked={locked} takenIds={takenIds} />
       </div>
       {onRemove && !locked ? (
         <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground" onClick={onRemove} aria-label="Remove match">
@@ -475,8 +495,13 @@ export default function TournamentStageDesigner({
   const leagueGroupSignature = JSON.stringify(active?.kind === 'LEAGUE' ? active.groups || [] : []);
 
   const applyLeaguePairings = (next: SuggestedPairing[]) => {
-    setLeaguePairings(next);
-    updateStage({ matchPairings: next });
+    const enriched = next.map((p) => ({
+      ...p,
+      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
+      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
+    }));
+    setLeaguePairings(enriched);
+    updateStage({ matchPairings: enriched });
   };
 
   const slotLeaguePairings = (pairings: SuggestedPairing[]) =>
@@ -559,15 +584,25 @@ export default function TournamentStageDesigner({
   );
 
   const applyQualifierPairings = (next: SuggestedPairing[]) => {
-    setQualifierPairings(next);
-    updateStage({ matchPairings: next });
+    const enriched = next.map((p) => ({
+      ...p,
+      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
+      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
+    }));
+    setQualifierPairings(enriched);
+    updateStage({ matchPairings: enriched });
   };
 
   const applyFinalsPairings = (next: SuggestedPairing[]) => {
-    setFinalsPairings(next);
+    const enriched = next.map((p) => ({
+      ...p,
+      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
+      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
+    }));
+    setFinalsPairings(enriched);
     updateStage({
-      matchPairings: next,
-      includeThirdPlace: next.some((p) => p.stage === 'THIRD_PLACE'),
+      matchPairings: enriched,
+      includeThirdPlace: enriched.some((p) => p.stage === 'THIRD_PLACE'),
     });
   };
 
@@ -632,6 +667,17 @@ export default function TournamentStageDesigner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.kind, active?.id]);
 
+  const allDraftPairings = React.useMemo(
+    () => [...leaguePairings, ...qualifierPairings, ...finalsPairings, ...spocPairings],
+    [leaguePairings, qualifierPairings, finalsPairings, spocPairings],
+  );
+
+  const takenIdsFor = (pair: SuggestedPairing | undefined) =>
+    teamIdsBookedOnDay(
+      allDraftPairings.filter((p) => p !== pair),
+      pair?.dayNumber,
+    );
+
   const stagedConfig = (): TournamentStageConfig => ({
     scheduleMode,
     stages: config.stages.map((s, idx) => {
@@ -646,6 +692,14 @@ export default function TournamentStageDesigner({
 
   const handleSave = async () => {
     if (!editionId) return;
+    const clash = allDraftPairings.filter((p) => p.dayNumber && (p.team1Id || p.team2Id));
+    if (hasTeamPlayingTwiceOnSameDay(clash)) {
+      setMessage({
+        type: 'err',
+        text: 'A team cannot play two matches on the same day. Clear the duplicate booking, then save.',
+      });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const res = await saveTournamentStageConfig(editionId, stagedConfig());
@@ -1109,16 +1163,17 @@ export default function TournamentStageDesigner({
                               }}
                               onTeam1={(id) => {
                                 const copy = [...leaguePairings];
-                                copy[idx] = { ...copy[idx], team1Id: id };
+                                copy[idx] = setPairingTeam(copy[idx], 1, id, teams);
                                 applyLeaguePairings(copy);
                               }}
                               onTeam2={(id) => {
                                 const copy = [...leaguePairings];
-                                copy[idx] = { ...copy[idx], team2Id: id };
+                                copy[idx] = setPairingTeam(copy[idx], 2, id, teams);
                                 applyLeaguePairings(copy);
                               }}
                               onRemove={() => applyLeaguePairings(leaguePairings.filter((_, i) => i !== idx))}
-                              warning={teamsPlayingTwiceOnDay(leaguePairings, idx, teams)}
+                              warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), teams)}
+                              takenIds={takenIdsFor(pair)}
                             />
                           ))}
                           {groupPairs.length === 0 && (
@@ -1189,20 +1244,22 @@ export default function TournamentStageDesigner({
                         }}
                         onTeam1={(id) => {
                           const copy = [...qualifierPairings];
-                          copy[idx] = { ...copy[idx], team1Id: id };
+                          copy[idx] = setPairingTeam(copy[idx], 1, id, teams);
                           applyQualifierPairings(copy);
                         }}
                         onTeam2={(id) => {
                           const copy = [...qualifierPairings];
-                          copy[idx] = { ...copy[idx], team2Id: id };
+                          copy[idx] = setPairingTeam(copy[idx], 2, id, teams);
                           applyQualifierPairings(copy);
                         }}
                         onRemove={() => applyQualifierPairings(qualifierPairings.filter((_, i) => i !== idx))}
+                        warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), teams)}
+                        takenIds={takenIdsFor(pair)}
                       />
                     ))}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Add extra qualifier or placement matches as needed. Completed days stay locked.
+                    Add extra qualifier or placement matches as needed. A team can play only one match per day. Completed days stay locked.
                   </p>
                 </div>
               )}
@@ -1242,15 +1299,17 @@ export default function TournamentStageDesigner({
                       }}
                       onTeam1={(id) => {
                         const copy = [...finalsPairings];
-                        copy[idx] = { ...copy[idx], team1Id: id };
+                        copy[idx] = setPairingTeam(copy[idx], 1, id, activeStageTeams);
                         applyFinalsPairings(copy);
                       }}
                       onTeam2={(id) => {
                         const copy = [...finalsPairings];
-                        copy[idx] = { ...copy[idx], team2Id: id };
+                        copy[idx] = setPairingTeam(copy[idx], 2, id, activeStageTeams);
                         applyFinalsPairings(copy);
                       }}
                       onRemove={() => applyFinalsPairings(finalsPairings.filter((_, i) => i !== idx))}
+                      warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), activeStageTeams)}
+                      takenIds={takenIdsFor(pair)}
                     />
                   ))}
                 </div>
@@ -1332,15 +1391,17 @@ export default function TournamentStageDesigner({
                       }}
                       onTeam1={(id) => {
                         const copy = [...spocPairings];
-                        copy[idx] = { ...copy[idx], team1Id: id };
+                        copy[idx] = setPairingTeam(copy[idx], 1, id, activeStageTeams);
                         applySpocPairings(copy);
                       }}
                       onTeam2={(id) => {
                         const copy = [...spocPairings];
-                        copy[idx] = { ...copy[idx], team2Id: id };
+                        copy[idx] = setPairingTeam(copy[idx], 2, id, activeStageTeams);
                         applySpocPairings(copy);
                       }}
                       onRemove={() => applySpocPairings(spocPairings.filter((_, i) => i !== idx))}
+                      warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), activeStageTeams)}
+                      takenIds={takenIdsFor(pair)}
                     />
                   ))}
                 </div>

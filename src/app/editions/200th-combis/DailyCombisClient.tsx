@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
 import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
+import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { resolveTeamFace } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
 import * as XLSX from 'xlsx';
 
@@ -540,18 +542,14 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
               }
             });
           }
-          const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t]));
-          const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
-            (stage.matchPairings || []).map((p: any) => {
-              const t1 = teamsById.get(p.team1Id);
-              const t2 = teamsById.get(p.team2Id);
-              return {
-                dayNumber: p.dayNumber,
-                team1Name: t1?.name || p.team1Name || '',
-                team2Name: t2?.name || p.team2Name || '',
-              };
-            })
-          );
+          const pairings = resolveOrganizerPairings(
+            (res as any).stageConfig?.stages || [],
+            res.teams || [],
+          ).map((p) => ({
+            dayNumber: p.dayNumber,
+            team1Name: p.team1Name,
+            team2Name: p.team2Name,
+          }));
           let dayDates: Record<number, string> = {};
           if (res.edition?.dayDates) {
             try {
@@ -778,10 +776,26 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
             </div>
           ) : null}
           {filteredMatches.map((match, mIdx) => {
-            const t1KeyUpper = match.team1Key?.trim().toUpperCase();
-            const t2KeyUpper = match.team2Key?.trim().toUpperCase();
-            const t1 = TEAMS_INFO[t1KeyUpper] || { name: match.team1Key, tag: 'T1', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
-            const t2 = TEAMS_INFO[t2KeyUpper] || { name: match.team2Key, tag: 'T2', captain: 'Captain', logo: '/logo.png', color: 'text-foreground', border: 'border-border' };
+            const t1Face = resolveTeamFace({ name: match.team1Key });
+            const t2Face = resolveTeamFace({ name: match.team2Key });
+            const t1Info = TEAMS_INFO[t1Face.name];
+            const t2Info = TEAMS_INFO[t2Face.name];
+            const t1 = {
+              name: t1Face.name,
+              tag: t1Face.tag,
+              captain: t1Info?.captain || 'Captain',
+              logo: t1Face.logo,
+              color: t1Info?.color || t1Face.color || 'text-foreground',
+              border: t1Info?.border || t1Face.border || 'border-border',
+            };
+            const t2 = {
+              name: t2Face.name,
+              tag: t2Face.tag,
+              captain: t2Info?.captain || 'Captain',
+              logo: t2Face.logo,
+              color: t2Info?.color || t2Face.color || 'text-foreground',
+              border: t2Info?.border || t2Face.border || 'border-border',
+            };
 
             return (
               <div

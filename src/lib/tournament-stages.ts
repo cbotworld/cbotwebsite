@@ -850,7 +850,24 @@ export function groupPairingWaves(pairings: SuggestedPairing[]): SuggestedPairin
   return waves;
 }
 
-export function hasTeamPlayingTwiceOnSameDay(pairings: SuggestedPairing[]): boolean {
+export function teamIdsBookedOnDay(
+  pairings: SuggestedPairing[],
+  dayNumber: number | undefined,
+  exceptIndex = -1,
+): Set<string> {
+  const used = new Set<string>();
+  if (!dayNumber) return used;
+  pairings.forEach((p, i) => {
+    if (i === exceptIndex || Number(p.dayNumber) !== Number(dayNumber)) return;
+    if (p.team1Id) used.add(p.team1Id);
+    if (p.team2Id) used.add(p.team2Id);
+  });
+  return used;
+}
+
+export function sameDayTeamClash(
+  pairings: SuggestedPairing[],
+): { dayNumber: number; teamId: string } | null {
   const byDay = new Map<number, string[]>();
   pairings.forEach((p) => {
     if (!p.dayNumber) return;
@@ -859,14 +876,18 @@ export function hasTeamPlayingTwiceOnSameDay(pairings: SuggestedPairing[]): bool
     if (p.team2Id) list.push(p.team2Id);
     byDay.set(p.dayNumber, list);
   });
-  for (const list of byDay.values()) {
+  for (const [dayNumber, list] of byDay.entries()) {
     const seen = new Set<string>();
     for (const id of list) {
-      if (seen.has(id)) return true;
+      if (seen.has(id)) return { dayNumber, teamId: id };
       seen.add(id);
     }
   }
-  return false;
+  return null;
+}
+
+export function hasTeamPlayingTwiceOnSameDay(pairings: SuggestedPairing[]): boolean {
+  return Boolean(sameDayTeamClash(pairings));
 }
 
 export function nextSlotAfter(pairings: SuggestedPairing[], startSlot: number, mode: ScheduleMode): number {

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { officialMatchDays } from '@/lib/bicentennial-monuments';
+import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
 export const dynamic = 'force-dynamic';
@@ -76,12 +78,24 @@ function lineupSlots(savedLineups: string | null | undefined, dayNumber: number)
   return result;
 }
 
-function teamPayload(team: any | undefined, fallbackName: string, fallbackTag: string) {
-  return {
-    id: team?.id || fallbackName,
+function teamPayload(
+  team: any | undefined,
+  fallbackName: string,
+  fallbackTag: string,
+  catalog?: Array<{ id: string; name?: string | null; tag?: string | null; logo?: string | null }>,
+) {
+  const face = resolveTeamFace({
+    id: team?.id,
     name: team?.name || fallbackName,
     tag: team?.tag || fallbackTag,
-    logo: team?.logo || null,
+    logo: team?.logo,
+    teams: catalog,
+  });
+  return {
+    id: team?.id || face.name,
+    name: face.name,
+    tag: face.tag,
+    logo: face.logo,
     captainName: team?.captain?.name || team?.captain?.username || null,
     savedLineups: team?.savedLineups || null,
   };
@@ -135,16 +149,7 @@ export async function GET() {
       }
     }
 
-    const pairings = stages.flatMap((stage: any) =>
-      (stage.matchPairings || []).map((p: any) => ({
-        dayNumber: Number(p.dayNumber) || 0,
-        stageName: stage.name || '',
-        team1Id: p.team1Id,
-        team2Id: p.team2Id,
-        team1Name: p.team1Name,
-        team2Name: p.team2Name,
-      })),
-    );
+    const pairings = resolveOrganizerPairings(stages, teams);
 
     const dayDates = parseDayDates(edition?.dayDates);
     const now = Date.now();
@@ -164,8 +169,8 @@ export async function GET() {
     pairings.forEach((p) => {
       if (!p.dayNumber || (!p.team1Name && !p.team1Id) || (!p.team2Name && !p.team2Id)) return;
       const incoming = {
-        team1Name: teamsById.get(p.team1Id)?.name || p.team1Name || 'Team 1',
-        team2Name: teamsById.get(p.team2Id)?.name || p.team2Name || 'Team 2',
+        team1Name: p.team1Name,
+        team2Name: p.team2Name,
         team1Id: p.team1Id,
         team2Id: p.team2Id,
       };
@@ -201,8 +206,8 @@ export async function GET() {
         const t2 =
           (m.team2Id && teamsById.get(m.team2Id)) ||
           teamsByName.get(String(m.team2Name || '').toUpperCase().trim());
-        const left = teamPayload(t1, m.team1Name, 'T1');
-        const right = teamPayload(t2, m.team2Name, 'T2');
+        const left = teamPayload(t1, m.team1Name, 'T1', teams);
+        const right = teamPayload(t2, m.team2Name, 'T2', teams);
         const leftSlots = revealed ? lineupSlots(left.savedLineups, dayNumber) : {};
         const rightSlots = revealed ? lineupSlots(right.savedLineups, dayNumber) : {};
 

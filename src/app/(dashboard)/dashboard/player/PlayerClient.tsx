@@ -26,6 +26,7 @@ import {
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import { coherentMatchSides } from '@/lib/team-identity';
 import {
   buildOrganizerScheduleDays,
   resolveOrganizerPairings,
@@ -99,6 +100,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
             dayDates,
             pairings,
             stages: (res as any).stageConfig?.stages || [],
+            teams: res.teams || [],
           })
         );
         setNowMs(Date.now());
@@ -143,12 +145,21 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     const usedDbIds = new Set<string>();
 
     return scheduleDays.map((day) => {
-      const fix = day.matches.find(
-        (f) => f.team1 === teamNameUpper || f.team2 === teamNameUpper
-      );
+      const fix = day.matches.find((f) => {
+        const sides = coherentMatchSides(f);
+        const tag = (currentTeam.tag || '').toUpperCase().trim();
+        return (
+          sides.team1.name === teamNameUpper ||
+          sides.team2.name === teamNameUpper ||
+          (!!tag && (sides.team1.tag === tag || sides.team2.tag === tag))
+        );
+      });
       if (!fix) return null;
-      const isT1 = fix.team1 === teamNameUpper;
-      const oppName = isT1 ? fix.team2 : fix.team1;
+      const sides = coherentMatchSides(fix);
+      const tag = (currentTeam.tag || '').toUpperCase().trim();
+      const isT1 =
+        sides.team1.name === teamNameUpper || (!!tag && sides.team1.tag === tag);
+      const oppName = isT1 ? sides.team2.name : sides.team1.name;
       const startMs = new Date(day.startIso).getTime();
       const endMs = new Date(day.endIso).getTime();
 
@@ -169,8 +180,8 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       const windowStatus = monumentStatus({ startIso: day.startIso, endIso: day.endIso }, nowMs);
       const computedStatus = windowStatus === 'completed' ? 'COMPLETED' : windowStatus === 'live' ? 'LIVE' : 'SCHEDULED';
 
-      const t1Name = fix.team1;
-      const t2Name = fix.team2;
+      const t1Name = sides.team1.name;
+      const t2Name = sides.team2.name;
 
       return {
         ...(dbMatch || {}),
@@ -186,13 +197,13 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         team1: {
           id: isT1 ? currentTeam.id : dbMatch?.team1?.id || `t_${t1Name.replace(/\s+/g, '_')}`,
           name: t1Name,
-          logo: teamLogos[t1Name] || (isT1 ? currentTeam.logo : ''),
+          logo: sides.team1.logo || teamLogos[t1Name] || (isT1 ? currentTeam.logo : ''),
         },
         team2Id: !isT1 ? currentTeam.id : dbMatch?.team2Id || `t_${t2Name.replace(/\s+/g, '_')}`,
         team2: {
           id: !isT1 ? currentTeam.id : dbMatch?.team2?.id || `t_${t2Name.replace(/\s+/g, '_')}`,
           name: t2Name,
-          logo: teamLogos[t2Name] || (!isT1 ? currentTeam.logo : ''),
+          logo: sides.team2.logo || teamLogos[t2Name] || (!isT1 ? currentTeam.logo : ''),
         },
       };
     }).filter(Boolean);

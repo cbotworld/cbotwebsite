@@ -24,6 +24,7 @@ import {
   suggestFinalsPairings,
   suggestQualifierPairings,
   pairingsAlreadyScheduled,
+  sameDayTeamClash,
   type SuggestedPairing,
   normalizeDayDates,
 } from '@/lib/tournament-stages';
@@ -458,6 +459,18 @@ export async function saveTournamentStageConfig(
 
   try {
     const normalized = await enrichStagePairingNames(editionId, normalizeStageConfig(config));
+    const allPairings = (normalized.stages || []).flatMap((stage) => stage.matchPairings || []);
+    const clash = sameDayTeamClash(allPairings);
+    if (clash) {
+      const team = await prisma.team.findUnique({
+        where: { id: clash.teamId },
+        select: { name: true },
+      });
+      return {
+        success: false,
+        error: `${team?.name || 'A team'} is already booked on Day ${clash.dayNumber}. A team can play only one match per day.`,
+      };
+    }
     await prisma.systemSetting.upsert({
       where: { key: stageConfigKey(editionId) },
       update: { value: JSON.stringify(normalized) },
