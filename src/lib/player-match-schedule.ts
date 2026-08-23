@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
 import {
+  currentPlayDayNumber,
   isDayUnlockedByYoutubeSequence,
   summarizePlayerDayStreams,
   tournamentPlayWindow,
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
-import { buildOrganizerScheduleDays } from '@/lib/organizer-schedule';
+import { buildOrganizerScheduleDays, resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
 export async function getPlayerMatchSchedule(userId: string) {
@@ -44,15 +45,8 @@ export async function getPlayerMatchSchedule(userId: string) {
         select: { id: true, name: true, tag: true, logo: true },
       })
     : [];
-  const teamsById = new Map(teams.map((t) => [t.id, t.name]));
   const teamByName = new Map(teams.map((t) => [t.name.toUpperCase().trim(), t]));
-  const pairings = (stageConfig?.stages || []).flatMap((stage: any) =>
-    (stage.matchPairings || []).map((p: any) => ({
-      dayNumber: p.dayNumber,
-      team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
-      team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
-    })),
-  );
+  const pairings = resolveOrganizerPairings(stageConfig?.stages || [], teams);
 
   let dayDates: Record<number, string> = {};
   if (edition?.dayDates) {
@@ -70,10 +64,20 @@ export async function getPlayerMatchSchedule(userId: string) {
 
   const now = Date.now();
   const teamNameUpper = (team?.name || '').toUpperCase().trim();
-  const { currentDay, totalDays } = tournamentPlayWindow(
+  const officialWindow = tournamentPlayWindow(
     now,
     Math.max(edition?.totalDays || 0, scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
   );
+  const liveScheduleDay = scheduleDays.find((d) => monumentStatus(d, now) === 'live')?.dayNumber;
+  const scheduleCurrentDay = currentPlayDayNumber(
+    scheduleDays.map((d) => ({
+      dayNumber: d.dayNumber,
+      status: monumentStatus(d, now),
+    })),
+  );
+  // Prefer the live schedule day so past official days never constrain today.
+  const currentDay = liveScheduleDay || scheduleCurrentDay || officialWindow.currentDay || 1;
+  const totalDays = Math.max(officialWindow.totalDays, currentDay);
 
   const playerStreams = await prisma.liveStream.findMany({
     where: {
@@ -118,9 +122,19 @@ export async function getPlayerMatchSchedule(userId: string) {
       const myTeam = teamByName.get(myName);
       const oppTeam = teamByName.get(oppName);
       const status = monumentStatus(day, now);
-      const canGoLive = isDayUnlockedByYoutubeSequence(day.dayNumber, fixtureDays, daysWithYoutube);
+      const isLiveDay = status === 'live';
+      const isCurrent = isLiveDay || day.dayNumber === currentDay;
+      const isPast = !isCurrent && day.dayNumber < currentDay;
+      const isFuture = day.dayNumber > currentDay && !isLiveDay;
+      const canGoLive = isPast
+        ? false
+        : isCurrent
+          ? true
+          : isDayUnlockedByYoutubeSequence(day.dayNumber, fixtureDays, daysWithYoutube, currentDay);
       const latest = streamSummary.latestByDay[day.dayNumber] || null;
-      const prerequisiteDay = unlockPrerequisiteDay(day.dayNumber, fixtureDays);
+      const prerequisiteDay = isFuture
+        ? unlockPrerequisiteDay(day.dayNumber, fixtureDays, currentDay)
+        : null;
       return {
         dayNumber: day.dayNumber,
         label: `Day ${day.dayNumber}`,
@@ -133,9 +147,11 @@ export async function getPlayerMatchSchedule(userId: string) {
         canGoLive,
         lockedReason: canGoLive
           ? null
-          : prerequisiteDay
-            ? `Save at least one YouTube link for Day ${prerequisiteDay} before Day ${day.dayNumber} unlocks.`
-            : 'This day is not on your schedule.',
+          : isPast
+            ? 'This match day is over. Watch the saved YouTube video instead.'
+            : prerequisiteDay
+              ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${day.dayNumber} unlocks.`
+              : 'This day is not on your schedule.',
         prerequisiteDay,
         hasYoutube: Boolean(latest),
         latestYoutubeUrl: latest?.youtubeUrl || null,

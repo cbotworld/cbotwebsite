@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeBroadcastRequest, broadcastCorsHeaders, broadcastOptions } from '@/lib/mobile-broadcast-auth';
 import { transitionBroadcast } from '@/lib/youtube-live';
+import { updateMobileLiveStreamStatus } from '@/lib/record-mobile-livestream';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -22,6 +23,11 @@ export async function POST(
       return NextResponse.json({ error: 'Broadcast id is required.' }, { status: 400, headers: broadcastCorsHeaders });
     }
     await transitionBroadcast(id, 'complete');
+    try {
+      await updateMobileLiveStreamStatus(id, 'ARCHIVED');
+    } catch (persistError) {
+      console.error('Failed to archive mobile live stream:', persistError);
+    }
     return NextResponse.json({ ok: true, status: 'complete' }, { headers: broadcastCorsHeaders });
   } catch (error: any) {
     console.error('End broadcast error:', error);

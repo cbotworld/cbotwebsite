@@ -14,6 +14,7 @@ import {
   liveFixtureTitle,
   liveStageSummary,
   pathSummary,
+  resolveOrganizerPairings,
   type OrganizerScheduleDay,
 } from '@/lib/organizer-schedule';
 
@@ -94,32 +95,14 @@ export default function BicentennialSchedulePage() {
       try {
         const res = await get200thEditionCombisData();
         if (!res.success || cancelled) return;
-        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t]));
-        const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
-          (stage.matchPairings || []).map((p: any) => {
-            const t1 = teamsById.get(p.team1Id);
-            const t2 = teamsById.get(p.team2Id);
-            const isSpoc = stage.kind === 'SPOC_EXHIBITION';
-            return {
-              dayNumber: p.dayNumber,
-              team1Name: p.team1Name || t1?.name || '',
-              team2Name: p.team2Name || t2?.name || '',
-              team1Logo: t1?.logo || undefined,
-              team2Logo: t2?.logo || undefined,
-              team1Tag: t1?.tag || undefined,
-              team2Tag: t2?.tag || undefined,
-              isSpocExhibition: isSpoc,
-              matchLabel: p.label || (isSpoc ? 'Spoc Exhibition Match' : undefined),
-            };
-          })
-        );
+        const nextStages = (res as any).stageConfig?.stages || [];
+        const pairings = resolveOrganizerPairings(nextStages, res.teams || []);
         let dayDates: Record<number, string> = {};
         if (res.edition?.dayDates) {
           try {
             dayDates = JSON.parse(res.edition.dayDates);
           } catch {}
         }
-        const nextStages = (res as any).stageConfig?.stages || [];
         setStages(nextStages);
         setScheduleDays(
           buildOrganizerScheduleDays({
@@ -135,10 +118,17 @@ export default function BicentennialSchedulePage() {
       }
     };
     load();
-    const id = setInterval(load, 300000); // 5 min — schedule data rarely changes mid-session
+    const id = setInterval(load, 15000);
+    const onFocus = () => {
+      void load();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
     };
   }, []);
 
@@ -332,12 +322,18 @@ export default function BicentennialSchedulePage() {
                   const t1KeyUpper = match.team1?.trim().toUpperCase();
                   const t2KeyUpper = match.team2?.trim().toUpperCase();
                   const isSpoc = !!match.isSpocExhibition;
-                  const t1 = match.team1Logo
-                    ? { logo: match.team1Logo, tag: match.team1Tag || 'T1', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
-                    : TEAMS_INFO[t1KeyUpper] || { logo: '/logo.png', tag: match.team1Tag || 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
-                  const t2 = match.team2Logo
-                    ? { logo: match.team2Logo, tag: match.team2Tag || 'T2', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
-                    : TEAMS_INFO[t2KeyUpper] || { logo: '/logo.png', tag: match.team2Tag || 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const t1Info = TEAMS_INFO[t1KeyUpper];
+                  const t2Info = TEAMS_INFO[t2KeyUpper];
+                  const t1 = t1Info
+                    ? { ...t1Info }
+                    : match.team1Logo
+                      ? { logo: match.team1Logo, tag: match.team1Tag || 'T1', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
+                      : { logo: '/logo.png', tag: match.team1Tag || 'T1', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
+                  const t2 = t2Info
+                    ? { ...t2Info }
+                    : match.team2Logo
+                      ? { logo: match.team2Logo, tag: match.team2Tag || 'T2', color: 'text-violet-300', border: 'border-violet-500/50', bg: 'bg-violet-500/10' }
+                      : { logo: '/logo.png', tag: match.team2Tag || 'T2', color: 'text-foreground', border: 'border-border', bg: 'bg-muted' };
 
                   const isMatchHighlighted = searchTerm.trim() && (
                     match.team1.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||

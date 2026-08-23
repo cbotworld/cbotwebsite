@@ -39,6 +39,9 @@ function playersForFormat(format: string): number {
 export default function CaptainClient({
   initialTeam,
   initialMembers,
+  initialSpocTeam,
+  initialSpocMembers = [],
+  initialPlayerTeam,
   initialAllTeams = [],
   initialAllUsers = [],
   initialActiveEdition,
@@ -49,6 +52,9 @@ export default function CaptainClient({
 }: {
   initialTeam?: any;
   initialMembers?: any[];
+  initialSpocTeam?: any;
+  initialSpocMembers?: any[];
+  initialPlayerTeam?: any;
   initialAllTeams?: any[];
   initialAllUsers?: any[];
   initialActiveEdition?: any;
@@ -60,18 +66,31 @@ export default function CaptainClient({
   const { data: session } = useSession();
   const sessionUser = (session?.user as any);
 
+  const mainTeam = initialTeam && initialTeam.teamType !== 'SPOC_EXHIBITION' ? initialTeam : null;
+  const spocTeam = initialSpocTeam || (initialTeam?.teamType === 'SPOC_EXHIBITION' ? initialTeam : null);
+  const hasMainCaptainDesk = Boolean(initialActiveEdition?.hasMainCaptainDesk) || Boolean(mainTeam);
+  const hasSpocCaptainDesk = Boolean(initialActiveEdition?.hasSpocCaptainDesk) || Boolean(spocTeam);
+  const hasBothCaptainDesks = hasMainCaptainDesk && hasSpocCaptainDesk;
+  const [activeDesk, setActiveDesk] = React.useState<'main' | 'spoc'>(hasMainCaptainDesk ? 'main' : 'spoc');
+
   // Active Team & Roster Context
-  const currentTeam = initialTeam || MOCK_TEAMS[0];
-  const teamMembers = (initialMembers && initialMembers.length > 0)
-    ? initialMembers
-    : (currentTeam.spocMembers?.map((m: any) => m.user).filter(Boolean)
-      || currentTeam.members?.map((m: any) => m.user)
-      || []);
+  const currentTeam =
+    activeDesk === 'spoc' && spocTeam
+      ? spocTeam
+      : mainTeam || initialTeam || MOCK_TEAMS[0];
+  const teamMembers =
+    activeDesk === 'spoc' && spocTeam
+      ? (initialSpocMembers.length > 0
+          ? initialSpocMembers
+          : currentTeam.spocMembers?.map((m: any) => m.user).filter(Boolean) || [])
+      : (initialMembers && initialMembers.length > 0)
+        ? initialMembers
+        : (currentTeam.members?.map((m: any) => m.user) || []);
 
   const allTeams = (initialAllTeams && initialAllTeams.length > 0) ? initialAllTeams : MOCK_TEAMS;
 
   // Round formats from organiser — main tournament or Spoc exhibition stage
-  const isSpocTeam = Boolean(initialActiveEdition?.isSpocTeam) || currentTeam?.teamType === 'SPOC_EXHIBITION';
+  const isSpocTeam = currentTeam?.teamType === 'SPOC_EXHIBITION';
   const spocMatchDays: Array<{ dayNumber: number; opponentName?: string; opponentTag?: string }> =
     initialActiveEdition?.spocMatchDays || [];
 
@@ -124,7 +143,8 @@ export default function CaptainClient({
   });
   const [dayLineupModalOpen, setDayLineupModalOpen] = React.useState(false);
   const [roundLineups, setRoundLineups] = React.useState<Array<{ playerIds: string[] }>>([]);
-  const [savedDayLineups, setSavedDayLineups] = React.useState<Record<number, any>>({});
+  const [lineupsByTeamId, setLineupsByTeamId] = React.useState<Record<string, Record<number, any>>>({});
+  const savedDayLineups = (currentTeam?.id && lineupsByTeamId[currentTeam.id]) || {};
   const [lineupSubmittedSuccess, setLineupSubmittedSuccess] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [emailPreviewUrl, setEmailPreviewUrl] = React.useState<string | null>(null);
@@ -164,16 +184,30 @@ export default function CaptainClient({
   }, [spocMatchDays]);
 
   React.useEffect(() => {
-    if (currentTeam?.savedLineups) {
-      try {
-        setSavedDayLineups(JSON.parse(currentTeam.savedLineups));
-      } catch (e) {
-        console.error('Failed to parse currentTeam savedLineups JSON:', e);
+    const teamId = currentTeam?.id;
+    if (!teamId) return;
+    setLineupsByTeamId((prev) => {
+      if (prev[teamId]) return prev;
+      let parsed: Record<number, any> = {};
+      if (currentTeam.savedLineups) {
+        try {
+          parsed = JSON.parse(currentTeam.savedLineups);
+        } catch (e) {
+          console.error('Failed to parse currentTeam savedLineups JSON:', e);
+        }
       }
+      return { ...prev, [teamId]: parsed };
+    });
+  }, [currentTeam?.id, currentTeam?.savedLineups]);
+
+  React.useEffect(() => {
+    if (isSpocTeam && (initialActiveEdition?.spocMatchDays?.length || 0) > 0) {
+      setSelectedDayNumber(initialActiveEdition.spocMatchDays[0].dayNumber);
     } else {
-      setSavedDayLineups({});
+      setSelectedDayNumber(1);
     }
-  }, [currentTeam]);
+    setCombiFilter('ALL');
+  }, [currentTeam?.id]);
 
   // Initialise round lineups — each round starts with empty player slots
   const initRoundLineups = (_dayNum: number) => {
@@ -254,11 +288,15 @@ export default function CaptainClient({
       return;
     }
 
-    setSavedDayLineups(prev => ({
+    const teamId = currentTeam.id;
+    setLineupsByTeamId((prev) => ({
       ...prev,
-      [selectedDayNumber]: {
-        rounds,
-        submittedAt: timeStr,
+      [teamId]: {
+        ...(prev[teamId] || {}),
+        [selectedDayNumber]: {
+          rounds,
+          submittedAt: timeStr,
+        },
       },
     }));
 
@@ -295,6 +333,38 @@ export default function CaptainClient({
           <p className="text-muted-foreground text-sm mt-1">
             {isSpocTeam ? 'Spoc Exhibition Team Captain' : 'Captain Dashboard'}
           </p>
+          {hasBothCaptainDesks ? (
+            <div className="mt-4 inline-flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveDesk('main')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                  activeDesk === 'main'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Main team
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDesk('spoc')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                  activeDesk === 'spoc'
+                    ? 'bg-violet-500 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Spoc exhibition
+              </button>
+            </div>
+          ) : null}
+          {hasBothCaptainDesks ? (
+            <p className="text-xs text-violet-300/90 mt-2">
+              You captain both teams. Use <strong>Main team</strong> as usual, then switch to{' '}
+              <strong>Spoc exhibition</strong> to submit that match combi.
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center text-amber-400 font-black text-xl">
@@ -785,8 +855,11 @@ export default function CaptainClient({
         {/* Embedded PlayerClient — captain sees full player dashboard below */}
         <PlayerClient
           initialPlayer={initialPlayer || currentTeam?.captain || { name: captainName, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
-          initialTeam={initialTeam}
-          initialTeammates={teamMembers}
+          initialTeam={initialPlayerTeam || mainTeam || initialTeam}
+          initialTeammates={
+            (initialPlayerTeam || mainTeam)?.members?.map((m: any) => m.user).filter(Boolean)
+            || (initialMembers && initialMembers.length > 0 ? initialMembers : teamMembers)
+          }
           initialMatches={initialPlayerMatches}
           initialPatterns={initialPatterns}
           initialStreams={initialPlayerStreams}

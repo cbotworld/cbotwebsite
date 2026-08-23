@@ -82,6 +82,93 @@ export function stageForDay(dayNumber: number, stages?: OrganizerScheduleStage[]
   });
 }
 
+export function stageDayWindow(stage?: { startDay?: number; durationDays?: number }) {
+  const start = Number(stage?.startDay) || 0;
+  const end = start + (Number(stage?.durationDays) || 1) - 1;
+  return { start, end };
+}
+
+/** Team IDs win over stale saved names so the schedule never shows the wrong opponent. */
+export function resolveOrganizerPairings(
+  stages: Array<{
+    kind?: string;
+    name?: string;
+    startDay?: number;
+    durationDays?: number;
+    matchPairings?: Array<{
+      dayNumber?: number;
+      team1Id?: string;
+      team2Id?: string;
+      team1Name?: string;
+      team2Name?: string;
+      label?: string;
+    }>;
+  }> | undefined,
+  teams: Array<{ id: string; name?: string | null; tag?: string | null; logo?: string | null }>,
+) {
+  const teamsById = new Map(teams.map((t) => [t.id, t]));
+  const resolved: Array<{
+    dayNumber: number;
+    team1Name: string;
+    team2Name: string;
+    team1Logo?: string;
+    team2Logo?: string;
+    team1Tag?: string;
+    team2Tag?: string;
+    isSpocExhibition?: boolean;
+    matchLabel?: string;
+  }> = [];
+
+  const allStages = stages || [];
+  for (const stage of allStages) {
+    const { start, end } = stageDayWindow(stage);
+    const isSpoc = stage.kind === 'SPOC_EXHIBITION';
+    for (const p of stage.matchPairings || []) {
+      const dayNumber = Number(p.dayNumber) || 0;
+      if (dayNumber < 1) continue;
+      if (!isSpoc) {
+        const owner = stageForDay(dayNumber, allStages);
+        if (owner) {
+          const sameStage =
+            (owner.startDay || 0) === (stage.startDay || 0) && (owner.kind || '') === (stage.kind || '');
+          if (!sameStage) continue;
+        } else if (start > 0 && (dayNumber < start || dayNumber > end)) {
+          continue;
+        }
+      }
+
+      const t1 = p.team1Id ? teamsById.get(p.team1Id) : undefined;
+      const t2 = p.team2Id ? teamsById.get(p.team2Id) : undefined;
+      const team1Name = (t1?.name || p.team1Name || '').trim();
+      const team2Name = (t2?.name || p.team2Name || '').trim();
+      if (!team1Name || !team2Name) continue;
+      if (team1Name.toUpperCase() === team2Name.toUpperCase()) continue;
+
+      resolved.push({
+        dayNumber,
+        team1Name,
+        team2Name,
+        team1Logo: t1?.logo || undefined,
+        team2Logo: t2?.logo || undefined,
+        team1Tag: t1?.tag || undefined,
+        team2Tag: t2?.tag || undefined,
+        isSpocExhibition: isSpoc,
+        matchLabel: p.label || (isSpoc ? 'Spoc Exhibition Match' : undefined),
+      });
+    }
+  }
+
+  const seen = new Set<string>();
+  return resolved.filter((p) => {
+    const a = p.team1Name.toUpperCase();
+    const b = p.team2Name.toUpperCase();
+    const key = `${p.dayNumber}:${[a, b].sort().join('|')}:${p.isSpocExhibition ? 's' : 'm'}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function kindShort(kind?: string, name?: string) {
   if (kind === 'ROUND_ROBIN') return 'RR';
   if (kind === 'LEAGUE') return name || 'League';
@@ -232,9 +319,22 @@ export function buildOrganizerScheduleDays(opts?: {
   pairingsByDay.forEach((matches, dayNumber) => {
     const existing = byDay.get(dayNumber);
     if (existing) {
-      const spocMatches = matches.filter((m) => m.isSpocExhibition);
-      const mainMatches = existing.matches.filter((m) => !m.isSpocExhibition);
+      const organizerMain = matches.filter((m) => !m.isSpocExhibition);
+      const organizerSpoc = matches.filter((m) => m.isSpocExhibition);
+      const officialMain = existing.matches.filter((m) => !m.isSpocExhibition);
+      const officialSpoc = existing.matches.filter((m) => m.isSpocExhibition);
+      const mainMatches = organizerMain.length ? organizerMain : officialMain;
+      const spocMatches = organizerSpoc.length ? organizerSpoc : officialSpoc;
       existing.matches = [...mainMatches, ...spocMatches];
+      const stage = stageForDay(dayNumber, stages);
+      if (organizerMain.length && stage?.name) {
+        existing.stageName = stage.name;
+        existing.stageKind = stage.kind || existing.stageKind;
+        existing.stageOrder = stage.order || existing.stageOrder;
+        existing.stageLabel = stageChipLabel(stage, dayNumber);
+        existing.title = `${stage.name.toUpperCase()} · DAY ${dayNumber}`;
+        existing.isSpocDay = false;
+      }
       if (spocMatches.length && mainMatches.length === 0) {
         existing.isSpocDay = true;
         existing.stageKind = 'SPOC_EXHIBITION';

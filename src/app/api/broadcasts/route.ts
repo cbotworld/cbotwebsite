@@ -3,6 +3,7 @@ import { authorizeBroadcastRequest, broadcastCorsHeaders, broadcastOptions } fro
 import { createLiveSession } from '@/lib/youtube-live';
 import { userFromBearer } from '@/lib/mobile-session';
 import { getPlayerMatchSchedule } from '@/lib/player-match-schedule';
+import { recordMobileLiveStream } from '@/lib/record-mobile-livestream';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -15,7 +16,7 @@ function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-/** Create a YouTube live broadcast + RTMP key for the Cbot app. Does not store live-video rows. */
+/** Create a YouTube live broadcast + RTMP key for the Cbot app. */
 export async function POST(request: NextRequest) {
   const auth = await authorizeBroadcastRequest(request);
   if (!auth.ok) return auth.response;
@@ -34,8 +35,10 @@ export async function POST(request: NextRequest) {
     let endIso = asText(body.endIso);
 
     const user = await userFromBearer(request);
+    let teamId: string | null = null;
     if (user) {
       const schedule = await getPlayerMatchSchedule(user.id);
+      teamId = schedule?.team?.id || null;
       const dayNum = parseInt(day.replace(/\D/g, ''), 10);
       const days = (schedule?.days || []).filter(Boolean) as any[];
       const row =
@@ -99,6 +102,30 @@ export async function POST(request: NextRequest) {
       timeRange,
       endIso,
     });
+
+    if (user) {
+      const dayNum = parseInt(day.replace(/\D/g, ''), 10);
+      if (Number.isFinite(dayNum) && dayNum > 0) {
+        try {
+          await recordMobileLiveStream({
+            userId: user.id,
+            dayNumber: dayNum,
+            teamId,
+            opponentName,
+            youtubeBroadcastId: session.broadcastId,
+            youtubeStreamId: session.streamId,
+            youtubeVideoId: session.broadcastId,
+            youtubeUrl: session.watchUrl,
+            rtmpIngestionUrl: session.ingestionAddress,
+            streamKey: session.streamName,
+            status: 'READY',
+          });
+        } catch (persistError) {
+          console.error('Failed to persist mobile live stream:', persistError);
+        }
+      }
+    }
+
     return NextResponse.json(
       {
         ...session,

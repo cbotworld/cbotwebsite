@@ -239,6 +239,58 @@ export async function createLiveSession(details: BroadcastDetails): Promise<Crea
   };
 }
 
+export type ChannelVideoItem = {
+  youtubeVideoId: string;
+  title: string;
+  publishedAt: string;
+  thumbnailUrl: string | null;
+  youtubeUrl: string;
+};
+
+/** Official CBOTWORLD channel uploads (authorized YouTube account). */
+export async function listOfficialChannelVideos(limit = 300): Promise<ChannelVideoItem[]> {
+  try {
+    const accessToken = await getAccessToken();
+    const chRes = await fetch(
+      'https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&mine=true',
+      { headers: ytHeaders(accessToken) },
+    );
+    const chData = await chRes.json();
+    const uploads = chData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads as string | undefined;
+    if (!uploads) return [];
+
+    const items: ChannelVideoItem[] = [];
+    let pageToken = '';
+    while (items.length < limit) {
+      const url = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+      url.searchParams.set('part', 'snippet,contentDetails');
+      url.searchParams.set('playlistId', uploads);
+      url.searchParams.set('maxResults', '50');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const res = await fetch(url.toString(), { headers: ytHeaders(accessToken) });
+      const data = await res.json();
+      for (const it of data.items || []) {
+        const id = it.contentDetails?.videoId || it.snippet?.resourceId?.videoId;
+        if (!id) continue;
+        items.push({
+          youtubeVideoId: id,
+          title: it.snippet?.title || 'CBOT WORLD',
+          publishedAt: it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || '',
+          thumbnailUrl:
+            it.snippet?.thumbnails?.high?.url || it.snippet?.thumbnails?.medium?.url || null,
+          youtubeUrl: `https://www.youtube.com/watch?v=${id}`,
+        });
+      }
+      pageToken = data.nextPageToken || '';
+      if (!pageToken) break;
+    }
+    return items.slice(0, limit);
+  } catch (error) {
+    console.error('listOfficialChannelVideos:', error);
+    return [];
+  }
+}
+
 export async function transitionBroadcast(broadcastId: string, status: 'live' | 'complete') {
   const accessToken = await getAccessToken();
   const maxAttempts = status === 'live' ? 12 : 1;

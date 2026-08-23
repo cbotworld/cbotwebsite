@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { userFromBearer } from '@/lib/mobile-session';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
-import { resolveEditionAndTeam } from '@/lib/mobile-team';
+import { listCaptainDesks, resolveEditionAndTeam } from '@/lib/mobile-team';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import {
   isSpocExhibitionTeam,
@@ -122,7 +122,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
 
-    const { edition, team: baseTeam } = await resolveEditionAndTeam(user.id, { preferSpoc: true });
+    const preview = await resolveEditionAndTeam(user.id);
+    const requestedTeamId = (request.nextUrl.searchParams.get('teamId') || '').trim() || undefined;
+    const requestedDesk = (request.nextUrl.searchParams.get('desk') || '').trim().toUpperCase();
+    const captainDesks = await listCaptainDesks(user.id, preview.edition?.id);
+    const deskTeamId =
+      requestedTeamId ||
+      (requestedDesk === 'SPOC'
+        ? captainDesks.find((d) => d.kind === 'SPOC')?.id
+        : requestedDesk === 'MAIN'
+          ? captainDesks.find((d) => d.kind === 'MAIN')?.id
+          : captainDesks.find((d) => d.kind === 'MAIN')?.id || captainDesks[0]?.id);
+
+    const { edition, team: baseTeam } = await resolveEditionAndTeam(user.id, {
+      teamId: deskTeamId,
+    });
     if (!baseTeam) {
       return NextResponse.json(
         {
@@ -290,12 +304,14 @@ export async function GET(request: NextRequest) {
         success: true,
         canEdit,
         isSpocTeam,
+        captainDesks,
         team: {
           id: team.id,
           name: team.name,
           tag: team.tag,
           logo: team.logo,
           captainName: team.captain?.name || team.captain?.username || null,
+          kind: isSpocTeam ? 'SPOC' : 'MAIN',
         },
         members: Array.from(memberMap.values()),
         roundFormats,
@@ -320,7 +336,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
 
-    const { edition, team } = await resolveEditionAndTeam(user.id, { preferSpoc: true });
+    const body = await request.json().catch(() => ({}));
+    const requestedTeamId = typeof body.teamId === 'string' ? body.teamId.trim() : undefined;
+    const { edition, team } = await resolveEditionAndTeam(user.id, { teamId: requestedTeamId });
     if (!team) {
       return NextResponse.json({ success: false, error: 'No team found.' }, { status: 404, headers: mobileCorsHeaders });
     }
@@ -331,7 +349,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
     const dayNumber = Number(body.dayNumber);
     const rounds = Array.isArray(body.rounds) ? body.rounds : [];
     if (!dayNumber || rounds.length === 0) {
@@ -339,6 +356,24 @@ export async function PUT(request: NextRequest) {
         { success: false, error: 'dayNumber and rounds are required.' },
         { status: 400, headers: mobileCorsHeaders },
       );
+    }
+
+    if (team.teamType === 'SPOC_EXHIBITION') {
+      const full = await prisma.team.findUnique({
+        where: { id: team.id },
+        include: { spocMembers: { select: { userId: true } } },
+      });
+      const allowed = new Set((full?.spocMembers || []).map((m) => m.userId));
+      if (team.captainId) allowed.add(team.captainId);
+      const invalid = rounds
+        .flatMap((r: any) => (r.playerIds || []).filter(Boolean))
+        .find((pid: string) => !allowed.has(pid));
+      if (invalid) {
+        return NextResponse.json(
+          { success: false, error: 'Spoc combi can only include players from your Spoc exhibition roster.' },
+          { status: 400, headers: mobileCorsHeaders },
+        );
+      }
     }
 
     if (edition?.dayDates) {

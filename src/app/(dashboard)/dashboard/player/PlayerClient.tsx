@@ -14,18 +14,21 @@ import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Radio, RotateCcw, AlertCircle, MessageSquare, Share2
+  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Share2
 } from 'lucide-react';
 import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
 import {
+  currentPlayDayNumber,
   isDayUnlockedByYoutubeSequence,
   summarizePlayerDayStreams,
+  tournamentPlayWindow,
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
 import { get200thEditionCombisData } from '@/lib/actions/combisActions';
 import {
   buildOrganizerScheduleDays,
+  resolveOrganizerPairings,
   type OrganizerScheduleDay,
 } from '@/lib/organizer-schedule';
 import { ProfileTab } from '@/components/player/ProfileTab';
@@ -83,14 +86,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       try {
         const res = await get200thEditionCombisData();
         if (!res.success || cancelled) return;
-        const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
-        const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
-          (stage.matchPairings || []).map((p: any) => ({
-            dayNumber: p.dayNumber,
-            team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
-            team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
-          }))
-        );
+        const pairings = resolveOrganizerPairings((res as any).stageConfig?.stages || [], res.teams || []);
         let dayDates: Record<number, string> = {};
         if (res.edition?.dayDates) {
           try {
@@ -111,7 +107,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
       }
     };
     load();
-    const id = setInterval(load, 300000); // 5 min — schedule data rarely changes mid-session
+    const id = setInterval(load, 15000);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -219,16 +215,6 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
     [streamSummary],
   );
 
-  // GoLive Comment Modal (for replays)
-  const [goLiveModal, setGoLiveModal] = React.useState<{
-    open: boolean;
-    match: any;
-    isReplay: boolean;
-  }>({ open: false, match: null, isReplay: false });
-  const [replayComment, setReplayComment] = React.useState('');
-  const [replayCommentError, setReplayCommentError] = React.useState('');
-  const [goLiveLoading, setGoLiveLoading] = React.useState<string | null>(null);
-
   /** Sorted schedule (ascending by matchNumber / scheduledTime) */
   const sortedSchedule = React.useMemo(
     () => [...personalSchedule].sort((a: any, b: any) => (a.matchNumber || 0) - (b.matchNumber || 0)),
@@ -241,60 +227,40 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
   );
 
   /**
-   * First scheduled day is always open. Later days unlock only after the previous
-   * scheduled day has ≥1 real YouTube link. Unlocked days stay open for re-live.
+   * Current calendar day is always open. Past days are ignored — skipping Day 8
+   * does not block Day 9. Future days unlock only after the previous remaining
+   * day has a YouTube save (Day 9 video unlocks Day 10, Day 10 unlocks Day 11).
    */
+  const currentPlayDay = React.useMemo(() => {
+    const fromSchedule = currentPlayDayNumber(
+      sortedSchedule.map((m: any) => ({
+        dayNumber: m.matchNumber || 0,
+        status: monumentStatus({ startIso: m.scheduledTime, endIso: m.endIso }, nowMs),
+      })),
+    );
+    return Math.max(fromSchedule || 0, tournamentPlayWindow(nowMs).currentDay || 0, 1);
+  }, [sortedSchedule, nowMs]);
+
   const canGoLive = React.useCallback(
     (match: any): { allowed: boolean; prerequisiteDay: number | null } => {
       const dayNum = match?.matchNumber || 0;
+      const windowStatus = monumentStatus(
+        { startIso: match?.scheduledTime, endIso: match?.endIso },
+        nowMs,
+      );
+      if (windowStatus === 'live' || dayNum === currentPlayDay) {
+        return { allowed: true, prerequisiteDay: null };
+      }
+      if (dayNum < currentPlayDay) {
+        return { allowed: false, prerequisiteDay: null };
+      }
       return {
-        allowed: isDayUnlockedByYoutubeSequence(dayNum, scheduledDayNumbers, daysWithYoutube),
-        prerequisiteDay: unlockPrerequisiteDay(dayNum, scheduledDayNumbers),
+        allowed: isDayUnlockedByYoutubeSequence(dayNum, scheduledDayNumbers, daysWithYoutube, currentPlayDay),
+        prerequisiteDay: unlockPrerequisiteDay(dayNum, scheduledDayNumbers, currentPlayDay),
       };
     },
-    [scheduledDayNumbers, daysWithYoutube]
+    [scheduledDayNumbers, daysWithYoutube, currentPlayDay, nowMs]
   );
-
-  /** Open the Cbot YouTube live app — live video is not stored in the website DB. */
-  const openCbotLive = (match: any, dayNumber: number) => {
-    const name = currentPlayer?.name || currentPlayer?.username || 'Player';
-    const day = `Day ${dayNumber}`;
-    const params = new URLSearchParams({ name, day });
-    const team1 = match?.team1?.name || '';
-    const team2 = match?.team2?.name || '';
-    if (team1) params.set('teamName', team1);
-    if (team2) params.set('opponentName', team2);
-    const dayInfo = scheduleDays.find((d) => d.dayNumber === dayNumber);
-    if (dayInfo?.stageName || dayInfo?.title) params.set('stage', dayInfo.stageName || dayInfo.title);
-    if (dayInfo?.timeRange) params.set('timeRange', dayInfo.timeRange);
-    if (dayInfo?.endIso) params.set('endIso', dayInfo.endIso);
-    params.set('editionTitle', 'CBOT 200th Edition');
-    window.location.href = `cbot://live?${params.toString()}`;
-  };
-
-  /** Main Go Live click handler — called from each row's button */
-  const handleGoLiveClick = (match: any, matchIndex: number) => {
-    const { allowed, prerequisiteDay } = canGoLive(match);
-    const dayNum = match.matchNumber || matchIndex + 1;
-    if (!allowed) {
-      alert(
-        prerequisiteDay
-          ? `Day ${dayNum} unlocks after you save at least one YouTube link for Day ${prerequisiteDay}. You can still go live again on Day ${prerequisiteDay}.`
-          : `Day ${dayNum} is not available on your schedule yet.`,
-      );
-      return;
-    }
-    openCbotLive(match, dayNum);
-  };
-
-  const handleReplaySubmit = () => {
-    if (!replayComment.trim()) {
-      setReplayCommentError('Please enter a reason before going live again.');
-      return;
-    }
-    setGoLiveLoading(goLiveModal.match?.id || 'loading');
-    openCbotLive(goLiveModal.match, goLiveModal.match?.matchNumber || 1);
-  };
 
   // Score & Live Stream Submission Modal State
   const [scoreModalOpen, setScoreModalOpen] = React.useState(false);
@@ -398,19 +364,16 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">CBOT 200th Edition</div>
                   <div className="text-base font-black text-foreground leading-tight">
-                    {currentTeam.name} — All Matches &amp; Go Live
+                    {currentTeam.name} — Match schedule
                   </div>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 text-[10px]">
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/20">
-                  <Radio className="h-3 w-3" /> GO LIVE — open once unlocked
-                </span>
-                <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-violet-500/15 text-violet-400 font-bold border border-violet-500/20">
-                  <RotateCcw className="h-3 w-3" /> GO LIVE AGAIN — latest YouTube link kept
+                  <Video className="h-3 w-3" /> GO LIVE — CBOT mobile app only
                 </span>
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/40 text-muted-foreground font-bold border border-border">
-                  <Lock className="h-3 w-3" /> Next day unlocks after prior day has ≥1 YouTube save
+                  <Lock className="h-3 w-3" /> Next day unlocks after an app Go Live on the previous day
                 </span>
               </div>
             </div>
@@ -518,7 +481,7 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                           </div>
                         </div>
 
-                        {/* Status + Go Live button */}
+                        {/* Status + app-only go live note */}
                         <div className="flex flex-col items-end gap-2 w-[11rem] sm:w-[11.5rem] shrink-0">
                           <div className="flex items-center gap-1.5">
                             <Badge
@@ -548,51 +511,17 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
                           </div>
 
                           {!allowed ? (
-                            <Button
-                              size="sm"
-                              disabled
-                              className="h-9 px-4 text-[11px] font-black gap-2 opacity-40 cursor-not-allowed w-full"
-                              title={
-                                prerequisiteDay
-                                  ? `Save a YouTube link for Day ${prerequisiteDay} first`
-                                  : 'Not available'
-                              }
-                            >
+                            <div className="h-9 px-3 w-full rounded-lg border border-border bg-muted/30 flex items-center justify-center gap-1.5 text-[10px] font-black text-muted-foreground opacity-70">
                               <Lock className="h-3.5 w-3.5" />
-                              {prerequisiteDay ? `Need Day ${prerequisiteDay} YT` : 'Locked'}
-                            </Button>
-                          ) : isReplay ? (
-                            <Button
-                              size="sm"
-                              className="h-9 px-4 text-[11px] font-black gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-500/20 w-full"
-                              onClick={() => handleGoLiveClick(match, idx)}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                              GO LIVE AGAIN
-                            </Button>
+                              {prerequisiteDay ? `Need Day ${prerequisiteDay} in app` : 'Locked'}
+                            </div>
                           ) : (
-                            <Button
-                              variant={isCurrentlyLive ? undefined : 'carrom'}
-                              size="sm"
-                              className={
-                                isCurrentlyLive
-                                  ? 'h-9 px-4 text-[11px] font-black gap-2 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 w-full'
-                                  : 'h-9 px-4 text-[11px] font-black gap-2 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02] transition-all w-full'
-                              }
-                              onClick={() => handleGoLiveClick(match, idx)}
-                            >
-                              {isCurrentlyLive ? (
-                                <>
-                                  <span className="h-2.5 w-2.5 rounded-full bg-white animate-pulse" />
-                                  GO LIVE
-                                </>
-                              ) : (
-                                <>
-                                  <Radio className="h-3.5 w-3.5 animate-pulse" />
-                                  🔴 GO LIVE
-                                </>
-                              )}
-                            </Button>
+                            <div className="h-auto min-h-9 px-3 py-1.5 w-full rounded-lg border border-amber-500/30 bg-amber-500/10 text-center">
+                              <div className="text-[10px] font-black text-amber-400 leading-tight">USE CBOT APP</div>
+                              <div className="text-[8px] font-bold text-muted-foreground leading-tight mt-0.5">
+                                {isReplay ? 'Go live again on mobile' : 'Go live on mobile only'}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -771,62 +700,6 @@ export default function PlayerClient({ initialPlayer, initialTeam, initialTeamma
         </TabsContent>
 
       </Tabs>
-
-      {/* GO LIVE REPLAY COMMENT MODAL */}
-      {goLiveModal.open && (
-        <Dialog open={goLiveModal.open} onOpenChange={(open) => setGoLiveModal(prev => ({ ...prev, open }))}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="h-5 w-5 text-violet-400" /> Go Live Again (Replay)
-            </DialogTitle>
-            <DialogDescription>
-              You are starting a new stream/recording for Day {goLiveModal.match?.matchNumber} vs {goLiveModal.match?.team1Id === currentTeam?.id ? goLiveModal.match?.team2?.name : goLiveModal.match?.team1?.name}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-3">
-            <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-3 flex gap-2.5 items-start">
-              <AlertCircle className="h-5 w-5 text-violet-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-violet-300 leading-normal">
-                <strong>Replay stream rules:</strong> Since this day has already been streamed, please provide a quick comment explaining why you are going live again (e.g. "technical lag/stream disconnected", "doubles match replay", "dispute board", etc.) so referees understand the split recordings.
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                <MessageSquare className="h-3.5 w-3.5" /> Replay Reason
-              </label>
-              <textarea
-                value={replayComment}
-                onChange={(e) => setReplayComment(e.target.value)}
-                placeholder="Explain the reason for starting a new stream..."
-                rows={3}
-                className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-              />
-              {replayCommentError && (
-                <p className="text-[10px] text-red-500 font-medium">{replayCommentError}</p>
-              )}
-            </div>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs h-9 px-4 rounded-lg"
-                onClick={() => setGoLiveModal(prev => ({ ...prev, open: false }))}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="carrom"
-                size="sm"
-                className="text-xs h-9 px-5 rounded-lg font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-md"
-                onClick={handleReplaySubmit}
-                disabled={goLiveLoading !== null}
-              >
-                {goLiveLoading ? 'Starting...' : 'Go Live Again'}
-              </Button>
-            </div>
-          </div>
-        </Dialog>
-      )}
 
       {/* PLAYER SCORE & LIVE STREAM SUBMISSION MODAL */}
       {selectedMatch && (

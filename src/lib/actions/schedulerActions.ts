@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
@@ -40,9 +40,38 @@ async function requireOrganizer() {
 }
 
 function revalidateSchedulePaths() {
-  revalidatePath('/admin');
-  revalidatePath('/dashboard/organizer');
-  revalidatePath('/fixtures');
+  revalidateTag('organizer-schedule');
+  revalidateTag('edition-200-combis-data');
+  [
+    '/admin',
+    '/dashboard/organizer',
+    '/dashboard/player',
+    '/dashboard/captain',
+    '/fixtures',
+    '/editions/200th-schedule',
+    '/edition-200-schedule',
+    '/editions/200th-combis',
+    '/edition-200-combis',
+  ].forEach((path) => revalidatePath(path));
+}
+
+async function enrichStagePairingNames(editionId: string, config: TournamentStageConfig): Promise<TournamentStageConfig> {
+  const teams = await prisma.team.findMany({
+    where: { editionId },
+    select: { id: true, name: true },
+  });
+  const byId = new Map(teams.map((t) => [t.id, t.name]));
+  return {
+    ...config,
+    stages: (config.stages || []).map((stage) => ({
+      ...stage,
+      matchPairings: (stage.matchPairings || []).map((p) => ({
+        ...p,
+        team1Name: byId.get(p.team1Id) || p.team1Name || '',
+        team2Name: byId.get(p.team2Id) || p.team2Name || '',
+      })),
+    })),
+  };
 }
 
 export async function generateRoundRobinFixtures(editionId: string, teamsList: any[]) {
@@ -428,7 +457,7 @@ export async function saveTournamentStageConfig(
   }
 
   try {
-    const normalized = normalizeStageConfig(config);
+    const normalized = await enrichStagePairingNames(editionId, normalizeStageConfig(config));
     await prisma.systemSetting.upsert({
       where: { key: stageConfigKey(editionId) },
       update: { value: JSON.stringify(normalized) },

@@ -100,6 +100,7 @@ async function fetch200thEditionCombisData() {
 
 export async function get200thEditionCombisData() {
   return unstable_cache(fetch200thEditionCombisData, ['edition-200-combis-data'], {
-    revalidate: 300,
+    revalidate: 15,
+    tags: ['edition-200-combis-data', 'organizer-schedule'],
   })();
 }

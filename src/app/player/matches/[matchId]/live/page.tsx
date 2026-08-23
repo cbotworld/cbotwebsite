@@ -1,205 +1,31 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { redirect, notFound } from 'next/navigation';
-import PlayerMatchLiveClient from './LiveClient';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
 
 export const revalidate = 0;
 
-export default async function PlayerMatchLivePage({ 
-  params,
-  searchParams,
-}: { 
-  params: Promise<{ matchId: string }>;
-  searchParams?: Promise<{ token?: string; playerId?: string; comment?: string; replay?: string }>;
-}) {
-  const { matchId } = await params;
-  const sParams = searchParams ? await searchParams : {};
-  
-  let userId: string | null = null;
-  let userName: string = 'Player';
-
-  // 1. Check NextAuth session
+export default async function PlayerMatchLivePage() {
   const session = await getServerSession(authOptions);
-  if (session?.user) {
-    const sessionUser = session.user as any;
-    userId = sessionUser.id;
-    userName = sessionUser.name || sessionUser.username || 'Player';
-  }
-
-  // 2. Check mobile token fallback if no session cookie
-  if (!userId && sParams.token) {
-    try {
-      const decoded = Buffer.from(sParams.token, 'base64').toString('utf8');
-      const tokenUserId = decoded.split(':')[0];
-      const dbUser = await prisma.user.findUnique({ where: { id: tokenUserId } });
-      if (dbUser) {
-        userId = dbUser.id;
-        userName = dbUser.name || dbUser.username || 'Player';
-      }
-    } catch (e) {
-      console.warn('Mobile token decode error:', e);
-    }
-  }
-
-  if (!userId) {
+  if (!session?.user) {
     redirect('/login?callbackUrl=/dashboard/player');
   }
 
-  // Fetch the match with both teams fully populated
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-
-    include: {
-      edition: true,
-      team1: {
-        include: {
-          captain: true,
-          members: { include: { user: true } },
-        },
-      },
-      team2: {
-        include: {
-          captain: true,
-          members: { include: { user: true } },
-        },
-      },
-    },
-  });
-
-  // If no match found, try to find today's match for this player's team
-  let resolvedMatch = match;
-  if (!resolvedMatch) {
-    // Find the active edition
-    const activeEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
-
-    // Find which team this player is on
-    const editionParticipant = activeEdition ? await prisma.editionParticipant.findFirst({
-      where: { userId, editionId: activeEdition.id },
-    }) : null;
-
-    if (editionParticipant?.teamId) {
-      const today = new Date();
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const todayEnd = new Date(todayStart.getTime() + 86400000);
-
-      // Try today's match first, then next scheduled
-      resolvedMatch = await prisma.match.findFirst({
-        where: {
-          OR: [
-            { team1Id: editionParticipant.teamId },
-            { team2Id: editionParticipant.teamId },
-          ],
-          status: { in: ['SCHEDULED', 'LIVE'] },
-          scheduledTime: { gte: todayStart, lt: todayEnd },
-        },
-        include: {
-          edition: true,
-          team1: { include: { captain: true, members: { include: { user: true } } } },
-          team2: { include: { captain: true, members: { include: { user: true } } } },
-        },
-        orderBy: { scheduledTime: 'asc' },
-      }) as any;
-
-      // Fallback: next upcoming match
-      if (!resolvedMatch) {
-        resolvedMatch = await prisma.match.findFirst({
-          where: {
-            OR: [
-              { team1Id: editionParticipant.teamId },
-              { team2Id: editionParticipant.teamId },
-            ],
-            status: { notIn: ['COMPLETED', 'CANCELLED'] },
-          },
-          include: {
-            edition: true,
-            team1: { include: { captain: true, members: { include: { user: true } } } },
-            team2: { include: { captain: true, members: { include: { user: true } } } },
-          },
-          orderBy: { scheduledTime: 'asc' },
-        }) as any;
-      }
-    }
-  }
-
-  // Fallback to official Edition #200 Monument Schedule if DB match is not created yet
-  if (!resolvedMatch) {
-    const activeEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
-    const participant = await prisma.editionParticipant.findFirst({
-      where: { userId, editionId: activeEdition?.id },
-      include: { team: true }
-    });
-
-    const playerTeamName = participant?.team?.name || 'Ebony Overlords';
-    const playerTeamLogo = participant?.team?.logo || 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg';
-    const teamUpper = playerTeamName.toUpperCase().trim();
-
-    const teamLogos: Record<string, string> = {
-      'PLYWOOD PIONEERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
-      'SUPERNOVA QUEEN': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
-      'POCKET DYNAMOS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
-      'LUMEN PILLAR': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
-      'VANILLA FALCONS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
-      'VINTAGE STRIKERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
-      'EBONY OVERLORDS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
-      'BORIC SPEEDSTERS': 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
-    };
-
-    // Monument 4 (today's active day) fixtures
-    const monument4Fixtures = [
-      { t1: 'PLYWOOD PIONEERS', t2: 'VANILLA FALCONS' },
-      { t1: 'EBONY OVERLORDS', t2: 'POCKET DYNAMOS' },
-      { t1: 'BORIC SPEEDSTERS', t2: 'SUPERNOVA QUEEN' },
-      { t1: 'VINTAGE STRIKERS', t2: 'LUMEN PILLAR' },
-    ];
-
-    const fix = monument4Fixtures.find(
-      (f) => f.t1.toUpperCase() === teamUpper || f.t2.toUpperCase() === teamUpper
-    ) || { t1: playerTeamName, t2: 'POCKET DYNAMOS' };
-
-    const isT1 = fix.t1.toUpperCase() === teamUpper;
-    const oppName = isT1 ? fix.t2 : fix.t1;
-    const oppLogo = teamLogos[oppName.toUpperCase()] || null;
-
-    const matchDetails = {
-      matchId: matchId || `monument_4_${teamUpper.replace(/\s+/g, '_')}`,
-      editionTitle: 'Edition #200',
-      editionNumber: 200,
-      playerName: userName,
-      teamName: playerTeamName,
-      teamLogo: playerTeamLogo,
-      opponentName: oppName,
-      opponentLogo: oppLogo,
-      scheduledTime: '2026-08-12T20:00:00+05:30',
-      tableNumber: 1,
-      status: 'LIVE',
-    };
-
-    return <PlayerMatchLiveClient matchDetails={matchDetails} />;
-  }
-
-  // Determine which team the logged-in player belongs to
-  const isTeam1Member =
-    resolvedMatch.team1?.members?.some((m: any) => m.userId === userId) ||
-    resolvedMatch.team1?.captainId === userId;
-
-  const myTeam = isTeam1Member ? resolvedMatch.team1 : resolvedMatch.team2;
-  const oppTeam = isTeam1Member ? resolvedMatch.team2 : resolvedMatch.team1;
-
-  const matchDetails = {
-    matchId: resolvedMatch.id,
-    editionTitle: resolvedMatch.edition?.title || `Edition #${resolvedMatch.edition?.number || 200}`,
-    editionNumber: resolvedMatch.edition?.number || 200,
-    playerName: userName,
-    teamName: myTeam?.name || 'My Team',
-    teamLogo: myTeam?.logo || null,
-    opponentName: oppTeam?.name || 'Opponent',
-    opponentLogo: oppTeam?.logo || null,
-    scheduledTime: resolvedMatch.scheduledTime?.toISOString() || null,
-    tableNumber: (resolvedMatch as any).tableNumber || 1,
-    status: resolvedMatch.status,
-    initialReplayComment: sParams.comment || null,
-  };
-
-  return <PlayerMatchLiveClient matchDetails={matchDetails} />;
+  return (
+    <div className="mx-auto max-w-lg px-4 py-16">
+      <div className="rounded-3xl border border-amber-500/30 bg-card p-8 text-center space-y-4 shadow-lg">
+        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">CBOT Live</div>
+        <h1 className="text-2xl font-black tracking-tight">Go live only in the CBOT app</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Streaming is not available on the website. Open the CBOT mobile app, go to Matches, and tap GO LIVE for your match day.
+        </p>
+        <Link
+          href="/dashboard/player"
+          className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-black text-slate-950 hover:bg-amber-400"
+        >
+          Back to player dashboard
+        </Link>
+      </div>
+    </div>
+  );
 }

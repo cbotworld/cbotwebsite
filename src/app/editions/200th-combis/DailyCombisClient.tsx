@@ -540,13 +540,17 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
               }
             });
           }
-          const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t.name]));
+          const teamsById = new Map((res.teams || []).map((t: any) => [t.id, t]));
           const pairings = ((res as any).stageConfig?.stages || []).flatMap((stage: any) =>
-            (stage.matchPairings || []).map((p: any) => ({
-              dayNumber: p.dayNumber,
-              team1Name: p.team1Name || teamsById.get(p.team1Id) || '',
-              team2Name: p.team2Name || teamsById.get(p.team2Id) || '',
-            }))
+            (stage.matchPairings || []).map((p: any) => {
+              const t1 = teamsById.get(p.team1Id);
+              const t2 = teamsById.get(p.team2Id);
+              return {
+                dayNumber: p.dayNumber,
+                team1Name: t1?.name || p.team1Name || '',
+                team2Name: t2?.name || p.team2Name || '',
+              };
+            })
           );
           let dayDates: Record<number, string> = {};
           if (res.edition?.dayDates) {

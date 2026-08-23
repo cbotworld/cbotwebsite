@@ -1,12 +1,13 @@
 import { eventDayWindows, monumentStatus } from '@/lib/bicentennial-monuments';
 
 /**
- * Go-live unlock is sequential by YouTube saves — not a calendar lookahead window.
+ * Go-live unlock is sequential by YouTube saves from the current calendar day forward.
  *
- * - A player's first scheduled day is always open.
- * - Day N unlocks only after that player has ≥1 real YouTube link for the previous
- *   scheduled day (Day N-1 in their fixture list).
- * - Unlocked days stay open forever so players can GO LIVE AGAIN; the latest link is shown.
+ * - Past days cannot be played (watch-only). Skipping a past day does not block later days.
+ * - The current calendar day is always open, even if earlier days were not played.
+ * - Day N+1 unlocks only after that player has ≥1 real YouTube link for Day N
+ *   (among remaining days from today forward). Example: play Day 9 and save a
+ *   video, then Day 10 unlocks the same day; Day 11 needs a Day 10 video.
  */
 
 export type PlayWindowDay = {
@@ -161,27 +162,45 @@ export function summarizePlayerDayStreams(
   };
 }
 
-/** Unlock by sequence among this player's scheduled days. */
+/**
+ * Sequential YouTube lock applies to FUTURE days only.
+ * - Past (day < currentDay): not playable.
+ * - Current day: always playable — past days never block it.
+ * - Future (day > currentDay): needs a YouTube save on the previous remaining day.
+ */
 export function isDayUnlockedByYoutubeSequence(
   dayNumber: number,
   scheduledDays: number[],
   daysWithYoutube: Iterable<number>,
+  currentDay?: number,
 ): boolean {
   if (dayNumber < 1) return false;
   const sorted = [...new Set(scheduledDays)].filter((d) => d > 0).sort((a, b) => a - b);
-  const idx = sorted.indexOf(dayNumber);
+  if (!sorted.length) return false;
+  const fromDay = currentDay && currentDay > 0 ? currentDay : sorted[0];
+  if (dayNumber < fromDay) return false;
+  if (dayNumber === fromDay) return true;
+  const playable = sorted.filter((d) => d >= fromDay);
+  const idx = playable.indexOf(dayNumber);
   if (idx < 0) return false;
-  if (idx === 0) return true;
-  const prev = sorted[idx - 1];
+  const prev = playable[idx - 1];
   const have = daysWithYoutube instanceof Set ? daysWithYoutube : new Set(daysWithYoutube);
   return have.has(prev);
 }
 
-export function unlockPrerequisiteDay(dayNumber: number, scheduledDays: number[]): number | null {
+export function unlockPrerequisiteDay(
+  dayNumber: number,
+  scheduledDays: number[],
+  currentDay?: number,
+): number | null {
   const sorted = [...new Set(scheduledDays)].filter((d) => d > 0).sort((a, b) => a - b);
-  const idx = sorted.indexOf(dayNumber);
+  if (!sorted.length) return null;
+  const fromDay = currentDay && currentDay > 0 ? currentDay : sorted[0];
+  if (dayNumber <= fromDay) return null;
+  const playable = sorted.filter((d) => d >= fromDay);
+  const idx = playable.indexOf(dayNumber);
   if (idx <= 0) return null;
-  return sorted[idx - 1];
+  return playable[idx - 1];
 }
 
 /** @deprecated Use isDayUnlockedByYoutubeSequence — calendar lookahead removed. */
