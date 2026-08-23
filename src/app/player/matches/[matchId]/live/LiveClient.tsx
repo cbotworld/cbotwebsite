@@ -144,24 +144,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
           matchDetails.initialReplayComment || undefined,
           currentDeviceId || undefined
         );
-        if (res.success && res.stream) {
-          setStreamId(res.stream.id);
-          setStreamStatus(res.stream.status as any);
-          if (res.stream.youtubeUrl) {
-            setDownloadUrl(res.stream.youtubeUrl);
-          }
-          if (res.attemptsCount) {
-            setAttemptsCount(res.attemptsCount);
-          }
-          if (res.stream.streamStartedAt) {
-            setStreamStartedAt(new Date(res.stream.streamStartedAt));
-          }
-          if (res.stream.failureReason?.startsWith('REPLAY_REASON:')) {
-            setReplayReason(res.stream.failureReason.replace('REPLAY_REASON:', '').trim());
-          }
-        } else {
-          setErrorMsg(res.error || 'Failed to initialize match studio.');
-        }
+        setErrorMsg(res.error || 'Go live is only available in the CBOT mobile app.');
       } catch (err: any) {
         setErrorMsg(err.message || 'Network error initializing match studio.');
       } finally {
