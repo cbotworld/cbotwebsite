@@ -34,24 +34,36 @@ export function Footer({ footerCms = DEFAULT_WEBSITE_CMS.footer }: FooterProps) 
             <h4 className="font-bold text-foreground mb-3 text-xs uppercase tracking-wider text-amber-500">
               Download Mobile App
             </h4>
-            <div className="flex flex-col gap-2">
-              <a
-                href="https://play.google.com/store/apps/details?id=com.cbotworld"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs font-black text-amber-300 hover:border-amber-400 hover:bg-amber-500/20 transition-all"
-              >
-                <span className="text-base leading-none">▶</span>
-                Google Play Store
-              </a>
+            <div className="flex flex-wrap items-center gap-2.5">
               <a
                 href="https://apps.apple.com/us/app/cbot-world/id6803811587"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-xs font-black text-foreground hover:border-amber-400/50 hover:text-amber-300 transition-all"
+                className="inline-flex h-10 shrink-0 items-center leading-none opacity-95 transition-opacity hover:opacity-100"
+                aria-label="Download on the App Store"
               >
-                <span className="text-base leading-none"></span>
-                App Store
+                <img
+                  src="/badges/app-store.png"
+                  alt="Download on the App Store"
+                  className="block h-10 w-auto object-contain"
+                  width={120}
+                  height={40}
+                />
+              </a>
+              <a
+                href="https://play.google.com/store/apps/details?id=com.cbotworld"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-10 shrink-0 items-center leading-none opacity-95 transition-opacity hover:opacity-100"
+                aria-label="Get it on Google Play"
+              >
+                <img
+                  src="/badges/google-play.png"
+                  alt="Get it on Google Play"
+                  className="block h-7 w-auto object-contain"
+                  width={126}
+                  height={28}
+                />
               </a>
             </div>
           </div>
