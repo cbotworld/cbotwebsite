@@ -85,15 +85,21 @@ export async function getPlayerMatchSchedule(
   });
 
   const now = Date.now();
+  const isSpocView = requested?.kind === 'SPOC';
   const teamNameUpper = (team?.name || '').toUpperCase().trim();
   const teamTag = (team?.tag || '').toUpperCase().trim();
+  const isSpocMatch = (day: (typeof scheduleDays)[number], m: (typeof scheduleDays)[number]['matches'][number]) =>
+    Boolean(m.isSpocExhibition) || Boolean(day.isSpocDay) || day.stageKind === 'SPOC_EXHIBITION';
   const matchForTeam = (day: (typeof scheduleDays)[number]) =>
-    day.matches.find(
-      (m) =>
+    day.matches.find((m) => {
+      const nameHit =
         m.team1 === teamNameUpper ||
         m.team2 === teamNameUpper ||
-        (!!teamTag && (m.team1Tag === teamTag || m.team2Tag === teamTag)),
-    );
+        (!!teamTag && (m.team1Tag === teamTag || m.team2Tag === teamTag));
+      if (!nameHit) return false;
+      const spoc = isSpocMatch(day, m);
+      return isSpocView ? spoc : !spoc;
+    });
   const officialWindow = tournamentPlayWindow(
     now,
     Math.max(edition?.totalDays || 0, scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
@@ -138,7 +144,23 @@ export async function getPlayerMatchSchedule(
   const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
 
   const daysByNumber = new Map(scheduleDays.map((d) => [d.dayNumber, d]));
-  const fixtureDays = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const allCalendarDays = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const fixtureDays = isSpocView
+    ? scheduleDays
+        .filter((d) => Boolean(matchForTeam(d)))
+        .map((d) => d.dayNumber)
+        .filter((n, i, arr) => n > 0 && arr.indexOf(n) === i)
+        .sort((a, b) => a - b)
+    : allCalendarDays;
+  const currentDayForView = isSpocView
+    ? fixtureDays.find((d) => d === currentDay) ||
+      fixtureDays.find((d) => {
+        const scheduled = daysByNumber.get(d);
+        return scheduled ? monumentStatus(scheduled, now) === 'live' : d === currentDay;
+      }) ||
+      fixtureDays.find((d) => d >= currentDay) ||
+      (fixtureDays.length ? fixtureDays[fixtureDays.length - 1] : currentDay)
+    : currentDay;
 
   const days = !team
     ? []
@@ -179,17 +201,17 @@ export async function getPlayerMatchSchedule(
             ? 'live'
             : 'upcoming';
       const isLiveDay = status === 'live';
-      const isCurrent = isLiveDay || dayNumber === currentDay;
-      const isPast = !isCurrent && dayNumber < currentDay;
-      const isFuture = dayNumber > currentDay && !isLiveDay;
+      const isCurrent = isLiveDay || dayNumber === currentDayForView;
+      const isPast = !isCurrent && dayNumber < currentDayForView;
+      const isFuture = dayNumber > currentDayForView && !isLiveDay;
       const canGoLive = isPast
         ? false
         : isCurrent
           ? true
-          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDay);
+          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDayForView);
       const latest = streamSummary.latestByDay[dayNumber] || null;
       const prerequisiteDay = isFuture
-        ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDay)
+        ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
         : null;
       return {
         dayNumber,
@@ -232,7 +254,9 @@ export async function getPlayerMatchSchedule(
   const live = days.find((d) => d && d.status === 'live') || null;
   const warning = !team
     ? 'Your account is not assigned to a team yet.'
-    : undefined;
+    : isSpocView && days.length === 0
+      ? 'No Spoc exhibition match is scheduled for your team yet.'
+      : undefined;
 
   return {
     user: {
@@ -248,9 +272,9 @@ export async function getPlayerMatchSchedule(
     captainDesks,
     liveDay: live?.dayNumber ?? null,
     liveLabel: live?.label ?? null,
-    currentDay,
-    playableFromDay: 1,
-    playableUntilDay: totalDays,
+    currentDay: currentDayForView,
+    playableFromDay: isSpocView ? (fixtureDays[0] || 1) : 1,
+    playableUntilDay: isSpocView ? (fixtureDays[fixtureDays.length - 1] || currentDayForView) : totalDays,
     daysWithYoutube: streamSummary.daysWithYoutube,
     warning,
     days,

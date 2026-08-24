@@ -12,7 +12,13 @@ import { VisitorCounter } from '@/components/layout/VisitorCounter';
 import { CountryBanner } from '@/components/layout/CountryBanner';
 import { UserRole } from '@/types';
 
-export function Navbar() {
+export function Navbar({
+  editionButtonLabel = '200th Edition',
+  editionButtonHref = '/edition-200-combis',
+}: {
+  editionButtonLabel?: string;
+  editionButtonHref?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
@@ -143,7 +149,7 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3 shrink-0">
           {/* 200th Edition Page Direct Link */}
           <Link
-            href="/edition-200-combis"
+            href={editionButtonHref}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black transition-all group shadow-sm ${
               is200thPage
                 ? 'bg-amber-500 text-slate-950 border border-amber-400 shadow-amber-500/20'
@@ -151,7 +157,7 @@ export function Navbar() {
             }`}
           >
             <span>🏆</span>
-            <span>200th Edition</span>
+            <span>{editionButtonLabel}</span>
           </Link>
 
           <VisitorCounter />
@@ -296,7 +302,7 @@ export function Navbar() {
           {/* Quick Navigation Section */}
           <div className="space-y-2 border-b border-border/50 pb-3">
             <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
-              🏆 200th Bicentennial Edition
+              🏆 {editionButtonLabel}
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <Link

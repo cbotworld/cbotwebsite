@@ -85,6 +85,11 @@ export type WebsiteLegacyCms = {
   videos: LegacyYoutubeVideo[];
 };
 
+export type WebsiteNavCms = {
+  editionButtonLabel: string;
+  editionButtonHref: string;
+};
+
 export type WebsiteFooterCms = {
   brandDescription: string;
   exploreHeading: string;
@@ -103,6 +108,7 @@ export type WebsiteFooterCms = {
 
 export type WebsiteCmsContent = {
   hero: WebsiteHeroCms;
+  nav: WebsiteNavCms;
   sponsors: WebsiteSponsorsCms;
   specialSponsors: WebsiteSpecialSponsorsCms;
   goldSponsors: WebsiteGoldSponsorsCms;
@@ -132,6 +138,10 @@ const DEFAULT_GOLD_SPONSORS: NamedSponsor[] = [
 ];
 
 export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
+  nav: {
+    editionButtonLabel: '200th Edition',
+    editionButtonHref: '/edition-200-combis',
+  },
   hero: {
     badgeText: 'Celebrating 200th Edition',
     headlineLine1: "World's Premier Online",
@@ -330,6 +340,7 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
   try {
     const parsed = JSON.parse(raw) as Partial<WebsiteCmsContent>;
     return {
+      nav: mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav),
       hero: mergeSection(DEFAULT_WEBSITE_CMS.hero, parsed.hero),
       sponsors: {
         ...mergeSection(DEFAULT_WEBSITE_CMS.sponsors, parsed.sponsors),

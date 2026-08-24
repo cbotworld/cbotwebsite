@@ -178,11 +178,13 @@ export default function PlayerClient({
       const fix = day.matches.find((f) => {
         const sides = coherentMatchSides(f);
         const tag = (currentTeam.tag || '').toUpperCase().trim();
-        return (
+        const nameHit =
           sides.team1.name === teamNameUpper ||
           sides.team2.name === teamNameUpper ||
-          (!!tag && (sides.team1.tag === tag || sides.team2.tag === tag))
-        );
+          (!!tag && (sides.team1.tag === tag || sides.team2.tag === tag));
+        if (!nameHit) return false;
+        const spoc = Boolean(f.isSpocExhibition) || Boolean(day.isSpocDay) || day.stageKind === 'SPOC_EXHIBITION';
+        return playerView === 'spoc' ? spoc : !spoc;
       });
       if (!fix) return null;
       const sides = coherentMatchSides(fix);
@@ -238,7 +240,7 @@ export default function PlayerClient({
       };
     }).filter(Boolean);
 
-  }, [initialMatches, currentTeam, scheduleDays, nowMs]);
+  }, [initialMatches, currentTeam, scheduleDays, nowMs, playerView]);
 
   const assignedPatterns = initialPatterns.length > 0 ? initialPatterns : [];
 

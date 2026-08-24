@@ -122,9 +122,7 @@ export function ProfileTab({ currentPlayer: p, currentTeam: team }: ProfileTabPr
 
   // ── Derived display values ───────────────────────────────────────
   const location = [form.city || p.city, form.state || p.state, form.country || p.country].filter(Boolean).join(', ') || null;
-  const totalMatches = (p.wins || 0) + (p.losses || 0);
-  const avg = p.average ? Number(p.average).toFixed(1) : totalMatches > 0 ? ((p.boardsWon || 0) / totalMatches).toFixed(1) : '—';
-  const initials = (p.name || '??').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (p.name || 'P').replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'P';
 
   return (
     <div className="space-y-5">
@@ -192,14 +190,6 @@ export function ProfileTab({ currentPlayer: p, currentTeam: team }: ProfileTabPr
                 <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 mb-0.5">CBOT 200th Edition — Your Team</div>
                 <div className="font-black text-base">{team.name}</div>
                 {team.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{team.description}</p>}
-                {team.stats && (
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] text-emerald-400 font-bold">{team.stats.wins}W</span>
-                    <span className="text-[10px] text-rose-400 font-bold">{team.stats.losses}L</span>
-                    <span className="text-[10px] text-muted-foreground">·</span>
-                    <span className="text-[10px] text-amber-400 font-bold">{team.stats.winRate}% Win Rate</span>
-                  </div>
-                )}
               </div>
               <Users className="h-5 w-5 text-amber-500/50 flex-shrink-0" />
             </div>

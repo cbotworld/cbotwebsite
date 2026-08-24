@@ -15,6 +15,7 @@ import {
   type WebsiteGoldSponsorsCms,
   type WebsiteLegacyCms,
   type WebsiteFooterCms,
+  type WebsiteNavCms,
 } from '@/lib/website-cms';
 import { updateEditionBranding } from '@/lib/actions/tournamentActions';
 import { safePublicImageUrl } from '@/lib/safe-image-url';
@@ -137,6 +138,20 @@ export async function updateWebsiteLegacyCms(data: WebsiteLegacyCms) {
   } catch (error) {
     console.error('[updateWebsiteLegacyCms]', error);
     return { success: false, error: 'Failed to save legacy videos' };
+  }
+}
+
+export async function updateWebsiteNavCms(data: WebsiteNavCms) {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return { success: false, error: auth.error };
+  try {
+    const label = (data.editionButtonLabel || '').trim() || '200th Edition';
+    const href = (data.editionButtonHref || '').trim() || '/edition-200-combis';
+    await saveCmsPatch({ nav: { editionButtonLabel: label, editionButtonHref: href } });
+    return { success: true };
+  } catch (error) {
+    console.error('[updateWebsiteNavCms]', error);
+    return { success: false, error: 'Failed to save navigation button' };
   }
 }
 

@@ -67,6 +67,7 @@ export default function LeaderboardClient({ players, teams }: { players: any[], 
               <option value="USA">USA</option>
               <option value="Maldives">Maldives</option>
               <option value="Canada">Canada</option>
+              <option value="Australia">Australia</option>
               <option value="UK">UK</option>
               <option value="Italy">Italy</option>
               <option value="France">France</option>

@@ -653,3 +653,75 @@ export async function sendPlayerCredentialsEmailAction(data: {
     return { success: false, error: error?.message || 'Failed to send credentials email' };
   }
 }
+
+const START_NEW_TOURNAMENT_PHRASE = 'start new tournament';
+
+/** Reset stage design, days, matches, and teams. Player accounts stay. */
+export async function startNewTournament(opts: {
+  editionId: string;
+  tournamentName: string;
+  confirmation: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
+
+  const title = (opts.tournamentName || '').trim();
+  const confirmation = (opts.confirmation || '').trim().toLowerCase();
+  if (!title) {
+    return { success: false, error: 'Enter the new tournament name.' };
+  }
+  if (confirmation !== START_NEW_TOURNAMENT_PHRASE) {
+    return { success: false, error: 'Type “start new tournament” exactly to confirm.' };
+  }
+
+  try {
+    const edition = await prisma.edition.findUnique({ where: { id: opts.editionId }, select: { id: true } });
+    if (!edition) return { success: false, error: 'Edition not found.' };
+
+    const { defaultTournamentStages, stageConfigKey } = await import('@/lib/tournament-stages');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.editionParticipant.updateMany({
+        where: { editionId: edition.id },
+        data: { teamId: null },
+      });
+      await tx.spocTeamMember.deleteMany({ where: { editionId: edition.id } });
+      await tx.leagueStanding.deleteMany({ where: { editionId: edition.id } });
+      await tx.liveStream.deleteMany({ where: { editionId: edition.id } });
+      await tx.match.deleteMany({ where: { editionId: edition.id } });
+      await tx.team.deleteMany({ where: { editionId: edition.id } });
+      await tx.edition.update({
+        where: { id: edition.id },
+        data: {
+          title,
+          dayDates: null,
+          tournamentStartDate: null,
+          tournamentEndDate: null,
+          totalDays: 15,
+          status: 'REGISTRATION_OPEN',
+        },
+      });
+      await tx.systemSetting.upsert({
+        where: { key: stageConfigKey(edition.id) },
+        create: { key: stageConfigKey(edition.id), value: JSON.stringify(defaultTournamentStages(8)) },
+        update: { value: JSON.stringify(defaultTournamentStages(8)) },
+      });
+    });
+
+    revalidatePath('/', 'layout');
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/player');
+    revalidatePath('/dashboard/captain');
+    revalidatePath('/fixtures');
+    revalidatePath('/edition-200-schedule');
+    revalidatePath('/edition-200-combis');
+    revalidatePath('/teams');
+
+    return { success: true, title };
+  } catch (error: any) {
+    console.error('[startNewTournament]', error);
+    return { success: false, error: error?.message || 'Failed to start a new tournament.' };
+  }
+}

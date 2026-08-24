@@ -9,6 +9,7 @@ const COUNTRIES = [
   { name: 'USA',       code: 'us' },
   { name: 'Maldives',  code: 'mv' },
   { name: 'Canada',    code: 'ca' },
+  { name: 'Australia', code: 'au' },
   { name: 'UK',        code: 'gb' },
   { name: 'Italy',     code: 'it' },
   { name: 'France',    code: 'fr' },

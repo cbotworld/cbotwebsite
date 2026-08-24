@@ -5,6 +5,7 @@ import {
   getEditionStageSnapshot,
   saveTournamentStageConfig,
 } from '@/lib/actions/schedulerActions';
+import { startNewTournament } from '@/lib/actions/tournamentActions';
 import {
   computeStandings,
   defaultTournamentStages,
@@ -51,12 +52,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   ArrowRight,
   CheckCircle2,
   GitBranch,
   Loader2,
+  AlertTriangle,
   Plus,
   RotateCcw,
   Save,
@@ -273,6 +276,10 @@ export default function TournamentStageDesigner({
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [resetOpen, setResetOpen] = React.useState(false);
+  const [resetName, setResetName] = React.useState('');
+  const [resetConfirm, setResetConfirm] = React.useState('');
+  const [resetting, setResetting] = React.useState(false);
   const [scheduleMode, setScheduleMode] = React.useState<ScheduleMode>('DIVIDED');
   const [message, setMessage] = React.useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
@@ -714,6 +721,26 @@ export default function TournamentStageDesigner({
     }
   };
 
+  const handleStartNewTournament = async () => {
+    if (!editionId) return;
+    setResetting(true);
+    setMessage(null);
+    const res = await startNewTournament({
+      editionId,
+      tournamentName: resetName,
+      confirmation: resetConfirm,
+    });
+    setResetting(false);
+    if (!res.success) {
+      setMessage({ type: 'err', text: res.error || 'Could not start a new tournament.' });
+      return;
+    }
+    setResetOpen(false);
+    setResetName('');
+    setResetConfirm('');
+    window.location.reload();
+  };
+
   const dayOptions = React.useMemo(
     () =>
       Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => ({
@@ -730,6 +757,7 @@ export default function TournamentStageDesigner({
   const rrCount = Math.max(dbRrCount, roundRobinMatchCount());
 
   return (
+    <>
     <Card className="border-emerald-500/30">
       <CardHeader className="border-b border-border pb-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -751,6 +779,21 @@ export default function TournamentStageDesigner({
             <Badge variant="success" className="font-extrabold text-xs px-3 py-1">
               {rrCount} Round Robin Matches
             </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs font-bold border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+              onClick={() => {
+                setResetName(editionTitle || '');
+                setResetConfirm('');
+                setResetOpen(true);
+              }}
+              disabled={saving || loading || resetting}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Start new tournament
+            </Button>
             <Button type="button" variant="carrom" size="sm" className="text-xs font-bold" onClick={handleSave} disabled={saving || loading}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save
@@ -780,7 +823,11 @@ export default function TournamentStageDesigner({
                     {idx > 0 ? <ArrowRight className="h-3.5 w-3.5 text-amber-500 shrink-0" /> : null}
                     <div
                       className={`flex items-center gap-1 rounded-full border px-2 py-1 ${
-                        isActive ? 'border-amber-500 bg-amber-500/15' : 'border-border bg-card'
+                        locked
+                          ? 'border-border/60 bg-muted/20'
+                          : isActive
+                            ? 'border-amber-500 bg-amber-500/15'
+                            : 'border-border bg-card'
                       }`}
                     >
                       <button type="button" onClick={() => setActiveIndex(idx)} className="text-[11px] font-black px-1">
@@ -858,7 +905,11 @@ export default function TournamentStageDesigner({
                     type="button"
                     onClick={() => setActiveIndex(idx)}
                     className={`text-left rounded-xl border p-4 transition-all ${
-                      isActive ? 'border-amber-500 bg-amber-500/10' : 'border-border bg-card hover:border-amber-500/40'
+                      locked
+                        ? 'border-border/60 bg-muted/20'
+                        : isActive
+                          ? 'border-amber-500 bg-amber-500/10'
+                          : 'border-border bg-card hover:border-amber-500/40'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -1479,5 +1530,56 @@ export default function TournamentStageDesigner({
         )}
       </CardContent>
     </Card>
+
+    <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+      <DialogHeader>
+        <DialogTitle className="text-rose-300">Start a new tournament?</DialogTitle>
+        <DialogDescription>
+          This resets stage design, daily events, match days, pairings, and all teams. Player accounts stay in the database and are not removed.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3 text-sm">
+        <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200">
+          You will need to add teams and rebuild the stage path for the new cup. Type the confirmation phrase to make this a conscious decision.
+        </p>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">New tournament name</label>
+          <Input
+            value={resetName}
+            onChange={(e) => setResetName(e.target.value)}
+            placeholder="e.g. 201st Edition"
+            className="font-bold"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+            Type <span className="text-rose-300">start new tournament</span> to confirm
+          </label>
+          <Input
+            value={resetConfirm}
+            onChange={(e) => setResetConfirm(e.target.value)}
+            placeholder="start new tournament"
+            className="font-mono"
+            autoComplete="off"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setResetOpen(false)} disabled={resetting}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="bg-rose-600 hover:bg-rose-500 text-white font-black"
+            onClick={() => void handleStartNewTournament()}
+            disabled={resetting || !resetName.trim() || resetConfirm.trim().toLowerCase() !== 'start new tournament'}
+          >
+            {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+            Reset and start
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+    </>
   );
 }

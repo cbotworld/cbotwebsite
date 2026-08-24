@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import { Navbar } from '@/components/layout/Navbar';
+import { NavbarWithCms } from '@/components/layout/NavbarWithCms';
 import { FooterWithCms } from '@/components/layout/FooterWithCms';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 
@@ -40,7 +40,7 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans flex min-h-screen flex-col bg-background text-foreground`}>
         <Providers>
-          <Navbar />
+          <NavbarWithCms />
           <main className="flex-1">{children}</main>
           <FooterWithCms />
           <WhatsAppButton />

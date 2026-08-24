@@ -13,14 +13,6 @@ export function Footer({ footerCms = DEFAULT_WEBSITE_CMS.footer }: FooterProps) 
   if (pathname?.includes('/live')) {
     return null;
   }
-  const exploreLinks = [
-    { label: '200th Edition Schedule', href: '/edition-200-schedule', live: true },
-    { label: 'Tournament Editions', href: '/editions', live: false },
-    { label: 'Match Fixtures', href: '/fixtures', live: false },
-    { label: 'Player Rankings', href: '/rankings', live: false },
-    { label: 'Teams Directory', href: '/teams', live: false },
-  ];
-
   return (
     <footer className="w-full border-t border-border/40 bg-card/60 backdrop-blur-md pt-12 pb-8 text-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -39,25 +31,29 @@ export function Footer({ footerCms = DEFAULT_WEBSITE_CMS.footer }: FooterProps) 
           </div>
 
           <div>
-            <h4 className="font-bold text-foreground mb-3 text-xs uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-              {footerCms.exploreHeading}
-              <span className="text-[9px] font-black tracking-widest text-amber-500/70 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded-full leading-none uppercase">
-                {footerCms.exploreSoonLabel}
-              </span>
+            <h4 className="font-bold text-foreground mb-3 text-xs uppercase tracking-wider text-amber-500">
+              Download Mobile App
             </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              {exploreLinks.map(({ label, href, live }) => (
-                <li key={label}>
-                  {live ? (
-                    <Link href={href} className="text-amber-400 font-bold hover:text-amber-300 transition-colors flex items-center gap-1">
-                      <span>✨</span> {label}
-                    </Link>
-                  ) : (
-                    <span className="text-muted-foreground/60 cursor-default">{label}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-2">
+              <a
+                href="https://play.google.com/store/apps/details?id=com.cbotworld"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs font-black text-amber-300 hover:border-amber-400 hover:bg-amber-500/20 transition-all"
+              >
+                <span className="text-base leading-none">▶</span>
+                Google Play Store
+              </a>
+              <a
+                href="https://apps.apple.com/us/app/cbot-world/id6803811587"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-xs font-black text-foreground hover:border-amber-400/50 hover:text-amber-300 transition-all"
+              >
+                <span className="text-base leading-none"></span>
+                App Store
+              </a>
+            </div>
           </div>
 
           <div className="space-y-3">

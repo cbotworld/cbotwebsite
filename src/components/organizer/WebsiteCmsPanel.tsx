@@ -10,6 +10,7 @@ import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   updateWebsiteHeroCms,
+  updateWebsiteNavCms,
   updateWebsiteSponsorsCms,
   updateWebsiteSpecialSponsorsCms,
   updateWebsiteGoldSponsorsCms,
@@ -27,6 +28,7 @@ import {
   type SpecialSponsor,
   type SpecialThanksChip,
   type WebsiteCmsContent,
+  type WebsiteNavCms,
 } from '@/lib/website-cms';
 
 type Props = {
@@ -35,12 +37,14 @@ type Props = {
 };
 
 export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props) {
+  const [nav, setNav] = React.useState<WebsiteNavCms>(initialCms.nav);
   const [hero, setHero] = React.useState(initialCms.hero);
   const [sponsors, setSponsors] = React.useState(initialCms.sponsors);
   const [specialSponsors, setSpecialSponsors] = React.useState(initialCms.specialSponsors);
   const [goldSponsors, setGoldSponsors] = React.useState(initialCms.goldSponsors);
   const [legacy, setLegacy] = React.useState(initialCms.legacy);
   const [footer, setFooter] = React.useState(initialCms.footer);
+  const [savingNav, setSavingNav] = React.useState(false);
   const [savingHero, setSavingHero] = React.useState(false);
   const [savingSponsors, setSavingSponsors] = React.useState(false);
   const [savingSpecial, setSavingSpecial] = React.useState(false);
@@ -50,6 +54,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
   const [message, setMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    setNav(initialCms.nav);
     setHero(initialCms.hero);
     setSponsors(initialCms.sponsors);
     setSpecialSponsors(initialCms.specialSponsors);
@@ -68,6 +73,13 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
       ...prev,
       stats: prev.stats.map((s, i) => (i === index ? { ...s, ...patch } : s)),
     }));
+  };
+
+  const saveNav = async () => {
+    setSavingNav(true);
+    const res = await updateWebsiteNavCms(nav);
+    setSavingNav(false);
+    showMessage(res.success ? 'Navbar edition button saved. Refresh the site to see it.' : res.error || 'Save failed');
   };
 
   const saveHero = async () => {
@@ -272,7 +284,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
             <Globe className="h-5 w-5 text-amber-500" /> Website CMS
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Edit homepage hero, sponsors, legacy videos, and footer. Team logos still come from Teams tab. Sponsor images are optional — initials show when empty.
+            Edit the navbar edition button, homepage hero, sponsors, legacy videos, and footer. Team logos still come from Teams tab. Sponsor images are optional — initials show when empty.
           </p>
         </div>
         {message && (
@@ -305,6 +317,39 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
         </TabsList>
 
         <TabsContent value="hero" className="space-y-4">
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-base font-black">Navbar edition button</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                This is the gold pill on the top bar (currently shown as “200th Edition”). Change the label anytime without creating a new edition.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold block mb-1">Button text</label>
+                  <Input
+                    value={nav.editionButtonLabel}
+                    onChange={(e) => setNav({ ...nav, editionButtonLabel: e.target.value })}
+                    placeholder="e.g. 201st Edition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Button link</label>
+                  <Input
+                    value={nav.editionButtonHref}
+                    onChange={(e) => setNav({ ...nav, editionButtonHref: e.target.value })}
+                    placeholder="/edition-200-combis"
+                  />
+                </div>
+              </div>
+              <Button type="button" variant="carrom" size="sm" className="font-bold" onClick={() => void saveNav()} disabled={savingNav}>
+                {savingNav ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                Save navbar button
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="border-amber-500/30">
             <CardHeader>
               <CardTitle className="text-base font-black">Hero text & stats</CardTitle>
