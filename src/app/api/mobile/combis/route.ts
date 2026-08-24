@@ -10,6 +10,11 @@ import {
   spocExhibitionStage,
   spocMatchDaysForTeam,
 } from '@/lib/spoc-teams';
+import {
+  combiCutoffIso,
+  isCombiSubmissionLocked,
+  officialCombiCalendarDate,
+} from '@/lib/combi-cutoff';
 
 export const dynamic = 'force-dynamic';
 
@@ -245,9 +250,9 @@ export async function GET(request: NextRequest) {
 
     const canEdit = canEditCombis(user.role, team.captainId, user.id);
     const days = dayNumbers.map((dayNumber) => {
-      const calendarDate = dayDates[String(dayNumber)] || dayDates[dayNumber as any] || '';
-      const cutoffIso = calendarDate ? `${calendarDate}T21:30:00+05:30` : null;
-      const revealed = cutoffIso ? now >= new Date(cutoffIso).getTime() : false;
+      const calendarDate = officialCombiCalendarDate(dayNumber, dayDates);
+      const cutoffIso = combiCutoffIso(dayNumber, dayDates);
+      const revealed = now >= new Date(cutoffIso).getTime();
       const entry = saved[String(dayNumber)] || saved[dayNumber as any];
       const showMine = revealed || canEdit;
       const myRounds = showMine ? entry?.rounds || [] : [];
@@ -376,23 +381,23 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    let dayDatesMap: Record<string, string> = {};
     if (edition?.dayDates) {
       try {
-        const dayDatesMap = JSON.parse(edition.dayDates);
-        const dateStr = dayDatesMap[dayNumber] || dayDatesMap[String(dayNumber)];
-        if (dateStr) {
-          const cutoffTime = new Date(`${dateStr}T21:30:00+05:30`).getTime();
-          if (Date.now() >= cutoffTime) {
-            return NextResponse.json(
-              {
-                success: false,
-                error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`,
-              },
-              { status: 400, headers: mobileCorsHeaders },
-            );
-          }
-        }
-      } catch {}
+        dayDatesMap = JSON.parse(edition.dayDates);
+      } catch {
+        dayDatesMap = {};
+      }
+    }
+    if (isCombiSubmissionLocked(dayNumber, dayDatesMap)) {
+      const dateStr = officialCombiCalendarDate(dayNumber, dayDatesMap);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`,
+        },
+        { status: 400, headers: mobileCorsHeaders },
+      );
     }
 
     let lineupsObj: any = {};

@@ -11,6 +11,7 @@ import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments'
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
+import { officialCombiCalendarDate } from '@/lib/combi-cutoff';
 import * as XLSX from 'xlsx';
 
 interface TeamInfo {
@@ -341,10 +342,7 @@ function calendarDateForDay(
   dayNumber: number,
   dayDates?: Record<number, string> | Record<string, string>
 ) {
-  const dates = (dayDates || {}) as Record<string | number, string>;
-  const raw = dates[dayNumber] ?? dates[String(dayNumber)];
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  return addDaysIsoDate('2026-08-10', dayNumber - 1);
+  return officialCombiCalendarDate(dayNumber, dayDates);
 }
 
 function toCombiDay(

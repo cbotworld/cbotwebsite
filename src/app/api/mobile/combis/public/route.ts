@@ -5,6 +5,7 @@ import { officialMatchDays } from '@/lib/bicentennial-monuments';
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
+import { combiCutoffIso, officialCombiCalendarDate } from '@/lib/combi-cutoff';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,18 +41,6 @@ function parseDayDates(raw?: string | null) {
   } catch {
     return {};
   }
-}
-
-function addDaysIsoDate(dateStr: string, days: number) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, (m || 1) - 1, (d || 1) + days));
-  return dt.toISOString().slice(0, 10);
-}
-
-function calendarDateForDay(dayNumber: number, dayDates: Record<string, string>) {
-  const raw = dayDates[String(dayNumber)] || dayDates[dayNumber as any];
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  return addDaysIsoDate('2026-08-10', dayNumber - 1);
 }
 
 function playersFromRound(round: any) {
@@ -193,8 +182,8 @@ export async function GET() {
     );
 
     const days = Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNumber) => {
-      const calendarDate = calendarDateForDay(dayNumber, dayDates);
-      const cutoffIso = `${calendarDate}T21:30:00+05:30`;
+      const calendarDate = officialCombiCalendarDate(dayNumber, dayDates);
+      const cutoffIso = combiCutoffIso(dayNumber, dayDates);
       const revealed = now >= new Date(cutoffIso).getTime();
       const bucket = matchesByDay.get(dayNumber);
       const stageName = pairings.find((p) => p.dayNumber === dayNumber)?.stageName || '';

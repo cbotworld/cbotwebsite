@@ -3,6 +3,10 @@
 import { prisma } from '@/lib/prisma';
 import { MatchLineupSlot } from '@/types';
 import { revalidatePath } from 'next/cache';
+import {
+  isCombiSubmissionLocked,
+  officialCombiCalendarDate,
+} from '@/lib/combi-cutoff';
 
 export async function submitMatchLineup(data: {
   matchId: string;
@@ -257,20 +261,20 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
       select: { dayDates: true }
     });
 
+    let dayDatesMap: Record<string, string> = {};
     if (activeEdition?.dayDates) {
       try {
-        const dayDatesMap = JSON.parse(activeEdition.dayDates);
-        const dateStr = dayDatesMap[dayNumber];
-        if (dateStr) {
-          const cutoffTime = new Date(`${dateStr}T21:30:00+05:30`).getTime();
-          if (Date.now() >= cutoffTime) {
-            return {
-              success: false,
-              error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`
-            };
-          }
-        }
-      } catch (e) {}
+        dayDatesMap = JSON.parse(activeEdition.dayDates);
+      } catch {
+        dayDatesMap = {};
+      }
+    }
+    if (isCombiSubmissionLocked(dayNumber, dayDatesMap)) {
+      const dateStr = officialCombiCalendarDate(dayNumber, dayDatesMap);
+      return {
+        success: false,
+        error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`,
+      };
     }
 
     const team = await prisma.team.findUnique({

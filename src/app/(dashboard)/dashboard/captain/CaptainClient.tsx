@@ -11,13 +11,11 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/componen
 import { Avatar } from '@/components/ui/avatar';
 import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
+import { isCombiSubmissionLocked, officialCombiCalendarDate } from '@/lib/combi-cutoff';
 import PlayerClient from '../player/PlayerClient';
 
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
-  const dateStr = dayDatesMap[dayNum];
-  if (!dateStr) return false;
-  const cutoffTime = new Date(`${dateStr}T21:30:00+05:30`).getTime();
-  return Date.now() >= cutoffTime;
+  return isCombiSubmissionLocked(dayNum, dayDatesMap);
 }
 
 // Helper: how many players a format needs per round
@@ -162,17 +160,10 @@ export default function CaptainClient({
         map = JSON.parse(initialActiveEdition.dayDates);
       } catch (e) {}
     }
-    
-    const total = initialActiveEdition?.totalDays || 15;
-    const startStr = map[1] || (initialActiveEdition?.tournamentStartDate ? new Date(initialActiveEdition.tournamentStartDate).toISOString().split('T')[0] : '2026-08-10');
-    const baseDate = startStr && !isNaN(new Date(startStr).getTime()) ? new Date(startStr) : new Date('2026-08-10');
 
+    const total = initialActiveEdition?.totalDays || 15;
     for (let i = 1; i <= total; i++) {
-      if (!map[i]) {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + (i - 1));
-        map[i] = d.toISOString().split('T')[0];
-      }
+      map[i] = officialCombiCalendarDate(i, map);
     }
     return map;
   }, [initialActiveEdition]);

@@ -40,6 +40,7 @@ import {
   teamIdsBookedOnDay,
   type SuggestedPairing,
 } from '@/lib/tournament-stages';
+import { officialCombiCalendarDate } from '@/lib/combi-cutoff';
 import type { QualifierPairing, ScheduleMode, StageKind, StageSeeding, TournamentStage, TournamentStageConfig } from '@/types';
 import {
   BICENTENNIAL_MONUMENTS,
@@ -745,7 +746,7 @@ export default function TournamentStageDesigner({
     () =>
       Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => ({
         day,
-        date: dayDates[day],
+        date: officialCombiCalendarDate(day, dayDates),
         completed: day !== currentEventDay && isCalendarDayCompleted(day, dayDates),
       })),
     [totalDays, dayDates, currentEventDay]
