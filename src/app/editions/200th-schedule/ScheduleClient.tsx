@@ -87,7 +87,7 @@ export function ScheduleClient({
   const [selectedDay, setSelectedDay] = React.useState<number | 'ALL'>('ALL');
   const [searchTerm, setSearchTerm] = React.useState('');
   const [nowMs, setNowMs] = React.useState(() => Date.now());
-  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>(() => buildOrganizerScheduleDays());
+  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
   const [stages, setStages] = React.useState<Array<{ order?: number; kind?: string; name?: string; startDay?: number; durationDays?: number }>>([]);
 
   const liveDayNum = React.useMemo(

@@ -355,9 +355,14 @@ export function buildOrganizerScheduleDays(opts?: {
     });
   };
 
-  officialMatchDays().forEach((d) => {
-    pushDay(d.dayNumber, d.title, d.startIso, d.endIso, d.timeRange, d.matches.map((m) => ({ ...m, isSpocExhibition: false })));
-  });
+  // Seeded 200th-edition fixtures are only a fallback when this edition has no
+  // stage path of its own. Otherwise Day 8–10 would keep showing Royal Carroms
+  // pairings after the organizer designed a 7-day round robin.
+  if (!stages.length) {
+    officialMatchDays().forEach((d) => {
+      pushDay(d.dayNumber, d.title, d.startIso, d.endIso, d.timeRange, d.matches.map((m) => ({ ...m, isSpocExhibition: false })));
+    });
+  }
 
   const pairingsByDay = new Map<number, OrganizerScheduleMatch[]>();
   (opts?.pairings || []).forEach((p) => {
@@ -435,9 +440,13 @@ export function buildOrganizerScheduleDays(opts?: {
     );
   });
 
-  const officialMax = officialMatchDays().reduce((max, d) => Math.max(max, d.dayNumber), 7);
+  const officialMax = stages.length
+    ? 0
+    : officialMatchDays().reduce((max, d) => Math.max(max, d.dayNumber), 7);
   const stageMax = stages.length ? stageSpanDays(stages as any) : 0;
-  const totalDays = Math.max(officialMax, opts?.totalDays || 0, stageMax, 7);
+  const totalDays = stages.length
+    ? Math.max(stageMax, 1)
+    : Math.max(officialMax, opts?.totalDays || 0, 7);
 
   const days: OrganizerScheduleDay[] = [];
   for (let n = 1; n <= totalDays; n += 1) {

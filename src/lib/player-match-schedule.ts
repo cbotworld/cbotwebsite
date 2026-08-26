@@ -105,7 +105,7 @@ export async function getPlayerMatchSchedule(
     });
   const officialWindow = tournamentPlayWindow(
     now,
-    Math.max(edition?.totalDays || 0, scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
+    Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
   );
   const liveScheduleDay = scheduleDays.find((d) => monumentStatus(d, now) === 'live')?.dayNumber;
   const scheduleCurrentDay = currentPlayDayNumber(
@@ -114,16 +114,15 @@ export async function getPlayerMatchSchedule(
       status: monumentStatus(d, now),
     })),
   );
-  // Prefer the live schedule day so past official days never constrain today.
-  const currentDay = liveScheduleDay || scheduleCurrentDay || officialWindow.currentDay || 1;
-  const totalDays = Math.max(
-    officialWindow.totalDays,
-    edition?.totalDays || 0,
-    scheduleDays.length,
-    ...scheduleDays.map((d) => d.dayNumber),
-    currentDay,
-    1,
+  const hasStages = (stageConfig?.stages || []).some((s: any) => s?.kind && s.kind !== 'SPOC_EXHIBITION');
+  const scheduleMax = Math.max(1, ...scheduleDays.map((d) => d.dayNumber), scheduleDays.length);
+  const currentDay = Math.min(
+    liveScheduleDay || scheduleCurrentDay || (hasStages ? 0 : officialWindow.currentDay) || 1,
+    scheduleMax,
   );
+  const totalDays = hasStages
+    ? scheduleMax
+    : Math.max(officialWindow.totalDays, edition?.totalDays || 0, scheduleMax, currentDay, 1);
 
   const playerStreams = await prisma.liveStream.findMany({
     where: {
@@ -147,14 +146,24 @@ export async function getPlayerMatchSchedule(
   const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
 
   const daysByNumber = new Map(scheduleDays.map((d) => [d.dayNumber, d]));
-  const allCalendarDays = Array.from({ length: totalDays }, (_, i) => i + 1);
   const fixtureDays = isSpocView
     ? scheduleDays
         .filter((d) => Boolean(matchForTeam(d)))
         .map((d) => d.dayNumber)
         .filter((n, i, arr) => n > 0 && arr.indexOf(n) === i)
         .sort((a, b) => a - b)
-    : allCalendarDays;
+    : scheduleDays
+        .filter((d) => {
+          const spocOnly =
+            (Boolean(d.isSpocDay) || d.stageKind === 'SPOC_EXHIBITION') &&
+            !d.matches.some((m) => !m.isSpocExhibition);
+          if (spocOnly) return false;
+          if (matchForTeam(d)) return true;
+          return !d.matches.some((m) => !m.isSpocExhibition);
+        })
+        .map((d) => d.dayNumber)
+        .filter((n, i, arr) => n > 0 && arr.indexOf(n) === i)
+        .sort((a, b) => a - b);
   const currentDayForView = isSpocView
     ? fixtureDays.find((d) => d === currentDay) ||
       fixtureDays.find((d) => {
@@ -207,11 +216,13 @@ export async function getPlayerMatchSchedule(
       const isCurrent = isLiveDay || dayNumber === currentDayForView;
       const isPast = !isCurrent && dayNumber < currentDayForView;
       const isFuture = dayNumber > currentDayForView && !isLiveDay;
-      const canGoLive = isPast
+      const canGoLive = oppMissing
         ? false
-        : isCurrent
-          ? true
-          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDayForView);
+        : isPast
+          ? false
+          : isCurrent
+            ? true
+            : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDayForView);
       const latest = streamSummary.latestByDay[dayNumber] || null;
       const prerequisiteDay = isFuture
         ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
@@ -230,7 +241,9 @@ export async function getPlayerMatchSchedule(
         canTieBreakGoLive: true,
         lockedReason: canGoLive
           ? null
-          : isPast
+          : oppMissing
+            ? 'Opponent is TBD until this stage is assigned.'
+            : isPast
             ? 'This match day is completed. Watch the saved YouTube video, or use Practice / Tie Breaker.'
             : prerequisiteDay
               ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${dayNumber} unlocks.`

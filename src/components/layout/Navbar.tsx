@@ -11,14 +11,22 @@ import { Avatar } from '@/components/ui/avatar';
 import { VisitorCounter } from '@/components/layout/VisitorCounter';
 import { CountryBanner } from '@/components/layout/CountryBanner';
 import { UserRole } from '@/types';
+import {
+  PUBLIC_COMBIS_PATH,
+  PUBLIC_SCHEDULE_PATH,
+  PUBLIC_TEAMS_PLAYERS_PATH,
+  isPublicCombisPath,
+  isPublicSchedulePath,
+  isPublicTeamsPlayersPath,
+} from '@/lib/website-cms';
 
 export function Navbar({
   editionButtonLabel = '200th Edition',
-  editionButtonHref = '/edition-200-combis',
+  editionButtonHref = PUBLIC_COMBIS_PATH,
   combisLabel = 'Daily Team Combis',
-  combisHref = '/edition-200-combis',
+  combisHref = PUBLIC_COMBIS_PATH,
   scheduleLabel = 'Match Schedule',
-  scheduleHref = '/edition-200-schedule',
+  scheduleHref = PUBLIC_SCHEDULE_PATH,
   brandName = 'CBOT World',
   brandTagline = 'Connect Carrom Enthusiasts Worldwide',
   shortName = 'CBOT',
@@ -101,6 +109,9 @@ export function Navbar({
   // repoint these links from the CMS, so match the configured hrefs as well as
   // the legacy edition routes.
   const isEditionPage =
+    isPublicCombisPath(pathname) ||
+    isPublicSchedulePath(pathname) ||
+    isPublicTeamsPlayersPath(pathname) ||
     pathname === combisHref ||
     pathname === scheduleHref ||
     pathname === editionButtonHref ||
@@ -108,8 +119,9 @@ export function Navbar({
     pathname.includes('combis') ||
     pathname.includes('schedule') ||
     pathname.includes('videos');
-  const isCombisActive = pathname === combisHref || pathname === '/editions/200th-combis';
-  const isScheduleActive = pathname === scheduleHref || pathname === '/editions/200th-schedule';
+  const isCombisActive = isPublicCombisPath(pathname) || pathname === combisHref;
+  const isScheduleActive = isPublicSchedulePath(pathname) || pathname === scheduleHref;
+  const isTeamsPlayersActive = isPublicTeamsPlayersPath(pathname);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
@@ -170,9 +182,9 @@ export function Navbar({
         {/* Desktop Right Actions */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
           <Link
-            href="/teams-and-players"
+            href={PUBLIC_TEAMS_PLAYERS_PATH}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all border ${
-              pathname === '/teams-and-players'
+              isTeamsPlayersActive
                 ? 'bg-amber-500 text-slate-950 border-amber-400'
                 : 'bg-muted/40 text-foreground border-border/60 hover:border-amber-500/40 hover:bg-muted'
             }`}
@@ -282,7 +294,7 @@ export function Navbar({
             
             {/* Sub-Tab 1: Daily Team Combis */}
             <Link
-              href={combisHref}
+              href={combisHref || PUBLIC_COMBIS_PATH}
               className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
                 isCombisActive
                   ? 'text-amber-400 font-black'
@@ -298,7 +310,7 @@ export function Navbar({
 
             {/* Sub-Tab 2: Match Schedule */}
             <Link
-              href={scheduleHref}
+              href={scheduleHref || PUBLIC_SCHEDULE_PATH}
               className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
                 isScheduleActive
                   ? 'text-amber-400 font-black'
@@ -312,8 +324,21 @@ export function Navbar({
               )}
             </Link>
 
-
-          </div>
+            {/* Sub-Tab 3: Teams & Players */}
+            <Link
+              href={PUBLIC_TEAMS_PLAYERS_PATH}
+              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+                isTeamsPlayersActive
+                  ? 'text-amber-400 font-black'
+                  : 'hover:text-foreground'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span>Teams &amp; Players</span>
+              {isTeamsPlayersActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
+            </Link>          </div>
         </div>
       )}
 
@@ -337,9 +362,9 @@ export function Navbar({
             <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
               🏆 {editionButtonLabel}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               <Link
-                href={combisHref}
+                href={combisHref || PUBLIC_COMBIS_PATH}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isCombisActive
@@ -350,7 +375,7 @@ export function Navbar({
                 <span>⚔️</span> Combis
               </Link>
               <Link
-                href={scheduleHref}
+                href={scheduleHref || PUBLIC_SCHEDULE_PATH}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isScheduleActive
@@ -359,6 +384,17 @@ export function Navbar({
                 }`}
               >
                 <span>📅</span> Schedule
+              </Link>
+              <Link
+                href={PUBLIC_TEAMS_PLAYERS_PATH}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                  isTeamsPlayersActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <Users className="h-3.5 w-3.5 shrink-0" /> Teams
               </Link>
             </div>
           </div>
@@ -377,10 +413,10 @@ export function Navbar({
               <Home className="h-4 w-4 text-amber-400" /> {shortName} Arena Home
             </Link>
             <Link
-              href="/teams-and-players"
+              href={PUBLIC_TEAMS_PLAYERS_PATH}
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                pathname === '/teams-and-players' ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
+                isTeamsPlayersActive ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
               }`}
             >
               <Users className="h-4 w-4 text-amber-400" /> Teams &amp; Players

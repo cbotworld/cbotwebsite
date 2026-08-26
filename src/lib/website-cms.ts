@@ -148,6 +148,56 @@ export type WebsiteFooterCms = {
   developerLogoUrl: string;
 };
 
+/** Canonical public URLs — keep these stable even if CMS labels change. */
+export const PUBLIC_COMBIS_PATH = '/combis';
+export const PUBLIC_SCHEDULE_PATH = '/schedule';
+export const PUBLIC_TEAMS_PLAYERS_PATH = '/teams-and-players';
+
+const COMBIS_PATH_ALIASES = new Set([
+  PUBLIC_COMBIS_PATH,
+  '/edition-200-combis',
+  '/editions/200th-combis',
+  '/edition-test-combis',
+]);
+const SCHEDULE_PATH_ALIASES = new Set([
+  PUBLIC_SCHEDULE_PATH,
+  '/edition-200-schedule',
+  '/editions/200th-schedule',
+  '/edition-test-schedule',
+]);
+
+function pathOnly(pathname?: string | null) {
+  return (pathname || '').split('?')[0];
+}
+
+export function isPublicCombisPath(pathname?: string | null) {
+  const path = pathOnly(pathname);
+  return COMBIS_PATH_ALIASES.has(path) || /^\/edition-[^/]+-combis$/.test(path);
+}
+
+export function isPublicSchedulePath(pathname?: string | null) {
+  const path = pathOnly(pathname);
+  return SCHEDULE_PATH_ALIASES.has(path) || /^\/edition-[^/]+-schedule$/.test(path);
+}
+
+export function isPublicTeamsPlayersPath(pathname?: string | null) {
+  const path = (pathname || '').split('?')[0];
+  return path === PUBLIC_TEAMS_PLAYERS_PATH;
+}
+
+export function pinPublicNavHrefs(nav: WebsiteNavCms): WebsiteNavCms {
+  const editionHref = (nav.editionButtonHref || '').trim();
+  return {
+    ...nav,
+    combisHref: PUBLIC_COMBIS_PATH,
+    scheduleHref: PUBLIC_SCHEDULE_PATH,
+    editionButtonHref:
+      !editionHref || isPublicCombisPath(editionHref) || isPublicSchedulePath(editionHref)
+        ? PUBLIC_COMBIS_PATH
+        : editionHref,
+  };
+}
+
 export type WebsiteCmsContent = {
   site: WebsiteSiteCms;
   pages: WebsitePagesCms;
@@ -252,11 +302,11 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   },
   nav: {
     editionButtonLabel: '200th Edition',
-    editionButtonHref: '/edition-200-combis',
+    editionButtonHref: PUBLIC_COMBIS_PATH,
     combisLabel: 'Daily Team Combis',
-    combisHref: '/edition-200-combis',
+    combisHref: PUBLIC_COMBIS_PATH,
     scheduleLabel: 'Match Schedule',
-    scheduleHref: '/edition-200-schedule',
+    scheduleHref: PUBLIC_SCHEDULE_PATH,
   },
   hero: {
     badgeText: 'Celebrating 200th Edition',
@@ -275,7 +325,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     posterUrl: '',
     currentEditionBadge: 'Current Edition',
     ctaButtonText: 'View Bicentennial Monuments Schedule (200th Edition)',
-    ctaButtonLink: '/edition-200-schedule',
+    ctaButtonLink: PUBLIC_SCHEDULE_PATH,
   },
   sponsors: {
     sectionBadge: '💎 Official Elite Sponsors',
@@ -468,8 +518,15 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
         hallOfFame: mergeSection(DEFAULT_WEBSITE_CMS.pages.hallOfFame, parsed.pages?.hallOfFame),
         teamsPlayers: mergeSection(DEFAULT_WEBSITE_CMS.pages.teamsPlayers, parsed.pages?.teamsPlayers),
       },
-      nav: mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav),
-      hero: mergeSection(DEFAULT_WEBSITE_CMS.hero, parsed.hero),
+      nav: pinPublicNavHrefs(mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav)),
+      hero: {
+        ...mergeSection(DEFAULT_WEBSITE_CMS.hero, parsed.hero),
+        ctaButtonLink: isPublicSchedulePath((parsed.hero?.ctaButtonLink || '').trim())
+          ? PUBLIC_SCHEDULE_PATH
+          : isPublicCombisPath((parsed.hero?.ctaButtonLink || '').trim())
+            ? PUBLIC_COMBIS_PATH
+            : parsed.hero?.ctaButtonLink || DEFAULT_WEBSITE_CMS.hero.ctaButtonLink,
+      },
       sponsors: {
         ...mergeSection(DEFAULT_WEBSITE_CMS.sponsors, parsed.sponsors),
         eliteSponsors:

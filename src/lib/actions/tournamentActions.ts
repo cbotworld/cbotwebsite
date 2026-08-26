@@ -303,8 +303,8 @@ export async function saveEditionCalendar(editionId: string, day1: string, total
     revalidatePath('/dashboard/player');
     revalidatePath('/dashboard/captain');
     revalidatePath('/fixtures');
-    revalidatePath('/edition-200-schedule');
-    revalidatePath('/edition-200-combis');
+    revalidatePath('/schedule');
+    revalidatePath('/combis');
     revalidatePath('/', 'layout');
 
     return { success: true, dayDates: filled, edition: updated };
@@ -981,8 +981,8 @@ export async function startNewTournament(opts: {
     revalidatePath('/dashboard/player');
     revalidatePath('/dashboard/captain');
     revalidatePath('/fixtures');
-    revalidatePath('/edition-200-schedule');
-    revalidatePath('/edition-200-combis');
+    revalidatePath('/schedule');
+    revalidatePath('/combis');
     revalidatePath('/teams');
     revalidatePath('/teams-and-players');
 

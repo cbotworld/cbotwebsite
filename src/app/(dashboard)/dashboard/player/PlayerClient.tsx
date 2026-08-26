@@ -114,7 +114,7 @@ export default function PlayerClient({
         ? initialTeammates
         : currentTeam?.members?.map((m: any) => m.user) || [];
   const [nowMs, setNowMs] = React.useState(() => Date.now());
-  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>(() => buildOrganizerScheduleDays());
+  const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -180,6 +180,15 @@ export default function PlayerClient({
     const usedDbIds = new Set<string>();
 
     return scheduleDays.map((day) => {
+      const isSpocDay = Boolean(day.isSpocDay) || day.stageKind === 'SPOC_EXHIBITION';
+      const hasMainMatches = day.matches.some((m) => !m.isSpocExhibition);
+      const isSpocOnly = isSpocDay && !hasMainMatches;
+      if (playerView === 'spoc') {
+        if (!isSpocDay && !day.matches.some((m) => m.isSpocExhibition)) return null;
+      } else if (isSpocOnly) {
+        return null;
+      }
+
       const fix = day.matches.find((f) => {
         const sides = coherentMatchSides(f);
         const tag = (currentTeam.tag || '').toUpperCase().trim();
@@ -191,7 +200,38 @@ export default function PlayerClient({
         const spoc = Boolean(f.isSpocExhibition) || Boolean(day.isSpocDay) || day.stageKind === 'SPOC_EXHIBITION';
         return playerView === 'spoc' ? spoc : !spoc;
       });
-      if (!fix) return null;
+
+      const windowStatus = monumentStatus({ startIso: day.startIso, endIso: day.endIso }, nowMs);
+      const computedStatus = windowStatus === 'completed' ? 'COMPLETED' : windowStatus === 'live' ? 'LIVE' : 'SCHEDULED';
+
+      if (!fix) {
+        const assignedOnDay = playerView === 'spoc' ? day.matches.some((m) => m.isSpocExhibition) : hasMainMatches;
+        if (assignedOnDay) return null;
+        return {
+          id: `schedule_${day.dayNumber}_TBD`,
+          matchNumber: day.dayNumber,
+          scheduledTime: day.startIso,
+          endIso: day.endIso,
+          calendarDate: day.calendarDate,
+          timeRange: day.timeRange,
+          status: computedStatus,
+          tableNumber: 1,
+          isTbd: true,
+          team1Id: currentTeam.id,
+          team1: {
+            id: currentTeam.id,
+            name: currentTeam.name,
+            logo: currentTeam.logo || '',
+          },
+          team2Id: 'tbd',
+          team2: {
+            id: 'tbd',
+            name: 'TBD',
+            logo: '',
+          },
+        };
+      }
+
       const sides = coherentMatchSides(fix);
       const tag = (currentTeam.tag || '').toUpperCase().trim();
       const isT1 =
@@ -214,9 +254,6 @@ export default function PlayerClient({
       });
       if (dbMatch?.id) usedDbIds.add(dbMatch.id);
 
-      const windowStatus = monumentStatus({ startIso: day.startIso, endIso: day.endIso }, nowMs);
-      const computedStatus = windowStatus === 'completed' ? 'COMPLETED' : windowStatus === 'live' ? 'LIVE' : 'SCHEDULED';
-
       const t1Name = sides.team1.name;
       const t2Name = sides.team2.name;
 
@@ -230,6 +267,7 @@ export default function PlayerClient({
         timeRange: day.timeRange,
         status: computedStatus,
         tableNumber: dbMatch?.tableNumber || 1,
+        isTbd: false,
         team1Id: isT1 ? currentTeam.id : dbMatch?.team1Id || `t_${t1Name.replace(/\s+/g, '_')}`,
         team1: {
           id: isT1 ? currentTeam.id : dbMatch?.team1?.id || `t_${t1Name.replace(/\s+/g, '_')}`,
@@ -286,11 +324,15 @@ export default function PlayerClient({
         status: monumentStatus({ startIso: m.scheduledTime, endIso: m.endIso }, nowMs),
       })),
     );
+    if (sortedSchedule.length) return fromSchedule || 1;
     return Math.max(fromSchedule || 0, tournamentPlayWindow(nowMs).currentDay || 0, 1);
   }, [sortedSchedule, nowMs]);
 
   const canGoLive = React.useCallback(
     (match: any): { allowed: boolean; prerequisiteDay: number | null } => {
+      if (match?.isTbd || /^tbd$/i.test(match?.team1?.name || '') || /^tbd$/i.test(match?.team2?.name || '')) {
+        return { allowed: false, prerequisiteDay: null };
+      }
       const dayNum = match?.matchNumber || 0;
       const windowStatus = monumentStatus(
         { startIso: match?.scheduledTime, endIso: match?.endIso },
@@ -498,6 +540,7 @@ export default function PlayerClient({
                     match.team1?.name?.toUpperCase() === currentTeam.name?.toUpperCase();
                   const myTeamName = isMyTeam1 ? (match.team1?.name || currentTeam.name) : (match.team2?.name || currentTeam.name);
                   const oppTeamName = isMyTeam1 ? (match.team2?.name || 'TBD') : (match.team1?.name || 'TBD');
+                  const oppIsTbd = Boolean(match.isTbd) || /^tbd$/i.test(oppTeamName);
                   const myTeamLogo = isMyTeam1 ? (match.team1?.logo || currentTeam.logo) : (match.team2?.logo || currentTeam.logo);
                   const oppTeamLogo = isMyTeam1 ? match.team2?.logo : match.team1?.logo;
                   const dayNum = match.matchNumber || idx + 1;
@@ -565,7 +608,9 @@ export default function PlayerClient({
                               </div>
                             )}
                             <span className="text-[10px] font-bold text-foreground text-center leading-tight truncate w-full">{oppTeamName}</span>
-                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">OPP</Badge>
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 text-muted-foreground">
+                              {oppIsTbd ? 'TBD' : 'OPP'}
+                            </Badge>
                           </div>
                         </div>
 

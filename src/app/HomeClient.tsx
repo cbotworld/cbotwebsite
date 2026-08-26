@@ -195,7 +195,7 @@ export default function HomeClient({
                 </div>
 
                 <div className="pt-1">
-                  <Link href={hero.ctaButtonLink || '/edition-200-schedule'}>
+                  <Link href={hero.ctaButtonLink || '/schedule'}>
                     <Button variant="carrom" className="w-full font-black text-xs h-10 shadow-lg shadow-amber-500/20 gap-2 border border-amber-400">
                       <span>📅</span> {hero.ctaButtonText}
                     </Button>

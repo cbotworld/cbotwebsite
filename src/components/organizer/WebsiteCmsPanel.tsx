@@ -528,7 +528,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
                   <Input
                     value={nav.editionButtonHref}
                     onChange={(e) => setNav({ ...nav, editionButtonHref: e.target.value })}
-                    placeholder="/edition-200-combis"
+                    placeholder="/combis"
                   />
                 </div>
               </div>
@@ -548,11 +548,8 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
                   </div>
                   <div>
                     <label className="text-xs font-bold block mb-1">Combis tab link</label>
-                    <Input
-                      value={nav.combisHref}
-                      onChange={(e) => setNav({ ...nav, combisHref: e.target.value })}
-                      placeholder="/edition-200-combis"
-                    />
+                    <Input value="/combis" readOnly className="bg-muted/40 text-muted-foreground" />
+                    <p className="text-[10px] text-muted-foreground mt-1">Fixed public URL: cbotworld.com/combis</p>
                   </div>
                   <div>
                     <label className="text-xs font-bold block mb-1">Schedule tab text</label>
@@ -564,11 +561,13 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
                   </div>
                   <div>
                     <label className="text-xs font-bold block mb-1">Schedule tab link</label>
-                    <Input
-                      value={nav.scheduleHref}
-                      onChange={(e) => setNav({ ...nav, scheduleHref: e.target.value })}
-                      placeholder="/edition-200-schedule"
-                    />
+                    <Input value="/schedule" readOnly className="bg-muted/40 text-muted-foreground" />
+                    <p className="text-[10px] text-muted-foreground mt-1">Fixed public URL: cbotworld.com/schedule</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      Teams &amp; Players is the third tab under this bar and always opens <span className="font-mono">/teams-and-players</span>.
+                    </p>
                   </div>
                 </div>
               </div>

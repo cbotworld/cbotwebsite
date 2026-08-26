@@ -49,10 +49,9 @@ function revalidateSchedulePaths() {
     '/dashboard/player',
     '/dashboard/captain',
     '/fixtures',
-    '/editions/200th-schedule',
-    '/edition-200-schedule',
-    '/editions/200th-combis',
-    '/edition-200-combis',
+    '/schedule',
+    '/combis',
+    '/teams-and-players',
   ].forEach((path) => revalidatePath(path));
 }
 

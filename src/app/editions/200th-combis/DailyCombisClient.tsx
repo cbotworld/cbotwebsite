@@ -380,7 +380,10 @@ function buildCombiSchedule(opts?: {
   stages?: Array<{ startDay?: number; durationDays?: number; kind?: string; name?: string }>;
 }): DayCombiFixture[] {
   const dates = opts?.dayDates;
-  const official = officialMatchDays().map((d) => {
+  const stages = opts?.stages || [];
+  const official = stages.length
+    ? []
+    : officialMatchDays().map((d) => {
     const calendarDate = calendarDateForDay(d.dayNumber, dates);
     // The monument keeps its own play window only while it still falls on its original
     // day; once the organizer moves the calendar, the window follows the new date.
@@ -439,9 +442,13 @@ function buildCombiSchedule(opts?: {
     );
   });
 
-  const officialMax = official.reduce((max, d) => Math.max(max, d.dayNumber), 7);
-  const stageMax = opts?.stages?.length ? stageSpanDays(opts.stages as any) : 0;
-  const totalDays = Math.max(officialMax, opts?.totalDays || 0, stageMax, 7);
+  const officialMax = stages.length
+    ? 0
+    : official.reduce((max, d) => Math.max(max, d.dayNumber), 7);
+  const stageMax = stages.length ? stageSpanDays(stages as any) : 0;
+  const totalDays = stages.length
+    ? Math.max(stageMax, 1)
+    : Math.max(officialMax, opts?.totalDays || 0, 7);
 
   const days: DayCombiFixture[] = [];
   for (let n = 1; n <= totalDays; n += 1) {

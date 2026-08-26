@@ -7,6 +7,10 @@ import { prisma } from '@/lib/prisma';
 import {
   DEFAULT_WEBSITE_CMS,
   parseWebsiteCms,
+  pinPublicNavHrefs,
+  PUBLIC_COMBIS_PATH,
+  PUBLIC_SCHEDULE_PATH,
+  PUBLIC_TEAMS_PLAYERS_PATH,
   WEBSITE_CMS_KEY,
   type WebsiteCmsContent,
   type WebsiteHeroCms,
@@ -50,6 +54,9 @@ async function saveWebsiteCms(content: WebsiteCmsContent) {
   revalidatePath('/', 'layout');
   revalidatePath('/editions');
   revalidatePath('/dashboard/organizer');
+  revalidatePath(PUBLIC_COMBIS_PATH);
+  revalidatePath(PUBLIC_SCHEDULE_PATH);
+  revalidatePath(PUBLIC_TEAMS_PLAYERS_PATH);
 }
 
 export async function updateWebsiteHeroCms(data: WebsiteHeroCms, editionId?: string) {
@@ -162,14 +169,14 @@ export async function updateWebsiteNavCms(data: WebsiteNavCms) {
       (data[key] || '').trim() || current[key] || DEFAULT_WEBSITE_CMS.nav[key];
 
     await saveCmsPatch({
-      nav: {
+      nav: pinPublicNavHrefs({
         editionButtonLabel: keep('editionButtonLabel'),
         editionButtonHref: keep('editionButtonHref'),
         combisLabel: keep('combisLabel'),
-        combisHref: keep('combisHref'),
+        combisHref: PUBLIC_COMBIS_PATH,
         scheduleLabel: keep('scheduleLabel'),
-        scheduleHref: keep('scheduleHref'),
-      },
+        scheduleHref: PUBLIC_SCHEDULE_PATH,
+      }),
     });
     return { success: true };
   } catch (error) {
