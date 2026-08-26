@@ -24,7 +24,7 @@ import {
   SCORE_EDIT_PLAYER_CLOSED,
 } from '@/lib/score-edit-policy';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
-import { editionBoardAverage, previewTargetBonus, resolveScoreInput, type DayBoardScore } from '@/lib/board-scores';
+import { editionBoardAverage, normalizeBoards, previewTargetBonus, resolveScoreInput, type DayBoardScore } from '@/lib/board-scores';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
@@ -362,7 +362,7 @@ export async function getOrganiserScoreDesk() {
         dayNumber: s.dayNumber,
         score: s.score,
         slams: s.slams,
-        boards: Array.isArray(s.boards) ? s.boards : [],
+        boards: normalizeBoards(s.boards, s.score, s.slams),
         source,
         enteredByName: enterer?.name || enterer?.username || null,
       };

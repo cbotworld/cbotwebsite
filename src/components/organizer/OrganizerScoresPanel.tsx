@@ -12,7 +12,7 @@ import {
 import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
 import { ScoreEditRules } from '@/components/scores/ScoreEditRules';
 import { SCORE_EDIT_ORGANISER_HELP } from '@/lib/score-edit-policy';
-import { boardsToDraft, draftToPayload, emptyBoardDraft } from '@/lib/board-scores';
+import { boardsToDraft, draftToPayload, emptyBoardDraft, type DayBoardScore } from '@/lib/board-scores';
 
 type DeskDay = { dayNumber: number; calendarDate: string; published: boolean };
 type DeskScore = {
@@ -20,7 +20,7 @@ type DeskScore = {
   dayNumber: number;
   score: number;
   slams: number;
-  boards: Array<{ score?: number; slams?: number }>;
+  boards: DayBoardScore[];
   source: string;
   enteredByName?: string | null;
 };
