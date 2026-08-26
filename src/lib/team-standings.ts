@@ -349,7 +349,7 @@ export function buildStageStandingBlocks(opts: {
           applyBonuses(row, team, days, opts.scores, opts.dayDates, now);
           row.days = (row.days || [])
             .map((d) => ({ ...d, total: d.eventPts + d.slamBonus + d.avgBonus }))
-            .filter((d) => d.eventPts || d.slamBonus || d.avgBonus || d.events.length)
+            .filter((d) => d.eventPts || d.slamBonus || d.avgBonus || (d.events || []).length)
             .sort((a, b) => a.dayNumber - b.dayNumber);
         }
         return { key: group.key, name: group.name, rows: rankStandingRows([...rowsByTeam.values()]) };

@@ -5,7 +5,7 @@ import StandingsClient from './StandingsClient';
 export const dynamic = 'force-dynamic';
 
 export default async function StandingsPage() {
-  const payload = await getPublicStandings();
+  const payload = JSON.parse(JSON.stringify(await getPublicStandings()));
   return <StandingsClient payload={payload} />;
 }
 

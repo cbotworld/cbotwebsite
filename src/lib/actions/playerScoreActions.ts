@@ -498,17 +498,26 @@ export async function recordPlayerAverageChange(
   revalidateScorePages();
 }
 
+const emptyScoreboard = {
+  edition: null as { id: string; title: string; number: number } | null,
+  days: [] as Array<{ dayNumber: number; published: boolean; calendarDate: string }>,
+  teams: [] as any[],
+  scores: [] as any[],
+  maxDay: 1,
+};
+
 export async function getPublicScoreboard() {
-  const edition = await loadLatestEdition();
-  if (!edition) {
-    return {
-      edition: null,
-      days: [] as Array<{ dayNumber: number; published: boolean; calendarDate: string }>,
-      teams: [] as any[],
-      scores: [] as any[],
-      maxDay: 1,
-    };
+  try {
+    return await loadPublicScoreboard();
+  } catch (error) {
+    console.error('getPublicScoreboard', error);
+    return emptyScoreboard;
   }
+}
+
+async function loadPublicScoreboard() {
+  const edition = await loadLatestEdition();
+  if (!edition) return emptyScoreboard;
   const stages = (await loadStageConfig(edition.id)).stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const teams = await prisma.team.findMany({
@@ -535,16 +544,27 @@ export async function getPublicScoreboard() {
       id: t.id,
       name: t.name,
       tag: t.tag,
-      players: t.members.map((m) => ({
-        id: m.user.id,
-        name: m.user.name || m.user.username,
-      })),
+      players: t.members
+        .filter((m) => m.user)
+        .map((m) => ({
+          id: m.user.id,
+          name: m.user.name || m.user.username,
+        })),
     })),
     scores: scores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
   };
 }
 
 export async function getPublicStandings() {
+  try {
+    return await loadPublicStandings();
+  } catch (error) {
+    console.error('getPublicStandings', error);
+    return { edition: null, blocks: [] as any[], players: [] as any[], placement: [] as any[], stages: [] as any[] };
+  }
+}
+
+async function loadPublicStandings() {
   const edition = await loadLatestEdition();
   if (!edition) return { edition: null, blocks: [], players: [], placement: [], stages: [] };
   const config = await loadStageConfig(edition.id);

@@ -11,15 +11,18 @@ export default function PlayerScoresClient({
   scores,
 }: {
   editionTitle: string;
-  days: Array<{ dayNumber: number; published: boolean; calendarDate: string }>;
-  teams: Array<{ id: string; name: string; tag: string; players: Array<{ id: string; name: string }> }>;
-  scores: Array<{ userId: string; dayNumber: number; score: number; slams: number }>;
+  days?: Array<{ dayNumber: number; published: boolean; calendarDate: string }>;
+  teams?: Array<{ id: string; name: string; tag: string; players: Array<{ id: string; name: string }> }>;
+  scores?: Array<{ userId: string; dayNumber: number; score: number; slams: number }>;
 }) {
-  const latestPublished = [...days].reverse().find((d) => d.published)?.dayNumber || days[0]?.dayNumber || 1;
+  const dayList = Array.isArray(days) ? days : [];
+  const teamList = Array.isArray(teams) ? teams : [];
+  const scoreList = Array.isArray(scores) ? scores : [];
+  const latestPublished = [...dayList].reverse().find((d) => d.published)?.dayNumber || dayList[0]?.dayNumber || 1;
   const [day, setDay] = React.useState(latestPublished);
-  const selected = days.find((d) => d.dayNumber === day) || days[0];
+  const selected = dayList.find((d) => d.dayNumber === day) || dayList[0];
   const byUser = new Map(
-    scores.filter((s) => s.dayNumber === day).map((s) => [s.userId, s]),
+    scoreList.filter((s) => s.dayNumber === day).map((s) => [s.userId, s]),
   );
 
   return (
@@ -32,7 +35,7 @@ export default function PlayerScoresClient({
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {days.map((d) => (
+        {dayList.map((d) => (
           <button
             key={d.dayNumber}
             type="button"
@@ -45,7 +48,13 @@ export default function PlayerScoresClient({
           </button>
         ))}
       </div>
-      {!selected?.published ? (
+      {dayList.length === 0 ? (
+        <Card className="border-amber-500/30">
+          <CardContent className="p-6 text-sm font-semibold text-muted-foreground">
+            Player scores will appear here once the edition schedule is set.
+          </CardContent>
+        </Card>
+      ) : !selected?.published ? (
         <Card className="border-amber-500/30">
           <CardContent className="p-6 text-sm font-semibold text-muted-foreground">
             Day {day} publishes at 8:00pm IST on {selected?.calendarDate}. Scores stay hidden until then.
@@ -53,14 +62,14 @@ export default function PlayerScoresClient({
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {teams.map((team) => (
+          {teamList.map((team) => (
             <Card key={team.id} className="border-border">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-black">{team.name}</CardTitle>
                 <CardDescription>{team.tag}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {team.players.map((player) => {
+                {(team.players || []).map((player) => {
                   const row = byUser.get(player.id);
                   return (
                     <div key={player.id} className="flex items-center justify-between text-sm border-b border-border/40 pb-1.5 last:border-0">

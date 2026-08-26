@@ -3,8 +3,6 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { MOCK_TEAMS, MOCK_MATCHES } from '@/lib/mock-data';
-import { submitScoreReport } from '@/lib/actions/matchActions';
 import { getMyDayScores, submitPlayerDayScore } from '@/lib/actions/playerScoreActions';
 import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
 import { boardsToDraft, draftToPayload, emptyBoardDraft } from '@/lib/board-scores';
@@ -12,14 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
-  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, Send, PlayCircle, MapPin, Share2, Sparkles
+  UserCheck, Trophy, Target, Crown, Calendar, Video, CheckCircle2, Layers, Users, Lock, PlayCircle, MapPin, Share2, Sparkles
 } from 'lucide-react';
-import { Match, BoardPattern, User } from '@/types';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
 import {
   currentPlayDayNumber,
@@ -373,61 +369,6 @@ export default function PlayerClient({
     [scheduledDayNumbers, daysWithYoutube, currentPlayDay, nowMs]
   );
 
-  // Score & Live Stream Submission Modal State
-  const [scoreModalOpen, setScoreModalOpen] = React.useState(false);
-  const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
-
-  // Submission Form States
-  const [team1Score, setTeam1Score] = React.useState('');
-  const [team2Score, setTeam2Score] = React.useState('');
-  const [queenStrikes, setQueenStrikes] = React.useState('');
-  const [missesCount, setMissesCount] = React.useState('');
-  const [liveStreamUrl, setLiveStreamUrl] = React.useState('');
-  const [recordingUrl, setRecordingUrl] = React.useState('');
-  const [proofNotes, setProofNotes] = React.useState('');
-
-  const [submissionSuccess, setSubmissionSuccess] = React.useState('');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const handleOpenScoreModal = (match: Match) => {
-    setSelectedMatch(match);
-    setSubmissionSuccess('');
-    setScoreModalOpen(true);
-    setTeam1Score(match.score1 > 0 ? match.score1.toString() : '');
-    setTeam2Score(match.score2 > 0 ? match.score2.toString() : '');
-    setQueenStrikes('');
-    setMissesCount('');
-    setLiveStreamUrl('');
-    setRecordingUrl('');
-    setProofNotes('');
-  };
-
-  const handlePlayerScoreSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMatch) return;
-    setIsSubmitting(true);
-
-    const res = await submitScoreReport({
-      matchId: selectedMatch.id,
-      captainUserId: currentPlayer.id,
-      team1Score: parseInt(team1Score || '0', 10),
-      team2Score: parseInt(team2Score || '0', 10),
-      queenStrikes1: parseInt(queenStrikes || '0', 10),
-      queenStrikes2: 0,
-      proofNotes: `Player Notes: ${proofNotes} | Misses/Fouls: ${missesCount || 0} | Stream: ${liveStreamUrl} | Recording: ${recordingUrl}`,
-      proofUrl: liveStreamUrl || recordingUrl,
-    });
-
-    if (res.success) {
-      setSubmissionSuccess('Score, misses & live stream links submitted for Referee verification!');
-      setTimeout(() => {
-        setScoreModalOpen(false);
-        setSubmissionSuccess('');
-      }, 2000);
-    }
-    setIsSubmitting(false);
-  };
-
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       
@@ -730,7 +671,6 @@ export default function PlayerClient({
           <TabsTrigger value="profile"><UserCheck className="h-4 w-4 mr-2" /> Profile</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-2" /> My Team</TabsTrigger>
           <TabsTrigger value="day-score" className="text-amber-500 data-[state=active]:text-amber-600"><Target className="h-4 w-4 mr-2" /> Day Score</TabsTrigger>
-          <TabsTrigger value="submit-score" className="text-amber-500 data-[state=active]:text-amber-600"><Send className="h-4 w-4 mr-2" /> Submit Score</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -866,144 +806,7 @@ export default function PlayerClient({
           </Card>
         </TabsContent>
 
-        <TabsContent value="submit-score">
-            <Card className="border-amber-500/30">
-                <CardHeader>
-                    <CardTitle className="text-xl font-bold flex items-center gap-2">
-                        <Send className="h-5 w-5 text-amber-500" /> Submit Match Score
-                    </CardTitle>
-                    <CardDescription>
-                        Select a match to submit scores, fouls, and live stream links.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4 max-w-2xl">
-                        <label className="text-sm font-bold">Select Match</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {personalSchedule.filter(m => m.status !== 'COMPLETED').map(match => (
-                                <Button 
-                                    key={match.id}
-                                    variant="outline"
-                                    className="justify-start h-auto py-3 px-4 text-left border-border bg-card hover:border-amber-500/50"
-                                    onClick={() => handleOpenScoreModal(match)}
-                                >
-                                    <div className="flex flex-col gap-1 w-full">
-                                        <div className="flex justify-between items-center w-full">
-                                            <span className="font-mono text-xs text-amber-500">Match #{match.matchNumber}</span>
-                                            <Badge variant="secondary" className="text-[9px]">{match.status}</Badge>
-                                        </div>
-                                        <div className="font-bold text-sm mt-1 text-wrap">
-                                            {match.team1?.name} vs {match.team2?.name}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            Table {match.tableNumber} • {new Date(match.scheduledTime).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                </Button>
-                            ))}
-                            {personalSchedule.filter(m => m.status !== 'COMPLETED').length === 0 && (
-                                <div className="text-sm text-muted-foreground p-4 bg-muted/20 rounded-lg text-center col-span-full">
-                                    No pending matches available for score submission.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </TabsContent>
-
       </Tabs>
-
-      {/* PLAYER SCORE & LIVE STREAM SUBMISSION MODAL */}
-      {selectedMatch && (
-        <Dialog open={scoreModalOpen} onOpenChange={setScoreModalOpen}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5 text-amber-500" /> Submit Match Details
-            </DialogTitle>
-            <DialogDescription>
-              Match #{selectedMatch.matchNumber} ({selectedMatch.team1?.name} vs {selectedMatch.team2?.name})
-            </DialogDescription>
-          </DialogHeader>
-
-          {submissionSuccess ? (
-            <div className="p-6 text-center space-y-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 my-4">
-              <CheckCircle2 className="h-10 w-10 text-amber-500 mx-auto" />
-              <h3 className="font-extrabold text-base">{submissionSuccess}</h3>
-            </div>
-          ) : (
-            <form onSubmit={handlePlayerScoreSubmit} className="space-y-4 py-2 overflow-y-auto max-h-[60vh] px-1">
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold block mb-1">{selectedMatch.team1?.name} Score <span className="text-red-500">*</span></label>
-                  <Input type="number" value={team1Score} onChange={(e) => setTeam1Score(e.target.value)} required placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1">{selectedMatch.team2?.name} Score <span className="text-red-500">*</span></label>
-                  <Input type="number" value={team2Score} onChange={(e) => setTeam2Score(e.target.value)} required placeholder="0" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold block mb-1">Queen Covers <span className="text-red-500">*</span></label>
-                  <Input type="number" value={queenStrikes} onChange={(e) => setQueenStrikes(e.target.value)} required placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1">Fouls / Misses</label>
-                  <Input type="number" value={missesCount} onChange={(e) => setMissesCount(e.target.value)} placeholder="0" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold mb-1 flex items-center gap-1">
-                  <Video className="h-3.5 w-3.5 text-rose-500" /> Live Stream Link <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="url"
-                  value={liveStreamUrl}
-                  onChange={(e) => setLiveStreamUrl(e.target.value)}
-                  placeholder="https://youtube.com/live/..."
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold mb-1 flex items-center gap-1">
-                  <PlayCircle className="h-3.5 w-3.5 text-blue-500" /> Match Recording Link (Optional)
-                </label>
-                <Input
-                  type="url"
-                  value={recordingUrl}
-                  onChange={(e) => setRecordingUrl(e.target.value)}
-                  placeholder="https://facebook.com/watch/..."
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold block mb-1">Match Proof Notes</label>
-                <textarea
-                  rows={2}
-                  value={proofNotes}
-                  onChange={(e) => setProofNotes(e.target.value)}
-                  placeholder="Additional context about the match, disputes, etc."
-                  className="w-full rounded-lg border border-input bg-background p-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-border mt-4">
-                <Button type="button" variant="outline" onClick={() => setScoreModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="carrom" disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Report'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </Dialog>
-      )}
 
     </div>
   );

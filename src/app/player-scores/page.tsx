@@ -7,12 +7,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function PlayerScoresPage() {
   const [cms, board] = await Promise.all([getWebsiteCmsContent(), getPublicScoreboard()]);
+  const safe = JSON.parse(JSON.stringify(board || {}));
   return (
     <PlayerScoresClient
-      editionTitle={board.edition?.title || cms.pages.playerScores.title}
-      days={board.days}
-      teams={board.teams}
-      scores={board.scores}
+      editionTitle={safe.edition?.title || cms.pages?.playerScores?.title || 'Player Scores'}
+      days={Array.isArray(safe.days) ? safe.days : []}
+      teams={Array.isArray(safe.teams) ? safe.teams : []}
+      scores={Array.isArray(safe.scores) ? safe.scores : []}
     />
   );
 }

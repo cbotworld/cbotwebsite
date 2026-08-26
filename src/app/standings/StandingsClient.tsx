@@ -38,12 +38,13 @@ function StatButton({
 }
 
 export default function StandingsClient({ payload }: { payload: any }) {
-  const blocks = payload.blocks || [];
+  const data = payload || {};
+  const blocks = Array.isArray(data.blocks) ? data.blocks : [];
   const [tab, setTab] = React.useState<'teams' | 'players'>('teams');
   const [stageId, setStageId] = React.useState(blocks.find((b: any) => b.current)?.stageId || blocks[0]?.stageId || '');
   const stage = blocks.find((b: any) => b.stageId === stageId) || blocks[0];
-  const players = payload.players || [];
-  const placement = payload.placement || [];
+  const players = Array.isArray(data.players) ? data.players : [];
+  const placement = Array.isArray(data.placement) ? data.placement : [];
   const rankingReady = players.some((row: any) => Number(row.boardCount) > 0);
   const [open, setOpen] = React.useState<{ row: any; focus: FocusCol } | null>(null);
   const days = open?.row?.days || [];
@@ -54,7 +55,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       <div>
         <Badge variant="carrom" className="mb-2">Standings</Badge>
-        <h1 className="text-3xl font-black tracking-tight">{payload.edition?.title || 'Team Standings'}</h1>
+        <h1 className="text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
         <p className="text-sm text-muted-foreground mt-1">
           One table per organiser stage. Position is total points, then matches won if points are tied, then slams. Tap Event, Slams, Target+ or Total for the day-wise breakdown after each day completes.
         </p>
