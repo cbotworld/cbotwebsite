@@ -132,7 +132,7 @@ export function StandingsScreen(_props: Props) {
               <View style={styles.tableHead}>
                 <Text style={[styles.th, styles.colRank]}>#</Text>
                 <Text style={[styles.th, styles.colName]}>PLAYER</Text>
-                <Text style={[styles.th, styles.colNum]}>BRDS</Text>
+                <Text style={[styles.th, styles.colNum]}>SLAMS</Text>
                 <Text style={[styles.th, styles.colNum]}>WO</Text>
                 <Text style={[styles.th, styles.colNum]}>AVG</Text>
               </View>
@@ -147,7 +147,7 @@ export function StandingsScreen(_props: Props) {
                       {row.teamName}
                     </Text>
                   </View>
-                  <Text style={[styles.td, styles.colNum]}>{row.boardCount}</Text>
+                  <Text style={[styles.td, styles.colNum]}>{row.slams ?? 0}</Text>
                   <Text style={[styles.td, styles.colNum]}>{row.walkovers}</Text>
                   <Text style={[styles.tdStrong, styles.colNum]}>
                     {row.boardAverage == null ? '—' : Number(row.boardAverage).toFixed(2)}
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
   thOn: { color: '#f59e0b' },
   colRank: { width: 22 },
   colName: { flex: 1, minWidth: 72, paddingRight: 4 },
-  colNum: { width: 40, textAlign: 'right' },
+  colNum: { width: 48, textAlign: 'right' },
   colStat: { width: 32, textAlign: 'center' },
   td: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
   tdOn: { color: '#fbbf24', fontWeight: '900' },

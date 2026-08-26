@@ -80,7 +80,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     <TableHead>#</TableHead>
                     <TableHead>Player</TableHead>
                     <TableHead>Team</TableHead>
-                    <TableHead>Boards</TableHead>
+                    <TableHead>Slams</TableHead>
                     <TableHead>WO</TableHead>
                     <TableHead>Avg</TableHead>
                   </TableRow>
@@ -91,7 +91,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                       <TableCell className="font-black">{row.rank}</TableCell>
                       <TableCell className="font-semibold">{row.name}</TableCell>
                       <TableCell>{row.teamName}</TableCell>
-                      <TableCell>{row.boardCount}</TableCell>
+                      <TableCell>{row.slams ?? 0}</TableCell>
                       <TableCell>{row.walkovers}</TableCell>
                       <TableCell className="font-mono font-bold">{row.boardAverage == null ? '—' : Number(row.boardAverage).toFixed(2)}</TableCell>
                     </TableRow>
