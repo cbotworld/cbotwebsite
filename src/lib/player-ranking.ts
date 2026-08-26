@@ -6,7 +6,7 @@ import type {
   TournamentStage,
 } from '@/types';
 import { isDayScorePublished } from '@/lib/day-scoring';
-import { editionBoardAverage, previewTargetBonus } from '@/lib/board-scores';
+import { editionBoardAverage, previewTargetBonus, roundAverage } from '@/lib/board-scores';
 import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
 
@@ -51,6 +51,10 @@ export function rankPlayers(opts: {
     }
     const stats = editionBoardAverage(submitted);
     const slams = submitted.reduce((sum, row) => sum + (row.slams || 0), 0);
+    const boardAverage = stats.boardCount > 0 ? stats.average : null;
+    const current = Number(player.average);
+    const rankingAverage =
+      Number.isFinite(current) && current > 0 ? roundAverage(current) : boardAverage;
     return {
       userId: player.userId,
       name: player.name,
@@ -60,7 +64,7 @@ export function rankPlayers(opts: {
       walkovers,
       totalScore: stats.totalScore,
       boardCount: stats.boardCount,
-      boardAverage: stats.boardCount > 0 ? stats.average : null,
+      boardAverage: rankingAverage,
       matchesWon: player.matchesWon || 0,
       slams,
       rank: 0,

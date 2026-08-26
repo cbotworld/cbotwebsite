@@ -177,7 +177,13 @@ export async function fetchPlayerCombis() {
 
 export type DayScoreInfo = {
   success: boolean;
-  scores: Array<{ dayNumber: number; score: number; slams: number }>;
+  scores: Array<{
+    dayNumber: number;
+    score: number;
+    slams: number;
+    boards?: Array<{ score: number; slams: number }>;
+  }>;
+  days?: Array<{ dayNumber: number; windowOpen: boolean; windowReason?: string | null; submitted?: boolean }>;
   eligibleDay?: number | null;
   maxDay?: number;
   windowOpen?: boolean;
@@ -186,6 +192,8 @@ export type DayScoreInfo = {
   publishedDays?: Array<{ dayNumber: number; published: boolean }>;
   cutoffIso?: string;
   editionTitle?: string;
+  target?: number;
+  average?: number;
   error?: string;
 };
 
@@ -204,7 +212,12 @@ export async function fetchPlayerScores(): Promise<DayScoreInfo> {
   return data as DayScoreInfo;
 }
 
-export async function submitPlayerDayScore(dayNumber: number, score: number, slams: number) {
+export async function submitPlayerDayScore(
+  dayNumber: number,
+  score: number,
+  slams: number,
+  boards?: Array<{ score: number; slams: number }>,
+) {
   const current = getSession();
   if (!current?.token) {
     throw new Error('Please log in.');
@@ -215,7 +228,7 @@ export async function submitPlayerDayScore(dayNumber: number, score: number, sla
       Authorization: `Bearer ${current.token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ dayNumber, score, slams }),
+    body: JSON.stringify({ dayNumber, score, slams, boards }),
   });
   const data = await res.json();
   if (!data.success) {

@@ -74,7 +74,6 @@ export function StandingsScreen({ embedded }: { embedded?: boolean }) {
   const stage = blocks.find((b) => b.stageId === stageId) || blocks[0];
   const players = payload?.players || [];
   const placement = payload?.placement || [];
-  const rankingReady = players.some((row: any) => Number(row.boardCount) > 0);
   const days = open?.row?.days || [];
 
   return (
@@ -111,8 +110,8 @@ export function StandingsScreen({ embedded }: { embedded?: boolean }) {
         </View>
       ) : tab === 'players' ? (
         <ScrollView contentContainerStyle={styles.list}>
-          {players.length === 0 || !rankingReady ? (
-            <Text style={styles.empty}>Publishes after the first 8:00pm IST score lock.</Text>
+          {players.length === 0 ? (
+            <Text style={styles.empty}>No players on the edition roster yet.</Text>
           ) : (
             <>
               <View style={styles.tableHead}>

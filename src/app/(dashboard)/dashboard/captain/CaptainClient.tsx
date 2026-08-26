@@ -13,6 +13,16 @@ import { Avatar } from '@/components/ui/avatar';
 import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
 import { getTeamDayScores, submitTeamDayScores, getPublicScoreboard } from '@/lib/actions/playerScoreActions';
+import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
+import { ScoreEditRules } from '@/components/scores/ScoreEditRules';
+import { SCORE_EDIT_CAPTAIN_CLOSED, SCORE_EDIT_CAPTAIN_HELP } from '@/lib/score-edit-policy';
+import {
+  aggregateBoards,
+  boardsToDraft,
+  draftToPayload,
+  previewTargetBonus,
+  type BoardDraft,
+} from '@/lib/board-scores';
 import {
   buildDayDatesMap,
   currentCombiDayNumber,
@@ -20,43 +30,59 @@ import {
   isCombiSubmissionLocked,
   normalizeDayDates,
 } from '@/lib/combi-cutoff';
+import { combiRoundLabel } from '@/lib/combi-round-label';
 import PlayerClient from '../player/PlayerClient';
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
   return isCombiSubmissionLocked(dayNum, dayDatesMap);
 }
 
 function mapTeamScorePlayers(players: any[]) {
-  return (players || []).map((p: any) => ({
-    userId: p.userId,
-    name: p.name,
-    score: p.score == null ? '' : String(p.score),
-    slams: p.slams == null ? '0' : String(p.slams),
-    missingPrior: Boolean(p.missingPrior),
-    average: Number(p.averageInEffect ?? p.average) || 0,
-  }));
+  return (players || []).map((p: any) => {
+    const boards = boardsToDraft(p.boards, p.score, p.slams);
+    return {
+      userId: p.userId,
+      name: p.name,
+      score: p.score == null ? '' : String(p.score),
+      slams: p.slams == null ? '0' : String(p.slams),
+      boards,
+      target: Number(p.target) || 0,
+      missingPrior: Boolean(p.missingPrior),
+      average: Number(p.averageInEffect ?? p.average) || 0,
+    };
+  });
 }
 
-function rowHasAvgBonus(row: { score: string; average?: number }): boolean | null {
-  if (row.score === '') return null;
+function rowFilledBoards(row: { boards?: BoardDraft[]; score: string; slams: string }) {
+  const fromDrafts = draftToPayload(row.boards || []).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+  if (fromDrafts.length) return fromDrafts;
   const score = parseInt(row.score, 10);
-  if (!Number.isFinite(score)) return null;
-  return score < (Number(row.average) || 0);
+  if (!Number.isFinite(score) || row.score === '') return [];
+  return [{ score, slams: parseInt(row.slams || '0', 10) || 0 }];
 }
 
-function avgBonusText(row: { score: string; average?: number }) {
-  const yes = rowHasAvgBonus(row);
-  if (yes == null) return 'Avg —';
-  return yes ? 'Avg Yes' : 'Avg No';
+function rowHasTargetBonus(row: { boards?: BoardDraft[]; score: string; slams: string; target?: number }): boolean | null {
+  const filled = rowFilledBoards(row);
+  if (!filled.length) return null;
+  return previewTargetBonus(aggregateBoards(filled).score, row.target);
+}
+
+function avgBonusText(row: { boards?: BoardDraft[]; score: string; slams: string; target?: number }) {
+  const yes = rowHasTargetBonus(row);
+  if (yes == null) return 'Bonus —';
+  return yes ? 'Bonus Yes' : 'Bonus No';
 }
 
 function combiPlayerLabel(
   member: { id: string; name?: string; username?: string },
-  rows: Array<{ userId: string; score: string; slams: string; average?: number }>,
+  rows: Array<{ userId: string; score: string; slams: string; boards?: BoardDraft[]; target?: number }>,
 ) {
   const name = member.name || member.username || 'Player';
   const row = rows.find((r) => r.userId === member.id);
-  if (!row || row.score === '') return `${name} · — · Avg —`;
-  return `${name} · ${row.score} · ${row.slams || 0}s · ${avgBonusText(row)}`;
+  if (!row) return `${name} · — · Bonus —`;
+  const filled = rowFilledBoards(row);
+  if (!filled.length) return `${name} · — · Bonus —`;
+  const agg = aggregateBoards(filled);
+  return `${name} · ${agg.score} · ${agg.boardCount}b · ${avgBonusText(row)}`;
 }
 
 // Helper: how many players a format needs per round
@@ -148,32 +174,7 @@ export default function CaptainClient({
 
   const roundsPerDay: number = editionRoundFormats.length;
 
-  // Helper to get labels like "Singles 1", "Doubles 2", "Triples 1"
-  const getRoundLabel = (index: number) => {
-    let singlesCount = 0;
-    let doublesCount = 0;
-    let triplesCount = 0;
-    let genericCount = 0;
-
-    for (let i = 0; i <= index; i++) {
-      const fmt = editionRoundFormats[i]?.toUpperCase() || 'SINGLES';
-      if (fmt.includes('TRIPLES')) {
-        triplesCount++;
-      } else if (fmt.includes('DOUBLES')) {
-        doublesCount++;
-      } else if (fmt.includes('SINGLES')) {
-        singlesCount++;
-      } else {
-        genericCount++;
-      }
-    }
-
-    const currentFmt = editionRoundFormats[index]?.toUpperCase() || 'SINGLES';
-    if (currentFmt.includes('TRIPLES')) return `Triples ${triplesCount}`;
-    if (currentFmt.includes('DOUBLES')) return `Doubles ${doublesCount}`;
-    if (currentFmt.includes('SINGLES')) return `Singles ${singlesCount}`;
-    return `Match ${genericCount}`;
-  };
+  const getRoundLabel = (index: number) => combiRoundLabel(editionRoundFormats, index);
 
   // Roster view
   const [rosterViewMode, setRosterViewMode] = React.useState<'MY_TEAM' | 'ALL_TEAMS'>('MY_TEAM');
@@ -202,6 +203,8 @@ export default function CaptainClient({
     name: string;
     score: string;
     slams: string;
+    boards: BoardDraft[];
+    target?: number;
     missingPrior?: boolean;
     average?: number;
   }>>([]);
@@ -327,11 +330,15 @@ export default function CaptainClient({
 
   const handleSaveTeamScores = async () => {
     if (!currentTeam?.id) return;
-    const filled = teamScoreRows.filter((r) => r.score !== '' && !r.missingPrior);
+    const filled = teamScoreRows.filter((r) => !r.missingPrior && rowFilledBoards(r).length > 0);
     const res = await submitTeamDayScores(
       currentTeam.id,
       selectedDayNumber,
-      filled.map((r) => ({ userId: r.userId, score: parseInt(r.score, 10), slams: parseInt(r.slams || '0', 10) })),
+      filled.map((r) => {
+        const boards = rowFilledBoards(r);
+        const agg = aggregateBoards(boards);
+        return { userId: r.userId, score: agg.score, slams: agg.slams, boards };
+      }),
     );
     setTeamScoreMsg(res.success ? 'Saved team scores.' : res.error || 'Failed');
     if (res.success) {
@@ -508,58 +515,57 @@ export default function CaptainClient({
       </Card>
 
       <Card className="border-emerald-500/30">
-        <CardHeader>
-          <CardTitle className="text-lg font-black">Team day scores — Day {selectedDayNumber}</CardTitle>
-          <CardDescription>
-            {teamScoreOpen
-              ? 'Enter or fix teammate scores if they forgot or entered wrong. Closes 9:30pm IST with combis.'
-              : 'Window closed at 9:30pm IST. Published scores below.'}
-          </CardDescription>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg font-black">Team day scores</CardTitle>
+            <CardDescription>Enter or fix teammate boards. Saved player scores load automatically.</CardDescription>
+          </div>
+          <select
+            className="h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold min-w-[10rem]"
+            value={selectedDayNumber}
+            onChange={(e) => setSelectedDayNumber(parseInt(e.target.value, 10) || 1)}
+          >
+            {combiDayNumbers.map((d) => (
+              <option key={d} value={d}>
+                Day {d}
+                {dayDatesMap[d] ? ` · ${dayDatesMap[d]}` : ''}
+              </option>
+            ))}
+          </select>
         </CardHeader>
         <CardContent className="space-y-3">
+          <ScoreEditRules note={teamScoreOpen ? SCORE_EDIT_CAPTAIN_HELP : SCORE_EDIT_CAPTAIN_CLOSED} />
           {teamScoreOpen && (
-            <div className="grid grid-cols-[1fr_5rem_5rem_4.5rem] gap-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground px-0.5">
-              <span>Player</span>
-              <span>Score</span>
-              <span>Slams</span>
-              <span>Avg bonus</span>
-            </div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Board score and slam per player. Total vs that player’s target decides bonus.
+            </p>
           )}
           {teamScoreOpen && teamScoreRows.map((row, idx) => (
-            <div key={row.userId} className="grid grid-cols-[1fr_5rem_5rem_4.5rem] gap-2 items-center text-sm">
+            <div key={row.userId} className="rounded-xl border border-border p-3 space-y-2">
               <div className="min-w-0">
                 <div className="font-semibold truncate">{row.name}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — you can still edit until 9:30pm' : 'Empty — walkover if still blank at 8pm'}
+                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — captain can still edit until 9:30pm IST' : 'Empty — walkover if still blank at 8:00pm IST'}
                 </div>
               </div>
-              <Input
-                type="number"
-                min={0}
+              <BoardScoreEditor
+                compact
+                boards={row.boards}
                 disabled={!teamScoreOpen || row.missingPrior}
-                value={row.score}
-                onChange={(e) => {
-                  const next = [...teamScoreRows];
-                  next[idx] = { ...row, score: e.target.value };
-                  setTeamScoreRows(next);
+                target={row.target}
+                onChange={(next) => {
+                  const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+                  const agg = aggregateBoards(filled);
+                  const updated = [...teamScoreRows];
+                  updated[idx] = {
+                    ...row,
+                    boards: next,
+                    score: filled.length ? String(agg.score) : '',
+                    slams: String(agg.slams),
+                  };
+                  setTeamScoreRows(updated);
                 }}
-                placeholder="score"
               />
-              <Input
-                type="number"
-                min={0}
-                disabled={!teamScoreOpen || row.missingPrior}
-                value={row.slams}
-                onChange={(e) => {
-                  const next = [...teamScoreRows];
-                  next[idx] = { ...row, slams: e.target.value };
-                  setTeamScoreRows(next);
-                }}
-                placeholder="slams"
-              />
-              <span className={`text-[11px] font-black ${rowHasAvgBonus(row) ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                {avgBonusText(row)}
-              </span>
             </div>
           ))}
           {teamScoreMsg && <p className="text-xs font-semibold">{teamScoreMsg}</p>}
@@ -864,10 +870,11 @@ export default function CaptainClient({
 
                 {!isDayLocked(selectedDayNumber, dayDatesMap) && teamScoreRows.length > 0 && (
                   <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                    <ScoreEditRules note={teamScoreOpen ? SCORE_EDIT_CAPTAIN_HELP : SCORE_EDIT_CAPTAIN_CLOSED} />
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <div className="text-xs font-black text-emerald-400">Team scores for this day</div>
-                        <div className="text-[10px] text-muted-foreground">Fix a missed or wrong score until 9:30 PM IST. Avg bonus is Yes when score is under average.</div>
+                        <div className="text-[10px] text-muted-foreground">{SCORE_EDIT_CAPTAIN_HELP}</div>
                       </div>
                       {teamScoreOpen ? (
                         <Button type="button" size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={() => void handleSaveTeamScores()}>
@@ -876,39 +883,28 @@ export default function CaptainClient({
                       ) : null}
                     </div>
                     {teamScoreMsg ? <p className="text-[10px] font-semibold">{teamScoreMsg}</p> : null}
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {teamScoreRows.map((row, idx) => (
-                        <div key={row.userId} className="grid grid-cols-[1fr_4.5rem_4.5rem_3.5rem] gap-1.5 items-center">
+                        <div key={row.userId} className="rounded-lg border border-border/70 p-2 space-y-1">
                           <div className="min-w-0 text-xs font-semibold truncate">{row.name}</div>
-                          <Input
-                            type="number"
-                            min={0}
+                          <BoardScoreEditor
+                            compact
+                            boards={row.boards}
                             disabled={!teamScoreOpen || row.missingPrior}
-                            value={row.score}
-                            onChange={(e) => {
-                              const next = [...teamScoreRows];
-                              next[idx] = { ...row, score: e.target.value };
-                              setTeamScoreRows(next);
+                            target={row.target}
+                            onChange={(next) => {
+                              const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+                              const agg = aggregateBoards(filled);
+                              const updated = [...teamScoreRows];
+                              updated[idx] = {
+                                ...row,
+                                boards: next,
+                                score: filled.length ? String(agg.score) : '',
+                                slams: String(agg.slams),
+                              };
+                              setTeamScoreRows(updated);
                             }}
-                            className="h-8 text-xs"
-                            placeholder="score"
                           />
-                          <Input
-                            type="number"
-                            min={0}
-                            disabled={!teamScoreOpen || row.missingPrior}
-                            value={row.slams}
-                            onChange={(e) => {
-                              const next = [...teamScoreRows];
-                              next[idx] = { ...row, slams: e.target.value };
-                              setTeamScoreRows(next);
-                            }}
-                            className="h-8 text-xs"
-                            placeholder="slams"
-                          />
-                          <span className={`text-[10px] font-black ${rowHasAvgBonus(row) ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                            {avgBonusText(row)}
-                          </span>
                         </div>
                       ))}
                     </div>
@@ -963,7 +959,7 @@ export default function CaptainClient({
                         <span className="text-xs font-black text-amber-400">{getRoundLabel(ri)}</span>
                       </div>
 
-                      <div className={`grid gap-2 ${roundPlayersNeeded === 1 ? 'grid-cols-1' : roundPlayersNeeded === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                      <div className={`grid gap-2 ${roundPlayersNeeded === 1 ? 'grid-cols-1' : roundPlayersNeeded === 2 ? 'grid-cols-2' : roundPlayersNeeded >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                         {Array.from({ length: roundPlayersNeeded }, (_, si) => {
                           const selectedId = round.playerIds[si] || '';
                           

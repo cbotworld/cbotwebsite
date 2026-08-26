@@ -119,8 +119,25 @@ const rankedWo = rankPlayers({
   dayDates: { 1: '2026-08-10' },
 });
 const bRow = rankedWo.find((r) => r.userId === 'b');
-assert(bRow?.walkovers === 1 && bRow.boardAverage == null && bRow.boardCount === 0, 'walkover days are excluded from average');
-assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'submitted score ranks above walkover-only player');
+assert(bRow?.walkovers === 1 && bRow.boardAverage === 24 && bRow.boardCount === 0, 'walkover days are excluded from board count; current average still ranks');
+assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'lower current/board average ranks first');
+
+const rankedCurrent = rankPlayers({
+  players: [
+    { userId: 'a', name: 'A', teamId: 't', teamName: 'T', average: 18 },
+    { userId: 'b', name: 'B', teamId: 't', teamName: 'T', average: 22 },
+  ],
+  scores: [
+    { userId: 'a', dayNumber: 1, score: 40, slams: 0 },
+    { userId: 'b', dayNumber: 1, score: 10, slams: 0 },
+  ],
+  logs: [],
+  maxDay: 1,
+  now: new Date('2026-08-10T20:00:00+05:30'),
+  dayDates: { 1: '2026-08-10' },
+});
+assert(rankedCurrent[0].userId === 'a' && rankedCurrent[0].boardAverage === 18, 'current average ranks ahead of day scores');
+assert(rankedCurrent[1].userId === 'b' && rankedCurrent[1].boardAverage === 22, 'higher current average ranks second');
 
 const rankedBoards = rankPlayers({
   players: [

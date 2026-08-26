@@ -18,12 +18,17 @@ import {
   scoreWindowStartIso,
   todayIstCalendarDate,
 } from '@/lib/day-scoring';
+import {
+  SCORE_EDIT_CAPTAIN_CLOSED,
+  SCORE_EDIT_NOT_OPEN_YET,
+  SCORE_EDIT_PLAYER_CLOSED,
+} from '@/lib/score-edit-policy';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
 import { editionBoardAverage, previewTargetBonus, resolveScoreInput, type DayBoardScore } from '@/lib/board-scores';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
-import { countEventWinsForPlayer, editionProfileStats, publishedDays, rankPlayers } from '@/lib/player-ranking';
+import { countEventWinsForPlayer, editionProfileStats, rankPlayers } from '@/lib/player-ranking';
 
 function roleOf(session: any) {
   return String(session?.user?.role || '');
@@ -128,11 +133,11 @@ function describeScoreWindow(day: number, dayDates: any) {
   }
   const start = new Date(scoreWindowStartIso(day, dayDates)).getTime();
   if (Number.isFinite(start) && Date.now() < start) {
-    return { windowOpen: false, windowReason: 'This day is not open yet (from midnight IST).' };
+    return { windowOpen: false, windowReason: SCORE_EDIT_NOT_OPEN_YET };
   }
   return {
     windowOpen: false,
-    windowReason: 'Window closed at 8:00pm IST. Ask the organiser to add a missed day.',
+    windowReason: SCORE_EDIT_PLAYER_CLOSED,
   };
 }
 
@@ -155,17 +160,14 @@ export async function submitPlayerDayScoreForUser(
   const day = Number(dayNumber);
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
 
-  const existing = await prisma.playerDayScore.findMany({
-    where: { editionId: edition.id, userId },
-    select: { dayNumber: true },
-  });
-  if (!hasSubmittedPriorDays(existing.map((r) => r.dayNumber), day)) {
-    return { success: false as const, error: 'Submit the previous day first.' };
-  }
   if (!isScoreSubmitOpen(day, edition.dayDates)) {
+    const start = new Date(scoreWindowStartIso(day, edition.dayDates)).getTime();
     return {
       success: false as const,
-      error: 'Score window for this day is closed. Ask your captain before 9:30pm IST, or the organiser after that.',
+      error:
+        Number.isFinite(start) && Date.now() < start
+          ? SCORE_EDIT_NOT_OPEN_YET
+          : SCORE_EDIT_PLAYER_CLOSED,
     };
   }
 
@@ -209,7 +211,7 @@ export async function submitTeamDayScoresForActor(opts: {
   const day = Number(opts.dayNumber);
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
   if (!opts.isOrganiser && !isCaptainScoreEditOpen(day, edition.dayDates)) {
-    return { success: false as const, error: 'Captain score edits closed at 9:30pm IST. Ask the organiser.' };
+    return { success: false as const, error: SCORE_EDIT_CAPTAIN_CLOSED };
   }
 
   const memberIds = new Set([
@@ -306,6 +308,68 @@ export async function organiserUpsertPlayerDayScore(
   return { success: true };
 }
 
+export async function getOrganiserScoreDesk() {
+  const { session, error } = await requireSession();
+  if (error || !session) return { success: false as const, error, maxDay: 1, days: [] as any[], scores: [] as any[] };
+  if (!isOrganiser(session)) return { success: false as const, error: 'Organiser access required.', maxDay: 1, days: [] as any[], scores: [] as any[] };
+  const edition = await loadLatestEdition();
+  if (!edition) return { success: false as const, error: 'No edition found.', maxDay: 1, days: [] as any[], scores: [] as any[] };
+  const stages = (await loadStageConfig(edition.id)).stages;
+  const maxDay = calendarDaysInEdition(stages, edition.totalDays);
+  const rows = await prisma.playerDayScore.findMany({
+    where: { editionId: edition.id },
+    select: {
+      userId: true,
+      dayNumber: true,
+      score: true,
+      slams: true,
+      boards: true,
+      enteredByUserId: true,
+    },
+  });
+  const entererIds = [...new Set(rows.map((r) => r.enteredByUserId).filter(Boolean))] as string[];
+  const enterers = entererIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: entererIds } },
+        select: { id: true, name: true, username: true, role: true },
+      })
+    : [];
+  const byEnterer = new Map(enterers.map((u) => [u.id, u]));
+  const days = Array.from({ length: maxDay }, (_, i) => {
+    const dayNumber = i + 1;
+    return {
+      dayNumber,
+      calendarDate: combiCalendarDate(dayNumber, edition.dayDates),
+      published: isDayScorePublished(dayNumber, edition.dayDates),
+    };
+  });
+  return {
+    success: true as const,
+    maxDay,
+    days,
+    scores: rows.map((s) => {
+      const enterer = s.enteredByUserId ? byEnterer.get(s.enteredByUserId) : null;
+      const source =
+        !s.enteredByUserId
+          ? 'Saved'
+          : s.enteredByUserId === s.userId
+            ? 'Player'
+            : enterer?.role === 'ORGANIZER' || enterer?.role === 'SUPER_ADMIN'
+              ? 'Organiser'
+              : 'Captain';
+      return {
+        userId: s.userId,
+        dayNumber: s.dayNumber,
+        score: s.score,
+        slams: s.slams,
+        boards: Array.isArray(s.boards) ? s.boards : [],
+        source,
+        enteredByName: enterer?.name || enterer?.username || null,
+      };
+    }),
+  };
+}
+
 export async function getMyDayScoresForUser(userId: string) {
   const edition = await loadLatestEdition();
   if (!edition) {
@@ -331,7 +395,22 @@ export async function getMyDayScoresForUser(userId: string) {
   });
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const submittedDays = scores.map((s) => s.dayNumber);
-  let eligibleDay = nextEligibleDay(submittedDays, maxDay);
+  const days: Array<{
+    dayNumber: number;
+    windowOpen: boolean;
+    windowReason: string | null;
+    submitted: boolean;
+  }> = [];
+  for (let d = 1; d <= maxDay; d += 1) {
+    const windowForDay = describeScoreWindow(d, edition.dayDates);
+    days.push({
+      dayNumber: d,
+      windowOpen: windowForDay.windowOpen,
+      windowReason: windowForDay.windowReason,
+      submitted: submittedDays.includes(d),
+    });
+  }
+  let eligibleDay = days.find((d) => d.windowOpen)?.dayNumber || nextEligibleDay(submittedDays, maxDay);
   if (!isScoreSubmitOpen(eligibleDay, edition.dayDates)) {
     for (let d = eligibleDay - 1; d >= 1; d -= 1) {
       if (isScoreSubmitOpen(d, edition.dayDates) && submittedDays.includes(d)) {
@@ -347,7 +426,13 @@ export async function getMyDayScoresForUser(userId: string) {
   }
   return {
     success: true as const,
-    scores,
+    scores: scores.map((s) => ({
+      dayNumber: s.dayNumber,
+      score: s.score,
+      slams: s.slams,
+      boards: Array.isArray((s as { boards?: unknown }).boards) ? (s as { boards: unknown }).boards : [],
+    })),
+    days,
     eligibleDay,
     maxDay,
     windowOpen: window.windowOpen,
@@ -438,7 +523,7 @@ export async function getTeamDayScoresForActor(
         target: u.target || 0,
         score,
         slams,
-        boards: row?.boards || null,
+        boards: Array.isArray(row?.boards) ? row.boards : [],
         hasTargetBonus: previewTargetBonus(score, u.target),
         hasAvgBonus: previewTargetBonus(score, u.target),
         missingPrior: !hasSubmittedPriorDays(daysByUser.get(u.id) || [], dayNumber),
@@ -642,16 +727,13 @@ async function loadPublicStandings() {
       average: m.average,
       matchesWon: countEventWinsForPlayer(m.id, standingTeams, pairings, scoreRows, edition.dayDates),
     })));
-  const hasPublishedDay = publishedDays(maxDay, edition.dayDates).length > 0;
-  const players = hasPublishedDay
-    ? rankPlayers({
-        players: rosterPlayers,
-        scores: scoreRows,
-        logs: logRows,
-        maxDay,
-        dayDates: edition.dayDates,
-      })
-    : [];
+  const players = rankPlayers({
+    players: rosterPlayers,
+    scores: scoreRows,
+    logs: logRows,
+    maxDay,
+    dayDates: edition.dayDates,
+  });
   return {
     edition: { id: edition.id, title: edition.title, number: edition.number },
     blocks,

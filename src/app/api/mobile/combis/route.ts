@@ -18,6 +18,7 @@ import {
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { averageForDay, logsForUser } from '@/lib/player-average';
 import { hasSubmittedPriorDays, previewAvgBonus } from '@/lib/day-scoring';
+import { combiRoundLabel, slotsForCombiFormat } from '@/lib/combi-round-label';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,29 +27,11 @@ export async function OPTIONS() {
 }
 
 function slotsForFormat(fmt: string) {
-  const u = (fmt || 'SINGLES').toUpperCase();
-  if (u.includes('TRIPLE')) return 3;
-  if (u.includes('DOUBLE')) return 2;
-  return 1;
+  return slotsForCombiFormat(fmt);
 }
 
 function roundLabel(formats: string[], index: number) {
-  let singles = 0;
-  let doubles = 0;
-  let triples = 0;
-  let other = 0;
-  for (let i = 0; i <= index; i++) {
-    const fmt = (formats[i] || 'SINGLES').toUpperCase();
-    if (fmt.includes('TRIPLE')) triples += 1;
-    else if (fmt.includes('DOUBLE')) doubles += 1;
-    else if (fmt.includes('SINGLE')) singles += 1;
-    else other += 1;
-  }
-  const fmt = (formats[index] || 'SINGLES').toUpperCase();
-  if (fmt.includes('TRIPLE')) return `Triples ${triples}`;
-  if (fmt.includes('DOUBLE')) return `Doubles ${doubles}`;
-  if (fmt.includes('SINGLE')) return `Singles ${singles}`;
-  return `Match ${other}`;
+  return combiRoundLabel(formats, index);
 }
 
 function canEditCombis(role: string | undefined, teamCaptainId: string | null | undefined, userId: string) {

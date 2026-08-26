@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { getMyDayScores, submitPlayerDayScore } from '@/lib/actions/playerScoreActions';
 import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
+import { ScoreEditRules } from '@/components/scores/ScoreEditRules';
+import { SCORE_EDIT_PLAYER_HELP } from '@/lib/score-edit-policy';
 import { boardsToDraft, draftToPayload, emptyBoardDraft } from '@/lib/board-scores';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -117,20 +119,20 @@ export default function PlayerClient({
   const [dayScoreMsg, setDayScoreMsg] = React.useState<string | null>(null);
   const [dayScoreBusy, setDayScoreBusy] = React.useState(false);
   const [myDayInfo, setMyDayInfo] = React.useState<any>(null);
+  const [selectedScoreDay, setSelectedScoreDay] = React.useState(1);
 
   React.useEffect(() => {
     getMyDayScores().then((res) => setMyDayInfo(res)).catch(() => {});
   }, []);
 
   React.useEffect(() => {
-    if (!myDayInfo?.eligibleDay) return;
-    const existing = (myDayInfo.scores || []).find((s: any) => s.dayNumber === myDayInfo.eligibleDay);
-    if (existing) {
-      setDayBoards(boardsToDraft(existing.boards, existing.score, existing.slams));
-    } else {
-      setDayBoards([emptyBoardDraft()]);
-    }
-  }, [myDayInfo]);
+    if (myDayInfo?.eligibleDay) setSelectedScoreDay(myDayInfo.eligibleDay);
+  }, [myDayInfo?.eligibleDay]);
+
+  React.useEffect(() => {
+    const existing = (myDayInfo?.scores || []).find((s: any) => s.dayNumber === selectedScoreDay);
+    setDayBoards(boardsToDraft(existing?.boards, existing?.score, existing?.slams));
+  }, [myDayInfo, selectedScoreDay]);
   const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
 
   React.useEffect(() => {
@@ -759,38 +761,58 @@ export default function PlayerClient({
                 <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
               </CardTitle>
               <CardDescription>
-                Board score and slam for Day {myDayInfo?.eligibleDay || 1}. Add boards (max 10). Total vs target decides target bonus. Closes at 8:00pm IST.
+                Choose a day. If you already submitted boards, they load here so you can update them until 8:00pm IST.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
-              {myDayInfo?.scores?.length ? (
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {myDayInfo.scores.map((s: any) => (
-                    <div key={s.dayNumber}>Day {s.dayNumber}: {s.score} ({s.slams} slams)</div>
-                  ))}
-                </div>
-              ) : null}
+              <ScoreEditRules note={SCORE_EDIT_PLAYER_HELP} />
               <div>
                 <label className="text-xs font-bold block mb-1">Day</label>
-                <Input type="number" value={myDayInfo?.eligibleDay || 1} disabled />
+                <select
+                  className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold"
+                  value={selectedScoreDay}
+                  onChange={(e) => setSelectedScoreDay(parseInt(e.target.value, 10) || 1)}
+                >
+                  {Array.from({ length: Math.max(1, Number(myDayInfo?.maxDay) || 1) }, (_, i) => i + 1).map((d) => {
+                    const saved = (myDayInfo?.scores || []).find((s: any) => s.dayNumber === d);
+                    const meta = (myDayInfo?.days || []).find((x: any) => x.dayNumber === d);
+                    return (
+                      <option key={d} value={d}>
+                        Day {d}
+                        {saved ? ' · entered' : ' · empty'}
+                        {meta?.windowOpen === false ? ' · closed' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
+              {(myDayInfo?.scores || []).find((s: any) => s.dayNumber === selectedScoreDay) ? (
+                <p className="text-xs font-semibold text-emerald-400">Your saved boards for Day {selectedScoreDay} are filled in below.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No score yet for Day {selectedScoreDay}. Add boards and save.</p>
+              )}
               <BoardScoreEditor
                 boards={dayBoards}
                 onChange={setDayBoards}
-                disabled={myDayInfo?.windowOpen === false}
+                disabled={(myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowOpen === false}
                 target={myDayInfo?.target ?? initialPlayer?.target ?? 0}
               />
-              {myDayInfo?.windowOpen === false && myDayInfo?.windowReason ? (
-                <p className="text-xs text-amber-400 font-semibold">{myDayInfo.windowReason}</p>
+              {(myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowOpen === false ? (
+                <p className="text-xs text-amber-400 font-semibold">
+                  {(myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowReason || SCORE_EDIT_PLAYER_HELP}
+                </p>
               ) : null}
               {dayScoreMsg && <p className="text-xs font-semibold">{dayScoreMsg}</p>}
               <Button
-                disabled={dayScoreBusy || myDayInfo?.windowOpen === false}
+                disabled={
+                  dayScoreBusy ||
+                  (myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowOpen === false
+                }
                 onClick={async () => {
                   setDayScoreBusy(true);
                   setDayScoreMsg(null);
                   const res = await submitPlayerDayScore(
-                    myDayInfo?.eligibleDay || 1,
+                    selectedScoreDay,
                     0,
                     0,
                     draftToPayload(dayBoards),
@@ -800,7 +822,11 @@ export default function PlayerClient({
                   setDayScoreBusy(false);
                 }}
               >
-                {dayScoreBusy ? 'Saving…' : myDayInfo?.windowOpen === false ? 'Window closed' : `Save Day ${myDayInfo?.eligibleDay || 1}`}
+                {dayScoreBusy
+                  ? 'Saving…'
+                  : (myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowOpen === false
+                    ? 'Window closed'
+                    : `Save Day ${selectedScoreDay}`}
               </Button>
             </CardContent>
           </Card>

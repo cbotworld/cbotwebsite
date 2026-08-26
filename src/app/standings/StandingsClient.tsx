@@ -45,7 +45,6 @@ export default function StandingsClient({ payload }: { payload: any }) {
   const stage = blocks.find((b: any) => b.stageId === stageId) || blocks[0];
   const players = Array.isArray(data.players) ? data.players : [];
   const placement = Array.isArray(data.placement) ? data.placement : [];
-  const rankingReady = players.some((row: any) => Number(row.boardCount) > 0);
   const [open, setOpen] = React.useState<{ row: any; focus: FocusCol } | null>(null);
   const days = open?.row?.days || [];
   const targetBonusDays = open && (open.focus === 'avg' || open.focus === 'total') ? playerBonusCards(days, 'target') : [];
@@ -69,11 +68,11 @@ export default function StandingsClient({ payload }: { payload: any }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-black">Player ranking</CardTitle>
-            <p className="text-xs text-muted-foreground">Lowest average ranks first. If averages are equal, more matches won ranks higher, then more slams.</p>
+            <p className="text-xs text-muted-foreground">Ranked by current average, lowest first. If averages are equal, more matches won ranks higher, then more slams.</p>
           </CardHeader>
           <CardContent>
-            {players.length === 0 || !rankingReady ? (
-              <p className="text-sm text-muted-foreground">Publishes after the first 8:00pm IST score lock.</p>
+            {players.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No players on the edition roster yet.</p>
             ) : (
               <Table>
                 <TableHeader>

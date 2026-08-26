@@ -235,9 +235,10 @@ export async function getStandings() {
   }
 }
 
-export async function getPlayerScores(token: string) {
+export async function getPlayerScores(token: string, dayNumber?: number) {
   try {
-    const res = await fetch(`${API_BASE}/api/mobile/scores`, {
+    const qs = dayNumber ? `?dayNumber=${dayNumber}` : '';
+    const res = await fetch(`${API_BASE}/api/mobile/scores${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return await res.json();
@@ -248,7 +249,19 @@ export async function getPlayerScores(token: string) {
 
 export async function submitPlayerScore(
   token: string,
-  payload: { dayNumber: number; score: number; slams: number; rows?: Array<{ userId: string; score: number; slams: number }>; teamId?: string },
+  payload: {
+    dayNumber: number;
+    score?: number;
+    slams?: number;
+    boards?: Array<{ score: number; slams: number }>;
+    rows?: Array<{
+      userId: string;
+      score?: number;
+      slams?: number;
+      boards?: Array<{ score: number; slams: number }>;
+    }>;
+    teamId?: string;
+  },
 ) {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/scores`, {

@@ -24,6 +24,20 @@ import {
   MatchDetails,
 } from './services/api';
 import { StandingsScreen } from './src/screens/StandingsScreen';
+import {
+  BoardScoreModal,
+  boardsFromSaved,
+  dayWindowOpen,
+  dayWindowReason,
+  parseBoardDrafts,
+  targetBonus,
+} from './src/components/BoardScoreModal';
+import { ScoreEditBanner } from './src/components/ScoreEditBanner';
+import {
+  SCORE_EDIT_CAPTAIN_CLOSED,
+  SCORE_EDIT_CAPTAIN_HELP,
+  SCORE_EDIT_PLAYER_HELP,
+} from './src/score-edit-policy';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -121,22 +135,41 @@ export default function App() {
   const [slamValue, setSlamValue] = useState('0');
   const [scoreInfo, setScoreInfo] = useState<any>(null);
   const [scoreBusy, setScoreBusy] = useState(false);
-  const [teamRows, setTeamRows] = useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean; average?: number }>>([]);
+  const [teamRows, setTeamRows] = useState<Array<{
+    userId: string;
+    name: string;
+    score: string;
+    slams: string;
+    missingPrior?: boolean;
+    average?: number;
+    target?: number;
+    boards?: Array<{ score?: number; slams?: number }>;
+  }>>([]);
   const [teamBusy, setTeamBusy] = useState(false);
   const [dayDrafts, setDayDrafts] = useState<Record<number, { score: string; slams: string }>>({});
   const [savingDay, setSavingDay] = useState<number | null>(null);
+  const [boardDay, setBoardDay] = useState<number | null>(null);
+  const [teamBoardPlayer, setTeamBoardPlayer] = useState<{
+    userId: string;
+    name: string;
+    target?: number;
+    boards?: Array<{ score?: number; slams?: number }>;
+    score?: number;
+    slams?: number;
+  } | null>(null);
 
-  const loadScores = async (authToken: string) => {
-    const res = await getPlayerScores(authToken);
+  const loadScores = async (authToken: string, day?: number) => {
+    const res = await getPlayerScores(authToken, day);
     if (res.success) {
       setScoreInfo(res);
-      if (res.eligibleDay) setScoreDay(res.eligibleDay);
+      if (day) setScoreDay(day);
+      else if (res.eligibleDay) setScoreDay(res.eligibleDay);
       const drafts: Record<number, { score: string; slams: string }> = {};
       for (const s of res.scores || []) {
         drafts[s.dayNumber] = { score: String(s.score), slams: String(s.slams ?? 0) };
       }
       setDayDrafts(drafts);
-      const existing = (res.scores || []).find((s: any) => s.dayNumber === res.eligibleDay);
+      const existing = (res.scores || []).find((s: any) => s.dayNumber === (day || res.eligibleDay));
       if (existing) {
         setScoreValue(String(existing.score));
         setSlamValue(String(existing.slams ?? 0));
@@ -149,40 +182,51 @@ export default function App() {
           slams: p.slams == null ? '0' : String(p.slams),
           missingPrior: Boolean(p.missingPrior),
           average: Number(p.averageInEffect ?? p.average) || 0,
+          target: Number(p.target) || 0,
+          boards: Array.isArray(p.boards) ? p.boards : [],
         })),
       );
     }
   };
 
-  const saveDayScore = async (dayNumber: number) => {
+  const saveBoards = async (dayNumber: number, boards: Array<{ score: number; slams: number }>) => {
     if (!token) return;
-    const draft = dayDrafts[dayNumber] || { score: '', slams: '0' };
-    const score = parseInt(draft.score, 10);
-    const slams = parseInt(draft.slams || '0', 10);
-    if (!Number.isFinite(score) || score < 0) {
-      Alert.alert('Score', 'Enter a valid day score (0 or more).');
-      return;
-    }
+    const stats = parseBoardDrafts(boards.map((b) => ({ score: String(b.score), slams: String(b.slams) })));
     setSavingDay(dayNumber);
-    const res = await submitPlayerScore(token, { dayNumber, score, slams });
+    const res = await submitPlayerScore(token, {
+      dayNumber,
+      score: stats.total,
+      slams: stats.slams,
+      boards,
+    });
     if (res.success) {
-      Alert.alert('Saved', `Day ${dayNumber} score submitted.`);
-      await loadScores(token);
+      Alert.alert('Saved', `Day ${dayNumber} boards submitted.`);
+      setBoardDay(null);
+      await loadScores(token, dayNumber);
     } else {
       Alert.alert('Not saved', res.error || 'Failed');
     }
     setSavingDay(null);
   };
 
-  const updateDayDraft = (dayNumber: number, patch: Partial<{ score: string; slams: string }>) => {
-    setDayDrafts((prev) => ({
-      ...prev,
-      [dayNumber]: {
-        score: prev[dayNumber]?.score ?? '',
-        slams: prev[dayNumber]?.slams ?? '0',
-        ...patch,
-      },
-    }));
+  const saveTeamBoards = async (userId: string, name: string, boards: Array<{ score: number; slams: number }>) => {
+    if (!token) return;
+    const stats = parseBoardDrafts(boards.map((b) => ({ score: String(b.score), slams: String(b.slams) })));
+    const dayNumber = scoreDay || scoreInfo?.teamDayNumber || scoreInfo?.eligibleDay || 1;
+    setTeamBusy(true);
+    const res = await submitPlayerScore(token, {
+      dayNumber,
+      teamId: scoreInfo?.teamId,
+      rows: [{ userId, score: stats.total, slams: stats.slams, boards }],
+    });
+    if (res.success) {
+      Alert.alert('Saved', `${name} · Day ${dayNumber} boards saved.`);
+      setTeamBoardPlayer(null);
+      await loadScores(token, dayNumber);
+    } else {
+      Alert.alert('Not saved', res.error || 'Failed');
+    }
+    setTeamBusy(false);
   };
 
   const renderMatchDayScore = (dayNumber: number) => {
@@ -190,13 +234,12 @@ export default function App() {
     const published = (scoreInfo?.publishedDays || []).some(
       (d: any) => d.dayNumber === dayNumber && d.published,
     );
-    const eligible = Number(scoreInfo?.eligibleDay) === dayNumber;
-    const canEdit = Boolean(scoreInfo?.windowOpen) && eligible;
-    const draft = dayDrafts[dayNumber] || {
-      score: submitted != null ? String(submitted.score) : '',
-      slams: submitted != null ? String(submitted.slams ?? 0) : '0',
-    };
-    const saving = savingDay === dayNumber;
+    const canEdit = dayWindowOpen(scoreInfo, dayNumber);
+    const stats = submitted
+      ? parseBoardDrafts(boardsFromSaved(submitted))
+      : null;
+    const bonus = stats ? targetBonus(stats.boardCount ? stats.total : null, scoreInfo?.target) : null;
+    const tgt = Number(scoreInfo?.target) || 0;
 
     let body: React.ReactNode;
     if (published && !submitted) {
@@ -204,54 +247,34 @@ export default function App() {
     } else if (canEdit) {
       body = (
         <>
-          <View style={styles.cardScoreInputs}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.cardScoreLabel}>SCORE</Text>
-              <TextInput
-                style={styles.cardScoreInput}
-                keyboardType="number-pad"
-                value={draft.score}
-                onChangeText={(t) => updateDayDraft(dayNumber, { score: t.replace(/[^\d]/g, '') })}
-                placeholder="0"
-                placeholderTextColor="#64748b"
-              />
-            </View>
-            <View style={{ width: 88 }}>
-              <Text style={styles.cardScoreLabel}>SLAMS</Text>
-              <TextInput
-                style={styles.cardScoreInput}
-                keyboardType="number-pad"
-                value={draft.slams}
-                onChangeText={(t) => updateDayDraft(dayNumber, { slams: t.replace(/[^\d]/g, '') })}
-                placeholder="0"
-                placeholderTextColor="#64748b"
-              />
-            </View>
-          </View>
+          {stats?.boardCount ? (
+            <Text style={styles.cardScoreHint}>
+              Total {stats.total} · {stats.boardCount} boards · Avg {stats.average} · Target {tgt > 0 ? tgt : 0}
+              {bonus === true ? ' · Bonus Yes' : tgt > 0 ? ' · Bonus No' : ''}
+            </Text>
+          ) : null}
           <TouchableOpacity
-            style={[styles.cardScoreSave, saving && { opacity: 0.55 }]}
-            onPress={() => void saveDayScore(dayNumber)}
-            disabled={saving}
+            style={[styles.cardScoreSave, savingDay === dayNumber && { opacity: 0.55 }]}
+            onPress={() => setBoardDay(dayNumber)}
+            disabled={savingDay === dayNumber}
           >
             <Text style={styles.cardScoreSaveText}>
-              {saving ? 'SAVING…' : submitted ? 'UPDATE SCORE' : 'SUBMIT SCORE'}
+              {submitted ? 'UPDATE BOARDS' : 'SUBMIT BOARDS'}
             </Text>
           </TouchableOpacity>
-          <Text style={styles.cardScoreHint}>Until 8:00pm IST · you can overwrite until then</Text>
+          <Text style={styles.cardScoreHint}>{SCORE_EDIT_PLAYER_HELP}</Text>
         </>
       );
     } else if (submitted) {
       body = (
         <Text style={styles.cardScoreLocked}>
-          Score {submitted.score} · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+          Total {submitted.score} · {stats?.boardCount || 0} boards · Avg {stats?.average ?? '—'} ·{' '}
+          {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+          {bonus === true ? ' · Bonus Yes' : tgt > 0 ? ' · Bonus No' : ''}
         </Text>
       );
     } else {
-      const reason =
-        Number(scoreInfo?.eligibleDay) > 0 && Number(scoreInfo.eligibleDay) < dayNumber
-          ? `Submit Day ${scoreInfo.eligibleDay} first`
-          : scoreInfo?.windowReason || 'Opens after the match · until 8:00pm IST';
-      body = <Text style={styles.cardScoreHint}>{reason}</Text>;
+      body = <Text style={styles.cardScoreHint}>{dayWindowReason(scoreInfo, dayNumber)}</Text>;
     }
 
     return (
@@ -513,6 +536,9 @@ export default function App() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <ScoreEditBanner />
+          </View>
           {matches.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
@@ -682,6 +708,19 @@ export default function App() {
         >
           <Text style={styles.logoutText}>SIGN OUT</Text>
         </TouchableOpacity>
+        {boardDay != null ? (
+          <BoardScoreModal
+            key={boardDay}
+            visible
+            dayNumber={boardDay}
+            target={scoreInfo?.target}
+            initialBoards={boardsFromSaved((scoreInfo?.scores || []).find((s: any) => s.dayNumber === boardDay))}
+            busy={savingDay === boardDay}
+            editNote={SCORE_EDIT_PLAYER_HELP}
+            onClose={() => setBoardDay(null)}
+            onSave={(boards) => void saveBoards(boardDay, boards)}
+          />
+        ) : null}
       </SafeAreaView>
     );
   }
@@ -903,7 +942,9 @@ export default function App() {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>DAY SCORE</Text>
-            <Text style={styles.headerSubtitle}>Submit by 8:00 PM IST · captains can fix teammate scores until 9:30 PM IST</Text>
+            <Text style={styles.headerSubtitle}>
+              Players until 8:00pm IST · captains until 9:30pm IST · organiser anytime
+            </Text>
           </View>
         </View>
         <TabBar
@@ -934,122 +975,136 @@ export default function App() {
               </View>
             </View>
           ) : null}
-          <Text style={styles.headerSubtitle}>Day {scoreInfo?.eligibleDay || scoreDay} (locked)</Text>
-          {(scoreInfo?.scores || []).map((s: any) => (
-            <Text key={s.dayNumber} style={styles.tabText}>Day {s.dayNumber}: {s.score} ({s.slams} slams)</Text>
-          ))}
-          {scoreInfo?.windowOpen === false && scoreInfo?.windowReason ? (
-            <Text style={styles.tabText}>{scoreInfo.windowReason}</Text>
+          <ScoreEditBanner forCaptain={teamRows.length > 0} />
+          <Text style={styles.headerSubtitle}>Pick a day, then enter each board in the popup.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {Array.from({ length: Math.max(1, Number(scoreInfo?.maxDay) || 1) }, (_, i) => i + 1).map((d) => {
+              const on = scoreDay === d;
+              const open = dayWindowOpen(scoreInfo, d);
+              return (
+                <TouchableOpacity
+                  key={d}
+                  onPress={() => {
+                    setScoreDay(d);
+                    if (token) void loadScores(token, d);
+                  }}
+                  style={[styles.tabBtn, on && styles.tabBtnActive, !open && { opacity: 0.55 }]}
+                >
+                  <Text style={[styles.tabText, on && styles.tabTextActive]}>DAY {d}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          {(scoreInfo?.scores || []).map((s: any) => {
+            const st = parseBoardDrafts(boardsFromSaved(s));
+            const bonus = targetBonus(st.boardCount ? st.total : null, scoreInfo?.target);
+            return (
+              <Text key={s.dayNumber} style={styles.tabText}>
+                Day {s.dayNumber}: {st.total} ({st.boardCount} boards, avg {st.average ?? '—'})
+                {bonus === true ? ' · bonus Yes' : ''}
+              </Text>
+            );
+          })}
+          {!dayWindowOpen(scoreInfo, scoreInfo?.eligibleDay || scoreDay) ? (
+            <Text style={styles.tabText}>{dayWindowReason(scoreInfo, scoreInfo?.eligibleDay || scoreDay)}</Text>
           ) : null}
-          <TextInput style={styles.input} placeholder="Score" placeholderTextColor="#64748b" keyboardType="number-pad" value={scoreValue} onChangeText={setScoreValue} editable={scoreInfo?.windowOpen !== false} />
-          <TextInput style={styles.input} placeholder="Slams" placeholderTextColor="#64748b" keyboardType="number-pad" value={slamValue} onChangeText={setSlamValue} editable={scoreInfo?.windowOpen !== false} />
           <TouchableOpacity
             style={styles.loginButton}
-            disabled={scoreBusy || scoreInfo?.windowOpen === false}
-            onPress={async () => {
-              if (!token) return;
-              setScoreBusy(true);
-              const res = await submitPlayerScore(token, {
-                dayNumber: scoreInfo?.eligibleDay || scoreDay,
-                score: parseInt(scoreValue, 10),
-                slams: parseInt(slamValue || '0', 10),
-              });
-              if (res.success) {
-                Alert.alert('Saved', 'Day score submitted.');
-                await loadScores(token);
-              } else {
-                Alert.alert('Not saved', res.error || 'Failed');
-              }
-              setScoreBusy(false);
-            }}
+            disabled={scoreBusy || !dayWindowOpen(scoreInfo, scoreDay || scoreInfo?.eligibleDay)}
+            onPress={() => setBoardDay(scoreDay || scoreInfo?.eligibleDay || 1)}
           >
-            <Text style={styles.loginButtonText}>{scoreBusy ? 'SAVING…' : scoreInfo?.windowOpen === false ? 'WINDOW CLOSED' : 'SAVE SCORE'}</Text>
+            <Text style={styles.loginButtonText}>
+              {dayWindowOpen(scoreInfo, scoreDay || scoreInfo?.eligibleDay) ? 'ENTER BOARDS' : 'WINDOW CLOSED'}
+            </Text>
           </TouchableOpacity>
           {teamRows.length > 0 ? (
             <View style={{ marginTop: 12, gap: 10 }}>
-              <Text style={styles.headerSubtitle}>Team scores — captains can fill or fix teammates until 9:30 PM IST</Text>
-              {teamRows.map((row, idx) => {
+              <Text style={styles.headerSubtitle}>{SCORE_EDIT_CAPTAIN_HELP}</Text>
+              {teamRows.map((row) => {
                 const teamOpen = scoreInfo?.teamScoreWindowOpen !== false;
-                const scoreNum = parseInt(row.score, 10);
-                const avgYes = row.score !== '' && Number.isFinite(scoreNum) && scoreNum < (Number(row.average) || 0);
-                const avgLabel = row.score === '' ? 'Avg —' : avgYes ? 'Avg Yes' : 'Avg No';
+                const stats = parseBoardDrafts(boardsFromSaved({
+                  dayNumber: scoreDay,
+                  score: row.score === '' ? undefined : Number(row.score),
+                  slams: Number(row.slams) || 0,
+                  boards: row.boards,
+                }));
+                const bonus = targetBonus(stats.boardCount ? stats.total : null, row.target);
+                const tgt = Number(row.target) || 0;
+                const bonusLabel = stats.boardCount === 0 ? 'bonus —' : bonus === true ? 'bonus Yes' : tgt > 0 ? 'bonus No' : 'bonus —';
                 return (
                 <View key={row.userId} style={styles.teamScoreRow}>
                   <Text style={styles.tabText}>
                     {row.name}
-                    {row.missingPrior ? ' · needs earlier day' : row.score !== '' ? ' · submitted' : ' · empty'}
+                    {row.missingPrior ? ' · needs earlier day' : stats.boardCount ? ` · ${stats.total} (${stats.boardCount} boards, avg ${stats.average})` : ' · empty'}
                     {' · '}
-                    {avgLabel}
+                    {bonusLabel}
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TextInput
-                      style={[styles.input, { flex: 1 }]}
-                      placeholder="Score"
-                      placeholderTextColor="#64748b"
-                      keyboardType="number-pad"
-                      value={row.score}
-                      editable={teamOpen && !row.missingPrior}
-                      onChangeText={(text) => {
-                        const next = [...teamRows];
-                        next[idx] = { ...row, score: text };
-                        setTeamRows(next);
-                      }}
-                    />
-                    <TextInput
-                      style={[styles.input, { flex: 1 }]}
-                      placeholder="Slams"
-                      placeholderTextColor="#64748b"
-                      keyboardType="number-pad"
-                      value={row.slams}
-                      editable={teamOpen && !row.missingPrior}
-                      onChangeText={(text) => {
-                        const next = [...teamRows];
-                        next[idx] = { ...row, slams: text };
-                        setTeamRows(next);
-                      }}
-                    />
-                  </View>
+                  <Text style={styles.cardScoreHint}>Target {tgt > 0 ? tgt : '0 (no bonus)'}</Text>
+                  {teamOpen && !row.missingPrior ? (
+                    <TouchableOpacity
+                      style={styles.cardScoreSave}
+                      disabled={teamBusy}
+                      onPress={() =>
+                        setTeamBoardPlayer({
+                          userId: row.userId,
+                          name: row.name,
+                          target: row.target,
+                          boards: row.boards,
+                          score: row.score === '' ? undefined : Number(row.score),
+                          slams: Number(row.slams) || 0,
+                        })
+                      }
+                    >
+                      <Text style={styles.cardScoreSaveText}>
+                        {stats.boardCount ? 'UPDATE BOARDS' : 'ENTER BOARDS'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.cardScoreHint}>
+                      {row.missingPrior ? 'Organiser must fill the earlier day first.' : SCORE_EDIT_CAPTAIN_CLOSED}
+                    </Text>
+                  )}
                 </View>
                 );
               })}
-              <TouchableOpacity
-                style={styles.loginButton}
-                disabled={teamBusy || scoreInfo?.teamScoreWindowOpen === false}
-                onPress={async () => {
-                  if (!token) return;
-                  setTeamBusy(true);
-                  const filled = teamRows.filter((r) => r.score !== '' && !r.missingPrior);
-                  const res = await submitPlayerScore(token, {
-                    dayNumber: scoreInfo?.teamDayNumber || scoreInfo?.eligibleDay || scoreDay,
-                    score: parseInt(scoreValue || '0', 10),
-                    slams: parseInt(slamValue || '0', 10),
-                    rows: filled.map((r) => ({
-                      userId: r.userId,
-                      score: parseInt(r.score, 10),
-                      slams: parseInt(r.slams || '0', 10),
-                    })),
-                    teamId: scoreInfo?.teamId,
-                  });
-                  if (res.success) {
-                    Alert.alert('Saved', 'Team scores submitted.');
-                    await loadScores(token);
-                  } else {
-                    Alert.alert('Not saved', res.error || 'Failed');
-                  }
-                  setTeamBusy(false);
-                }}
-              >
-                <Text style={styles.loginButtonText}>{teamBusy ? 'SAVING TEAM…' : scoreInfo?.teamScoreWindowOpen === false ? 'WINDOW CLOSED' : 'SAVE TEAM SCORES'}</Text>
-              </TouchableOpacity>
             </View>
           ) : null}
         </ScrollView>
+        {teamBoardPlayer ? (
+          <BoardScoreModal
+            key={`team-${teamBoardPlayer.userId}-${scoreDay}`}
+            visible
+            dayNumber={scoreDay || scoreInfo?.teamDayNumber || 1}
+            playerName={teamBoardPlayer.name}
+            target={teamBoardPlayer.target}
+            initialBoards={boardsFromSaved({
+              dayNumber: scoreDay,
+              score: teamBoardPlayer.score,
+              slams: teamBoardPlayer.slams,
+              boards: teamBoardPlayer.boards,
+            })}
+            busy={teamBusy}
+            editNote={SCORE_EDIT_CAPTAIN_HELP}
+            onClose={() => setTeamBoardPlayer(null)}
+            onSave={(boards) => void saveTeamBoards(teamBoardPlayer.userId, teamBoardPlayer.name, boards)}
+          />
+        ) : boardDay != null ? (
+          <BoardScoreModal
+            key={`score-${boardDay}`}
+            visible
+            dayNumber={boardDay}
+            target={scoreInfo?.target}
+            initialBoards={boardsFromSaved((scoreInfo?.scores || []).find((s: any) => s.dayNumber === boardDay))}
+            busy={savingDay === boardDay}
+            editNote={SCORE_EDIT_PLAYER_HELP}
+            onClose={() => setBoardDay(null)}
+            onSave={(boards) => void saveBoards(boardDay, boards)}
+          />
+        ) : null}
       </SafeAreaView>
     );
   }
 
-  // ==========================================
-  // SCREEN 2c: YOUTUBE CHANNEL VIDEOS
   // ==========================================
   if (screen === 'videos') {
     return (

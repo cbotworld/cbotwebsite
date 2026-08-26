@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ScoreEditRules } from '@/components/scores/ScoreEditRules';
 
 export default function PlayerScoresClient({
   editionTitle,
@@ -31,8 +32,9 @@ export default function PlayerScoresClient({
         <Badge variant="carrom" className="mb-2">Day-wise scores</Badge>
         <h1 className="text-3xl font-black tracking-tight">Player Scores</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {editionTitle} — published at 8:00pm IST so captains can set combis.
+          {editionTitle} — this page publishes at 8:00pm IST so captains can set combis.
         </p>
+        <ScoreEditRules />
       </div>
       <div className="flex flex-wrap gap-2">
         {dayList.map((d) => (

@@ -77,7 +77,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { headers: mobileCorsHeaders });
     }
 
-    const result = await submitPlayerDayScoreForUser(user.id, Number(body.dayNumber), body.score, body.slams);
+    const result = await submitPlayerDayScoreForUser(
+      user.id,
+      Number(body.dayNumber),
+      body.score,
+      body.slams,
+      body.boards,
+    );
     return NextResponse.json(result, { headers: mobileCorsHeaders });
   } catch (error: any) {
     console.error('Mobile scores POST', error);

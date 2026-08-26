@@ -6,6 +6,7 @@ import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { combiCutoffIso, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { combiRoundLabel } from '@/lib/combi-round-label';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,22 +60,7 @@ function slotKey(name: string, index: number) {
 }
 
 function roundLabel(formats: string[], index: number) {
-  let singles = 0;
-  let doubles = 0;
-  let triples = 0;
-  let other = 0;
-  for (let i = 0; i <= index; i++) {
-    const fmt = (formats[i] || 'SINGLES').toUpperCase();
-    if (fmt.includes('TRIPLE')) triples += 1;
-    else if (fmt.includes('DOUBLE')) doubles += 1;
-    else if (fmt.includes('SINGLE')) singles += 1;
-    else other += 1;
-  }
-  const fmt = (formats[index] || 'SINGLES').toUpperCase();
-  if (fmt.includes('TRIPLE')) return `Triples ${triples}`;
-  if (fmt.includes('DOUBLE')) return `Doubles ${doubles}`;
-  if (fmt.includes('SINGLE')) return `Singles ${singles}`;
-  return `Match ${other}`;
+  return combiRoundLabel(formats, index);
 }
 
 function eventSlotsFromPatterns(patterns?: Array<{ matchFormat?: string | null }>): EventSlot[] {
