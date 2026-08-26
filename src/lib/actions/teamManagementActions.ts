@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
+import { syncCaptainRole } from '@/lib/captain-role';
 
 // Calculate player category based on past performance for auto-balancing
 export async function calculatePlayerCategoriesForDraft(playerIds: string[]) {
@@ -109,6 +110,8 @@ export async function publishFinalizedTeams(editionId: string, finalizedTeams: a
         }
       });
 
+      await syncCaptainRole({ newCaptainId: ft.captainId });
+
       // Create EditionParticipants for each member
       const participantPromises = ft.members.map((m: any) => 
         prisma.editionParticipant.create({
@@ -160,17 +163,14 @@ export async function updateTeamCaptain(teamId: string, newCaptainId: string) {
 
     if (!team) return { success: false, error: 'Team not found' };
 
-    // Update team captainId
+    const previousCaptainId = team.captainId;
+
     await prisma.team.update({
       where: { id: teamId },
       data: { captainId: newCaptainId },
     });
 
-    // Update User role
-    await prisma.user.update({
-      where: { id: newCaptainId },
-      data: { role: 'CAPTAIN' },
-    });
+    await syncCaptainRole({ newCaptainId, previousCaptainId });
 
     return { success: true, message: 'Captain updated successfully' };
   } catch (error) {

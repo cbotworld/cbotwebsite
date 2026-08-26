@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
+import { syncCaptainRole } from '@/lib/captain-role';
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -83,6 +84,11 @@ export async function addOrUpdateSpocTeam(data: {
       });
     }
 
+    await syncCaptainRole({
+      newCaptainId: data.captainId || existing?.captainId || null,
+      previousCaptainId: existing?.captainId || null,
+    });
+
     await prisma.spocTeamMember.deleteMany({ where: { teamId: teamRecord.id } });
 
     if (rosterCheck.playerUserIds.length) {
@@ -142,6 +148,11 @@ export async function updateSpocTeamRoster(data: {
       },
     });
 
+    await syncCaptainRole({
+      newCaptainId: data.captainId || null,
+      previousCaptainId: team.captainId,
+    });
+
     await prisma.spocTeamMember.deleteMany({ where: { teamId: team.id } });
 
     if (rosterCheck.playerUserIds.length) {
@@ -182,6 +193,7 @@ export async function deleteSpocTeam(teamId: string) {
     }
 
     await prisma.team.delete({ where: { id: teamId } });
+    await syncCaptainRole({ previousCaptainId: team.captainId });
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
     return { success: true };

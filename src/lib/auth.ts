@@ -124,19 +124,33 @@ export const authOptions: NextAuthOptions = {
         token.username = (user as any).username;
         token.isActivated = (user as any).isActivated;
         token.hasCaptainDesk = false;
-        const role = String((user as any).role || '');
-        if (token.id && role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
-          try {
-            const desk = await prisma.team.findFirst({
-              where: { captainId: String(token.id) },
-              select: { id: true },
-            });
-            token.hasCaptainDesk = Boolean(desk);
-          } catch {
-            token.hasCaptainDesk = false;
+      }
+
+      // Re-read role and captaincy on every call rather than only at sign-in:
+      // starting a new tournament resets every captain to player, and that has
+      // to reach the UI without making people log out and back in.
+      if (token.id) {
+        try {
+          const fresh = await prisma.user.findUnique({
+            where: { id: String(token.id) },
+            select: {
+              role: true,
+              captainedTeams: { select: { id: true }, take: 1 },
+            },
+          });
+          if (fresh) {
+            const role = fresh.role || 'PLAYER';
+            token.role = role;
+            token.hasCaptainDesk =
+              role === 'ORGANIZER' || role === 'SUPER_ADMIN'
+                ? false
+                : fresh.captainedTeams.length > 0;
           }
+        } catch {
+          // Leave the existing token alone if the lookup fails.
         }
       }
+
       return token;
     },
     async session({ session, token }) {

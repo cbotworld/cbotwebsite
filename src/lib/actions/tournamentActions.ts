@@ -11,6 +11,8 @@ import {
   istCalendarDateFromMs,
   normalizeDayDates,
 } from '@/lib/combi-cutoff';
+import { syncCaptainRole } from '@/lib/captain-role';
+
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
@@ -397,12 +399,10 @@ export async function addOrUpdateEditionTeam(data: {
       });
     }
 
-    if (data.captainId) {
-      await prisma.user.update({
-        where: { id: data.captainId },
-        data: { role: 'CAPTAIN' }
-      });
-    }
+    await syncCaptainRole({
+      newCaptainId: data.captainId || existing?.captainId || null,
+      previousCaptainId: existing?.captainId || null,
+    });
 
     if (data.playerUserIds && data.playerUserIds.length > 0) {
       await prisma.editionParticipant.updateMany({
@@ -538,14 +538,12 @@ export async function updateTeamRosterAndCaptain(data: {
       }
     }
 
-    if (data.captainId) {
-      try {
-        await prisma.user.update({
-          where: { id: data.captainId },
-          data: { role: 'CAPTAIN' }
-        });
-      } catch (e) {}
-    }
+    try {
+      await syncCaptainRole({
+        newCaptainId: data.captainId || null,
+        previousCaptainId: team?.captainId || null,
+      });
+    } catch (e) {}
 
     const finalTeam = await prisma.team.findUnique({
       where: { id: targetTeamId },
@@ -571,9 +569,14 @@ export async function deleteTeam(teamId: string) {
     return { success: false, error: 'Unauthorized: Organizer access required.' };
   }
   try {
+    const doomed = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { captainId: true },
+    });
     await prisma.team.deleteMany({
       where: { id: teamId }
     });
+    await syncCaptainRole({ previousCaptainId: doomed?.captainId || null });
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
     return { success: true };
@@ -686,7 +689,11 @@ export async function sendPlayerCredentialsEmailAction(data: {
 
 const START_NEW_TOURNAMENT_PHRASE = 'start new tournament';
 
-/** Reset stage design, days, matches, and teams. Player accounts stay. */
+/**
+ * Reset stage design, days, matches, and teams. Player accounts stay, but
+ * everyone drops back to player: the new tournament's captains are whoever the
+ * organizer assigns once its teams exist.
+ */
 export async function startNewTournament(opts: {
   editionId: string;
   tournamentName: string;
@@ -722,6 +729,10 @@ export async function startNewTournament(opts: {
       await tx.liveStream.deleteMany({ where: { editionId: edition.id } });
       await tx.match.deleteMany({ where: { editionId: edition.id } });
       await tx.team.deleteMany({ where: { editionId: edition.id } });
+      await tx.user.updateMany({
+        where: { role: 'CAPTAIN' },
+        data: { role: 'PLAYER' },
+      });
       await tx.edition.update({
         where: { id: edition.id },
         data: {
