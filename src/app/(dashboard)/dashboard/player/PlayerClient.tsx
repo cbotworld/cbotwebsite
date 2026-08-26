@@ -33,6 +33,7 @@ import {
   type OrganizerScheduleDay,
 } from '@/lib/organizer-schedule';
 import { ProfileTab } from '@/components/player/ProfileTab';
+import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
 
 export default function PlayerClient({
@@ -45,6 +46,8 @@ export default function PlayerClient({
   initialSpocTeam,
   initialSpocMembers = [],
   hasSpocCaptainDesk = false,
+  shortName = DEFAULT_WEBSITE_CMS.site.shortName,
+  editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: {
   initialPlayer: any;
   initialTeam: any;
@@ -55,6 +58,8 @@ export default function PlayerClient({
   initialSpocTeam?: any;
   initialSpocMembers?: any[];
   hasSpocCaptainDesk?: boolean;
+  shortName?: string;
+  editionLabel?: string;
 }) {
   const { data: session } = useSession();
 
@@ -445,7 +450,7 @@ export default function PlayerClient({
                   <Video className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">CBOT 200th Edition</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">{`${shortName} ${editionLabel}`}</div>
                   <div className="text-base font-black text-foreground leading-tight">
                     {currentTeam.name} — Match schedule
                   </div>
@@ -662,7 +667,12 @@ export default function PlayerClient({
         </TabsList>
 
         <TabsContent value="profile">
-          <ProfileTab currentPlayer={currentPlayer} currentTeam={currentTeam} />
+          <ProfileTab
+            currentPlayer={currentPlayer}
+            currentTeam={currentTeam}
+            shortName={shortName}
+            editionLabel={editionLabel}
+          />
         </TabsContent>
 
 

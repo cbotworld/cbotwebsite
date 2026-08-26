@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 
 export type CreateBroadcastResult = {
   broadcastId: string;
@@ -119,7 +120,7 @@ function firstFittingTitle(candidates: string[]) {
   return (fit || candidates[candidates.length - 1] || 'CBOT Live').slice(0, 100);
 }
 
-function buildBroadcastCopy(details: BroadcastDetails) {
+function buildBroadcastCopy(details: BroadcastDetails, fallbackEditionTitle: string) {
   const name = details.name.trim();
   const day = details.day.trim();
   const teamName = details.teamName?.trim() || '';
@@ -127,7 +128,7 @@ function buildBroadcastCopy(details: BroadcastDetails) {
   const teamTag = details.teamTag?.trim() || '';
   const opponentTag = details.opponentTag?.trim() || '';
   const stage = details.stage?.trim() || '';
-  const editionTitle = details.editionTitle?.trim() || 'CBOT 200th Edition';
+  const editionTitle = details.editionTitle?.trim() || fallbackEditionTitle;
   const timeRange = details.timeRange?.trim() || '';
   const matchLine = teamName && opponentName ? `${teamName} vs ${opponentName}` : teamName || opponentName;
   const shortMatch =
@@ -170,7 +171,8 @@ function buildBroadcastCopy(details: BroadcastDetails) {
 
 export async function createLiveSession(details: BroadcastDetails): Promise<CreateBroadcastResult> {
   const accessToken = await getAccessToken();
-  const { title, description } = buildBroadcastCopy(details);
+  const site = await getWebsiteCmsSite();
+  const { title, description } = buildBroadcastCopy(details, `${site.shortName} ${site.editionLabel}`);
   const scheduledStartTime = new Date().toISOString();
 
   const broadcastRes = await fetch(

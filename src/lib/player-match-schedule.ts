@@ -11,6 +11,7 @@ import { buildOrganizerScheduleDays, calendarDateForDay, addDaysIsoDate, formatD
 import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
+import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 export async function getPlayerMatchSchedule(
   userId: string,
   opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' },
@@ -22,6 +23,9 @@ export async function getPlayerMatchSchedule(
     where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
     orderBy: { number: 'desc' },
   });
+
+  const cmsSite = await getWebsiteCmsSite();
+  const fallbackEditionTitle = `${cmsSite.shortName} ${cmsSite.editionLabel}`;
 
   const participation = await prisma.editionParticipant.findFirst({
     where: edition?.id ? { userId, editionId: edition.id } : { userId },
@@ -245,7 +249,7 @@ export async function getPlayerMatchSchedule(
         opponentTag: oppFace.tag,
         opponentLogo: oppFace.logo,
         tableNumber: 1,
-        editionTitle: edition?.title || 'CBOT 200th Edition',
+        editionTitle: edition?.title || fallbackEditionTitle,
         editionNumber: edition?.number || 200,
       };
     });

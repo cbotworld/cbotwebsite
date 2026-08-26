@@ -1117,7 +1117,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border pb-4 gap-2">
           <div>
             <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Users className="h-5 w-5 text-amber-500" /> Teams — Cornerstones of Carrom
+              <Users className="h-5 w-5 text-amber-500" /> Teams — {initialWebsiteCms.site.editionSeriesName}
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               Manage teams, assign captains and roster players for this edition.

@@ -11,10 +11,13 @@ import {
   Users, Lock, CheckCircle2, AlertCircle, Eye, EyeOff,
   Pencil, X, Save, User, Calendar
 } from 'lucide-react';
+import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
 interface ProfileTabProps {
   currentPlayer: any;
   currentTeam: any;
+  shortName?: string;
+  editionLabel?: string;
 }
 
 // Read-only display row
@@ -48,7 +51,12 @@ function LockedRow({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
-export function ProfileTab({ currentPlayer: p, currentTeam: team }: ProfileTabProps) {
+export function ProfileTab({
+  currentPlayer: p,
+  currentTeam: team,
+  shortName = DEFAULT_WEBSITE_CMS.site.shortName,
+  editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
+}: ProfileTabProps) {
   // ── Edit Profile State ───────────────────────────────────────────
   const [editing, setEditing] = React.useState(false);
   const [saveStatus, setSaveStatus] = React.useState<{ ok: boolean; msg: string } | null>(null);
@@ -187,7 +195,7 @@ export function ProfileTab({ currentPlayer: p, currentTeam: team }: ProfileTabPr
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 mb-0.5">CBOT 200th Edition — Your Team</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70 mb-0.5">{`${shortName} ${editionLabel} — Your Team`}</div>
                 <div className="font-black text-base">{team.name}</div>
                 {team.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{team.description}</p>}
               </div>

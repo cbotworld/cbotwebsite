@@ -13,6 +13,7 @@ import {
 } from '@/lib/combi-cutoff';
 import { syncCaptainRole } from '@/lib/captain-role';
 import { filterMainTeams } from '@/lib/spoc-teams';
+import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
@@ -203,7 +204,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
         data: {
           id: editionId,
           number: 200,
-          title: title || 'Cornerstones of Carrom',
+          title: title || (await getWebsiteCmsSite()).editionSeriesName,
           slug: slugData.slug || `edition-${Date.now()}`,
           theme,
           themeDescription: description,

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { getMatchLiveStreamAction } from '@/lib/actions/youtubeActions';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { prisma } from '@/lib/prisma';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,9 +34,11 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
   const stream = streamResult.stream;
   const isExpired = streamResult.isExpired || stream?.status === 'EXPIRED';
 
+  const cmsSite = (await getWebsiteCmsContent()).site;
+
   const team1Name = match?.team1?.name || 'Team 1';
   const team2Name = match?.team2?.name || 'Team 2';
-  const editionTitle = match?.edition?.title || 'Edition #200';
+  const editionTitle = match?.edition?.title || cmsSite.editionLabel;
   const matchTitle = `${editionTitle} - ${team1Name} vs ${team2Name} (${matchId})`;
 
   const rawVideoUrl = stream?.youtubeUrl || stream?.youtubeEmbedUrl;

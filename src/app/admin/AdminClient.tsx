@@ -27,8 +27,13 @@ import {
   Radio, Lock, Download, RefreshCw, Activity, ArrowRight, ShieldAlert, Sparkles, Zap, Edit, Trash2, Power, Globe, Phone, MapPin, History, Eye, ArrowRightLeft, Send, Clock
 } from 'lucide-react';
 import { Tournament, User, UserRole, BoardPattern, Edition, Match, StandingRow, MatchLineup } from '@/types';
+import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
-export default function AdminPortalPage() {
+export default function AdminPortalPage({
+  editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
+}: {
+  editionLabel?: string;
+}) {
   const { data: session } = useSession();
   const currentRole: UserRole = (session?.user as any)?.role || 'ORGANIZER';
 
@@ -573,7 +578,7 @@ export default function AdminPortalPage() {
                     <TableRow key={st.id}>
                       <TableCell className="font-mono text-xs font-bold">
                         <div>Match #{st.match?.matchNumber || '1'}</div>
-                        <div className="text-[10px] text-muted-foreground">{st.edition?.title || 'Edition #200'}</div>
+                        <div className="text-[10px] text-muted-foreground">{st.edition?.title || editionLabel}</div>
                       </TableCell>
                       <TableCell className="font-bold text-xs">
                         {st.player?.name || st.player?.username || 'Player'}

@@ -13,6 +13,7 @@ export async function NavbarWithCms() {
       scheduleHref={cms.nav.scheduleHref}
       brandName={cms.site.brandName}
       brandTagline={cms.site.brandTagline}
+      shortName={cms.site.shortName}
     />
   );
 }

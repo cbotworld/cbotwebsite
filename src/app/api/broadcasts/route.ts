@@ -4,6 +4,7 @@ import { createLiveSession } from '@/lib/youtube-live';
 import { userFromBearer } from '@/lib/mobile-session';
 import { getPlayerMatchSchedule } from '@/lib/player-match-schedule';
 import { recordMobileLiveStream } from '@/lib/record-mobile-livestream';
+import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -85,7 +86,10 @@ export async function POST(request: NextRequest) {
         if (!timeRange) timeRange = row.timeRange || '';
         if (!endIso && !isBonusPlay) endIso = row.endIso || '';
       }
-      if (!editionTitle) editionTitle = 'CBOT 200th Edition';
+      if (!editionTitle) {
+        const site = await getWebsiteCmsSite();
+        editionTitle = `${site.shortName} ${site.editionLabel}`;
+      }
     }
 
     if (!name || !day) {

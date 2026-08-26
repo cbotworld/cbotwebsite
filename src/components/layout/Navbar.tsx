@@ -21,6 +21,7 @@ export function Navbar({
   scheduleHref = '/edition-200-schedule',
   brandName = 'CBOT World',
   brandTagline = 'Connect Carrom Enthusiasts Worldwide',
+  shortName = 'CBOT',
 }: {
   editionButtonLabel?: string;
   editionButtonHref?: string;
@@ -30,6 +31,7 @@ export function Navbar({
   scheduleHref?: string;
   brandName?: string;
   brandTagline?: string;
+  shortName?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -130,7 +132,7 @@ export function Navbar({
               {isSigningOut
                 ? 'Ending your secure CBOT session and redirecting to login'
                 : isNavigatingHome
-                ? 'Connecting to CBOT Arena Home & Active Tournaments'
+                ? `Connecting to ${shortName} Arena Home & Active Tournaments`
                 : 'Fetching live tournament statistics, player data, and schedules'}
             </p>
           </div>
@@ -361,7 +363,7 @@ export function Navbar({
                 pathname === '/' ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
               }`}
             >
-              <Home className="h-4 w-4 text-amber-400" /> CBOT Arena Home
+              <Home className="h-4 w-4 text-amber-400" /> {shortName} Arena Home
             </Link>
 
             {session?.user ? (

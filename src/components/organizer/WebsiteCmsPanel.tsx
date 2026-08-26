@@ -43,6 +43,7 @@ type Props = {
 
 const PAGE_HEADING_FIELDS: Array<{ key: keyof WebsitePagesCms; label: string }> = [
   { key: 'schedule', label: 'Match schedule page' },
+  { key: 'combis', label: 'Daily combis page' },
   { key: 'videos', label: 'Videos page' },
   { key: 'fixtures', label: 'Fixtures page' },
   { key: 'about', label: 'About page' },

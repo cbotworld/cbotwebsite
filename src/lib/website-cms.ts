@@ -122,6 +122,7 @@ export type WebsitePageHeading = {
 
 export type WebsitePagesCms = {
   schedule: WebsitePageHeading;
+  combis: WebsitePageHeading;
   videos: WebsitePageHeading;
   fixtures: WebsitePageHeading;
   about: WebsitePageHeading;
@@ -203,6 +204,11 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       badge: '✨ 200th Edition',
       title: 'Official Match Fixtures',
       subtitle: 'Carrom Balu Online Tournament',
+    },
+    combis: {
+      badge: 'Official Combis & Lineups',
+      title: 'BICENTENNIAL DAILY TEAM COMBIS',
+      subtitle: 'Submitted by Captains • Auto-Published Every Day at 9:30 PM IST',
     },
     videos: {
       badge: '🏆 Bicentennial 200th Edition Video Center',
@@ -447,6 +453,7 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
       site: mergeSection(DEFAULT_WEBSITE_CMS.site, parsed.site),
       pages: {
         schedule: mergeSection(DEFAULT_WEBSITE_CMS.pages.schedule, parsed.pages?.schedule),
+        combis: mergeSection(DEFAULT_WEBSITE_CMS.pages.combis, parsed.pages?.combis),
         videos: mergeSection(DEFAULT_WEBSITE_CMS.pages.videos, parsed.pages?.videos),
         fixtures: mergeSection(DEFAULT_WEBSITE_CMS.pages.fixtures, parsed.pages?.fixtures),
         about: mergeSection(DEFAULT_WEBSITE_CMS.pages.about, parsed.pages?.about),

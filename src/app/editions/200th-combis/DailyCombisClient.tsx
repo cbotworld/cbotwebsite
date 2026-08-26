@@ -12,6 +12,7 @@ import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
+import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 import * as XLSX from 'xlsx';
 interface TeamInfo {
   name: string;
@@ -488,7 +489,24 @@ function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, team
   ];
 }
 
-export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?: any[] }) {
+function filenameToken(value: string) {
+  return value
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+export default function DailyCombisClient({
+  initialTeams = [],
+  pageCms = DEFAULT_WEBSITE_CMS.pages.combis,
+  shortName = DEFAULT_WEBSITE_CMS.site.shortName,
+  editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
+}: {
+  initialTeams?: any[];
+  pageCms?: WebsitePageHeading;
+  shortName?: string;
+  editionLabel?: string;
+}) {
   const [dbTeams, setDbTeams] = React.useState<any[]>(initialTeams);
   const [pickedDayNum, setPickedDayNum] = React.useState<number>(0);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
@@ -641,7 +659,8 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `Day ${selectedDayNum} Combis`);
-    XLSX.writeFile(workbook, `CBOT_200th_Edition_Day_${selectedDayNum}_Combis.xlsx`);
+    const filePrefix = filenameToken(`${shortName} ${editionLabel}`) || 'Combis';
+    XLSX.writeFile(workbook, `${filePrefix}_Day_${selectedDayNum}_Combis.xlsx`);
   };
 
   return (
@@ -655,14 +674,14 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="CBOT Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <Badge variant="carrom" className="px-3.5 py-1 font-black text-xs uppercase tracking-widest bg-amber-500/20 text-amber-400 border-amber-500/40">
-                Official Combis & Lineups
+                {pageCms.badge}
               </Badge>
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
-              BICENTENNIAL DAILY TEAM COMBIS
+              {pageCms.title}
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted-foreground">
-              Submitted by Captains • Auto-Published Every Day at 9:30 PM IST
+              {pageCms.subtitle}
             </p>
           </div>
 

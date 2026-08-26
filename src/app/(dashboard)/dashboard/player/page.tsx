@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import PlayerClient from './PlayerClient';
 import { TEAM_TYPE_SPOC, spocTeamMembersFromTeam } from '@/lib/spoc-teams';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
 export const revalidate = 0;
 
@@ -109,6 +110,8 @@ export default async function PlayerPage() {
 
   const patterns = await prisma.boardPattern.findMany({ take: 5 });
 
+  const websiteCms = await getWebsiteCmsContent();
+
   // All of this player's streams for the edition (includes day-N / schedule_* match ids)
   const liveStreams = player
     ? await prisma.liveStream.findMany({
@@ -142,6 +145,8 @@ export default async function PlayerPage() {
       initialSpocTeam={spocTeam}
       initialSpocMembers={spocMembers}
       hasSpocCaptainDesk={hasSpocCaptainDesk}
+      shortName={websiteCms.site.shortName}
+      editionLabel={websiteCms.site.editionLabel}
     />
   );
 }

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { unstable_noStore as noStore, unstable_cache } from 'next/cache';
+import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 
 const RETENTION_HOURS = 72; // 72 Hours Retention Window from Day End
 
@@ -188,14 +189,16 @@ export async function stopLiveStreamAction(
         include: { edition: true, team1: true, team2: true }
       }).catch(() => null);
 
-      const matchTitle = `CBOT ${matchInfo?.edition?.title || 'Edition #200'} - ${stream.matchId} - ${matchInfo?.team1?.name || 'Team 1'} vs ${matchInfo?.team2?.name || 'Team 2'}`;
+      const site = await getWebsiteCmsSite();
+      const editionTitle = matchInfo?.edition?.title || site.editionLabel;
+      const matchTitle = `${site.shortName} ${editionTitle} - ${stream.matchId} - ${matchInfo?.team1?.name || 'Team 1'} vs ${matchInfo?.team2?.name || 'Team 2'}`;
 
       // Trigger YouTube auto-upload asynchronously
       uploadRecordedVideoToYouTube({
         streamId: stream.id,
         videoUrl: recordedVideoUrl,
         title: matchTitle,
-        description: `Official CBOT Match Recording\nEdition: ${matchInfo?.edition?.title || '200th Edition'}\nMatch: ${stream.matchId}\nWatch live tournaments at https://www.cbotworld.com/matches/${stream.matchId}`,
+        description: `Official ${site.shortName} Match Recording\nEdition: ${editionTitle}\nMatch: ${stream.matchId}\nWatch live tournaments at https://www.cbotworld.com/matches/${stream.matchId}`,
       }).then(res => {
         if (res.success) {
           console.log(`✅ Successfully auto-published match ${stream.matchId} to YouTube: ${res.url}`);
