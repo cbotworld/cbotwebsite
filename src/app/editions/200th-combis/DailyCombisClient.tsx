@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -13,6 +13,16 @@ import { resolveTeamFace } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
+import {
+  parseSavedLineups,
+  scoreMatchDay,
+  sideScoreSum,
+  type DayScoreMap,
+  type LineupRound,
+  type MatchDayResult,
+  type RosterPlayer,
+} from '@/lib/combi-results';
+import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
 import * as XLSX from 'xlsx';
 interface TeamInfo {
   name: string;
@@ -94,12 +104,25 @@ interface EventSlot {
   label: string;
   leftPlayers: string;
   rightPlayers: string;
+  leftScore?: number | null;
+  rightScore?: number | null;
+  winnerTeam?: 0 | 1 | 2;
+  reason?: string;
+  leftPts?: number;
+  rightPts?: number;
 }
 
 interface MatchCombiData {
   team1Key: string;
   team2Key: string;
   events: EventSlot[];
+  team1EventPts?: number | null;
+  team2EventPts?: number | null;
+  team1Wins?: number;
+  team2Wins?: number;
+  ties?: number;
+  matchWinner?: 0 | 1 | 2;
+  scored?: boolean;
 }
 
 interface DayCombiFixture {
@@ -214,6 +237,121 @@ const OFFICIAL_TEAM_COMBIS: Record<string, {
     triples2: 'SUMA NAVEEN, ROHIT PACKIYA, HEMACHANDRA KUMAR Y',
   },
 };
+
+function findTeamByKey(teamKey: string, teamsList: any[]) {
+  const keyUpper = teamKey.trim().toUpperCase();
+  return (teamsList || []).find((t: any) => {
+    if (!t || !t.name) return false;
+    const nameUpper = t.name.trim().toUpperCase();
+    const tagUpper = t.tag?.trim().toUpperCase();
+    const teamInfoName = TEAMS_INFO[keyUpper]?.name?.trim().toUpperCase();
+    return nameUpper === keyUpper || tagUpper === keyUpper || (teamInfoName && nameUpper === teamInfoName);
+  });
+}
+
+function teamRoster(team: any): RosterPlayer[] {
+  if (!team) return [];
+  const isSpoc = team.teamType === TEAM_TYPE_SPOC;
+  const rows = isSpoc ? team.spocMembers || [] : team.members || [];
+  const byId = new Map<string, RosterPlayer>();
+  if (team.captain?.id) {
+    byId.set(team.captain.id, { id: team.captain.id, name: team.captain.name || team.captain.username });
+  }
+  for (const row of rows) {
+    const user = row.user;
+    if (!user?.id) continue;
+    byId.set(user.id, { id: user.id, name: user.name || user.username });
+  }
+  return Array.from(byId.values());
+}
+
+function scoreMapForDay(scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>, dayNum: number): DayScoreMap {
+  const map: DayScoreMap = {};
+  for (const row of scores || []) {
+    if (row.dayNumber !== dayNum) continue;
+    map[row.userId] = { score: row.score, slams: row.slams || 0 };
+  }
+  return map;
+}
+
+function scoreFixtureMatch(
+  t1Key: string,
+  t2Key: string,
+  dayNum: number,
+  teamsList: any[],
+  scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>,
+  revealed: boolean,
+): MatchDayResult | null {
+  if (!revealed) return null;
+  const t1 = findTeamByKey(t1Key, teamsList);
+  const t2 = findTeamByKey(t2Key, teamsList);
+  if (!t1 || !t2) return null;
+  return scoreMatchDay(
+    parseSavedLineups(t1.savedLineups)[String(dayNum)]?.rounds as LineupRound[] | undefined,
+    parseSavedLineups(t2.savedLineups)[String(dayNum)]?.rounds as LineupRound[] | undefined,
+    teamRoster(t1),
+    teamRoster(t2),
+    scoreMapForDay(scores, dayNum),
+  );
+}
+
+function withMatchResults(
+  t1Key: string,
+  t2Key: string,
+  dayNum: number,
+  teamsList: any[],
+  scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>,
+  revealed: boolean,
+): MatchCombiData {
+  const events = buildMatchEvents(t1Key, t2Key, dayNum, teamsList);
+  const scored = scoreFixtureMatch(t1Key, t2Key, dayNum, teamsList, scores, revealed);
+  if (!scored) {
+    return { team1Key: t1Key, team2Key: t2Key, events, scored: false };
+  }
+  const dayScores = scoreMapForDay(scores, dayNum);
+  const mapped = events.map((evt, i) => {
+    const hit =
+      scored.events.find((e) => String(e.name || '').toLowerCase().replace(/\s+/g, '') === evt.label.toLowerCase().replace(/\s+/g, '')) ||
+      scored.events[i];
+    if (!hit) return evt;
+    return {
+      ...evt,
+      leftScore: sideScoreSum(hit.team1PlayerIds, dayScores),
+      rightScore: sideScoreSum(hit.team2PlayerIds, dayScores),
+      winnerTeam: hit.winnerTeam,
+      reason: hit.reason,
+      leftPts: hit.team1Pts,
+      rightPts: hit.team2Pts,
+    };
+  });
+  return {
+    team1Key: t1Key,
+    team2Key: t2Key,
+    events: mapped,
+    scored: true,
+    team1EventPts: scored.team1EventPts,
+    team2EventPts: scored.team2EventPts,
+    team1Wins: scored.events.filter((e) => e.winnerTeam === 1).length,
+    team2Wins: scored.events.filter((e) => e.winnerTeam === 2).length,
+    ties: scored.events.filter((e) => e.reason === 'tie').length,
+    matchWinner: scored.matchWinner,
+  };
+}
+
+function eventResultLabel(evt: EventSlot, side: 1 | 2) {
+  if (evt.winnerTeam == null) return null;
+  if (evt.reason === 'void' || evt.reason === 'double-walkover') return 'VOID';
+  if (evt.reason === 'tie') return 'TIE';
+  const won = evt.winnerTeam === side;
+  if (evt.reason === 'walkover') return won ? 'WIN' : 'WO';
+  return won ? 'WIN' : 'LOSS';
+}
+
+function eventScoreLabel(score: number | null | undefined, result: string | null) {
+  if (result === 'WO' || result === 'VOID') return result === 'WO' ? 'WO' : '—';
+  if (score == null) return null;
+  return String(score);
+}
 
 function getTeamCombiForDay(
   teamKey: string,

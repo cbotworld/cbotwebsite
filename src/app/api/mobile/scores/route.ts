@@ -22,16 +22,30 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
+    const requestedDay = Number(request.nextUrl.searchParams.get('dayNumber') || '');
+    const requestedTeamId = (request.nextUrl.searchParams.get('teamId') || '').trim() || undefined;
     const mine = await getMyDayScoresForUser(user.id);
-    const { team } = await resolveEditionAndTeam(user.id);
+    const { team } = await resolveEditionAndTeam(user.id, { teamId: requestedTeamId });
     let teammates: any[] = [];
+    let teamScoreWindowOpen = false;
+    const teamDay =
+      Number.isInteger(requestedDay) && requestedDay > 0 ? requestedDay : mine.eligibleDay;
     if (team && team.captainId === user.id) {
-      const teamScores = await getTeamDayScoresForActor(team.id, mine.eligibleDay, user.id, false);
+      const teamScores = await getTeamDayScoresForActor(team.id, teamDay, user.id, false);
       teammates = teamScores.players || [];
+      teamScoreWindowOpen = Boolean(teamScores.windowOpen);
     }
     const editionStats = await getEditionProfileStatsForUser(user.id);
     return NextResponse.json(
-      { ...mine, success: true, teammates, teamId: team?.id || null, editionStats },
+      {
+        ...mine,
+        success: true,
+        teammates,
+        teamId: team?.id || null,
+        teamDayNumber: teamDay,
+        teamScoreWindowOpen,
+        editionStats,
+      },
       { headers: mobileCorsHeaders },
     );
   } catch (error: any) {
@@ -47,7 +61,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
     const body = await request.json().catch(() => ({}));
-    const { team } = await resolveEditionAndTeam(user.id);
+    const requestedTeamId = typeof body.teamId === 'string' ? body.teamId.trim() : '';
+    const { team } = await resolveEditionAndTeam(user.id, {
+      teamId: requestedTeamId || undefined,
+    });
 
     if (Array.isArray(body.rows) && team && team.captainId === user.id) {
       const result = await submitTeamDayScoresForActor({

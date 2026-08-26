@@ -21,6 +21,8 @@ function publicProfile(user: any, team: any) {
       email: user.email || '',
       bio: user.bio || '',
       city: user.city || '',
+      address: user.address || '',
+      pincode: user.pincode || '',
       state: user.state || '',
       country: user.country || '',
       whatsApp: user.whatsApp || '',
@@ -105,11 +107,34 @@ export async function PATCH(request: NextRequest) {
             ? parseInt(ageRaw, 10)
             : undefined;
 
+    const pincode = typeof body.pincode === 'string' ? body.pincode.replace(/\s/g, '') : undefined;
+    const address = typeof body.address === 'string' ? body.address.trim() : undefined;
+    if (body.address !== undefined && !address) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter your full address.' },
+        { status: 400, headers: mobileCorsHeaders },
+      );
+    }
+    if (body.pincode !== undefined && !pincode) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter your 6-digit pincode.' },
+        { status: 400, headers: mobileCorsHeaders },
+      );
+    }
+    if (pincode && !/^\d{6}$/.test(pincode)) {
+      return NextResponse.json(
+        { success: false, error: 'Pincode must be 6 digits.' },
+        { status: 400, headers: mobileCorsHeaders },
+      );
+    }
+
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: {
         ...(body.bio !== undefined && { bio: String(body.bio || '') || null }),
         ...(body.city !== undefined && { city: String(body.city || '') || null }),
+        ...(body.address !== undefined && { address: address || null }),
+        ...(body.pincode !== undefined && { pincode: pincode || null }),
         ...(body.state !== undefined && { state: String(body.state || '') || null }),
         ...(body.country !== undefined && { country: String(body.country || '') || null }),
         ...(body.whatsApp !== undefined && { whatsApp: String(body.whatsApp || '') || null }),

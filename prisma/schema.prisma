@@ -24,6 +24,8 @@ model User {
   country       String?   @default("India")
   state         String?   @default("Tamil Nadu")
   city          String?   @default("Chennai")
+  address       String?
+  pincode       String?
   whatsApp      String?
   age           Int?
   gender        String?
@@ -451,6 +453,7 @@ model PlayerDayScore {
   dayNumber       Int
   score           Int
   slams           Int      @default(0)
+  boards          Json?
   submittedAt     DateTime @default(now())
   updatedAt       DateTime @updatedAt
   enteredByUserId String?

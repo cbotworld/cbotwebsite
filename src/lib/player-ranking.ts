@@ -6,8 +6,8 @@ import type {
   TournamentStage,
 } from '@/types';
 import { isDayScorePublished } from '@/lib/day-scoring';
-import { averageForDay, walkoverRankingScore } from '@/lib/player-average';
-import { combiCalendarDate, isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
+import { editionBoardAverage, previewTargetBonus } from '@/lib/board-scores';
+import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
 
 export type RankedPlayer = {
@@ -16,6 +16,7 @@ export type RankedPlayer = {
   teamId: string;
   teamName: string;
   average?: number | null;
+  matchesWon?: number;
 };
 
 export function publishedDays(maxDay: number, dayDates?: DayDatesInput, now = new Date()): number[] {
@@ -39,58 +40,60 @@ export function rankPlayers(opts: {
   const scoreKey = (userId: string, day: number) => `${userId}:${day}`;
   const byKey = new Map<string, PlayerDayScoreRow>();
   for (const row of opts.scores) byKey.set(scoreKey(row.userId, row.dayNumber), row);
-  const logsByUser = new Map<string, PlayerAverageLogRow[]>();
-  for (const log of opts.logs) {
-    const list = logsByUser.get(log.userId) || [];
-    list.push(log);
-    logsByUser.set(log.userId, list);
-  }
 
   const rows: PlayerRankingRow[] = opts.players.map((player) => {
-    let totalScore = 0;
+    const submitted: PlayerDayScoreRow[] = [];
     let walkovers = 0;
     for (const day of days) {
-      const submitted = byKey.get(scoreKey(player.userId, day));
-      if (submitted) {
-        totalScore += submitted.score;
-      } else {
-        const ymd = combiCalendarDate(day, opts.dayDates);
-        const avg = averageForDay(logsByUser.get(player.userId), ymd, player.average || 0);
-        totalScore += walkoverRankingScore(avg);
-        walkovers += 1;
-      }
+      const row = byKey.get(scoreKey(player.userId, day));
+      if (row) submitted.push(row);
+      else walkovers += 1;
     }
+    const stats = editionBoardAverage(submitted);
+    const slams = submitted.reduce((sum, row) => sum + (row.slams || 0), 0);
     return {
       userId: player.userId,
       name: player.name,
       teamId: player.teamId,
       teamName: player.teamName,
-      daysCounted: days.length,
+      daysCounted: submitted.length,
       walkovers,
-      totalScore,
+      totalScore: stats.totalScore,
+      boardCount: stats.boardCount,
+      boardAverage: stats.boardCount > 0 ? stats.average : null,
+      matchesWon: player.matchesWon || 0,
+      slams,
       rank: 0,
     };
   });
 
   rows.sort((a, b) => {
-    if (a.totalScore !== b.totalScore) return a.totalScore - b.totalScore;
-    if (a.walkovers !== b.walkovers) return a.walkovers - b.walkovers;
-    return a.name.localeCompare(b.name);
+    const aAvg = a.boardAverage;
+    const bAvg = b.boardAverage;
+    if (aAvg == null && bAvg == null) return tieBreakPlayers(a, b);
+    if (aAvg == null) return 1;
+    if (bAvg == null) return -1;
+    if (aAvg !== bAvg) return aAvg - bAvg;
+    return tieBreakPlayers(a, b);
   });
-  let lastTotal = Number.NaN;
-  let lastWalk = Number.NaN;
+  let lastKey = '';
   let lastRank = 0;
   rows.forEach((row, i) => {
-    if (row.totalScore === lastTotal && row.walkovers === lastWalk) {
-      row.rank = lastRank;
-    } else {
+    const key = `${row.boardAverage ?? 'x'}:${row.matchesWon}:${row.slams}`;
+    if (key === lastKey) row.rank = lastRank;
+    else {
       lastRank = i + 1;
-      lastTotal = row.totalScore;
-      lastWalk = row.walkovers;
+      lastKey = key;
       row.rank = lastRank;
     }
   });
   return rows;
+}
+
+function tieBreakPlayers(a: PlayerRankingRow, b: PlayerRankingRow) {
+  if (a.matchesWon !== b.matchesWon) return b.matchesWon - a.matchesWon;
+  if (a.slams !== b.slams) return b.slams - a.slams;
+  return a.name.localeCompare(b.name);
 }
 
 export function editionProfileStats(opts: {
@@ -98,6 +101,7 @@ export function editionProfileStats(opts: {
   scores: PlayerDayScoreRow[];
   logs: PlayerAverageLogRow[];
   fallbackAverage?: number;
+  fallbackTarget?: number;
   dayDates?: DayDatesInput;
   now?: Date;
   eventWins?: number;
@@ -108,9 +112,7 @@ export function editionProfileStats(opts: {
   for (const row of opts.scores) {
     if (!isDayScorePublished(row.dayNumber, opts.dayDates, now)) continue;
     slams += row.slams || 0;
-    const ymd = combiCalendarDate(row.dayNumber, opts.dayDates);
-    const avg = averageForDay(opts.logs, ymd, opts.fallbackAverage || 0);
-    if (row.score < avg) averageBonuses += 1;
+    if (previewTargetBonus(row.score, opts.fallbackTarget) === true) averageBonuses += 1;
   }
   return { wins: opts.eventWins || 0, slams, averageBonuses };
 }

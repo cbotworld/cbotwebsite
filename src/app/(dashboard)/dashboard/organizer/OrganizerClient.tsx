@@ -184,6 +184,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [editUserAge, setEditUserAge] = React.useState('');
   const [editUserGender, setEditUserGender] = React.useState('Male');
   const [editUserCity, setEditUserCity] = React.useState('');
+  const [editUserAddress, setEditUserAddress] = React.useState('');
+  const [editUserPincode, setEditUserPincode] = React.useState('');
   const [editUserState, setEditUserState] = React.useState('');
   const [editUserCountry, setEditUserCountry] = React.useState('');
   const [editUserAvgHistory, setEditUserAvgHistory] = React.useState<Array<{ effectiveFrom: string; average: number }>>([]);
@@ -677,6 +679,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setEditUserAge(usr.age ? usr.age.toString() : '');
     setEditUserGender(usr.gender || 'Male');
     setEditUserCity(usr.city || '');
+    setEditUserAddress(usr.address || '');
+    setEditUserPincode(usr.pincode || '');
     setEditUserState(usr.state || '');
     setEditUserCountry(usr.country || '');
     setEditUserAvgHistory([]);
@@ -711,6 +715,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               age: parsedAge,
               gender: editUserGender || undefined,
               city: editUserCity.trim() || undefined,
+              address: editUserAddress.trim() || undefined,
+              pincode: editUserPincode.trim() || undefined,
               state: editUserState.trim() || undefined,
               country: editUserCountry.trim() || undefined,
             }
@@ -730,6 +736,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       age: parsedAge,
       gender: editUserGender || undefined,
       city: editUserCity.trim() || undefined,
+      address: editUserAddress.trim() || undefined,
+      pincode: editUserPincode.trim() || undefined,
       state: editUserState.trim() || undefined,
       country: editUserCountry.trim() || undefined,
     });
@@ -1913,16 +1921,40 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </div>
 
           {/* Location Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-3">
             <div>
-              <label className="text-xs font-bold block mb-1">City (Optional)</label>
-              <Input
-                value={editUserCity}
-                onChange={(e) => setEditUserCity(e.target.value)}
-                placeholder="e.g. Chennai"
-                className="text-xs"
+              <label className="text-xs font-bold block mb-1">Full address</label>
+              <textarea
+                value={editUserAddress}
+                onChange={(e) => setEditUserAddress(e.target.value)}
+                placeholder="House / flat, street, area, landmark"
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-amber-500/50"
               />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold block mb-1">Pincode</label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={editUserPincode}
+                  onChange={(e) => setEditUserPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="e.g. 600001"
+                  className="text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold block mb-1">City / Town</label>
+                <Input
+                  value={editUserCity}
+                  onChange={(e) => setEditUserCity(e.target.value)}
+                  placeholder="e.g. Chennai"
+                  className="text-xs"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold block mb-1">State (Optional)</label>
               <Input
@@ -1941,6 +1973,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 className="text-xs"
               />
             </div>
+          </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

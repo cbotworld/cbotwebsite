@@ -1,9 +1,9 @@
 import { scoreMatchDay, scoreOneEvent } from '@/lib/combi-results';
 import { averageForDay, walkoverRankingScore } from '@/lib/player-average';
 import { rankPlayers } from '@/lib/player-ranking';
-import { buildStageStandingBlocks, type StandingTeam } from '@/lib/team-standings';
+import { buildStageStandingBlocks, rankStandingRows, type StandingTeam } from '@/lib/team-standings';
 import { insertIndexForNewStage, stageJustFinishedForAverageReview } from '@/lib/tournament-stages';
-import type { TournamentStage } from '@/types';
+import type { StageStandingRow, TournamentStage } from '@/types';
 
 function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
@@ -102,7 +102,7 @@ const ranked = rankPlayers({
   now: new Date('2026-08-10T20:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
-assert(ranked[0].userId === 'a' && ranked[0].rank === 1 && ranked[0].totalScore === 20, 'lowest total is rank 1');
+assert(ranked[0].userId === 'a' && ranked[0].rank === 1 && ranked[0].boardAverage === 20, 'lowest board average is rank 1');
 
 const rankedWo = rankPlayers({
   players: [
@@ -119,8 +119,25 @@ const rankedWo = rankPlayers({
   dayDates: { 1: '2026-08-10' },
 });
 const bRow = rankedWo.find((r) => r.userId === 'b');
-assert(bRow?.walkovers === 1 && bRow.totalScore === 25, 'ranking walkover = in-effect average+1');
-assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'submitted 20 beats walkover 25');
+assert(bRow?.walkovers === 1 && bRow.boardAverage == null && bRow.boardCount === 0, 'walkover days are excluded from average');
+assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'submitted score ranks above walkover-only player');
+
+const rankedBoards = rankPlayers({
+  players: [
+    { userId: 'a', name: 'A', teamId: 't', teamName: 'T' },
+    { userId: 'b', name: 'B', teamId: 't', teamName: 'T' },
+  ],
+  scores: [
+    { userId: 'a', dayNumber: 1, score: 40, slams: 0, boards: [{ score: 20, slams: 0 }, { score: 20, slams: 0 }] },
+    { userId: 'b', dayNumber: 1, score: 22, slams: 0, boards: [{ score: 22, slams: 0 }] },
+  ],
+  logs: [],
+  maxDay: 1,
+  now: new Date('2026-08-10T20:00:00+05:30'),
+  dayDates: { 1: '2026-08-10' },
+});
+assert(rankedBoards[0].userId === 'a' && rankedBoards[0].boardAverage === 20, 'lower total-score/boards ranks first');
+assert(rankedBoards[1].userId === 'b' && rankedBoards[1].boardAverage === 22, 'higher average ranks second despite lower total');
 
 const qfThenFinals: TournamentStage[] = [
   { id: 'rr', order: 1, kind: 'ROUND_ROBIN', name: 'Round Robin' },
@@ -143,10 +160,10 @@ const dayDates = { 1: '2026-08-10' };
 const lineup = (playerId: string) =>
   JSON.stringify({ '1': { rounds: [{ name: 'Singles 1', playerIds: [playerId] }] } });
 const standingTeams: StandingTeam[] = [
-  { id: 'main1', name: 'Main 1', teamType: 'MAIN', savedLineups: lineup('m1'), members: [{ id: 'm1', name: 'M1', average: 24 }] },
-  { id: 'main2', name: 'Main 2', teamType: 'MAIN', savedLineups: lineup('m2'), members: [{ id: 'm2', name: 'M2', average: 24 }] },
-  { id: 'spoc1', name: 'Spoc 1', teamType: 'SPOC_EXHIBITION', savedLineups: lineup('s1'), members: [{ id: 's1', name: 'S1', average: 24 }] },
-  { id: 'spoc2', name: 'Spoc 2', teamType: 'SPOC_EXHIBITION', savedLineups: lineup('s2'), members: [{ id: 's2', name: 'S2', average: 24 }] },
+  { id: 'main1', name: 'Main 1', teamType: 'MAIN', savedLineups: lineup('m1'), members: [{ id: 'm1', name: 'M1', average: 24, target: 24 }] },
+  { id: 'main2', name: 'Main 2', teamType: 'MAIN', savedLineups: lineup('m2'), members: [{ id: 'm2', name: 'M2', average: 24, target: 24 }] },
+  { id: 'spoc1', name: 'Spoc 1', teamType: 'SPOC_EXHIBITION', savedLineups: lineup('s1'), members: [{ id: 's1', name: 'S1', average: 24, target: 24 }] },
+  { id: 'spoc2', name: 'Spoc 2', teamType: 'SPOC_EXHIBITION', savedLineups: lineup('s2'), members: [{ id: 's2', name: 'S2', average: 24, target: 24 }] },
 ];
 const standingStages: TournamentStage[] = [
   {
@@ -198,6 +215,10 @@ const afterEight = standingAt('2026-08-10T20:00:00+05:30');
 const rrAfterEight = afterEight.find((b) => b.kind === 'ROUND_ROBIN')?.groups[0].rows.find((r) => r.teamId === 'main1');
 assert(rrAfterEight?.eventPts === 0, 'eventPts hidden until 9:30');
 assert(rrAfterEight?.slamBonus === 2 && rrAfterEight.avgBonus === 1, 'slam/avg after 8pm');
+assert(
+  rrAfterEight?.days?.some((d) => d.targetBonusPlayers?.some((p) => p.name === 'M1' && p.score === 20)),
+  'target bonus popup lists the player by day',
+);
 
 const afterCombi = standingAt('2026-08-10T21:30:00+05:30');
 const rrBlock = afterCombi.find((b) => b.kind === 'ROUND_ROBIN');
@@ -212,5 +233,40 @@ const spocRow = spocBlock?.groups[0].rows.find((r) => r.teamId === 'spoc1');
 assert(rrMain?.eventPts === 2 && rrMain.slamBonus === 2 && rrMain.avgBonus === 1, 'RR event pts after 9:30');
 assert(spocRow?.eventPts === 2 && spocRow.slamBonus === 5, 'SPOC points stay on SPOC table');
 assert(rrMain?.slamBonus !== 5 && rrMain?.eventPts !== 4, 'SPOC results do not mix into RR');
+
+function standingRow(partial: Partial<StageStandingRow> & Pick<StageStandingRow, 'teamId' | 'teamName'>): StageStandingRow {
+  return {
+    eventPts: 0,
+    slamBonus: 0,
+    avgBonus: 0,
+    total: 0,
+    matchesWon: 0,
+    rank: 0,
+    ...partial,
+  };
+}
+
+const tiedOnPoints = rankStandingRows([
+  standingRow({ teamId: 'lowWins', teamName: 'Low Wins', total: 10, matchesWon: 1, slamBonus: 9 }),
+  standingRow({ teamId: 'highWins', teamName: 'High Wins', total: 10, matchesWon: 3, slamBonus: 1 }),
+  standingRow({ teamId: 'leader', teamName: 'Leader', total: 12, matchesWon: 0, slamBonus: 0 }),
+]);
+assert(tiedOnPoints[0].teamId === 'leader' && tiedOnPoints[0].rank === 1, 'highest total ranks first even with zero wins');
+assert(tiedOnPoints[1].teamId === 'highWins' && tiedOnPoints[1].rank === 2, 'same points: more matches won ranks higher');
+assert(tiedOnPoints[2].teamId === 'lowWins' && tiedOnPoints[2].rank === 3, 'same points: fewer matches won ranks lower');
+
+const tiedOnWins = rankStandingRows([
+  standingRow({ teamId: 'fewSlams', teamName: 'Few Slams', total: 8, matchesWon: 2, slamBonus: 1 }),
+  standingRow({ teamId: 'manySlams', teamName: 'Many Slams', total: 8, matchesWon: 2, slamBonus: 4 }),
+]);
+assert(tiedOnWins[0].teamId === 'manySlams' && tiedOnWins[0].rank === 1, 'same points and wins: more slams ranks higher');
+assert(tiedOnWins[1].teamId === 'fewSlams' && tiedOnWins[1].rank === 2, 'same points and wins: fewer slams ranks lower');
+
+const fullTie = rankStandingRows([
+  standingRow({ teamId: 'b', teamName: 'Beta', total: 6, matchesWon: 1, slamBonus: 2 }),
+  standingRow({ teamId: 'a', teamName: 'Alpha', total: 6, matchesWon: 1, slamBonus: 2 }),
+]);
+assert(fullTie[0].teamId === 'a' && fullTie[1].teamId === 'b', 'name is display order only after a full tie');
+assert(fullTie[0].rank === 1 && fullTie[1].rank === 1, 'same points, wins, and slams share rank');
 
 console.log('verify-combi-results: all asserts passed');

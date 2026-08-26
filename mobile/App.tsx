@@ -23,10 +23,11 @@ import {
   submitPlayerScore,
   MatchDetails,
 } from './services/api';
+import { StandingsScreen } from './src/screens/StandingsScreen';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type Screen = 'login' | 'matches' | 'combis' | 'videos' | 'live' | 'scores';
+type Screen = 'login' | 'matches' | 'combis' | 'standings' | 'videos' | 'live' | 'scores';
 
 type CombiDay = NonNullable<Awaited<ReturnType<typeof getPlayerCombis>>['days']>[number];
 type ChannelVideo = NonNullable<Awaited<ReturnType<typeof getChannelVideos>>['videos']>[number];
@@ -53,12 +54,14 @@ function TabBar({
   active,
   onMatches,
   onCombis,
+  onStandings,
   onVideos,
   onScores,
 }: {
   active: Screen;
   onMatches: () => void;
   onCombis: () => void;
+  onStandings: () => void;
   onVideos: () => void;
   onScores: () => void;
 }) {
@@ -69,6 +72,9 @@ function TabBar({
       </TouchableOpacity>
       <TouchableOpacity style={[styles.tabBtn, active === 'combis' && styles.tabBtnActive]} onPress={onCombis}>
         <Text style={[styles.tabText, active === 'combis' && styles.tabTextActive]}>COMBIS</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.tabBtn, active === 'standings' && styles.tabBtnActive]} onPress={onStandings}>
+        <Text style={[styles.tabText, active === 'standings' && styles.tabTextActive]}>STAND</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.tabBtn, active === 'scores' && styles.tabBtnActive]} onPress={onScores}>
         <Text style={[styles.tabText, active === 'scores' && styles.tabTextActive]}>SCORES</Text>
@@ -100,11 +106,11 @@ export default function App() {
   const [selectedCombiDay, setSelectedCombiDay] = useState<number | null>(null);
   const [combisLoading, setCombisLoading] = useState(false);
   const [videos, setVideos] = useState<ChannelVideo[]>([]);
-  const [videoDays, setVideoDays] = useState<number[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videoPlayerFilter, setVideoPlayerFilter] = useState('');
   const [videoDayFilter, setVideoDayFilter] = useState<number | 'ALL'>('ALL');
   const [videoSearchDraft, setVideoSearchDraft] = useState('');
+  const [videoDayDraft, setVideoDayDraft] = useState('');
 
   // Login State
   const [username, setUsername] = useState('');
@@ -115,7 +121,7 @@ export default function App() {
   const [slamValue, setSlamValue] = useState('0');
   const [scoreInfo, setScoreInfo] = useState<any>(null);
   const [scoreBusy, setScoreBusy] = useState(false);
-  const [teamRows, setTeamRows] = useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean }>>([]);
+  const [teamRows, setTeamRows] = useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean; average?: number }>>([]);
   const [teamBusy, setTeamBusy] = useState(false);
   const [dayDrafts, setDayDrafts] = useState<Record<number, { score: string; slams: string }>>({});
   const [savingDay, setSavingDay] = useState<number | null>(null);
@@ -142,6 +148,7 @@ export default function App() {
           score: p.score == null ? '' : String(p.score),
           slams: p.slams == null ? '0' : String(p.slams),
           missingPrior: Boolean(p.missingPrior),
+          average: Number(p.averageInEffect ?? p.average) || 0,
         })),
       );
     }
@@ -289,11 +296,19 @@ export default function App() {
       });
       if (res.success) {
         setVideos(res.videos || []);
-        setVideoDays(res.days || []);
       }
     } finally {
       setVideosLoading(false);
     }
+  };
+
+  const applyVideoQuery = (player: string, dayRaw: string) => {
+    const cleaned = player.trim();
+    const dayNum = parseInt(String(dayRaw || '').trim(), 10);
+    const day = Number.isFinite(dayNum) && dayNum > 0 ? dayNum : 'ALL';
+    setVideoPlayerFilter(cleaned);
+    setVideoDayFilter(day);
+    if (token) void loadVideos(token, { player: cleaned, day });
   };
 
   const openVideosForPlayer = (player: string, day?: number | null) => {
@@ -302,6 +317,7 @@ export default function App() {
     setVideoPlayerFilter(cleaned);
     setVideoSearchDraft(cleaned);
     setVideoDayFilter(day && day > 0 ? day : 'ALL');
+    setVideoDayDraft(day && day > 0 ? String(day) : '');
     setScreen('videos');
     if (token) {
       void loadVideos(token, { player: cleaned, day: day && day > 0 ? day : 'ALL' });
@@ -481,6 +497,7 @@ export default function App() {
           active="matches"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onStandings={() => setScreen('standings')}
           onScores={() => {
             setScreen('scores');
             if (token) void loadScores(token);
@@ -575,6 +592,30 @@ export default function App() {
                     <Text style={styles.youOpp}>OPP</Text>
                   </View>
                 </View>
+
+                {match.myEvent?.revealed ? (
+                  <View style={styles.eventBox}>
+                    {match.myEvent.selected ? (
+                      <>
+                        <Text style={styles.eventName}>{match.myEvent.name || 'Your event'}</Text>
+                        <Text style={styles.eventPlayers}>YOU · {match.myEvent.myPlayers.join(', ') || '—'}</Text>
+                        <Text style={styles.eventPlayers}>OPP · {match.myEvent.oppPlayers.join(', ') || '—'}</Text>
+                        {match.myEvent.scoresReady && match.myEvent.result ? (
+                          <Text style={styles.eventResult}>
+                            {match.myEvent.result}
+                            {match.myEvent.myScore != null && match.myEvent.oppScore != null
+                              ? ` · ${match.myEvent.myScore} vs ${match.myEvent.oppScore}`
+                              : ''}
+                          </Text>
+                        ) : (
+                          <Text style={styles.eventHint}>Result after 8:00pm IST</Text>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.eventHint}>Not selected in this day’s combi</Text>
+                    )}
+                  </View>
+                ) : null}
 
                 <TouchableOpacity
                   style={styles.goLiveRow}
@@ -674,6 +715,7 @@ export default function App() {
           active="combis"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onStandings={() => setScreen('standings')}
           onScores={() => {
             setScreen('scores');
             if (token) void loadScores(token);
@@ -831,6 +873,29 @@ export default function App() {
     );
   }
 
+  if (screen === 'standings') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <TabBar
+          active="standings"
+          onMatches={() => setScreen('matches')}
+          onCombis={() => setScreen('combis')}
+          onStandings={() => setScreen('standings')}
+          onScores={() => {
+            setScreen('scores');
+            if (token) void loadScores(token);
+          }}
+          onVideos={() => {
+            setScreen('videos');
+            if (token) void loadVideos(token);
+          }}
+        />
+        <StandingsScreen embedded />
+      </SafeAreaView>
+    );
+  }
+
   if (screen === 'scores') {
     return (
       <SafeAreaView style={styles.container}>
@@ -838,13 +903,14 @@ export default function App() {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>DAY SCORE</Text>
-            <Text style={styles.headerSubtitle}>Submit by 8:00 PM IST · captains can fill the team</Text>
+            <Text style={styles.headerSubtitle}>Submit by 8:00 PM IST · captains can fix teammate scores until 9:30 PM IST</Text>
           </View>
         </View>
         <TabBar
           active="scores"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onStandings={() => setScreen('standings')}
           onScores={() => setScreen('scores')}
           onVideos={() => {
             setScreen('videos');
@@ -864,7 +930,7 @@ export default function App() {
               </View>
               <View style={styles.scoreStatBox}>
                 <Text style={styles.scoreStatNum}>{scoreInfo.editionStats.averageBonuses ?? 0}</Text>
-                <Text style={styles.scoreStatLabel}>AVG BONUS</Text>
+                <Text style={styles.scoreStatLabel}>TGT BONUS</Text>
               </View>
             </View>
           ) : null}
@@ -901,10 +967,20 @@ export default function App() {
           </TouchableOpacity>
           {teamRows.length > 0 ? (
             <View style={{ marginTop: 12, gap: 10 }}>
-              <Text style={styles.headerSubtitle}>Team scores — captains can fill teammates before 8pm</Text>
-              {teamRows.map((row, idx) => (
+              <Text style={styles.headerSubtitle}>Team scores — captains can fill or fix teammates until 9:30 PM IST</Text>
+              {teamRows.map((row, idx) => {
+                const teamOpen = scoreInfo?.teamScoreWindowOpen !== false;
+                const scoreNum = parseInt(row.score, 10);
+                const avgYes = row.score !== '' && Number.isFinite(scoreNum) && scoreNum < (Number(row.average) || 0);
+                const avgLabel = row.score === '' ? 'Avg —' : avgYes ? 'Avg Yes' : 'Avg No';
+                return (
                 <View key={row.userId} style={styles.teamScoreRow}>
-                  <Text style={styles.tabText}>{row.name}{row.missingPrior ? ' · needs earlier day' : row.score !== '' ? ' · submitted' : ' · empty'}</Text>
+                  <Text style={styles.tabText}>
+                    {row.name}
+                    {row.missingPrior ? ' · needs earlier day' : row.score !== '' ? ' · submitted' : ' · empty'}
+                    {' · '}
+                    {avgLabel}
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
@@ -912,7 +988,7 @@ export default function App() {
                       placeholderTextColor="#64748b"
                       keyboardType="number-pad"
                       value={row.score}
-                      editable={scoreInfo?.windowOpen !== false && !row.missingPrior}
+                      editable={teamOpen && !row.missingPrior}
                       onChangeText={(text) => {
                         const next = [...teamRows];
                         next[idx] = { ...row, score: text };
@@ -925,7 +1001,7 @@ export default function App() {
                       placeholderTextColor="#64748b"
                       keyboardType="number-pad"
                       value={row.slams}
-                      editable={scoreInfo?.windowOpen !== false && !row.missingPrior}
+                      editable={teamOpen && !row.missingPrior}
                       onChangeText={(text) => {
                         const next = [...teamRows];
                         next[idx] = { ...row, slams: text };
@@ -934,16 +1010,17 @@ export default function App() {
                     />
                   </View>
                 </View>
-              ))}
+                );
+              })}
               <TouchableOpacity
                 style={styles.loginButton}
-                disabled={teamBusy || scoreInfo?.windowOpen === false}
+                disabled={teamBusy || scoreInfo?.teamScoreWindowOpen === false}
                 onPress={async () => {
                   if (!token) return;
                   setTeamBusy(true);
                   const filled = teamRows.filter((r) => r.score !== '' && !r.missingPrior);
                   const res = await submitPlayerScore(token, {
-                    dayNumber: scoreInfo?.eligibleDay || scoreDay,
+                    dayNumber: scoreInfo?.teamDayNumber || scoreInfo?.eligibleDay || scoreDay,
                     score: parseInt(scoreValue || '0', 10),
                     slams: parseInt(slamValue || '0', 10),
                     rows: filled.map((r) => ({
@@ -951,6 +1028,7 @@ export default function App() {
                       score: parseInt(r.score, 10),
                       slams: parseInt(r.slams || '0', 10),
                     })),
+                    teamId: scoreInfo?.teamId,
                   });
                   if (res.success) {
                     Alert.alert('Saved', 'Team scores submitted.');
@@ -961,7 +1039,7 @@ export default function App() {
                   setTeamBusy(false);
                 }}
               >
-                <Text style={styles.loginButtonText}>{teamBusy ? 'SAVING TEAM…' : scoreInfo?.windowOpen === false ? 'WINDOW CLOSED' : 'SAVE TEAM SCORES'}</Text>
+                <Text style={styles.loginButtonText}>{teamBusy ? 'SAVING TEAM…' : scoreInfo?.teamScoreWindowOpen === false ? 'WINDOW CLOSED' : 'SAVE TEAM SCORES'}</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -981,7 +1059,7 @@ export default function App() {
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>📺 CHANNEL VIDEOS</Text>
             <Text style={styles.headerSubtitle}>
-              Search by player name · filter by day · tap to watch on YouTube
+              Search by player name or day · tap to watch on YouTube
             </Text>
           </View>
           <TouchableOpacity
@@ -996,6 +1074,7 @@ export default function App() {
           active="videos"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onStandings={() => setScreen('standings')}
           onScores={() => {
             setScreen('scores');
             if (token) void loadScores(token);
@@ -1004,82 +1083,68 @@ export default function App() {
         />
 
         <View style={styles.videoSearchRow}>
-          <TextInput
-            style={styles.videoSearchInput}
-            placeholder="Search player name..."
-            placeholderTextColor="#64748b"
-            value={videoSearchDraft}
-            onChangeText={setVideoSearchDraft}
-            autoCapitalize="characters"
-            returnKeyType="search"
-            onSubmitEditing={() => {
-              const next = videoSearchDraft.trim();
-              setVideoPlayerFilter(next);
-              if (token) void loadVideos(token, { player: next, day: videoDayFilter });
-            }}
-          />
+          <View style={styles.videoSearchField}>
+            <TextInput
+              style={styles.videoSearchInput}
+              placeholder="Player name"
+              placeholderTextColor="#64748b"
+              value={videoSearchDraft}
+              onChangeText={(v) => {
+                setVideoSearchDraft(v);
+                if (!v.trim()) applyVideoQuery('', videoDayDraft);
+              }}
+              autoCapitalize="words"
+              returnKeyType="search"
+              onSubmitEditing={() => applyVideoQuery(videoSearchDraft, videoDayDraft)}
+            />
+            {videoSearchDraft ? (
+              <TouchableOpacity
+                style={styles.videoClearX}
+                onPress={() => {
+                  setVideoSearchDraft('');
+                  applyVideoQuery('', videoDayDraft);
+                }}
+                accessibilityLabel="Clear player name"
+              >
+                <Text style={styles.videoClearXText}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <View style={styles.videoSearchField}>
+            <TextInput
+              style={styles.videoSearchInput}
+              placeholder="Day"
+              placeholderTextColor="#64748b"
+              value={videoDayDraft}
+              onChangeText={(v) => {
+                const next = v.replace(/[^\d]/g, '').slice(0, 2);
+                setVideoDayDraft(next);
+                if (!next) applyVideoQuery(videoSearchDraft, '');
+              }}
+              keyboardType="number-pad"
+              returnKeyType="search"
+              onSubmitEditing={() => applyVideoQuery(videoSearchDraft, videoDayDraft)}
+            />
+            {videoDayDraft ? (
+              <TouchableOpacity
+                style={styles.videoClearX}
+                onPress={() => {
+                  setVideoDayDraft('');
+                  applyVideoQuery(videoSearchDraft, '');
+                }}
+                accessibilityLabel="Clear day"
+              >
+                <Text style={styles.videoClearXText}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <TouchableOpacity
             style={styles.videoSearchBtn}
-            onPress={() => {
-              const next = videoSearchDraft.trim();
-              setVideoPlayerFilter(next);
-              if (token) void loadVideos(token, { player: next, day: videoDayFilter });
-            }}
+            onPress={() => applyVideoQuery(videoSearchDraft, videoDayDraft)}
           >
             <Text style={styles.videoSearchBtnText}>SEARCH</Text>
           </TouchableOpacity>
         </View>
-
-        {(videoPlayerFilter || videoDayFilter !== 'ALL') && (
-          <View style={styles.activeFilterRow}>
-            <Text style={styles.activeFilterText} numberOfLines={1}>
-              {videoPlayerFilter ? `Player: ${videoPlayerFilter}` : 'All players'}
-              {videoDayFilter !== 'ALL' ? ` · Day ${videoDayFilter}` : ''}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setVideoPlayerFilter('');
-                setVideoSearchDraft('');
-                setVideoDayFilter('ALL');
-                if (token) void loadVideos(token, { player: '', day: 'ALL' });
-              }}
-            >
-              <Text style={styles.clearFilterText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.dayChipsScroll}
-          contentContainerStyle={styles.dayChipsContent}
-        >
-          <TouchableOpacity
-            style={[styles.dayChip, videoDayFilter === 'ALL' && styles.dayChipActive]}
-            onPress={() => {
-              setVideoDayFilter('ALL');
-              if (token) void loadVideos(token, { player: videoPlayerFilter, day: 'ALL' });
-            }}
-          >
-            <Text style={[styles.dayChipText, videoDayFilter === 'ALL' && styles.dayChipTextActive]}>All Days</Text>
-          </TouchableOpacity>
-          {videoDays.map((d) => {
-            const selected = videoDayFilter === d;
-            return (
-              <TouchableOpacity
-                key={d}
-                style={[styles.dayChip, selected && styles.dayChipActive]}
-                onPress={() => {
-                  setVideoDayFilter(d);
-                  if (token) void loadVideos(token, { player: videoPlayerFilter, day: d });
-                }}
-              >
-                <Text style={[styles.dayChipText, selected && styles.dayChipTextActive]}>Day {d}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
 
         <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
           {videosLoading ? (
@@ -1501,6 +1566,19 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     alignItems: 'center',
   },
+  eventBox: {
+    marginTop: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    padding: 10,
+    gap: 4,
+  },
+  eventName: { color: '#f59e0b', fontSize: 12, fontWeight: '900' },
+  eventPlayers: { color: '#e2e8f0', fontSize: 12, fontWeight: '700' },
+  eventResult: { color: '#f8fafc', fontSize: 12, fontWeight: '900', marginTop: 4 },
+  eventHint: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
   goLiveText: {
     fontSize: 11,
     fontWeight: '900',
@@ -1618,14 +1696,15 @@ const styles = StyleSheet.create({
 
   tabRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
+    gap: 4,
+    paddingHorizontal: 10,
     paddingBottom: 10,
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
+    paddingHorizontal: 2,
     borderRadius: 12,
     backgroundColor: '#0f172a',
     borderWidth: 1,
@@ -1636,10 +1715,10 @@ const styles = StyleSheet.create({
     borderColor: '#f59e0b',
   },
   tabText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '900',
     color: '#64748b',
-    letterSpacing: 1,
+    letterSpacing: 0.2,
   },
   tabTextActive: {
     color: '#f59e0b',
@@ -1829,18 +1908,41 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     marginBottom: 8,
+    alignItems: 'center',
+  },
+  videoSearchField: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
   },
   videoSearchInput: {
-    flex: 1,
     backgroundColor: '#0f172a',
     borderWidth: 1,
     borderColor: '#334155',
     borderRadius: 12,
     color: '#f8fafc',
     paddingHorizontal: 12,
+    paddingRight: 32,
     paddingVertical: 10,
     fontSize: 13,
     fontWeight: '700',
+  },
+  videoClearX: {
+    position: 'absolute',
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoClearXText: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 16,
+    marginTop: -1,
   },
   videoSearchBtn: {
     backgroundColor: '#f59e0b',

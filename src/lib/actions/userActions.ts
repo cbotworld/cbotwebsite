@@ -20,6 +20,8 @@ export async function generateUserCredentials(data: {
   country?: string;
   state?: string;
   city?: string;
+  address?: string;
+  pincode?: string;
   image?: string;
 }) {
   const session = await getServerSession(authOptions);
@@ -84,6 +86,8 @@ export async function generateUserCredentials(data: {
         country: data.country || 'India',
         state: data.state || 'Tamil Nadu',
         city: data.city || 'Chennai',
+        address: data.address || undefined,
+        pincode: data.pincode || undefined,
         whatsApp: data.whatsApp || undefined,
         image: data.image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
         rating: Math.round((data.average || 12) * 100),
@@ -122,6 +126,8 @@ export async function updatePlayerProfileDetails(userId: string, data: {
   age?: number;
   gender?: string;
   city?: string;
+  address?: string;
+  pincode?: string;
   state?: string;
   country?: string;
 }) {
@@ -172,6 +178,8 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           ...(data.age !== undefined && { age: data.age }),
           ...(data.gender !== undefined && { gender: data.gender }),
           ...(data.city !== undefined && { city: data.city }),
+          ...(data.address !== undefined && { address: data.address }),
+          ...(data.pincode !== undefined && { pincode: data.pincode }),
           ...(data.state !== undefined && { state: data.state }),
           ...(data.country !== undefined && { country: data.country }),
         },
@@ -198,6 +206,8 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           age: data.age || undefined,
           gender: data.gender || undefined,
           city: data.city || undefined,
+          address: data.address || undefined,
+          pincode: data.pincode || undefined,
           state: data.state || undefined,
           country: data.country || undefined,
         }
@@ -242,10 +252,12 @@ export async function togglePlayerActivation(userId: string) {
 /**
  * Self-service profile update for any logged-in player.
  * BLOCKED fields (organiser-controlled): name, username, average, target, rating, wins, losses, boardsWon, queenStrikes
- * EDITABLE fields: bio, city, state, country, whatsApp, email, age, gender
+ * EDITABLE fields: bio, address, pincode, city, state, country, whatsApp, email, age, gender
  */
 export async function updateMyProfile(data: {
   bio?: string;
+  address?: string;
+  pincode?: string;
   city?: string;
   state?: string;
   country?: string;
@@ -272,10 +284,24 @@ export async function updateMyProfile(data: {
   }
 
   try {
+    const pin = String(data.pincode || '').replace(/\s/g, '');
+    if (data.pincode !== undefined && pin && !/^\d{6}$/.test(pin)) {
+      return { success: false, error: 'Pincode must be 6 digits.' };
+    }
+    const address = String(data.address || '').trim();
+    if (data.address !== undefined && !address) {
+      return { success: false, error: 'Please enter your full address.' };
+    }
+    if (data.pincode !== undefined && !pin) {
+      return { success: false, error: 'Please enter your 6-digit pincode.' };
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(data.bio !== undefined && { bio: data.bio || null }),
+        ...(data.address !== undefined && { address: address || null }),
+        ...(data.pincode !== undefined && { pincode: pin || null }),
         ...(data.city !== undefined && { city: data.city || null }),
         ...(data.state !== undefined && { state: data.state || null }),
         ...(data.country !== undefined && { country: data.country || null }),

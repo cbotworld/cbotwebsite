@@ -10,14 +10,16 @@ import type { PlayerAverageLogRow, PlayerDayScoreRow, TournamentStageConfig } fr
 import {
   calendarDaysInEdition,
   hasSubmittedPriorDays,
+  isCaptainScoreEditOpen,
   isScoreSubmitOpen,
   nextEligibleDay,
-  validateScorePayload,
   isDayScorePublished,
   scoreCutoffIso,
   scoreWindowStartIso,
+  todayIstCalendarDate,
 } from '@/lib/day-scoring';
-import { averageChangeEffectiveFrom, logsForUser } from '@/lib/player-average';
+import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
+import { editionBoardAverage, previewTargetBonus, resolveScoreInput, type DayBoardScore } from '@/lib/board-scores';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
@@ -71,6 +73,7 @@ async function upsertDayScore(opts: {
   dayNumber: number;
   score: number;
   slams: number;
+  boards: DayBoardScore[];
   enteredByUserId: string;
 }) {
   return prisma.playerDayScore.upsert({
@@ -81,14 +84,27 @@ async function upsertDayScore(opts: {
       dayNumber: opts.dayNumber,
       score: opts.score,
       slams: opts.slams,
+      boards: opts.boards,
       enteredByUserId: opts.enteredByUserId,
     },
     update: {
       score: opts.score,
       slams: opts.slams,
+      boards: opts.boards,
       enteredByUserId: opts.enteredByUserId,
     },
   });
+}
+
+async function refreshPlayerEditionAverage(editionId: string, userId: string, changedById: string) {
+  const rows = await prisma.playerDayScore.findMany({
+    where: { editionId, userId },
+    select: { score: true, slams: true, boards: true },
+  });
+  const { average, boardCount } = editionBoardAverage(rows);
+  if (boardCount <= 0) return;
+  await prisma.user.update({ where: { id: userId }, data: { average } });
+  await recordPlayerAverageChange(userId, average, changedById, true);
 }
 
 async function userOnEditionTeam(userId: string, editionId: string) {
@@ -120,8 +136,14 @@ function describeScoreWindow(day: number, dayDates: any) {
   };
 }
 
-export async function submitPlayerDayScoreForUser(userId: string, dayNumber: number, score: unknown, slams: unknown) {
-  const parsed = validateScorePayload(score, slams);
+export async function submitPlayerDayScoreForUser(
+  userId: string,
+  dayNumber: number,
+  score: unknown,
+  slams: unknown,
+  boards?: unknown,
+) {
+  const parsed = resolveScoreInput(score, slams, boards);
   if (!parsed.ok) return { success: false as const, error: parsed.error };
   const edition = await loadLatestEdition();
   if (!edition) return { success: false as const, error: 'No edition found.' };
@@ -143,7 +165,7 @@ export async function submitPlayerDayScoreForUser(userId: string, dayNumber: num
   if (!isScoreSubmitOpen(day, edition.dayDates)) {
     return {
       success: false as const,
-      error: 'Score window for this day is closed. Ask your captain before 8pm, or the organiser after 8pm.',
+      error: 'Score window for this day is closed. Ask your captain before 9:30pm IST, or the organiser after that.',
     };
   }
 
@@ -153,8 +175,10 @@ export async function submitPlayerDayScoreForUser(userId: string, dayNumber: num
     dayNumber: day,
     score: parsed.score,
     slams: parsed.slams,
+    boards: parsed.boards,
     enteredByUserId: userId,
   });
+  await refreshPlayerEditionAverage(edition.id, userId, userId);
   revalidateScorePages();
   return { success: true as const };
 }
@@ -164,7 +188,7 @@ export async function submitTeamDayScoresForActor(opts: {
   isOrganiser: boolean;
   teamId: string;
   dayNumber: number;
-  rows: Array<{ userId: string; score: unknown; slams: unknown }>;
+  rows: Array<{ userId: string; score?: unknown; slams?: unknown; boards?: unknown }>;
 }) {
   const edition = await loadLatestEdition();
   if (!edition) return { success: false as const, error: 'No edition found.' };
@@ -184,8 +208,8 @@ export async function submitTeamDayScoresForActor(opts: {
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const day = Number(opts.dayNumber);
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
-  if (!opts.isOrganiser && !isScoreSubmitOpen(day, edition.dayDates)) {
-    return { success: false as const, error: 'Score window closed at 8:00pm IST.' };
+  if (!opts.isOrganiser && !isCaptainScoreEditOpen(day, edition.dayDates)) {
+    return { success: false as const, error: 'Captain score edits closed at 9:30pm IST. Ask the organiser.' };
   }
 
   const memberIds = new Set([
@@ -205,7 +229,7 @@ export async function submitTeamDayScoresForActor(opts: {
 
   for (const row of opts.rows) {
     if (!memberIds.has(row.userId)) return { success: false as const, error: 'Can only enter scores for this team.' };
-    const parsed = validateScorePayload(row.score, row.slams);
+    const parsed = resolveScoreInput(row.score, row.slams, row.boards);
     if (!parsed.ok) return { success: false as const, error: parsed.error };
     if (!hasSubmittedPriorDays(priorByUser.get(row.userId) || [], day)) {
       return { success: false as const, error: 'A player is missing an earlier day. Organiser must fill that day first.' };
@@ -216,23 +240,25 @@ export async function submitTeamDayScoresForActor(opts: {
       dayNumber: day,
       score: parsed.score,
       slams: parsed.slams,
+      boards: parsed.boards,
       enteredByUserId: opts.actorId,
     });
+    await refreshPlayerEditionAverage(edition.id, row.userId, opts.actorId);
   }
   revalidateScorePages();
   return { success: true as const };
 }
 
-export async function submitPlayerDayScore(dayNumber: number, score: unknown, slams: unknown) {
+export async function submitPlayerDayScore(dayNumber: number, score: unknown, slams: unknown, boards?: unknown) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error };
-  return submitPlayerDayScoreForUser((session.user as any).id as string, dayNumber, score, slams);
+  return submitPlayerDayScoreForUser((session.user as any).id as string, dayNumber, score, slams, boards);
 }
 
 export async function submitTeamDayScores(
   teamId: string,
   dayNumber: number,
-  rows: Array<{ userId: string; score: unknown; slams: unknown }>,
+  rows: Array<{ userId: string; score?: unknown; slams?: unknown; boards?: unknown }>,
 ) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error };
@@ -245,11 +271,17 @@ export async function submitTeamDayScores(
   });
 }
 
-export async function organiserUpsertPlayerDayScore(userId: string, dayNumber: number, score: unknown, slams: unknown) {
+export async function organiserUpsertPlayerDayScore(
+  userId: string,
+  dayNumber: number,
+  score: unknown,
+  slams: unknown,
+  boards?: unknown,
+) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error };
   if (!isOrganiser(session)) return { success: false as const, error: 'Organiser access required.' };
-  const parsed = validateScorePayload(score, slams);
+  const parsed = resolveScoreInput(score, slams, boards);
   if (!parsed.ok) return { success: false as const, error: parsed.error };
   const edition = await loadLatestEdition();
   if (!edition) return { success: false as const, error: 'No edition found.' };
@@ -266,8 +298,10 @@ export async function organiserUpsertPlayerDayScore(userId: string, dayNumber: n
     dayNumber: day,
     score: parsed.score,
     slams: parsed.slams,
+    boards: parsed.boards,
     enteredByUserId: (session.user as any).id,
   });
+  await refreshPlayerEditionAverage(edition.id, userId, (session.user as any).id);
   revalidateScorePages();
   return { success: true };
 }
@@ -295,6 +329,7 @@ export async function getMyDayScoresForUser(userId: string) {
     where: { editionId: edition.id, userId },
     orderBy: { dayNumber: 'asc' },
   });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const submittedDays = scores.map((s) => s.dayNumber);
   let eligibleDay = nextEligibleDay(submittedDays, maxDay);
   if (!isScoreSubmitOpen(eligibleDay, edition.dayDates)) {
@@ -321,6 +356,8 @@ export async function getMyDayScoresForUser(userId: string) {
     publishedDays: publishedFlags,
     cutoffIso: scoreCutoffIso(eligibleDay, edition.dayDates),
     editionTitle: edition.title,
+    target: user?.target || 0,
+    average: user?.average || 0,
   };
 }
 
@@ -343,8 +380,8 @@ export async function getTeamDayScoresForActor(
   const team = await prisma.team.findFirst({
     where: { id: teamId, editionId: edition.id },
     include: {
-      members: { include: { user: { select: { id: true, name: true, username: true, average: true } } } },
-      spocMembers: { include: { user: { select: { id: true, name: true, username: true, average: true } } } },
+      members: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
+      spocMembers: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
     },
   });
   if (!team) return { success: false as const, error: 'Team not found.', players: [] };
@@ -359,7 +396,7 @@ export async function getTeamDayScoresForActor(
   const allScores = memberIds.length
     ? await prisma.playerDayScore.findMany({
         where: { editionId: edition.id, userId: { in: memberIds } },
-        select: { userId: true, dayNumber: true, score: true, slams: true },
+        select: { userId: true, dayNumber: true, score: true, slams: true, boards: true },
       })
     : [];
   const byUserDay = new Map(allScores.filter((s) => s.dayNumber === dayNumber).map((s) => [s.userId, s]));
@@ -369,18 +406,44 @@ export async function getTeamDayScoresForActor(
     list.push(row.dayNumber);
     daysByUser.set(row.userId, list);
   }
+  const avgLogs = memberIds.length
+    ? await prisma.playerAverageLog.findMany({
+        where: { editionId: edition.id, userId: { in: memberIds } },
+        select: { userId: true, average: true, effectiveFrom: true },
+      })
+    : [];
+  const calendarDate = combiCalendarDate(dayNumber, edition.dayDates);
+  const captainWindowOpen = isCaptainScoreEditOpen(dayNumber, edition.dayDates) || isOrganiserActor;
   return {
     success: true as const,
-    windowOpen: isScoreSubmitOpen(dayNumber, edition.dayDates) || isOrganiserActor,
+    windowOpen: captainWindowOpen,
+    playerWindowOpen: isScoreSubmitOpen(dayNumber, edition.dayDates),
     published: isDayScorePublished(dayNumber, edition.dayDates),
-    players: roster.map((u) => ({
-      userId: u.id,
-      name: u.name || u.username,
-      average: u.average,
-      score: byUserDay.get(u.id)?.score ?? null,
-      slams: byUserDay.get(u.id)?.slams ?? null,
-      missingPrior: !hasSubmittedPriorDays(daysByUser.get(u.id) || [], dayNumber),
-    })),
+    cutoffIso: scoreCutoffIso(dayNumber, edition.dayDates),
+    captainCutoffIso: `${calendarDate}T21:30:00+05:30`,
+    players: roster.map((u) => {
+      const row = byUserDay.get(u.id);
+      const score = row?.score ?? null;
+      const slams = row?.slams ?? null;
+      const averageInEffect = averageForDay(
+        logsForUser(avgLogs, u.id),
+        calendarDate,
+        u.average || 0,
+      );
+      return {
+        userId: u.id,
+        name: u.name || u.username,
+        average: u.average,
+        averageInEffect,
+        target: u.target || 0,
+        score,
+        slams,
+        boards: row?.boards || null,
+        hasTargetBonus: previewTargetBonus(score, u.target),
+        hasAvgBonus: previewTargetBonus(score, u.target),
+        missingPrior: !hasSubmittedPriorDays(daysByUser.get(u.id) || [], dayNumber),
+      };
+    }),
   };
 }
 
@@ -390,7 +453,12 @@ export async function getTeamDayScores(teamId: string, dayNumber: number) {
   return getTeamDayScoresForActor(teamId, dayNumber, (session.user as any).id as string, isOrganiser(session));
 }
 
-export async function recordPlayerAverageChange(userId: string, newAverage: number, changedById: string) {
+export async function recordPlayerAverageChange(
+  userId: string,
+  newAverage: number,
+  changedById: string,
+  applyToday = false,
+) {
   const edition = await loadLatestEdition();
   if (!edition) return;
   const next = Number(newAverage);
@@ -400,6 +468,7 @@ export async function recordPlayerAverageChange(userId: string, newAverage: numb
     orderBy: [{ effectiveFrom: 'asc' }, { changedAt: 'asc' }],
   });
   const day1 = combiCalendarDate(1, edition.dayDates);
+  const effectiveFrom = applyToday ? todayIstCalendarDate() : averageChangeEffectiveFrom();
   if (logs.length === 0) {
     await prisma.playerAverageLog.create({
       data: { editionId: edition.id, userId, average: next, effectiveFrom: day1, changedById },
@@ -409,11 +478,10 @@ export async function recordPlayerAverageChange(userId: string, newAverage: numb
   }
   const latest = logs[logs.length - 1];
   if (Number(latest.average) === next) return;
-  const tomorrow = averageChangeEffectiveFrom();
-  const sameTomorrow = [...logs].reverse().find((row) => row.effectiveFrom === tomorrow);
-  if (sameTomorrow) {
+  const sameDate = [...logs].reverse().find((row) => row.effectiveFrom === effectiveFrom);
+  if (sameDate) {
     await prisma.playerAverageLog.update({
-      where: { id: sameTomorrow.id },
+      where: { id: sameDate.id },
       data: { average: next, changedById },
     });
   } else {
@@ -422,7 +490,7 @@ export async function recordPlayerAverageChange(userId: string, newAverage: numb
         editionId: edition.id,
         userId,
         average: next,
-        effectiveFrom: tomorrow,
+        effectiveFrom,
         changedById,
       },
     });
@@ -484,24 +552,49 @@ export async function getPublicStandings() {
   const teams = await prisma.team.findMany({
     where: { editionId: edition.id },
     include: {
-      members: { include: { user: { select: { id: true, name: true, username: true, average: true } } } },
+      captain: { select: { id: true, name: true, username: true, average: true, target: true } },
+      members: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
+      spocMembers: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
     },
   });
   const scores = await prisma.playerDayScore.findMany({ where: { editionId: edition.id } });
   const logs = await prisma.playerAverageLog.findMany({ where: { editionId: edition.id } });
-  const standingTeams = teams.map((t) => ({
-    id: t.id,
-    name: t.name,
-    tag: t.tag,
-    teamType: t.teamType,
-    savedLineups: t.savedLineups,
-    members: t.members.map((m) => ({ id: m.user.id, name: m.user.name, average: m.user.average })),
-  }));
+  const standingTeams = teams.map((t) => {
+    const isSpoc = t.teamType === 'SPOC_EXHIBITION';
+    const roster = isSpoc ? t.spocMembers : t.members;
+    const byId = new Map<string, { id: string; name: string | null; average?: number | null; target?: number | null }>();
+    if (t.captain) {
+      byId.set(t.captain.id, {
+        id: t.captain.id,
+        name: t.captain.name || t.captain.username,
+        average: t.captain.average,
+        target: t.captain.target,
+      });
+    }
+    for (const m of roster) {
+      if (!m.user) continue;
+      byId.set(m.user.id, {
+        id: m.user.id,
+        name: m.user.name || m.user.username,
+        average: m.user.average,
+        target: m.user.target,
+      });
+    }
+    return {
+      id: t.id,
+      name: t.name,
+      tag: t.tag,
+      teamType: t.teamType,
+      savedLineups: t.savedLineups,
+      members: Array.from(byId.values()),
+    };
+  });
   const scoreRows: PlayerDayScoreRow[] = scores.map((s) => ({
     userId: s.userId,
     dayNumber: s.dayNumber,
     score: s.score,
     slams: s.slams,
+    boards: (s as { boards?: unknown }).boards,
   }));
   const logRows: PlayerAverageLogRow[] = logs.map((l) => ({
     userId: l.userId,
@@ -527,6 +620,7 @@ export async function getPublicStandings() {
       teamId: t.id,
       teamName: t.name,
       average: m.average,
+      matchesWon: countEventWinsForPlayer(m.id, standingTeams, pairings, scoreRows, edition.dayDates),
     })));
   const hasPublishedDay = publishedDays(maxDay, edition.dayDates).length > 0;
   const players = hasPublishedDay
@@ -557,7 +651,7 @@ export async function getAverageReviewPrompt() {
 export async function getEditionProfileStatsForUser(userId: string) {
   const edition = await loadLatestEdition();
   if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], average: 0 };
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const scores = await prisma.playerDayScore.findMany({ where: { editionId: edition.id, userId } });
   const logs = await prisma.playerAverageLog.findMany({
     where: { editionId: edition.id, userId },
@@ -584,6 +678,7 @@ export async function getEditionProfileStatsForUser(userId: string) {
     scores: scores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
     logs: logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
     fallbackAverage: user?.average || 0,
+    fallbackTarget: user?.target || 0,
     dayDates: edition.dayDates,
     eventWins: wins,
   });

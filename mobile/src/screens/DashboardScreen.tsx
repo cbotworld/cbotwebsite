@@ -262,6 +262,30 @@ export function DashboardScreen({ navigation }: Props) {
                   </View>
                 </View>
 
+                {match.myEvent?.revealed ? (
+                  <View style={styles.eventBox}>
+                    {match.myEvent.selected ? (
+                      <>
+                        <Text style={styles.eventName}>{match.myEvent.name || 'Your event'}</Text>
+                        <Text style={styles.eventPlayers}>YOU · {match.myEvent.myPlayers.join(', ') || '—'}</Text>
+                        <Text style={styles.eventPlayers}>OPP · {match.myEvent.oppPlayers.join(', ') || '—'}</Text>
+                        {match.myEvent.scoresReady && match.myEvent.result ? (
+                          <Text style={styles.eventResult}>
+                            {match.myEvent.result}
+                            {match.myEvent.myScore != null && match.myEvent.oppScore != null
+                              ? ` · ${match.myEvent.myScore} vs ${match.myEvent.oppScore}`
+                              : ''}
+                          </Text>
+                        ) : (
+                          <Text style={styles.eventHint}>Result after 8:00pm IST</Text>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.eventHint}>Not selected in this day’s combi</Text>
+                    )}
+                  </View>
+                ) : null}
+
                 <Pressable
                   style={[styles.goLive, !match.canGoLive && styles.goLiveOff]}
                   onPress={() => onGoLive(match)}
@@ -387,6 +411,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
   },
+  eventBox: {
+    marginTop: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    padding: 10,
+    gap: 4,
+  },
+  eventName: { color: '#f59e0b', fontSize: 12, fontWeight: '900' },
+  eventPlayers: { color: '#e2e8f0', fontSize: 12, fontWeight: '700' },
+  eventResult: { color: '#f8fafc', fontSize: 12, fontWeight: '900', marginTop: 4 },
+  eventHint: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
   goLiveOff: { backgroundColor: '#1e293b' },
   goLiveText: { color: '#fff', fontWeight: '900', letterSpacing: 1 },
   scoreBox: {

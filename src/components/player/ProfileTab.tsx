@@ -9,7 +9,7 @@ import { activateUserAccount, updateMyProfile } from '@/lib/actions/userActions'
 import { getEditionProfileStatsForUser } from '@/lib/actions/playerScoreActions';
 import AverageHistoryGraph from '@/components/player/AverageHistoryGraph';
 import {
-  UserCheck, MapPin, Globe, Phone, Mail, Shield,
+  UserCheck, MapPin, Phone, Mail, Shield,
   Users, Lock, CheckCircle2, AlertCircle, Eye, EyeOff,
   Pencil, X, Save, User, Calendar
 } from 'lucide-react';
@@ -29,7 +29,7 @@ function InfoRow({ icon, label, value, placeholder }: { icon: React.ReactNode; l
       <div className="text-muted-foreground mt-0.5 flex-shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{label}</div>
-        <div className={`text-sm mt-0.5 break-words ${value ? 'font-semibold text-foreground' : 'text-muted-foreground/50 italic'}`}>
+        <div className={`text-sm mt-0.5 break-words whitespace-pre-line ${value ? 'font-semibold text-foreground' : 'text-muted-foreground/50 italic'}`}>
           {value || placeholder || '—'}
         </div>
       </div>
@@ -67,6 +67,8 @@ export function ProfileTab({
   // Editable fields — pre-filled from organiser-set profile
   const [form, setForm] = React.useState({
     bio: p.bio || '',
+    address: p.address || '',
+    pincode: p.pincode || '',
     city: p.city || '',
     state: p.state || '',
     country: p.country || '',
@@ -82,6 +84,8 @@ export function ProfileTab({
     setSaveStatus(null);
     const res = await updateMyProfile({
       bio: form.bio,
+      address: form.address,
+      pincode: form.pincode,
       city: form.city,
       state: form.state,
       country: form.country,
@@ -143,7 +147,14 @@ export function ProfileTab({
   };
 
   // ── Derived display values ───────────────────────────────────────
-  const location = [form.city || p.city, form.state || p.state, form.country || p.country].filter(Boolean).join(', ') || null;
+  const location =
+    [
+      form.address || p.address,
+      [form.city || p.city, form.state || p.state, form.pincode || p.pincode].filter(Boolean).join(', '),
+      form.country || p.country,
+    ]
+      .filter(Boolean)
+      .join('\n') || null;
   const initials = (p.name || 'P').replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'P';
 
   return (
@@ -233,7 +244,7 @@ export function ProfileTab({
                 </div>
                 <div>
                   <div className="text-2xl font-black">{editionStats.averageBonuses}</div>
-                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Avg bonus</div>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Target bonus</div>
                 </div>
               </div>
               {editionStats.history?.length > 0 && (
@@ -273,9 +284,33 @@ export function ProfileTab({
                     />
                   </div>
 
+                  {/* Full address */}
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Full address</label>
+                    <textarea
+                      value={form.address}
+                      onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                      rows={3}
+                      placeholder="House / flat, street, area, landmark"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                      required
+                    />
+                  </div>
+                  {/* Pincode */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Pincode</label>
+                    <Input
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={form.pincode}
+                      onChange={e => setForm(f => ({ ...f, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                      placeholder="e.g. 600001"
+                      required
+                    />
+                  </div>
                   {/* City */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">City</label>
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">City / Town</label>
                     <Input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} placeholder="e.g. Chennai" />
                   </div>
                   {/* State */}
@@ -354,8 +389,7 @@ export function ProfileTab({
                     <p className="text-sm mt-0.5">{form.bio || p.bio}</p>
                   </div>
                 )}
-                <InfoRow icon={<MapPin className="h-4 w-4" />} label="Location" value={location} placeholder="Not set" />
-                <InfoRow icon={<Globe className="h-4 w-4" />} label="Country" value={form.country || p.country} placeholder="Not set" />
+                <InfoRow icon={<MapPin className="h-4 w-4" />} label="Full address" value={location} placeholder="Not set" />
                 <InfoRow icon={<Calendar className="h-4 w-4" />} label="Age" value={form.age || (p.age ? String(p.age) : null)} placeholder="Not set" />
                 <InfoRow icon={<Users className="h-4 w-4" />} label="Gender" value={form.gender || p.gender} placeholder="Not set" />
                 <InfoRow icon={<Phone className="h-4 w-4" />} label="WhatsApp / Phone" value={form.whatsApp || p.whatsApp} placeholder="Not set" />

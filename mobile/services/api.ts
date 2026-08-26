@@ -49,6 +49,19 @@ export interface MatchDetails {
   latestYoutubeUrl?: string | null;
   latestYoutubeVideoId?: string | null;
   streamCount?: number;
+  myEvent?: {
+    revealed: boolean;
+    selected: boolean;
+    name: string;
+    format: string;
+    myPlayers: string[];
+    oppPlayers: string[];
+    myScore: number | null;
+    oppScore: number | null;
+    result: 'WIN' | 'LOSS' | 'TIE' | 'WALKOVER' | null;
+    eventPts: number;
+    scoresReady: boolean;
+  } | null;
 }
 
 export interface StreamSession {
@@ -108,6 +121,7 @@ export async function getPlayerMatches(token: string): Promise<{ success: boolea
       latestYoutubeUrl: day.latestYoutubeUrl || null,
       latestYoutubeVideoId: day.latestYoutubeVideoId || null,
       streamCount: day.streamCount || 0,
+      myEvent: day.myEvent || null,
     }));
     return { success: true, matches, team: data.team };
   } catch (err: any) {
@@ -210,6 +224,17 @@ export async function createStreamSession(matchId: string, token: string): Promi
   }
 }
 
+export async function getStandings() {
+  try {
+    const res = await fetch(`${API_BASE}/api/mobile/standings?t=${Date.now()}`, {
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error', blocks: [], players: [] };
+  }
+}
+
 export async function getPlayerScores(token: string) {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/scores`, {
@@ -223,7 +248,7 @@ export async function getPlayerScores(token: string) {
 
 export async function submitPlayerScore(
   token: string,
-  payload: { dayNumber: number; score: number; slams: number; rows?: Array<{ userId: string; score: number; slams: number }> },
+  payload: { dayNumber: number; score: number; slams: number; rows?: Array<{ userId: string; score: number; slams: number }>; teamId?: string },
 ) {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/scores`, {

@@ -25,6 +25,40 @@ function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boole
   return isCombiSubmissionLocked(dayNum, dayDatesMap);
 }
 
+function mapTeamScorePlayers(players: any[]) {
+  return (players || []).map((p: any) => ({
+    userId: p.userId,
+    name: p.name,
+    score: p.score == null ? '' : String(p.score),
+    slams: p.slams == null ? '0' : String(p.slams),
+    missingPrior: Boolean(p.missingPrior),
+    average: Number(p.averageInEffect ?? p.average) || 0,
+  }));
+}
+
+function rowHasAvgBonus(row: { score: string; average?: number }): boolean | null {
+  if (row.score === '') return null;
+  const score = parseInt(row.score, 10);
+  if (!Number.isFinite(score)) return null;
+  return score < (Number(row.average) || 0);
+}
+
+function avgBonusText(row: { score: string; average?: number }) {
+  const yes = rowHasAvgBonus(row);
+  if (yes == null) return 'Avg —';
+  return yes ? 'Avg Yes' : 'Avg No';
+}
+
+function combiPlayerLabel(
+  member: { id: string; name?: string; username?: string },
+  rows: Array<{ userId: string; score: string; slams: string; average?: number }>,
+) {
+  const name = member.name || member.username || 'Player';
+  const row = rows.find((r) => r.userId === member.id);
+  if (!row || row.score === '') return `${name} · — · Avg —`;
+  return `${name} · ${row.score} · ${row.slams || 0}s · ${avgBonusText(row)}`;
+}
+
 // Helper: how many players a format needs per round
 function playersNeeded(format: string): number {
   if (format.includes('TRIPLES') || format.includes('QUADRUPLES')) return 4;
@@ -163,7 +197,14 @@ export default function CaptainClient({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [emailPreviewUrl, setEmailPreviewUrl] = React.useState<string | null>(null);
   const [combiFilter, setCombiFilter] = React.useState<string>('ALL');
-  const [teamScoreRows, setTeamScoreRows] = React.useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean }>>([]);
+  const [teamScoreRows, setTeamScoreRows] = React.useState<Array<{
+    userId: string;
+    name: string;
+    score: string;
+    slams: string;
+    missingPrior?: boolean;
+    average?: number;
+  }>>([]);
   const [teamScoreOpen, setTeamScoreOpen] = React.useState(true);
   const [teamScoreMsg, setTeamScoreMsg] = React.useState<string | null>(null);
   const [publishedBoard, setPublishedBoard] = React.useState<any>(null);
@@ -212,15 +253,7 @@ export default function CaptainClient({
     getTeamDayScores(currentTeam.id, selectedDayNumber).then((res) => {
       if (!res.success) return;
       setTeamScoreOpen(Boolean('windowOpen' in res && res.windowOpen));
-      setTeamScoreRows(
-        (res.players || []).map((p: any) => ({
-          userId: p.userId,
-          name: p.name,
-          score: p.score == null ? '' : String(p.score),
-          slams: p.slams == null ? '0' : String(p.slams),
-          missingPrior: Boolean(p.missingPrior),
-        })),
-      );
+      setTeamScoreRows(mapTeamScorePlayers(res.players));
     });
     getPublicScoreboard().then((board) => setPublishedBoard(board)).catch(() => {});
   }, [currentTeam?.id, selectedDayNumber]);
@@ -291,6 +324,24 @@ export default function CaptainClient({
   const captainInitial = captainName.charAt(0).toUpperCase();
   const teamName = currentTeam?.name || 'Your Team';
   const editionTitle = initialActiveEdition?.title || 'Active Edition';
+
+  const handleSaveTeamScores = async () => {
+    if (!currentTeam?.id) return;
+    const filled = teamScoreRows.filter((r) => r.score !== '' && !r.missingPrior);
+    const res = await submitTeamDayScores(
+      currentTeam.id,
+      selectedDayNumber,
+      filled.map((r) => ({ userId: r.userId, score: parseInt(r.score, 10), slams: parseInt(r.slams || '0', 10) })),
+    );
+    setTeamScoreMsg(res.success ? 'Saved team scores.' : res.error || 'Failed');
+    if (res.success) {
+      const refreshed = await getTeamDayScores(currentTeam.id, selectedDayNumber);
+      if (refreshed.success) {
+        setTeamScoreOpen(Boolean(refreshed.windowOpen));
+        setTeamScoreRows(mapTeamScorePlayers(refreshed.players));
+      }
+    }
+  };
 
   const handleSaveDayLineup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -461,17 +512,25 @@ export default function CaptainClient({
           <CardTitle className="text-lg font-black">Team day scores — Day {selectedDayNumber}</CardTitle>
           <CardDescription>
             {teamScoreOpen
-              ? 'Enter scores for any player who could not submit. Closes 8:00pm IST.'
-              : 'Window closed. Published scores below help you set combis until 9:30pm.'}
+              ? 'Enter or fix teammate scores if they forgot or entered wrong. Closes 9:30pm IST with combis.'
+              : 'Window closed at 9:30pm IST. Published scores below.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {teamScoreOpen && (
+            <div className="grid grid-cols-[1fr_5rem_5rem_4.5rem] gap-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground px-0.5">
+              <span>Player</span>
+              <span>Score</span>
+              <span>Slams</span>
+              <span>Avg bonus</span>
+            </div>
+          )}
           {teamScoreOpen && teamScoreRows.map((row, idx) => (
-            <div key={row.userId} className="grid grid-cols-[1fr_5rem_5rem] gap-2 items-center text-sm">
+            <div key={row.userId} className="grid grid-cols-[1fr_5rem_5rem_4.5rem] gap-2 items-center text-sm">
               <div className="min-w-0">
                 <div className="font-semibold truncate">{row.name}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted' : 'Empty — walkover if still blank at 8pm'}
+                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — you can still edit until 9:30pm' : 'Empty — walkover if still blank at 8pm'}
                 </div>
               </div>
               <Input
@@ -498,40 +557,18 @@ export default function CaptainClient({
                 }}
                 placeholder="slams"
               />
+              <span className={`text-[11px] font-black ${rowHasAvgBonus(row) ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                {avgBonusText(row)}
+              </span>
             </div>
           ))}
           {teamScoreMsg && <p className="text-xs font-semibold">{teamScoreMsg}</p>}
           {teamScoreOpen && currentTeam?.id && (
-            <Button
-              onClick={async () => {
-                const filled = teamScoreRows.filter((r) => r.score !== '' && !r.missingPrior);
-                const res = await submitTeamDayScores(
-                  currentTeam.id,
-                  selectedDayNumber,
-                  filled.map((r) => ({ userId: r.userId, score: parseInt(r.score, 10), slams: parseInt(r.slams || '0', 10) })),
-                );
-                setTeamScoreMsg(res.success ? 'Saved team scores.' : res.error || 'Failed');
-                if (res.success) {
-                  const refreshed = await getTeamDayScores(currentTeam.id, selectedDayNumber);
-                  if (refreshed.success) {
-                    setTeamScoreOpen(Boolean(refreshed.windowOpen));
-                    setTeamScoreRows(
-                      (refreshed.players || []).map((p: any) => ({
-                        userId: p.userId,
-                        name: p.name,
-                        score: p.score == null ? '' : String(p.score),
-                        slams: p.slams == null ? '0' : String(p.slams),
-                        missingPrior: Boolean(p.missingPrior),
-                      })),
-                    );
-                  }
-                }
-              }}
-            >
+            <Button onClick={() => void handleSaveTeamScores()}>
               Save team scores
             </Button>
           )}
-          {!teamScoreOpen && publishedBoard?.days?.find((d: any) => d.dayNumber === selectedDayNumber)?.published && (
+          {publishedBoard?.days?.find((d: any) => d.dayNumber === selectedDayNumber)?.published && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
               {(publishedBoard.teams || []).map((t: any) => (
                 <div key={t.id} className="text-xs border border-border rounded-lg p-2">
@@ -825,6 +862,59 @@ export default function CaptainClient({
                   </div>
                 )}
 
+                {!isDayLocked(selectedDayNumber, dayDatesMap) && teamScoreRows.length > 0 && (
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-black text-emerald-400">Team scores for this day</div>
+                        <div className="text-[10px] text-muted-foreground">Fix a missed or wrong score until 9:30 PM IST. Avg bonus is Yes when score is under average.</div>
+                      </div>
+                      {teamScoreOpen ? (
+                        <Button type="button" size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={() => void handleSaveTeamScores()}>
+                          Save scores
+                        </Button>
+                      ) : null}
+                    </div>
+                    {teamScoreMsg ? <p className="text-[10px] font-semibold">{teamScoreMsg}</p> : null}
+                    <div className="space-y-1.5">
+                      {teamScoreRows.map((row, idx) => (
+                        <div key={row.userId} className="grid grid-cols-[1fr_4.5rem_4.5rem_3.5rem] gap-1.5 items-center">
+                          <div className="min-w-0 text-xs font-semibold truncate">{row.name}</div>
+                          <Input
+                            type="number"
+                            min={0}
+                            disabled={!teamScoreOpen || row.missingPrior}
+                            value={row.score}
+                            onChange={(e) => {
+                              const next = [...teamScoreRows];
+                              next[idx] = { ...row, score: e.target.value };
+                              setTeamScoreRows(next);
+                            }}
+                            className="h-8 text-xs"
+                            placeholder="score"
+                          />
+                          <Input
+                            type="number"
+                            min={0}
+                            disabled={!teamScoreOpen || row.missingPrior}
+                            value={row.slams}
+                            onChange={(e) => {
+                              const next = [...teamScoreRows];
+                              next[idx] = { ...row, slams: e.target.value };
+                              setTeamScoreRows(next);
+                            }}
+                            className="h-8 text-xs"
+                            placeholder="slams"
+                          />
+                          <span className={`text-[10px] font-black ${rowHasAvgBonus(row) ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                            {avgBonusText(row)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Duplicate player validation */}
                 {(() => {
                   const playerRoundMap: Record<string, number[]> = {};
@@ -913,10 +1003,10 @@ export default function CaptainClient({
                                         disabled={!!shouldDisable && m.id !== selectedId}
                                       >
                                         {inOtherRound && m.id !== selectedId
-                                          ? `🚫 ${m.name || m.username} (${getRoundLabel(inOtherRound - 1)})`
+                                          ? `🚫 ${combiPlayerLabel(m, teamScoreRows)} (${getRoundLabel(inOtherRound - 1)})`
                                           : inSameRound && m.id !== selectedId
-                                          ? `🚫 ${m.name || m.username} (Selected)`
-                                          : m.name || m.username}
+                                          ? `🚫 ${combiPlayerLabel(m, teamScoreRows)} (Selected)`
+                                          : combiPlayerLabel(m, teamScoreRows)}
                                       </option>
                                     );
                                   })}

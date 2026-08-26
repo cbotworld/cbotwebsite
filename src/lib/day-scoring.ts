@@ -1,6 +1,7 @@
 import {
   addDaysIsoDate,
   combiCalendarDate,
+  combiCutoffIso,
   type DayDatesInput,
   istCalendarDateFromMs,
 } from '@/lib/combi-cutoff';
@@ -36,6 +37,25 @@ export function isScoreSubmitOpen(
   const t = now.getTime();
   return Number.isFinite(start) && Number.isFinite(cutoff) && t >= start && t < cutoff;
 }
+
+/** Captains may add/fix teammate scores from midnight until the 9:30pm IST combi lock. */
+export function isCaptainScoreEditOpen(
+  dayNumber: number | string,
+  dayDates?: DayDatesInput,
+  now = new Date(),
+): boolean {
+  const start = new Date(scoreWindowStartIso(dayNumber, dayDates)).getTime();
+  const cutoff = new Date(combiCutoffIso(dayNumber, dayDates)).getTime();
+  const t = now.getTime();
+  return Number.isFinite(start) && Number.isFinite(cutoff) && t >= start && t < cutoff;
+}
+
+export function previewAvgBonus(score: number | null | undefined, average: number): boolean | null {
+  if (score == null || !Number.isFinite(Number(score))) return null;
+  return Number(score) < (Number(average) || 0);
+}
+
+export { previewTargetBonus, MAX_DAY_BOARDS } from '@/lib/board-scores';
 
 export function tomorrowIstCalendarDate(now = new Date()): string {
   return addDaysIsoDate(istCalendarDateFromMs(now.getTime()), 1);

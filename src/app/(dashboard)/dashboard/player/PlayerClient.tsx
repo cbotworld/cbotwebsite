@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react';
 import { MOCK_TEAMS, MOCK_MATCHES } from '@/lib/mock-data';
 import { submitScoreReport } from '@/lib/actions/matchActions';
 import { getMyDayScores, submitPlayerDayScore } from '@/lib/actions/playerScoreActions';
+import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
+import { boardsToDraft, draftToPayload, emptyBoardDraft } from '@/lib/board-scores';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -115,8 +117,7 @@ export default function PlayerClient({
         ? initialTeammates
         : currentTeam?.members?.map((m: any) => m.user) || [];
   const [nowMs, setNowMs] = React.useState(() => Date.now());
-  const [dayScore, setDayScore] = React.useState('');
-  const [daySlams, setDaySlams] = React.useState('0');
+  const [dayBoards, setDayBoards] = React.useState([emptyBoardDraft()]);
   const [dayScoreMsg, setDayScoreMsg] = React.useState<string | null>(null);
   const [dayScoreBusy, setDayScoreBusy] = React.useState(false);
   const [myDayInfo, setMyDayInfo] = React.useState<any>(null);
@@ -129,11 +130,9 @@ export default function PlayerClient({
     if (!myDayInfo?.eligibleDay) return;
     const existing = (myDayInfo.scores || []).find((s: any) => s.dayNumber === myDayInfo.eligibleDay);
     if (existing) {
-      setDayScore(String(existing.score));
-      setDaySlams(String(existing.slams ?? 0));
+      setDayBoards(boardsToDraft(existing.boards, existing.score, existing.slams));
     } else {
-      setDayScore('');
-      setDaySlams('0');
+      setDayBoards([emptyBoardDraft()]);
     }
   }, [myDayInfo]);
   const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
@@ -820,7 +819,7 @@ export default function PlayerClient({
                 <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
               </CardTitle>
               <CardDescription>
-                Personal score and slams for Day {myDayInfo?.eligibleDay || 1}. Closes at 8:00pm IST.
+                Board score and slam for Day {myDayInfo?.eligibleDay || 1}. Add boards (max 10). Total vs target decides target bonus. Closes at 8:00pm IST.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
@@ -831,20 +830,16 @@ export default function PlayerClient({
                   ))}
                 </div>
               ) : null}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold block mb-1">Day</label>
-                  <Input type="number" value={myDayInfo?.eligibleDay || 1} disabled />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1">Score</label>
-                  <Input type="number" min={0} value={dayScore} onChange={(e) => setDayScore(e.target.value)} placeholder="0" disabled={myDayInfo?.windowOpen === false} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1">Slams</label>
-                  <Input type="number" min={0} max={50} value={daySlams} onChange={(e) => setDaySlams(e.target.value)} disabled={myDayInfo?.windowOpen === false} />
-                </div>
+              <div>
+                <label className="text-xs font-bold block mb-1">Day</label>
+                <Input type="number" value={myDayInfo?.eligibleDay || 1} disabled />
               </div>
+              <BoardScoreEditor
+                boards={dayBoards}
+                onChange={setDayBoards}
+                disabled={myDayInfo?.windowOpen === false}
+                target={myDayInfo?.target ?? initialPlayer?.target ?? 0}
+              />
               {myDayInfo?.windowOpen === false && myDayInfo?.windowReason ? (
                 <p className="text-xs text-amber-400 font-semibold">{myDayInfo.windowReason}</p>
               ) : null}
@@ -854,7 +849,12 @@ export default function PlayerClient({
                 onClick={async () => {
                   setDayScoreBusy(true);
                   setDayScoreMsg(null);
-                  const res = await submitPlayerDayScore(myDayInfo?.eligibleDay || 1, parseInt(dayScore, 10), parseInt(daySlams || '0', 10));
+                  const res = await submitPlayerDayScore(
+                    myDayInfo?.eligibleDay || 1,
+                    0,
+                    0,
+                    draftToPayload(dayBoards),
+                  );
                   setDayScoreMsg(res.success ? 'Saved.' : res.error || 'Failed');
                   if (res.success) setMyDayInfo(await getMyDayScores());
                   setDayScoreBusy(false);

@@ -12,6 +12,15 @@ import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { getWebsiteCmsSite } from '@/lib/website-cms-site';
+import { isCombiSubmissionLocked } from '@/lib/combi-cutoff';
+import { isDayScorePublished } from '@/lib/day-scoring';
+import { isSpocExhibitionTeam } from '@/lib/spoc-teams';
+import {
+  parseSavedLineups,
+  playerMatchEvent,
+  type LineupRound,
+  type RosterPlayer,
+} from '@/lib/combi-results';
 export async function getPlayerMatchSchedule(
   userId: string,
   opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' },
@@ -66,10 +75,21 @@ export async function getPlayerMatchSchedule(
   const teams = edition?.id
     ? await prisma.team.findMany({
         where: { editionId: edition.id },
-        select: { id: true, name: true, tag: true, logo: true },
+        select: {
+          id: true,
+          name: true,
+          tag: true,
+          logo: true,
+          savedLineups: true,
+          teamType: true,
+          captain: { select: { id: true, name: true, username: true } },
+          members: { include: { user: { select: { id: true, name: true, username: true } } } },
+          spocMembers: { include: { user: { select: { id: true, name: true, username: true } } } },
+        },
       })
     : [];
   const teamByName = new Map(teams.map((t) => [t.name.toUpperCase().trim(), t]));
+  const teamById = new Map(teams.map((t) => [t.id, t]));
   const pairings = resolveOrganizerPairings(stageConfig?.stages || [], teams);
 
   let dayDates: Record<number, string> = {};
@@ -144,6 +164,26 @@ export async function getPlayerMatchSchedule(
   });
   const streamSummary = summarizePlayerDayStreams(playerStreams);
   const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
+  const dayScores = edition?.id
+    ? await prisma.playerDayScore.findMany({
+        where: { editionId: edition.id },
+        select: { userId: true, dayNumber: true, score: true, slams: true },
+      })
+    : [];
+
+  const rosterOf = (full: (typeof teams)[number] | undefined): RosterPlayer[] => {
+    if (!full) return [];
+    const byId = new Map<string, RosterPlayer>();
+    if (full.captain) {
+      byId.set(full.captain.id, { id: full.captain.id, name: full.captain.name || full.captain.username });
+    }
+    const list = isSpocExhibitionTeam(full) ? full.spocMembers : full.members;
+    for (const m of list) {
+      if (!m.user) continue;
+      byId.set(m.user.id, { id: m.user.id, name: m.user.name || m.user.username });
+    }
+    return Array.from(byId.values());
+  };
 
   const daysByNumber = new Map(scheduleDays.map((d) => [d.dayNumber, d]));
   const fixtureDays = isSpocView
@@ -184,11 +224,17 @@ export async function getPlayerMatchSchedule(
       const timeRange = scheduled?.timeRange || formatDayRange(startIso, endIso);
       const title = scheduled?.title || `DAY ${dayNumber}`;
       const fix = teamNameUpper && scheduled ? matchForTeam(scheduled) : null;
-      const isT1 = fix
-        ? fix.team1 === teamNameUpper || (!!teamTag && fix.team1Tag === teamTag)
-        : true;
+      const myTeamRow = (team?.id && teamById.get(team.id)) || teamByName.get(teamNameUpper);
+      const isT1 = !fix
+        ? true
+        : myTeamRow?.id && fix.team1Id
+          ? fix.team1Id === myTeamRow.id
+          : fix.team1 === teamNameUpper || (!!teamTag && fix.team1Tag === teamTag);
       const oppNameRaw = fix ? (isT1 ? fix.team2 : fix.team1) : '';
       const oppMissing = !oppNameRaw || /^tbd$/i.test(oppNameRaw);
+      const oppRow =
+        (isT1 ? (fix?.team2Id && teamById.get(fix.team2Id)) : (fix?.team1Id && teamById.get(fix.team1Id))) ||
+        teamByName.get(String(oppNameRaw).toUpperCase().trim());
       const myFace = resolveTeamFace({
         name: team?.name || 'Your team',
         tag: team?.tag,
@@ -227,6 +273,26 @@ export async function getPlayerMatchSchedule(
       const prerequisiteDay = isFuture
         ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
         : null;
+      const revealed = isCombiSubmissionLocked(dayNumber, dayDates, new Date(now));
+      const scoresReady = isDayScorePublished(dayNumber, dayDates, new Date(now));
+      const scoreMap: Record<string, { score: number; slams: number }> = {};
+      for (const s of dayScores) {
+        if (s.dayNumber === dayNumber) scoreMap[s.userId] = { score: s.score, slams: s.slams };
+      }
+      const myEvent =
+        fix && myTeamRow && !oppMissing
+          ? playerMatchEvent({
+              userId,
+              playerIsTeam1: isT1,
+              revealed,
+              scoresReady,
+              roundsMine: parseSavedLineups(myTeamRow.savedLineups)[String(dayNumber)]?.rounds as LineupRound[] | undefined,
+              roundsOpp: parseSavedLineups(oppRow?.savedLineups)[String(dayNumber)]?.rounds as LineupRound[] | undefined,
+              rosterMine: rosterOf(myTeamRow),
+              rosterOpp: rosterOf(oppRow || undefined),
+              scores: scoreMap,
+            })
+          : null;
       return {
         dayNumber,
         label: `Day ${dayNumber}`,
@@ -264,6 +330,7 @@ export async function getPlayerMatchSchedule(
         tableNumber: 1,
         editionTitle: edition?.title || fallbackEditionTitle,
         editionNumber: edition?.number || 200,
+        myEvent,
       };
     });
 

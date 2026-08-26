@@ -45,9 +45,23 @@ async function fetch200thEditionCombisData() {
               select: { id: true, name: true, username: true, rating: true, average: true, target: true }
             }
           }
+        },
+        spocMembers: {
+          include: {
+            user: {
+              select: { id: true, name: true, username: true }
+            }
+          }
         }
       }
     });
+
+    const scores = editionId
+      ? await prisma.playerDayScore.findMany({
+          where: { editionId },
+          select: { userId: true, dayNumber: true, score: true, slams: true },
+        })
+      : [];
 
     // 3. Fetch all Matches under Edition 200 from Supabase
     const matches = await prisma.match.findMany({
@@ -86,6 +100,7 @@ async function fetch200thEditionCombisData() {
       stageConfig,
       teams,
       matches,
+      scores,
     };
   } catch (error) {
     console.error('Failed to fetch 200th edition data from Supabase:', error);
@@ -94,6 +109,7 @@ async function fetch200thEditionCombisData() {
       error: 'Failed to fetch data from Supabase',
       teams: [],
       matches: [],
+      scores: [],
     };
   }
 }

@@ -1,7 +1,7 @@
-import type { PlayerAverageLogRow, PlayerDayScoreRow, StageStandingRow, TournamentStage } from '@/types';
-import { combiCalendarDate, isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
+import type { PlayerAverageLogRow, PlayerDayScoreRow, StageStandingRow, StandingDayBreakdown, TournamentStage } from '@/types';
+import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
 import { isDayScorePublished } from '@/lib/day-scoring';
-import { averageForDay } from '@/lib/player-average';
+import { previewTargetBonus } from '@/lib/board-scores';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
 import { daysForStage } from '@/lib/player-ranking';
 import { filterMainTeams, filterSpocTeams } from '@/lib/spoc-teams';
@@ -12,7 +12,7 @@ export type StandingTeam = {
   tag?: string | null;
   teamType?: string | null;
   savedLineups?: string | null;
-  members: Array<RosterPlayer & { average?: number | null }>;
+  members: Array<RosterPlayer & { average?: number | null; target?: number | null }>;
 };
 
 export type StagePairing = {
@@ -53,17 +53,21 @@ function scoreMapForDay(scores: PlayerDayScoreRow[], day: number) {
   return map;
 }
 
-function rankRows(rows: StageStandingRow[]): StageStandingRow[] {
+function standingRankKey(row: Pick<StageStandingRow, 'total' | 'matchesWon' | 'slamBonus'>) {
+  return `${row.total}:${row.matchesWon}:${row.slamBonus}`;
+}
+
+export function rankStandingRows(rows: StageStandingRow[]): StageStandingRow[] {
   const sorted = [...rows].sort((a, b) => {
     if (b.total !== a.total) return b.total - a.total;
-    if (b.eventPts !== a.eventPts) return b.eventPts - a.eventPts;
     if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
+    if (b.slamBonus !== a.slamBonus) return b.slamBonus - a.slamBonus;
     return a.teamName.localeCompare(b.teamName);
   });
   let lastKey = '';
   let lastRank = 0;
   sorted.forEach((row, i) => {
-    const key = String(row.total);
+    const key = standingRankKey(row);
     if (key === lastKey) row.rank = lastRank;
     else {
       lastRank = i + 1;
@@ -85,7 +89,41 @@ function emptyRow(team: StandingTeam): StageStandingRow {
     total: 0,
     matchesWon: 0,
     rank: 0,
+    days: [],
   };
+}
+
+function dayBucket(row: StageStandingRow, day: number): StandingDayBreakdown {
+  if (!row.days) row.days = [];
+  let d = row.days.find((x) => x.dayNumber === day);
+  if (!d) {
+    d = {
+      dayNumber: day,
+      opponentName: null,
+      eventPts: 0,
+      slamBonus: 0,
+      avgBonus: 0,
+      total: 0,
+      matchResult: null,
+      events: [],
+      targetBonusPlayers: [],
+      slamPlayers: [],
+    };
+    row.days.push(d);
+  }
+  return d;
+}
+
+function namesFor(ids: string[], team: StandingTeam) {
+  const byId = new Map(team.members.map((m) => [m.id, String(m.name || '').trim() || 'Player']));
+  return ids.map((id) => byId.get(id) || 'Player').join(', ');
+}
+
+function sideSum(ids: string[], map: Record<string, { score: number; slams: number }>): number | null {
+  if (!ids.length) return null;
+  const known = ids.map((id) => map[id]?.score).filter((n): n is number => typeof n === 'number');
+  if (!known.length) return null;
+  return known.reduce((a, b) => a + b, 0);
 }
 
 function applyBonuses(
@@ -93,23 +131,33 @@ function applyBonuses(
   team: StandingTeam,
   days: number[],
   scores: PlayerDayScoreRow[],
-  logs: PlayerAverageLogRow[],
   dayDates: DayDatesInput,
   now: Date,
 ) {
   for (const day of days) {
     if (!isDayScorePublished(day, dayDates, now)) continue;
-    const ymd = combiCalendarDate(day, dayDates);
     for (const member of team.members) {
       const score = scores.find((s) => s.userId === member.id && s.dayNumber === day);
       if (!score) continue;
+      const playerName = String(member.name || '').trim() || 'Player';
       row.slamBonus += score.slams || 0;
-      const avg = averageForDay(
-        logs.filter((l) => l.userId === member.id),
-        ymd,
-        member.average || 0,
-      );
-      if (score.score < avg) row.avgBonus += 1;
+      const bucket = dayBucket(row, day);
+      bucket.slamBonus += score.slams || 0;
+      if ((score.slams || 0) > 0) {
+        bucket.slamPlayers = bucket.slamPlayers || [];
+        bucket.slamPlayers.push({ userId: member.id, name: playerName, slams: score.slams || 0 });
+      }
+      if (previewTargetBonus(score.score, member.target) === true) {
+        row.avgBonus += 1;
+        bucket.avgBonus += 1;
+        bucket.targetBonusPlayers = bucket.targetBonusPlayers || [];
+        bucket.targetBonusPlayers.push({
+          userId: member.id,
+          name: playerName,
+          score: score.score,
+          target: member.target ?? null,
+        });
+      }
     }
   }
   row.total = row.eventPts + row.slamBonus + row.avgBonus;
@@ -145,6 +193,37 @@ function applyPairings(
     r2.eventPts += result.team2EventPts;
     if (result.matchWinner === 1) r1.matchesWon += 1;
     if (result.matchWinner === 2) r2.matchesWon += 1;
+    const map = scoreMapForDay(scores, pair.dayNumber);
+    const d1 = dayBucket(r1, pair.dayNumber);
+    const d2 = dayBucket(r2, pair.dayNumber);
+    d1.eventPts += result.team1EventPts;
+    d2.eventPts += result.team2EventPts;
+    d1.opponentName = t2.name;
+    d2.opponentName = t1.name;
+    d1.matchResult = result.matchWinner === 1 ? 'W' : result.matchWinner === 2 ? 'L' : 'T';
+    d2.matchResult = result.matchWinner === 2 ? 'W' : result.matchWinner === 1 ? 'L' : 'T';
+    d1.events = result.events.map((ev) => ({
+      name: ev.name,
+      format: ev.format,
+      myPlayers: namesFor(ev.team1PlayerIds, t1),
+      oppPlayers: namesFor(ev.team2PlayerIds, t2),
+      myPts: ev.team1Pts,
+      oppPts: ev.team2Pts,
+      myScore: sideSum(ev.team1PlayerIds, map),
+      oppScore: sideSum(ev.team2PlayerIds, map),
+      result: ev.reason === 'walkover' ? (ev.winnerTeam === 1 ? 'Win (WO)' : ev.winnerTeam === 2 ? 'Loss (WO)' : 'Void') : ev.winnerTeam === 1 ? 'Win' : ev.winnerTeam === 2 ? 'Loss' : 'Tie',
+    }));
+    d2.events = result.events.map((ev) => ({
+      name: ev.name,
+      format: ev.format,
+      myPlayers: namesFor(ev.team2PlayerIds, t2),
+      oppPlayers: namesFor(ev.team1PlayerIds, t1),
+      myPts: ev.team2Pts,
+      oppPts: ev.team1Pts,
+      myScore: sideSum(ev.team2PlayerIds, map),
+      oppScore: sideSum(ev.team1PlayerIds, map),
+      result: ev.reason === 'walkover' ? (ev.winnerTeam === 2 ? 'Win (WO)' : ev.winnerTeam === 1 ? 'Loss (WO)' : 'Void') : ev.winnerTeam === 2 ? 'Win' : ev.winnerTeam === 1 ? 'Loss' : 'Tie',
+    }));
   }
 }
 
@@ -267,9 +346,13 @@ export function buildStageStandingBlocks(opts: {
         applyPairings(rowsByTeam, teamsById, pairings, daySet, opts.scores, opts.dayDates, now, stage.id);
         for (const team of groupTeams) {
           const row = rowsByTeam.get(team.id)!;
-          applyBonuses(row, team, days, opts.scores, opts.logs, opts.dayDates, now);
+          applyBonuses(row, team, days, opts.scores, opts.dayDates, now);
+          row.days = (row.days || [])
+            .map((d) => ({ ...d, total: d.eventPts + d.slamBonus + d.avgBonus }))
+            .filter((d) => d.eventPts || d.slamBonus || d.avgBonus || d.events.length)
+            .sort((a, b) => a.dayNumber - b.dayNumber);
         }
-        return { key: group.key, name: group.name, rows: rankRows([...rowsByTeam.values()]) };
+        return { key: group.key, name: group.name, rows: rankStandingRows([...rowsByTeam.values()]) };
       });
 
       return {

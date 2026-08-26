@@ -9,15 +9,24 @@ import {
   getPublicScoreboard,
   getAverageReviewPrompt,
 } from '@/lib/actions/playerScoreActions';
+import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
+import { boardsToDraft, draftToPayload, emptyBoardDraft } from '@/lib/board-scores';
 
-export default function OrganizerScoresPanel({ users }: { users: Array<{ id: string; name?: string; username?: string }> }) {
+export default function OrganizerScoresPanel({
+  users,
+}: {
+  users: Array<{ id: string; name?: string; username?: string; target?: number | null }>;
+}) {
   const [day, setDay] = React.useState(1);
   const [userId, setUserId] = React.useState(users[0]?.id || '');
-  const [score, setScore] = React.useState('');
-  const [slams, setSlams] = React.useState('0');
+  const [boards, setBoards] = React.useState([emptyBoardDraft()]);
   const [msg, setMsg] = React.useState<string | null>(null);
   const [board, setBoard] = React.useState<any>(null);
   const [review, setReview] = React.useState<{ finishedStageName: string; nextStageName: string | null } | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const selected = users.find((u) => u.id === userId);
+  const target = Number(selected?.target) || 0;
 
   React.useEffect(() => {
     getPublicScoreboard().then(setBoard).catch(() => {});
@@ -31,8 +40,7 @@ export default function OrganizerScoresPanel({ users }: { users: Array<{ id: str
   React.useEffect(() => {
     if (!board || !userId) return;
     const row = (board.scores || []).find((s: any) => s.userId === userId && s.dayNumber === day);
-    setScore(row ? String(row.score) : '');
-    setSlams(row ? String(row.slams) : '0');
+    setBoards(boardsToDraft(row?.boards, row?.score, row?.slams));
   }, [board, userId, day]);
 
   return (
@@ -40,7 +48,8 @@ export default function OrganizerScoresPanel({ users }: { users: Array<{ id: str
       <CardHeader>
         <CardTitle className="text-xl font-black">Edit player scores</CardTitle>
         <CardDescription>
-          Full access after 8pm and after combis. Team points, slams, average bonuses, and player rank recompute immediately.
+          Enter board score and slam, then Add board (max 10). Day total is compared with the player’s target.
+          Target bonus is Yes only when total is under target. Target 0 means no bonus.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 max-w-xl">
@@ -60,7 +69,10 @@ export default function OrganizerScoresPanel({ users }: { users: Array<{ id: str
               onChange={(e) => setUserId(e.target.value)}
             >
               {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.name || u.username}</option>
+                <option key={u.id} value={u.id}>
+                  {u.name || u.username}
+                  {Number(u.target) > 0 ? ` · tgt ${u.target}` : ' · tgt 0'}
+                </option>
               ))}
             </select>
           </div>
@@ -68,28 +80,26 @@ export default function OrganizerScoresPanel({ users }: { users: Array<{ id: str
             <label className="text-xs font-bold block mb-1">Day</label>
             <Input type="number" min={1} value={day} onChange={(e) => setDay(parseInt(e.target.value, 10) || 1)} />
           </div>
-          <div>
-            <label className="text-xs font-bold block mb-1">Score</label>
-            <Input type="number" min={0} value={score} onChange={(e) => setScore(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-xs font-bold block mb-1">Slams</label>
-            <Input type="number" min={0} value={slams} onChange={(e) => setSlams(e.target.value)} />
-          </div>
         </div>
+        <BoardScoreEditor boards={boards} onChange={setBoards} target={target} />
         {msg && <p className="text-xs font-semibold">{msg}</p>}
         <Button
+          disabled={busy || !userId}
           onClick={async () => {
-            const res = await organiserUpsertPlayerDayScore(userId, day, parseInt(score, 10), parseInt(slams || '0', 10));
+            setBusy(true);
+            setMsg(null);
+            const payload = draftToPayload(boards);
+            const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload);
             setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
             if (res.success) setBoard(await getPublicScoreboard());
+            setBusy(false);
           }}
         >
-          Save score
+          {busy ? 'Saving…' : 'Save score'}
         </Button>
         {board?.days?.length ? (
           <p className="text-[11px] text-muted-foreground">
-            Latest published day: {board.days.filter((d: any) => d.published).pop()?.dayNumber || 'none yet'}. Average changes still use the existing player edit form — they apply from tomorrow.
+            Latest published day: {board.days.filter((d: any) => d.published).pop()?.dayNumber || 'none yet'}.
           </p>
         ) : null}
       </CardContent>

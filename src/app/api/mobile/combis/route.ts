@@ -16,6 +16,8 @@ import {
   combiCalendarDate,
 } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { averageForDay, logsForUser } from '@/lib/player-average';
+import { hasSubmittedPriorDays, previewAvgBonus } from '@/lib/day-scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,9 +87,9 @@ async function loadFullTeam(teamId: string) {
   return prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      captain: { select: { id: true, name: true, username: true } },
-      members: { include: { user: { select: { id: true, name: true, username: true, role: true } } } },
-      spocMembers: { include: { user: { select: { id: true, name: true, username: true, role: true } } } },
+      captain: { select: { id: true, name: true, username: true, average: true } },
+      members: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true } } } },
+      spocMembers: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true } } } },
     },
   });
 }
@@ -184,12 +186,13 @@ export async function GET(request: NextRequest) {
     const totalDays = edition?.totalDays || 10;
     const now = Date.now();
 
-    const memberMap = new Map<string, { id: string; name: string; username?: string }>();
+    const memberMap = new Map<string, { id: string; name: string; username?: string; average?: number | null }>();
     if (team.captain) {
       memberMap.set(team.captain.id, {
         id: team.captain.id,
         name: team.captain.name || team.captain.username || 'Captain',
         username: team.captain.username,
+        average: team.captain.average,
       });
     }
     const roster = isSpocTeam ? team.spocMembers : team.members;
@@ -199,6 +202,7 @@ export async function GET(request: NextRequest) {
         id: m.user.id,
         name: m.user.name || m.user.username || 'Player',
         username: m.user.username,
+        average: m.user.average,
       });
     }
 
@@ -250,6 +254,51 @@ export async function GET(request: NextRequest) {
       : Array.from({ length: totalDays }, (_, i) => i + 1);
 
     const canEdit = canEditCombis(user.role, team.captainId, user.id);
+    const memberIds = Array.from(memberMap.keys());
+    const scoreRows = canEdit && memberIds.length && edition?.id
+      ? await prisma.playerDayScore.findMany({
+          where: { editionId: edition.id, userId: { in: memberIds } },
+          select: { userId: true, dayNumber: true, score: true, slams: true },
+        })
+      : [];
+    const avgLogs = canEdit && memberIds.length && edition?.id
+      ? await prisma.playerAverageLog.findMany({
+          where: { editionId: edition.id, userId: { in: memberIds } },
+          select: { userId: true, average: true, effectiveFrom: true },
+        })
+      : [];
+    const daysSubmitted = new Map<string, number[]>();
+    const scoreByUserDay = new Map<string, { score: number; slams: number }>();
+    for (const row of scoreRows) {
+      const list = daysSubmitted.get(row.userId) || [];
+      list.push(row.dayNumber);
+      daysSubmitted.set(row.userId, list);
+      scoreByUserDay.set(`${row.userId}:${row.dayNumber}`, { score: row.score, slams: row.slams });
+    }
+    const members = Array.from(memberMap.values()).map((m) => {
+      const dayStats: Record<string, {
+        score: number | null;
+        slams: number | null;
+        average: number;
+        hasAvgBonus: boolean | null;
+        missingPrior: boolean;
+      }> = {};
+      if (canEdit) {
+        for (const dayNumber of dayNumbers) {
+          const calendarDate = combiCalendarDate(dayNumber, dayDates);
+          const average = averageForDay(logsForUser(avgLogs, m.id), calendarDate, m.average || 0);
+          const row = scoreByUserDay.get(`${m.id}:${dayNumber}`);
+          dayStats[String(dayNumber)] = {
+            score: row?.score ?? null,
+            slams: row?.slams ?? null,
+            average,
+            hasAvgBonus: previewAvgBonus(row?.score ?? null, average),
+            missingPrior: !hasSubmittedPriorDays(daysSubmitted.get(m.id) || [], dayNumber),
+          };
+        }
+      }
+      return { ...m, dayStats };
+    });
     const days = dayNumbers.map((dayNumber) => {
       const calendarDate = combiCalendarDate(dayNumber, dayDates);
       const cutoffIso = combiCutoffIso(dayNumber, dayDates);
@@ -287,6 +336,7 @@ export async function GET(request: NextRequest) {
         cutoffIso,
         revealed,
         locked: revealed,
+        canEditScores: canEdit && !revealed,
         submittedAt: showMine ? entry?.submittedAt || null : null,
         rounds: myRounds,
         isSpocExhibition: isSpocTeam,
@@ -319,7 +369,7 @@ export async function GET(request: NextRequest) {
           captainName: team.captain?.name || team.captain?.username || null,
           kind: isSpocTeam ? 'SPOC' : 'MAIN',
         },
-        members: Array.from(memberMap.values()),
+        members,
         roundFormats,
         roundsMeta,
         days,

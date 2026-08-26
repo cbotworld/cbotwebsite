@@ -125,6 +125,8 @@ export async function POST(request: NextRequest) {
           role: foundUser.role,
           bio: foundUser.bio || '',
           city: foundUser.city || '',
+          address: foundUser.address || '',
+          pincode: foundUser.pincode || '',
           state: foundUser.state || '',
           country: foundUser.country || '',
           whatsApp: foundUser.whatsApp || '',

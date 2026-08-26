@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
-import { officialMatchDays } from '@/lib/bicentennial-monuments';
-import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { buildOrganizerScheduleDays, resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { combiCutoffIso, combiCalendarDate } from '@/lib/combi-cutoff';
+import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+
 export const dynamic = 'force-dynamic';
 
 export async function OPTIONS() {
@@ -50,17 +51,57 @@ function playersFromRound(round: any) {
   return '';
 }
 
-function lineupSlots(savedLineups: string | null | undefined, dayNumber: number): Record<string, string> {
-  const dayData = parseLineups(savedLineups)[String(dayNumber)] || parseLineups(savedLineups)[dayNumber as any];
+type EventSlot = { key: string; name: string; format: string };
+
+function slotKey(name: string, index: number) {
+  const cleaned = String(name || '').toLowerCase().replace(/\s+/g, '');
+  return cleaned || `event${index + 1}`;
+}
+
+function roundLabel(formats: string[], index: number) {
+  let singles = 0;
+  let doubles = 0;
+  let triples = 0;
+  let other = 0;
+  for (let i = 0; i <= index; i++) {
+    const fmt = (formats[i] || 'SINGLES').toUpperCase();
+    if (fmt.includes('TRIPLE')) triples += 1;
+    else if (fmt.includes('DOUBLE')) doubles += 1;
+    else if (fmt.includes('SINGLE')) singles += 1;
+    else other += 1;
+  }
+  const fmt = (formats[index] || 'SINGLES').toUpperCase();
+  if (fmt.includes('TRIPLE')) return `Triples ${triples}`;
+  if (fmt.includes('DOUBLE')) return `Doubles ${doubles}`;
+  if (fmt.includes('SINGLE')) return `Singles ${singles}`;
+  return `Match ${other}`;
+}
+
+function eventSlotsFromPatterns(patterns?: Array<{ matchFormat?: string | null }>): EventSlot[] {
+  const formats = (patterns || []).map((p) => p.matchFormat || 'SINGLES').filter(Boolean);
+  if (!formats.length) return EVENT_SLOTS.map((s) => ({ ...s }));
+  return formats.map((format, index) => {
+    const name = roundLabel(formats, index);
+    return { key: slotKey(name, index), name, format };
+  });
+}
+
+function lineupSlots(
+  savedLineups: string | null | undefined,
+  dayNumber: number,
+  slots: EventSlot[],
+): Record<string, string> {
+  const parsed = parseLineups(savedLineups);
+  const dayData = parsed[String(dayNumber)] || parsed[dayNumber as any];
   const rounds = dayData?.rounds || [];
   const result: Record<string, string> = {};
   rounds.forEach((r: any, idx: number) => {
     const rName = r?.name ? String(r.name).toLowerCase().replace(/\s+/g, '') : '';
     const playersStr = playersFromRound(r);
-    if (rName && EVENT_SLOTS.some((s) => s.key === rName)) {
+    if (rName && slots.some((s) => s.key === rName)) {
       result[rName] = playersStr;
-    } else if (EVENT_SLOTS[idx] && !result[EVENT_SLOTS[idx].key]) {
-      result[EVENT_SLOTS[idx].key] = playersStr;
+    } else if (slots[idx] && !result[slots[idx].key]) {
+      result[slots[idx].key] = playersStr;
     }
   });
   return result;
@@ -89,26 +130,16 @@ function teamPayload(
   };
 }
 
-function sameMatch(
-  a: { team1Name: string; team2Name: string },
-  b: { team1Name: string; team2Name: string },
-) {
-  const a1 = a.team1Name.toUpperCase().trim();
-  const a2 = a.team2Name.toUpperCase().trim();
-  const b1 = b.team1Name.toUpperCase().trim();
-  const b2 = b.team2Name.toUpperCase().trim();
-  return (a1 === b1 && a2 === b2) || (a1 === b2 && a2 === b1);
-}
-
 export async function GET() {
   try {
-    const edition = await prisma.edition.findFirst({
+    const rawEdition = await prisma.edition.findFirst({
       where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
       orderBy: { number: 'desc' },
       include: {
         patterns: { orderBy: { sequence: 'asc' } },
       },
     });
+    const edition = await ensureOfficialDayDates(rawEdition);
 
     const teams = edition?.id
       ? await prisma.team.findMany({
@@ -138,66 +169,33 @@ export async function GET() {
     }
 
     const pairings = resolveOrganizerPairings(stages, teams);
-
     const dayDates = parseDayDates(edition?.dayDates);
     const now = Date.now();
-    const official = officialMatchDays();
-    const matchesByDay = new Map<
-      number,
-      { title: string; matches: Array<{ team1Name: string; team2Name: string; team1Id?: string; team2Id?: string }> }
-    >();
-
-    official.forEach((d) => {
-      matchesByDay.set(d.dayNumber, {
-        title: d.title,
-        matches: d.matches.map((m) => ({ team1Name: m.team1, team2Name: m.team2 })),
-      });
+    const slots = eventSlotsFromPatterns(edition?.patterns);
+    const scheduleDays = buildOrganizerScheduleDays({
+      totalDays: edition?.totalDays,
+      dayDates,
+      teams,
+      pairings,
+      stages,
     });
 
-    pairings.forEach((p) => {
-      if (!p.dayNumber || (!p.team1Name && !p.team1Id) || (!p.team2Name && !p.team2Id)) return;
-      const incoming = {
-        team1Name: p.team1Name,
-        team2Name: p.team2Name,
-        team1Id: p.team1Id,
-        team2Id: p.team2Id,
-      };
-      const existing = matchesByDay.get(p.dayNumber);
-      if (!existing) {
-        matchesByDay.set(p.dayNumber, {
-          title: p.stageName ? `${p.stageName} · Day ${p.dayNumber}` : `Day ${p.dayNumber}`,
-          matches: [incoming],
-        });
-        return;
-      }
-      if (!existing.matches.some((m) => sameMatch(m, incoming))) existing.matches.push(incoming);
-    });
-
-    const totalDays = Math.max(
-      edition?.totalDays || 0,
-      ...official.map((d) => d.dayNumber),
-      ...[...matchesByDay.keys()],
-      1,
-    );
-
-    const days = Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNumber) => {
-      const calendarDate = combiCalendarDate(dayNumber, dayDates);
-      const cutoffIso = combiCutoffIso(dayNumber, dayDates);
+    const days = scheduleDays.map((day) => {
+      const calendarDate = day.calendarDate || combiCalendarDate(day.dayNumber, dayDates);
+      const cutoffIso = combiCutoffIso(day.dayNumber, dayDates);
       const revealed = now >= new Date(cutoffIso).getTime();
-      const bucket = matchesByDay.get(dayNumber);
-      const stageName = pairings.find((p) => p.dayNumber === dayNumber)?.stageName || '';
 
-      const matches = (bucket?.matches || []).map((m) => {
+      const matches = (day.matches || []).map((m) => {
         const t1 =
           (m.team1Id && teamsById.get(m.team1Id)) ||
-          teamsByName.get(String(m.team1Name || '').toUpperCase().trim());
+          teamsByName.get(String(m.team1 || '').toUpperCase().trim());
         const t2 =
           (m.team2Id && teamsById.get(m.team2Id)) ||
-          teamsByName.get(String(m.team2Name || '').toUpperCase().trim());
-        const left = teamPayload(t1, m.team1Name, 'T1', teams);
-        const right = teamPayload(t2, m.team2Name, 'T2', teams);
-        const leftSlots = revealed ? lineupSlots(left.savedLineups, dayNumber) : {};
-        const rightSlots = revealed ? lineupSlots(right.savedLineups, dayNumber) : {};
+          teamsByName.get(String(m.team2 || '').toUpperCase().trim());
+        const left = teamPayload(t1, m.team1, m.team1Tag || 'T1', teams);
+        const right = teamPayload(t2, m.team2, m.team2Tag || 'T2', teams);
+        const leftSlots = revealed ? lineupSlots(left.savedLineups, day.dayNumber, slots) : {};
+        const rightSlots = revealed ? lineupSlots(right.savedLineups, day.dayNumber, slots) : {};
 
         return {
           team1: {
@@ -214,7 +212,7 @@ export async function GET() {
             logo: right.logo,
             captainName: right.captainName,
           },
-          events: EVENT_SLOTS.map((slot, index) => ({
+          events: slots.map((slot, index) => ({
             index,
             name: slot.name,
             format: slot.format,
@@ -225,16 +223,19 @@ export async function GET() {
       });
 
       return {
-        dayNumber,
+        dayNumber: day.dayNumber,
         calendarDate,
         cutoffIso,
         revealed,
-        title: bucket?.title || (stageName ? `${stageName} · Day ${dayNumber}` : `Day ${dayNumber}`),
+        title: day.title,
         matches,
       };
     });
 
-    return NextResponse.json({ success: true, days }, { headers: mobileCorsHeaders });
+    return NextResponse.json(
+      { success: true, days },
+      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store' } },
+    );
   } catch (error: any) {
     console.error('Mobile public combis GET:', error);
     return NextResponse.json(

@@ -151,6 +151,8 @@ export interface User {
   country?: string;
   state?: string;
   city?: string;
+  address?: string;
+  pincode?: string;
   whatsApp?: string;
   rating: number;
   wins: number;
@@ -285,12 +287,51 @@ export interface PlayerDayScoreRow {
   dayNumber: number;
   score: number;
   slams: number;
+  boards?: unknown;
 }
 
 export interface PlayerAverageLogRow {
   userId: string;
   average: number;
   effectiveFrom: string;
+}
+
+export interface StandingDayEvent {
+  name: string;
+  format: string;
+  myPlayers: string;
+  oppPlayers: string;
+  myPts: number;
+  oppPts: number;
+  myScore: number | null;
+  oppScore: number | null;
+  result: string;
+}
+
+export interface StandingDayPlayerBonus {
+  userId: string;
+  name: string;
+  score: number;
+  target: number | null;
+}
+
+export interface StandingDayPlayerSlam {
+  userId: string;
+  name: string;
+  slams: number;
+}
+
+export interface StandingDayBreakdown {
+  dayNumber: number;
+  opponentName: string | null;
+  eventPts: number;
+  slamBonus: number;
+  avgBonus: number;
+  total: number;
+  matchResult: 'W' | 'L' | 'T' | null;
+  events: StandingDayEvent[];
+  targetBonusPlayers?: StandingDayPlayerBonus[];
+  slamPlayers?: StandingDayPlayerSlam[];
 }
 
 export interface StageStandingRow {
@@ -303,6 +344,7 @@ export interface StageStandingRow {
   total: number;
   matchesWon: number;
   rank: number;
+  days?: StandingDayBreakdown[];
 }
 
 export interface PlayerRankingRow {
@@ -313,6 +355,10 @@ export interface PlayerRankingRow {
   daysCounted: number;
   walkovers: number;
   totalScore: number;
+  boardCount: number;
+  boardAverage: number | null;
+  matchesWon: number;
+  slams: number;
   rank: number;
 }
 

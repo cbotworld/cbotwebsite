@@ -126,3 +126,99 @@ export function scoreMatchDay(
   else if (team2EventPts > team1EventPts) matchWinner = 2;
   return { team1EventPts, team2EventPts, matchWinner, events };
 }
+
+export type PlayerMatchEvent = {
+  revealed: boolean;
+  selected: boolean;
+  name: string;
+  format: string;
+  myPlayers: string[];
+  oppPlayers: string[];
+  myScore: number | null;
+  oppScore: number | null;
+  result: 'WIN' | 'LOSS' | 'TIE' | 'WALKOVER' | null;
+  reason: EventResult['reason'] | null;
+  eventPts: number;
+  scoresReady: boolean;
+};
+
+function namesForIds(ids: string[], roster: RosterPlayer[]) {
+  const byId = new Map(roster.map((p) => [p.id, String(p.name || '').trim() || 'Player']));
+  return ids.map((id) => byId.get(id) || 'Player');
+}
+
+export function sideScoreSum(ids: string[], scores: DayScoreMap): number | null {
+  if (!ids.length) return null;
+  const known = ids.map((id) => scores[id]?.score).filter((n): n is number => typeof n === 'number');
+  if (!known.length) return null;
+  return known.reduce((a, b) => a + b, 0);
+}
+
+export function playerMatchEvent(opts: {
+  userId: string;
+  playerIsTeam1: boolean;
+  revealed: boolean;
+  scoresReady: boolean;
+  roundsMine?: LineupRound[];
+  roundsOpp?: LineupRound[];
+  rosterMine: RosterPlayer[];
+  rosterOpp: RosterPlayer[];
+  scores: DayScoreMap;
+}): PlayerMatchEvent {
+  const empty: PlayerMatchEvent = {
+    revealed: opts.revealed,
+    selected: false,
+    name: '',
+    format: '',
+    myPlayers: [],
+    oppPlayers: [],
+    myScore: null,
+    oppScore: null,
+    result: null,
+    reason: null,
+    eventPts: 0,
+    scoresReady: opts.scoresReady,
+  };
+  if (!opts.revealed) return empty;
+
+  const scored = scoreMatchDay(
+    opts.roundsMine,
+    opts.roundsOpp,
+    opts.rosterMine,
+    opts.rosterOpp,
+    opts.scores,
+  );
+  const hit = scored.events.find((ev) => {
+    const mine = opts.playerIsTeam1 ? ev.team1PlayerIds : ev.team2PlayerIds;
+    return mine.includes(opts.userId);
+  });
+  if (!hit) return empty;
+
+  const myIds = opts.playerIsTeam1 ? hit.team1PlayerIds : hit.team2PlayerIds;
+  const oppIds = opts.playerIsTeam1 ? hit.team2PlayerIds : hit.team1PlayerIds;
+  const myPts = opts.playerIsTeam1 ? hit.team1Pts : hit.team2Pts;
+  const won = opts.playerIsTeam1 ? hit.winnerTeam === 1 : hit.winnerTeam === 2;
+  const lost = opts.playerIsTeam1 ? hit.winnerTeam === 2 : hit.winnerTeam === 1;
+  let result: PlayerMatchEvent['result'] = null;
+  if (opts.scoresReady) {
+    if (hit.reason === 'walkover') result = won ? 'WIN' : 'WALKOVER';
+    else if (hit.reason === 'tie') result = 'TIE';
+    else if (won) result = 'WIN';
+    else if (lost) result = 'LOSS';
+  }
+
+  return {
+    revealed: true,
+    selected: true,
+    name: hit.name,
+    format: hit.format,
+    myPlayers: namesForIds(myIds, opts.rosterMine),
+    oppPlayers: namesForIds(oppIds, opts.rosterOpp),
+    myScore: opts.scoresReady ? sideScoreSum(myIds, opts.scores) : null,
+    oppScore: opts.scoresReady ? sideScoreSum(oppIds, opts.scores) : null,
+    result,
+    reason: hit.reason,
+    eventPts: myPts,
+    scoresReady: opts.scoresReady,
+  };
+}

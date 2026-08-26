@@ -39,6 +39,19 @@ export type MatchDetails = {
   latestYoutubeUrl?: string | null;
   latestYoutubeVideoId?: string | null;
   streamCount?: number;
+  myEvent?: {
+    revealed: boolean;
+    selected: boolean;
+    name: string;
+    format: string;
+    myPlayers: string[];
+    oppPlayers: string[];
+    myScore: number | null;
+    oppScore: number | null;
+    result: 'WIN' | 'LOSS' | 'TIE' | 'WALKOVER' | null;
+    eventPts: number;
+    scoresReady: boolean;
+  } | null;
 };
 
 type Session = {
@@ -114,6 +127,7 @@ export async function fetchPlayerSchedule() {
     latestYoutubeUrl: day.latestYoutubeUrl || null,
     latestYoutubeVideoId: day.latestYoutubeVideoId || null,
     streamCount: day.streamCount || 0,
+    myEvent: day.myEvent || null,
   }));
   return {
     matches,
@@ -240,5 +254,28 @@ export async function fetchChannelVideos(opts?: { player?: string; day?: number 
       title: string;
     }>;
     count: number;
+  };
+}
+
+export type StandingsPayload = {
+  edition: { id: string; title: string; number: number } | null;
+  blocks: any[];
+  players: any[];
+  placement: any[];
+  stages: any[];
+};
+
+export async function fetchStandings(): Promise<StandingsPayload> {
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/standings?t=${Date.now()}`, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to load standings.');
+  return {
+    edition: data.edition || null,
+    blocks: Array.isArray(data.blocks) ? data.blocks : [],
+    players: Array.isArray(data.players) ? data.players : [],
+    placement: Array.isArray(data.placement) ? data.placement : [],
+    stages: Array.isArray(data.stages) ? data.stages : [],
   };
 }
