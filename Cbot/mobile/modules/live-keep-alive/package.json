@@ -1,0 +1,8 @@
+{
+  "name": "live-keep-alive",
+  "version": "1.0.0",
+  "description": "Keep CBOT camera RTMP alive in the background with a foreground service and PiP.",
+  "main": "index.ts",
+  "license": "UNLICENSED",
+  "author": "CBOT"
+}

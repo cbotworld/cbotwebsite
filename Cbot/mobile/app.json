@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "Cbot",
+    "slug": "cbot",
+    "version": "1.2.1",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "cbot",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-screen-orientation",
+      "./plugins/withKeepLiveInBackground",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cbot needs camera access to live stream to YouTube.",
+          "microphonePermission": "Cbot needs microphone access to live stream to YouTube.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cbotworld",
+      "buildNumber": "13",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Cbot needs camera access to live stream to YouTube.",
+        "NSMicrophoneUsageDescription": "Cbot needs microphone access to live stream to YouTube.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.cbotworld",
+      "versionCode": 16,
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_CAMERA",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "owner": "karthikipad",
+    "extra": {
+      "eas": {
+        "projectId": "f4ca4f57-6593-4d04-9e02-ae5939b964ca"
+      }
+    }
+  }
+}
