@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS } from '@/lib/mock-data';
-import { addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction } from '@/lib/actions/tournamentActions';
+import { addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction, autoAssignPlayersToTeams } from '@/lib/actions/tournamentActions';
 import { sendFinalDailyLineupSummaryAction } from '@/lib/actions/lineupActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { finalizeEditionRankings } from '@/lib/actions/rankingActions';
@@ -31,6 +32,7 @@ import {
 import { filterMainTeams, filterSpocTeams, isMainTournamentTeam } from '@/lib/spoc-teams';
 import type { WebsiteCmsContent } from '@/lib/website-cms';
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
+  const router = useRouter();
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
   const [scoreReports, setScoreReports] = React.useState(initialScoreReports);
   const [usersList, setUsersList] = React.useState(initialUsersList);
@@ -400,6 +402,30 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   const [editTeamLogo, setEditTeamLogo] = React.useState('');
 
+  const [autoAssigning, setAutoAssigning] = React.useState(false);
+  const [teamsNotice, setTeamsNotice] = React.useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const handleAutoAssignPlayers = async () => {
+    const editionId = selectedEditionId || editions[0]?.id;
+    if (!editionId || autoAssigning) return;
+    setAutoAssigning(true);
+    setTeamsNotice(null);
+
+    const res = await autoAssignPlayersToTeams(editionId);
+
+    if (res.success) {
+      const spread = (res.breakdown || []).map((b: any) => `${b.name}: ${b.count}`).join(' · ');
+      setTeamsNotice({
+        kind: 'ok',
+        text: `Assigned ${res.assigned} players across ${res.teamCount} teams. ${spread}`,
+      });
+      router.refresh();
+    } else {
+      setTeamsNotice({ kind: 'error', text: res.error || 'Could not auto-assign players.' });
+    }
+    setAutoAssigning(false);
+  };
+
   const handleOpenEditTeamModal = (team: any) => {
     setEditingTeamId(team.id);
     setEditTeamName(team.name || '');
@@ -492,6 +518,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
     if (res.team) {
       const savedTeam = res.team;
+      setTeamsNotice(null);
       setTeamsList((prev) =>
         prev.map((t) =>
           t.id === editingTeamId || t.name === savedTeam.name
@@ -504,6 +531,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             : t
         )
       );
+    } else {
+      // Without this the optimistic roster above would linger on screen and
+      // only look wrong after a reload.
+      setTeamsNotice({
+        kind: 'error',
+        text: (res as any).error || 'The roster could not be saved. Reload to see what was stored.',
+      });
+      router.refresh();
     }
     setIsSubmitting(false);
   };
@@ -1088,10 +1123,38 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               Manage teams, assign captains and roster players for this edition.
             </p>
           </div>
-          <Button variant="carrom" size="sm" onClick={() => setAddTeamModalOpen(true)} className="text-xs font-bold">
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Team
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAutoAssignPlayers}
+              disabled={autoAssigning || selectedEditionTeams.length === 0}
+              className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              title="Spread every player evenly across these teams, keeping each captain on their own team"
+            >
+              {autoAssigning ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 mr-1" />
+              )}
+              {autoAssigning ? 'Assigning...' : 'Auto-assign Players'}
+            </Button>
+            <Button variant="carrom" size="sm" onClick={() => setAddTeamModalOpen(true)} className="text-xs font-bold">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Team
+            </Button>
+          </div>
         </CardHeader>
+        {teamsNotice && (
+          <div
+            className={`mx-4 mt-3 rounded-md border px-3 py-2 text-xs font-medium ${
+              teamsNotice.kind === 'ok'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+            }`}
+          >
+            {teamsNotice.text}
+          </div>
+        )}
         <CardContent className="p-0">
           <Table>
             <TableHeader>

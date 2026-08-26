@@ -12,6 +12,7 @@ import {
   normalizeDayDates,
 } from '@/lib/combi-cutoff';
 import { syncCaptainRole } from '@/lib/captain-role';
+import { filterMainTeams } from '@/lib/spoc-teams';
 
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
@@ -435,6 +436,9 @@ export async function addOrUpdateEditionTeam(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    // The homepage marquee and fixtures render team posters and are ISR-cached,
+    // so they have to be invalidated too or a new logo stays hidden for an hour.
+    revalidatePath('/', 'layout');
 
     return { success: true, team: teamRecord, isNew: !existing };
   } catch (error) {
@@ -498,15 +502,26 @@ export async function updateTeamRosterAndCaptain(data: {
 
     // Persist team roster members to EditionParticipant table
     if (data.playerUserIds) {
-      const defaultEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
-      const editionId = defaultEdition?.id || 'edition_205';
+      const targetTeam = await prisma.team.findUnique({
+        where: { id: targetTeamId },
+        select: { editionId: true },
+      });
+      const fallbackEdition = targetTeam?.editionId
+        ? null
+        : await prisma.edition.findFirst({ orderBy: { number: 'desc' }, select: { id: true } });
+      const editionId = targetTeam?.editionId || fallbackEdition?.id;
+      if (!editionId) {
+        return { success: false, error: 'No edition found to attach this roster to.' };
+      }
 
-      // 1. Remove existing members for this team
-      await prisma.editionParticipant.deleteMany({
-        where: { teamId: targetTeamId }
+      // Drop the old roster by unlinking it, never by deleting the rows: an
+      // EditionParticipant is the player's registration for the edition, and
+      // deleting it removes them from the tournament entirely.
+      await prisma.editionParticipant.updateMany({
+        where: { teamId: targetTeamId },
+        data: { teamId: null }
       });
 
-      // 2. Add selected player IDs as EditionParticipant records
       for (const uId of data.playerUserIds) {
         let user = await prisma.user.findFirst({
           where: {
@@ -527,8 +542,12 @@ export async function updateTeamRosterAndCaptain(data: {
           });
         }
 
-        await prisma.editionParticipant.create({
-          data: {
+        // A player holds one registration per edition, so re-point the existing
+        // row instead of inserting a second one.
+        await prisma.editionParticipant.upsert({
+          where: { editionId_userId: { editionId, userId: user.id } },
+          update: { teamId: targetTeamId },
+          create: {
             editionId,
             userId: user.id,
             teamId: targetTeamId,
@@ -555,11 +574,153 @@ export async function updateTeamRosterAndCaptain(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    // The homepage marquee and fixtures render team posters and are ISR-cached,
+    // so they have to be invalidated too or a new logo stays hidden for an hour.
+    revalidatePath('/', 'layout');
 
     return { success: true, team: finalTeam };
   } catch (error) {
     console.error('Failed to update team roster:', error);
     return { success: false, error: 'Failed to update team roster' };
+  }
+}
+
+/** Accounts that never join a team, whatever role they happen to hold. */
+const AUTO_ASSIGN_EXCLUDED_USERNAMES = ['carrombalu'];
+
+function shuffled<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Spreads every eligible player across the edition's main teams as evenly as
+ * possible, replacing whatever rosters exist. Each team keeps the captain it
+ * was given, and an uneven total puts the spare players on the first teams —
+ * 129 players over 8 teams gives one team 17 and the rest 16.
+ */
+export async function autoAssignPlayersToTeams(editionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
+
+  try {
+    const allTeams = await prisma.team.findMany({
+      where: { editionId },
+      select: { id: true, name: true, captainId: true, teamType: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const teams = filterMainTeams(allTeams);
+    if (!teams.length) {
+      return { success: false, error: 'Add the teams first, then auto-assign players.' };
+    }
+
+    const players = await prisma.user.findMany({
+      where: {
+        role: 'PLAYER',
+        NOT: { username: { in: AUTO_ASSIGN_EXCLUDED_USERNAMES } },
+      },
+      select: { id: true },
+      orderBy: { name: 'asc' },
+    });
+    if (!players.length) {
+      return { success: false, error: 'There are no eligible players to assign.' };
+    }
+
+    const playerIds = new Set(players.map((p) => p.id));
+
+    // Even split, with the remainder landing one-per-team on the first teams.
+    const base = Math.floor(players.length / teams.length);
+    const remainder = players.length % teams.length;
+    const capacity = new Map<string, number>(
+      teams.map((team, index) => [team.id, base + (index < remainder ? 1 : 0)]),
+    );
+
+    // A captain belongs on the team they captain, so seat them before the rest.
+    const rosters = new Map<string, string[]>(teams.map((team) => [team.id, []]));
+    const seated = new Set<string>();
+    for (const team of teams) {
+      const captainId = team.captainId;
+      if (captainId && playerIds.has(captainId) && !seated.has(captainId)) {
+        rosters.get(team.id)!.push(captainId);
+        seated.add(captainId);
+      }
+    }
+
+    const queue = shuffled(players.map((p) => p.id).filter((id) => !seated.has(id)));
+    for (const team of teams) {
+      const roster = rosters.get(team.id)!;
+      while (roster.length < (capacity.get(team.id) || 0) && queue.length) {
+        roster.push(queue.pop()!);
+      }
+    }
+    // Anything left over (teams already full of captains) tops up the smallest team.
+    while (queue.length) {
+      const smallest = teams.reduce((a, b) =>
+        rosters.get(a.id)!.length <= rosters.get(b.id)!.length ? a : b,
+      );
+      rosters.get(smallest.id)!.push(queue.pop()!);
+    }
+
+    const existing = await prisma.editionParticipant.findMany({
+      where: { editionId },
+      select: { id: true, userId: true },
+    });
+    const participantIdByUser = new Map(existing.map((p) => [p.userId, p.id]));
+
+    await prisma.$transaction(async (tx) => {
+      // Clear every existing link first so nobody keeps a stale team.
+      await tx.editionParticipant.updateMany({
+        where: { editionId },
+        data: { teamId: null },
+      });
+
+      const missing: Array<{ editionId: string; userId: string; teamId: string; status: string }> = [];
+      for (const team of teams) {
+        const roster = rosters.get(team.id)!;
+        const known = roster
+          .map((userId) => participantIdByUser.get(userId))
+          .filter((id): id is string => Boolean(id));
+        if (known.length) {
+          await tx.editionParticipant.updateMany({
+            where: { id: { in: known } },
+            data: { teamId: team.id },
+          });
+        }
+        for (const userId of roster) {
+          if (!participantIdByUser.has(userId)) {
+            missing.push({ editionId, userId, teamId: team.id, status: 'REGISTERED' });
+          }
+        }
+      }
+      if (missing.length) {
+        await tx.editionParticipant.createMany({ data: missing });
+      }
+    });
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/teams');
+    // The homepage marquee and fixtures render team posters and are ISR-cached,
+    // so they have to be invalidated too or a new logo stays hidden for an hour.
+    revalidatePath('/', 'layout');
+
+    return {
+      success: true,
+      assigned: players.length,
+      teamCount: teams.length,
+      breakdown: teams.map((team) => ({
+        name: team.name,
+        count: rosters.get(team.id)!.length,
+      })),
+    };
+  } catch (error: any) {
+    console.error('[autoAssignPlayersToTeams]', error);
+    return { success: false, error: error?.message || 'Failed to auto-assign players.' };
   }
 }
 
@@ -579,6 +740,9 @@ export async function deleteTeam(teamId: string) {
     await syncCaptainRole({ previousCaptainId: doomed?.captainId || null });
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    // The homepage marquee and fixtures render team posters and are ISR-cached,
+    // so they have to be invalidated too or a new logo stays hidden for an hour.
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error) {
     console.error('Error deleting team:', error);

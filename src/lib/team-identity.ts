@@ -128,8 +128,9 @@ function customFace(name?: string | null, tag?: string | null, logo?: string | n
 /**
  * Resolve one team slot to a single identity.
  * Never mix Team A's name with Team B's tag or poster.
- * When stored fields disagree, poster then tag beat a stale name
- * (e.g. "SUPERNOVA QUEEN" saved next to the Ebony Overlords poster / EO).
+ * A logo the organizer set is authoritative. Failing that, when stored fields
+ * disagree, poster then tag beat a stale name (e.g. "SUPERNOVA QUEEN" saved
+ * next to the Ebony Overlords poster / EO).
  */
 export function resolveTeamFace(input: {
   id?: string | null;
@@ -144,6 +145,14 @@ export function resolveTeamFace(input: {
   const logo = fromId?.logo || input.logo;
 
   const byLogo = officialFromLogo(logo);
+
+  // A poster the organizer uploaded is the team's own artwork, so it wins over
+  // the built-in catalog even when the name or tag still matches an official
+  // team. The catalog is only a fallback for teams that have no logo of their own.
+  if (logo && !byLogo) {
+    return customFace(name, tag, logo);
+  }
+
   const byTag = officialFromTag(tag);
   const byName = officialFromName(name);
 

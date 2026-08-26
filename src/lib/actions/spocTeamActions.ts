@@ -111,6 +111,7 @@ export async function addOrUpdateSpocTeam(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/', 'layout');
     return { success: true, team: fullTeam };
   } catch (error: any) {
     console.error('[addOrUpdateSpocTeam]', error);
@@ -175,6 +176,7 @@ export async function updateSpocTeamRoster(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/', 'layout');
     return { success: true, team: fullTeam };
   } catch (error: any) {
     console.error('[updateSpocTeamRoster]', error);
@@ -196,6 +198,7 @@ export async function deleteSpocTeam(teamId: string) {
     await syncCaptainRole({ previousCaptainId: team.captainId });
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error: any) {
     console.error('[deleteSpocTeam]', error);
