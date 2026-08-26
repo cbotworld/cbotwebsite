@@ -1,11 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import {
-  OFFICIAL_DAY1_CALENDAR,
-  addDaysIsoDate,
   buildDayDatesMap,
   calendarDateToUtcDate,
   dayDatesNeedRepair,
-  istCalendarDateFromMs,
   normalizeDayDates,
   toCalendarDate,
 } from '@/lib/combi-cutoff';
@@ -20,16 +17,6 @@ type RepairableEdition = {
 
 const FINISHED_STATUSES = new Set(['COMPLETED', 'FINISHED', 'ARCHIVED', 'CANCELLED']);
 
-/**
- * An edition already under way keeps the 200th edition calendar as its fallback.
- * One that has not started yet gets a near-future placeholder instead, so its days
- * are not born already in the past — the organizer then sets the real start date.
- */
-function defaultDay1(edition: RepairableEdition): string {
-  const inProgress = String(edition.status || '').toUpperCase() === 'IN_PROGRESS';
-  if (inProgress) return OFFICIAL_DAY1_CALENDAR;
-  return addDaysIsoDate(istCalendarDateFromMs(Date.now()), 7);
-}
 
 export function canRepairDayDates(edition: RepairableEdition | null | undefined): boolean {
   if (!edition?.id) return false;
@@ -51,8 +38,11 @@ export async function ensureOfficialDayDates<T extends RepairableEdition>(
   const needsRepair = dayDatesNeedRepair(edition.dayDates, totalDays);
   if (!needsRepair) return edition;
 
-  const day1 =
-    stored?.[1] || toCalendarDate(edition.tournamentStartDate ?? null) || defaultDay1(edition);
+  // Never invent a start date and write it. A new tournament stays undated
+  // until the organizer picks Day 1 — writing "today + 7" was snapping the
+  // picker back to that placeholder on every dashboard refresh.
+  const day1 = stored?.[1] || toCalendarDate(edition.tournamentStartDate ?? null);
+  if (!day1) return edition;
   const filled = buildDayDatesMap(totalDays, day1);
   for (const [day, date] of Object.entries(stored ?? {})) {
     const num = Number(day);

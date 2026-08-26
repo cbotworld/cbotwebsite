@@ -5,7 +5,7 @@ import {
   getEditionStageSnapshot,
   saveTournamentStageConfig,
 } from '@/lib/actions/schedulerActions';
-import { startNewTournament } from '@/lib/actions/tournamentActions';
+import { startNewTournament, saveEditionCalendar } from '@/lib/actions/tournamentActions';
 import {
   computeStandings,
   defaultTournamentStages,
@@ -257,6 +257,7 @@ export default function TournamentStageDesigner({
   startDate,
   onStartDateChange,
   onDaysNeededChange,
+  onCalendarSaved,
 }: {
   editionId: string;
   editionTitle: string;
@@ -268,12 +269,14 @@ export default function TournamentStageDesigner({
   startDate?: string;
   onStartDateChange?: (date: string) => void;
   onDaysNeededChange?: (days: number) => void;
+  onCalendarSaved?: (dayDates: Record<number, string>) => void;
 }) {
   const [config, setConfig] = React.useState<TournamentStageConfig>(() => defaultTournamentStages(teams.length || 8));
   const [matches, setMatches] = React.useState<MatchLite[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [savingCalendar, setSavingCalendar] = React.useState(false);
   const [resetOpen, setResetOpen] = React.useState(false);
   const [resetName, setResetName] = React.useState('');
   const [resetConfirm, setResetConfirm] = React.useState('');
@@ -787,6 +790,27 @@ export default function TournamentStageDesigner({
     }),
   });
 
+  const persistCalendar = async () => {
+    if (!editionId) return { success: false as const, error: 'No edition selected.' };
+    const day1 = startDate || dayDates[1];
+    if (!day1) return { success: false as const, error: 'Pick a start date first.' };
+    const res = await saveEditionCalendar(editionId, day1, daysNeeded || totalDays);
+    if (res.success && res.dayDates) onCalendarSaved?.(res.dayDates);
+    return res;
+  };
+
+  const handleSaveCalendar = async () => {
+    setSavingCalendar(true);
+    setMessage(null);
+    const res = await persistCalendar();
+    setSavingCalendar(false);
+    if (res.success) {
+      setMessage({ type: 'ok', text: 'Start date saved. Every match day now follows this date.' });
+    } else {
+      setMessage({ type: 'err', text: res.error || 'Failed to save the start date.' });
+    }
+  };
+
   const handleSave = async () => {
     if (!editionId) return;
     const clash = allDraftPairings.filter((p) => p.dayNumber && (p.team1Id || p.team2Id));
@@ -799,11 +823,17 @@ export default function TournamentStageDesigner({
     }
     setSaving(true);
     setMessage(null);
+    const calendar = await persistCalendar();
+    if (!calendar.success) {
+      setSaving(false);
+      setMessage({ type: 'err', text: calendar.error || 'Failed to save the start date.' });
+      return;
+    }
     const res = await saveTournamentStageConfig(editionId, stagedConfig());
     setSaving(false);
     if (res.success) {
       setConfig(res.config);
-      setMessage({ type: 'ok', text: 'Tournament stage design saved.' });
+      setMessage({ type: 'ok', text: 'Start date and tournament stage design saved.' });
     } else {
       setMessage({ type: 'err', text: res.error || 'Failed to save stage design.' });
     }
@@ -967,12 +997,25 @@ export default function TournamentStageDesigner({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-border bg-muted/20 p-3">
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">Event start date (Day 1)</label>
-                <Input
-                  type="date"
-                  value={startDate || dayDates[1] || ''}
-                  onChange={(e) => onStartDateChange?.(e.target.value)}
-                  className="h-9 text-xs font-bold font-mono bg-background"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={startDate || dayDates[1] || ''}
+                    onChange={(e) => onStartDateChange?.(e.target.value)}
+                    className="h-9 text-xs font-bold font-mono bg-background"
+                  />
+                  <Button
+                    type="button"
+                    variant="carrom"
+                    size="sm"
+                    className="h-9 text-[11px] font-bold shrink-0"
+                    onClick={() => void handleSaveCalendar()}
+                    disabled={savingCalendar || saving || !editionId}
+                  >
+                    {savingCalendar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                    Save date
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">Number of event days</label>

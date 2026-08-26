@@ -21,6 +21,7 @@ import {
 } from '@/lib/actions/websiteCmsActions';
 import {
   extractYoutubeId,
+  youtubeWatchUrl,
   newCmsId,
   sponsorInitials,
   type EliteSponsor,
@@ -895,6 +896,11 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
+              <p className="text-xs text-muted-foreground -mt-2">
+                Paste a full YouTube link in the first box — for example{' '}
+                <span className="font-mono text-foreground/80">https://www.youtube.com/watch?v=...</span> or{' '}
+                <span className="font-mono text-foreground/80">https://youtu.be/...</span>. You do not need the short video ID.
+              </p>
               {legacy.videos.map((video) => (
                 <div key={video.id} className="rounded-xl border border-border/60 p-4 space-y-3 bg-muted/10">
                   <div className="flex items-center justify-between">
@@ -903,13 +909,22 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
                       <Trash2 className="h-3.5 w-3.5" /> Remove
                     </Button>
                   </div>
-                  <Input
-                    value={video.youtubeId}
-                    onChange={(e) => updateLegacyVideo(video.id, { youtubeId: extractYoutubeId(e.target.value) })}
-                    placeholder="YouTube URL or video ID"
-                  />
-                  <Input value={video.title} onChange={(e) => updateLegacyVideo(video.id, { title: e.target.value })} placeholder="Video title (accessibility)" />
-                  <Input value={video.label} onChange={(e) => updateLegacyVideo(video.id, { label: e.target.value })} placeholder="Tab label (short)" />
+                  <div>
+                    <label className="text-xs font-bold block mb-1">YouTube link</label>
+                    <Input
+                      value={youtubeWatchUrl(video.youtubeId)}
+                      onChange={(e) => updateLegacyVideo(video.id, { youtubeId: extractYoutubeId(e.target.value) })}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Video title</label>
+                    <Input value={video.title} onChange={(e) => updateLegacyVideo(video.id, { title: e.target.value })} placeholder="Shown on the homepage player" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Tab label</label>
+                    <Input value={video.label} onChange={(e) => updateLegacyVideo(video.id, { label: e.target.value })} placeholder="Short name on the video tabs" />
+                  </div>
                 </div>
               ))}
               <Button variant="carrom" onClick={saveLegacy} disabled={savingLegacy} className="font-black gap-2">

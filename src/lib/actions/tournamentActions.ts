@@ -10,7 +10,9 @@ import {
   calendarDateToUtcDate,
   istCalendarDateFromMs,
   normalizeDayDates,
+  toCalendarDate,
 } from '@/lib/combi-cutoff';
+import { isCalendarDayCompleted } from '@/lib/tournament-stages';
 import { syncCaptainRole } from '@/lib/captain-role';
 import { filterMainTeams } from '@/lib/spoc-teams';
 import { getWebsiteCmsSite } from '@/lib/website-cms-site';
@@ -255,6 +257,60 @@ export async function updateEdition(editionId: string, formData: FormData) {
   } catch (error: any) {
     console.error('[updateEdition] Failed:', error?.message || error);
     return { success: false, error: 'Failed to update edition: ' + (error?.message || 'DB error') };
+  }
+}
+
+export async function saveEditionCalendar(editionId: string, day1: string, totalDays?: number) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
+
+  const start = toCalendarDate(day1);
+  if (!start) return { success: false, error: 'Pick a valid start date first.' };
+
+  try {
+    const existing = await prisma.edition.findUnique({
+      where: { id: editionId },
+      select: { id: true, status: true, totalDays: true, dayDates: true },
+    });
+    if (!existing) return { success: false, error: 'Edition not found.' };
+
+    const scheduleDays = Math.max(1, totalDays || existing.totalDays || 15);
+    const previous = normalizeDayDates(existing.dayDates) ?? {};
+    const filled = buildDayDatesMap(scheduleDays, start);
+
+    if (String(existing.status || '').toUpperCase() === 'IN_PROGRESS') {
+      for (const [key, date] of Object.entries(previous)) {
+        const day = Number(key);
+        if (day >= 1 && day <= scheduleDays && isCalendarDayCompleted(day, previous)) {
+          filled[day] = date;
+        }
+      }
+    }
+
+    const updated = await prisma.edition.update({
+      where: { id: editionId },
+      data: {
+        totalDays: scheduleDays,
+        dayDates: JSON.stringify(filled),
+        tournamentStartDate: calendarDateToUtcDate(filled[1]),
+        tournamentEndDate: calendarDateToUtcDate(filled[scheduleDays] || filled[1]),
+      },
+    });
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/player');
+    revalidatePath('/dashboard/captain');
+    revalidatePath('/fixtures');
+    revalidatePath('/edition-200-schedule');
+    revalidatePath('/edition-200-combis');
+    revalidatePath('/', 'layout');
+
+    return { success: true, dayDates: filled, edition: updated };
+  } catch (error: any) {
+    console.error('[saveEditionCalendar]', error);
+    return { success: false, error: 'Failed to save the start date.' };
   }
 }
 

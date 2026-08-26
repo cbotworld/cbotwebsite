@@ -252,6 +252,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [totalDays, setTotalDays] = React.useState<number>(15);
   const [startDate, setStartDate] = React.useState<string>(OFFICIAL_DAY1_CALENDAR);
   const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
+  const startDateRef = React.useRef(startDate);
+  const calendarSeedRef = React.useRef<{ editionId: string; start: string } | null>(null);
+  startDateRef.current = startDate;
 
   /** Consecutive days from the chosen start, with any already-set days kept as they are. */
   const generateDefaultDayDates = (startStr: string, numDays: number, existingMap: Record<number, string> = {}) => {
@@ -324,9 +327,18 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
       const loadedMap = normalizeDayDates(selectedEdition.dayDates) ?? {};
       const firstDate =
-        loadedMap[1] || toCalendarDate(selectedEdition.tournamentStartDate) || OFFICIAL_DAY1_CALENDAR;
-      setStartDate(firstDate);
-      setDayDatesMap(generateDefaultDayDates(firstDate, numDays, loadedMap));
+        loadedMap[1] || toCalendarDate(selectedEdition.tournamentStartDate) || '';
+      const editionChanged = calendarSeedRef.current?.editionId !== selectedEditionId;
+      const dirty =
+        !editionChanged &&
+        Boolean(calendarSeedRef.current) &&
+        startDateRef.current !== calendarSeedRef.current!.start;
+      if (dirty) return;
+
+      const nextStart = firstDate || startDateRef.current || OFFICIAL_DAY1_CALENDAR;
+      setStartDate(nextStart);
+      setDayDatesMap(generateDefaultDayDates(nextStart, numDays, loadedMap));
+      calendarSeedRef.current = { editionId: selectedEditionId, start: nextStart };
     }
   }, [selectedEditionId, editions]);
 
@@ -1108,6 +1120,20 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         startDate={startDate}
         onStartDateChange={handleStartDateChange}
         onDaysNeededChange={handleDaysNeeded}
+        onCalendarSaved={(saved) => {
+          if (saved[1]) {
+            setStartDate(saved[1]);
+            calendarSeedRef.current = { editionId: selectedEditionId, start: saved[1] };
+          }
+          setDayDatesMap(saved);
+          setEditions((prev) =>
+            prev.map((ed) =>
+              ed.id === selectedEditionId
+                ? { ...ed, dayDates: JSON.stringify(saved), tournamentStartDate: saved[1] }
+                : ed,
+            ),
+          );
+        }}
       />
       </TabsContent>
 

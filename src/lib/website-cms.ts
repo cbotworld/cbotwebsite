@@ -509,15 +509,29 @@ export function extractYoutubeId(input: string): string {
   if (!trimmed) return '';
   if (/^[a-zA-Z0-9_-]{6,}$/.test(trimmed) && !trimmed.includes('/')) return trimmed;
   try {
-    const url = new URL(trimmed);
-    if (url.hostname.includes('youtu.be')) return url.pathname.replace('/', '');
-    const v = url.searchParams.get('v');
-    if (v) return v;
-    const parts = url.pathname.split('/').filter(Boolean);
-    const embedIdx = parts.indexOf('embed');
-    if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
+    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+    const host = url.hostname.replace(/^www\./i, '').replace(/^m\./i, '').toLowerCase();
+    if (host === 'youtu.be') {
+      return url.pathname.split('/').filter(Boolean)[0] || trimmed;
+    }
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      const v = url.searchParams.get('v');
+      if (v) return v;
+      const parts = url.pathname.split('/').filter(Boolean);
+      for (const key of ['embed', 'shorts', 'live', 'v']) {
+        const idx = parts.indexOf(key);
+        if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+      }
+    }
   } catch {
     return trimmed;
   }
   return trimmed;
+}
+
+export function youtubeWatchUrl(youtubeId: string): string {
+  const id = extractYoutubeId(youtubeId);
+  if (!id) return '';
+  if (id.includes('/') || /\s/.test(id)) return youtubeId;
+  return `https://www.youtube.com/watch?v=${id}`;
 }
