@@ -701,7 +701,14 @@ export function createTournamentStage(
     };
   }
   if (kind === 'QUALIFIER') {
-    return { id, order, kind, name: 'Qualifiers', pairing: 'CROSS', durationDays: 2 };
+    return {
+      id,
+      order,
+      kind,
+      name: leagueIndex > 1 ? 'Qualifiers 2' : 'Qualifiers',
+      pairing: 'CROSS',
+      durationDays: 2,
+    };
   }
   if (kind === 'FINALS') {
     return { id, order, kind, name: 'Finals', includeThirdPlace: false, durationDays: 1 };
@@ -752,6 +759,40 @@ export function pathIdForStages(stages: TournamentStage[]): string | null {
   const kinds = stages.map((s) => s.kind).join(',');
   const found = STAGE_PATHS.find((p) => p.kinds.join(',') === kinds);
   return found?.id || null;
+}
+
+/** Where a newly added stage should sit so a 2nd qualifier lands after the first, not before it. */
+export function insertIndexForNewStage(stages: TournamentStage[], kind: StageKind): number {
+  if (kind === 'QUALIFIER') {
+    let lastQualifierAt = -1;
+    for (let i = 0; i < stages.length; i += 1) {
+      if (stages[i].kind === 'QUALIFIER') lastQualifierAt = i;
+    }
+    const finalsAt = stages.findIndex((s) => s.kind === 'FINALS');
+    if (lastQualifierAt >= 0) return lastQualifierAt + 1;
+    if (finalsAt !== -1) return finalsAt;
+    return stages.length;
+  }
+  if (kind === 'FINALS' || kind === 'SPOC_EXHIBITION') return stages.length;
+  const knockoutAt = stages.findIndex((s) => s.kind === 'QUALIFIER' || s.kind === 'FINALS');
+  return knockoutAt === -1 ? stages.length : knockoutAt;
+}
+
+export function stageJustFinishedForAverageReview(
+  stages: TournamentStage[],
+  lastDoneDay: number,
+): { finishedStageName: string; nextStageName: string | null } | null {
+  if (lastDoneDay <= 0) return null;
+  const ordered = stages.filter((s) => s.kind !== 'SPOC_EXHIBITION');
+  const finished = ordered.find((s) => {
+    const start = s.startDay || 0;
+    const duration = s.durationDays || 0;
+    if (!start || !duration) return false;
+    return start + duration - 1 === lastDoneDay;
+  });
+  if (!finished) return null;
+  const next = ordered.find((s) => (s.order || 0) > (finished.order || 0));
+  return { finishedStageName: finished.name, nextStageName: next?.name || null };
 }
 
 export function layoutStageDays(stages: TournamentStage[], lastDoneDay = 0): TournamentStage[] {

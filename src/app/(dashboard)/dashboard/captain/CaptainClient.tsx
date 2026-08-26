@@ -6,11 +6,13 @@ import { useSession } from 'next-auth/react';
 import { MOCK_TEAMS, MOCK_PATTERN_LIBRARY } from '@/lib/mock-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
 import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
+import { getTeamDayScores, submitTeamDayScores, getPublicScoreboard } from '@/lib/actions/playerScoreActions';
 import {
   buildDayDatesMap,
   currentCombiDayNumber,
@@ -161,6 +163,10 @@ export default function CaptainClient({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [emailPreviewUrl, setEmailPreviewUrl] = React.useState<string | null>(null);
   const [combiFilter, setCombiFilter] = React.useState<string>('ALL');
+  const [teamScoreRows, setTeamScoreRows] = React.useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean }>>([]);
+  const [teamScoreOpen, setTeamScoreOpen] = React.useState(true);
+  const [teamScoreMsg, setTeamScoreMsg] = React.useState<string | null>(null);
+  const [publishedBoard, setPublishedBoard] = React.useState<any>(null);
 
   const dayDatesMap: Record<number, string> = React.useMemo(() => {
     const totalDays = initialActiveEdition?.totalDays || 15;
@@ -200,6 +206,24 @@ export default function CaptainClient({
       return { ...prev, [teamId]: parsed };
     });
   }, [currentTeam?.id, currentTeam?.savedLineups]);
+
+  React.useEffect(() => {
+    if (!currentTeam?.id) return;
+    getTeamDayScores(currentTeam.id, selectedDayNumber).then((res) => {
+      if (!res.success) return;
+      setTeamScoreOpen(Boolean('windowOpen' in res && res.windowOpen));
+      setTeamScoreRows(
+        (res.players || []).map((p: any) => ({
+          userId: p.userId,
+          name: p.name,
+          score: p.score == null ? '' : String(p.score),
+          slams: p.slams == null ? '0' : String(p.slams),
+          missingPrior: Boolean(p.missingPrior),
+        })),
+      );
+    });
+    getPublicScoreboard().then((board) => setPublishedBoard(board)).catch(() => {});
+  }, [currentTeam?.id, selectedDayNumber]);
 
   React.useEffect(() => {
     if (isSpocTeam && (initialActiveEdition?.spocMatchDays?.length || 0) > 0) {
@@ -429,6 +453,104 @@ export default function CaptainClient({
               </div>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-emerald-500/30">
+        <CardHeader>
+          <CardTitle className="text-lg font-black">Team day scores — Day {selectedDayNumber}</CardTitle>
+          <CardDescription>
+            {teamScoreOpen
+              ? 'Enter scores for any player who could not submit. Closes 8:00pm IST.'
+              : 'Window closed. Published scores below help you set combis until 9:30pm.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {teamScoreOpen && teamScoreRows.map((row, idx) => (
+            <div key={row.userId} className="grid grid-cols-[1fr_5rem_5rem] gap-2 items-center text-sm">
+              <div className="min-w-0">
+                <div className="font-semibold truncate">{row.name}</div>
+                <div className="text-[10px] text-muted-foreground">
+                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted' : 'Empty — walkover if still blank at 8pm'}
+                </div>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                disabled={!teamScoreOpen || row.missingPrior}
+                value={row.score}
+                onChange={(e) => {
+                  const next = [...teamScoreRows];
+                  next[idx] = { ...row, score: e.target.value };
+                  setTeamScoreRows(next);
+                }}
+                placeholder="score"
+              />
+              <Input
+                type="number"
+                min={0}
+                disabled={!teamScoreOpen || row.missingPrior}
+                value={row.slams}
+                onChange={(e) => {
+                  const next = [...teamScoreRows];
+                  next[idx] = { ...row, slams: e.target.value };
+                  setTeamScoreRows(next);
+                }}
+                placeholder="slams"
+              />
+            </div>
+          ))}
+          {teamScoreMsg && <p className="text-xs font-semibold">{teamScoreMsg}</p>}
+          {teamScoreOpen && currentTeam?.id && (
+            <Button
+              onClick={async () => {
+                const filled = teamScoreRows.filter((r) => r.score !== '' && !r.missingPrior);
+                const res = await submitTeamDayScores(
+                  currentTeam.id,
+                  selectedDayNumber,
+                  filled.map((r) => ({ userId: r.userId, score: parseInt(r.score, 10), slams: parseInt(r.slams || '0', 10) })),
+                );
+                setTeamScoreMsg(res.success ? 'Saved team scores.' : res.error || 'Failed');
+                if (res.success) {
+                  const refreshed = await getTeamDayScores(currentTeam.id, selectedDayNumber);
+                  if (refreshed.success) {
+                    setTeamScoreOpen(Boolean(refreshed.windowOpen));
+                    setTeamScoreRows(
+                      (refreshed.players || []).map((p: any) => ({
+                        userId: p.userId,
+                        name: p.name,
+                        score: p.score == null ? '' : String(p.score),
+                        slams: p.slams == null ? '0' : String(p.slams),
+                        missingPrior: Boolean(p.missingPrior),
+                      })),
+                    );
+                  }
+                }
+              }}
+            >
+              Save team scores
+            </Button>
+          )}
+          {!teamScoreOpen && publishedBoard?.days?.find((d: any) => d.dayNumber === selectedDayNumber)?.published && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+              {(publishedBoard.teams || []).map((t: any) => (
+                <div key={t.id} className="text-xs border border-border rounded-lg p-2">
+                  <div className="font-black mb-1">{t.name}</div>
+                  {t.players.map((p: any) => {
+                    const s = (publishedBoard.scores || []).find((x: any) => x.userId === p.id && x.dayNumber === selectedDayNumber);
+                    return (
+                      <div key={p.id} className="flex justify-between gap-2">
+                        <span className="truncate">{p.name}</span>
+                        <span className="font-semibold whitespace-nowrap">
+                          {s ? `${s.score} · ${s.slams} slam${s.slams === 1 ? '' : 's'}` : 'Walkover'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

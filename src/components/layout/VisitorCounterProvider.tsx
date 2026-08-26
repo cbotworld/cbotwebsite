@@ -33,7 +33,9 @@ function writeCachedCount(count: number) {
 }
 
 export function VisitorCounterProvider({ children }: { children: React.ReactNode }) {
-  const [count, setCount] = React.useState<number | null>(() => readCachedCount());
+  // Always start as null so SSR HTML (`...`) matches the first client render.
+  // localStorage is only read after mount.
+  const [count, setCount] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;

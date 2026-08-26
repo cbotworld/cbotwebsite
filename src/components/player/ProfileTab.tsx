@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { activateUserAccount, updateMyProfile } from '@/lib/actions/userActions';
+import { getEditionProfileStatsForUser } from '@/lib/actions/playerScoreActions';
+import AverageHistoryGraph from '@/components/player/AverageHistoryGraph';
 import {
   UserCheck, MapPin, Globe, Phone, Mail, Shield,
   Users, Lock, CheckCircle2, AlertCircle, Eye, EyeOff,
@@ -107,6 +109,18 @@ export function ProfileTab({
   const [showNew, setShowNew] = React.useState(false);
   const [pinStatus, setPinStatus] = React.useState<{ ok: boolean; msg: string } | null>(null);
   const [isPinLoading, setIsPinLoading] = React.useState(false);
+  const [editionStats, setEditionStats] = React.useState<{
+    wins: number;
+    slams: number;
+    averageBonuses: number;
+    history: Array<{ effectiveFrom: string; average: number }>;
+    editionTitle?: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!p?.id) return;
+    getEditionProfileStatsForUser(p.id).then((res) => setEditionStats(res)).catch(() => {});
+  }, [p?.id]);
 
   const handlePinReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,7 +217,30 @@ export function ProfileTab({
             </div>
           )}
 
-
+          {editionStats && (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                This edition{editionStats.editionTitle ? ` — ${editionStats.editionTitle}` : ''}
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div className="text-2xl font-black">{editionStats.wins}</div>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Wins</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-black">{editionStats.slams}</div>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Slams</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-black">{editionStats.averageBonuses}</div>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Avg bonus</div>
+                </div>
+              </div>
+              {editionStats.history?.length > 0 && (
+                <AverageHistoryGraph history={editionStats.history} />
+              )}
+            </div>
+          )}
 
           {/* ── EDIT FORM (inline) ──────────────────────────────── */}
           {editing ? (

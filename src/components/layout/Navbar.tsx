@@ -15,9 +15,13 @@ import {
   PUBLIC_COMBIS_PATH,
   PUBLIC_SCHEDULE_PATH,
   PUBLIC_TEAMS_PLAYERS_PATH,
+  PUBLIC_PLAYER_SCORES_PATH,
+  PUBLIC_STANDINGS_PATH,
   isPublicCombisPath,
   isPublicSchedulePath,
   isPublicTeamsPlayersPath,
+  isPublicPlayerScoresPath,
+  isPublicStandingsPath,
 } from '@/lib/website-cms';
 
 export function Navbar({
@@ -68,6 +72,8 @@ export function Navbar({
   }, [pathname]);
 
   React.useEffect(() => {
+    router.prefetch(PUBLIC_PLAYER_SCORES_PATH);
+    router.prefetch(PUBLIC_STANDINGS_PATH);
     if (session?.user) {
       router.prefetch('/dashboard/organizer');
       router.prefetch('/dashboard/captain');
@@ -112,16 +118,22 @@ export function Navbar({
     isPublicCombisPath(pathname) ||
     isPublicSchedulePath(pathname) ||
     isPublicTeamsPlayersPath(pathname) ||
+    isPublicPlayerScoresPath(pathname) ||
+    isPublicStandingsPath(pathname) ||
     pathname === combisHref ||
     pathname === scheduleHref ||
     pathname === editionButtonHref ||
     pathname.includes('200') ||
     pathname.includes('combis') ||
     pathname.includes('schedule') ||
-    pathname.includes('videos');
+    pathname.includes('videos') ||
+    pathname.includes('player-scores') ||
+    pathname.includes('standings');
   const isCombisActive = isPublicCombisPath(pathname) || pathname === combisHref;
   const isScheduleActive = isPublicSchedulePath(pathname) || pathname === scheduleHref;
   const isTeamsPlayersActive = isPublicTeamsPlayersPath(pathname);
+  const isPlayerScoresActive = isPublicPlayerScoresPath(pathname);
+  const isStandingsActive = isPublicStandingsPath(pathname);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
@@ -327,7 +339,32 @@ export function Navbar({
               {isTeamsPlayersActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
-            </Link>          </div>
+            </Link>
+            <Link
+              href={PUBLIC_PLAYER_SCORES_PATH}
+              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+                isPlayerScoresActive ? 'text-amber-400 font-black' : 'hover:text-foreground'
+              }`}
+            >
+              <span>🎯</span>
+              <span>Player Scores</span>
+              {isPlayerScoresActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
+            </Link>
+            <Link
+              href={PUBLIC_STANDINGS_PATH}
+              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+                isStandingsActive ? 'text-amber-400 font-black' : 'hover:text-foreground'
+              }`}
+            >
+              <Trophy className="h-3.5 w-3.5" />
+              <span>Standings</span>
+              {isStandingsActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
+            </Link>
+          </div>
         </div>
       )}
 
@@ -384,6 +421,28 @@ export function Navbar({
                 }`}
               >
                 <Users className="h-3.5 w-3.5 shrink-0" /> Teams
+              </Link>
+              <Link
+                href={PUBLIC_PLAYER_SCORES_PATH}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                  isPlayerScoresActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <span>🎯</span> Scores
+              </Link>
+              <Link
+                href={PUBLIC_STANDINGS_PATH}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                  isStandingsActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <Trophy className="h-3.5 w-3.5 shrink-0" /> Table
               </Link>
             </div>
           </div>

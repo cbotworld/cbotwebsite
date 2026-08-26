@@ -61,7 +61,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
     const team = await teamForUser(user.id);
-    return NextResponse.json({ success: true, ...publicProfile(user, team) }, { headers: mobileCorsHeaders });
+    const { getEditionProfileStatsForUser } = await import('@/lib/actions/playerScoreActions');
+    const editionStats = await getEditionProfileStatsForUser(user.id);
+    return NextResponse.json(
+      { success: true, ...publicProfile(user, team), editionStats, averageHistory: editionStats.history || [] },
+      { headers: mobileCorsHeaders },
+    );
   } catch (error: any) {
     console.error('Mobile profile GET:', error);
     return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: mobileCorsHeaders });

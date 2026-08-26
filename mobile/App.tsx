@@ -19,12 +19,14 @@ import {
   getPlayerMatches,
   getPlayerCombis,
   getChannelVideos,
+  getPlayerScores,
+  submitPlayerScore,
   MatchDetails,
 } from './services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type Screen = 'login' | 'matches' | 'combis' | 'videos' | 'live';
+type Screen = 'login' | 'matches' | 'combis' | 'videos' | 'live' | 'scores';
 
 type CombiDay = NonNullable<Awaited<ReturnType<typeof getPlayerCombis>>['days']>[number];
 type ChannelVideo = NonNullable<Awaited<ReturnType<typeof getChannelVideos>>['videos']>[number];
@@ -52,11 +54,13 @@ function TabBar({
   onMatches,
   onCombis,
   onVideos,
+  onScores,
 }: {
   active: Screen;
   onMatches: () => void;
   onCombis: () => void;
   onVideos: () => void;
+  onScores: () => void;
 }) {
   return (
     <View style={styles.tabRow}>
@@ -65,6 +69,9 @@ function TabBar({
       </TouchableOpacity>
       <TouchableOpacity style={[styles.tabBtn, active === 'combis' && styles.tabBtnActive]} onPress={onCombis}>
         <Text style={[styles.tabText, active === 'combis' && styles.tabTextActive]}>COMBIS</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.tabBtn, active === 'scores' && styles.tabBtnActive]} onPress={onScores}>
+        <Text style={[styles.tabText, active === 'scores' && styles.tabTextActive]}>SCORES</Text>
       </TouchableOpacity>
       <TouchableOpacity style={[styles.tabBtn, active === 'videos' && styles.tabBtnActive]} onPress={onVideos}>
         <Text style={[styles.tabText, active === 'videos' && styles.tabTextActive]}>VIDEOS</Text>
@@ -103,6 +110,150 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+  const [scoreDay, setScoreDay] = useState(1);
+  const [scoreValue, setScoreValue] = useState('');
+  const [slamValue, setSlamValue] = useState('0');
+  const [scoreInfo, setScoreInfo] = useState<any>(null);
+  const [scoreBusy, setScoreBusy] = useState(false);
+  const [teamRows, setTeamRows] = useState<Array<{ userId: string; name: string; score: string; slams: string; missingPrior?: boolean }>>([]);
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [dayDrafts, setDayDrafts] = useState<Record<number, { score: string; slams: string }>>({});
+  const [savingDay, setSavingDay] = useState<number | null>(null);
+
+  const loadScores = async (authToken: string) => {
+    const res = await getPlayerScores(authToken);
+    if (res.success) {
+      setScoreInfo(res);
+      if (res.eligibleDay) setScoreDay(res.eligibleDay);
+      const drafts: Record<number, { score: string; slams: string }> = {};
+      for (const s of res.scores || []) {
+        drafts[s.dayNumber] = { score: String(s.score), slams: String(s.slams ?? 0) };
+      }
+      setDayDrafts(drafts);
+      const existing = (res.scores || []).find((s: any) => s.dayNumber === res.eligibleDay);
+      if (existing) {
+        setScoreValue(String(existing.score));
+        setSlamValue(String(existing.slams ?? 0));
+      }
+      setTeamRows(
+        (res.teammates || []).map((p: any) => ({
+          userId: p.userId,
+          name: p.name,
+          score: p.score == null ? '' : String(p.score),
+          slams: p.slams == null ? '0' : String(p.slams),
+          missingPrior: Boolean(p.missingPrior),
+        })),
+      );
+    }
+  };
+
+  const saveDayScore = async (dayNumber: number) => {
+    if (!token) return;
+    const draft = dayDrafts[dayNumber] || { score: '', slams: '0' };
+    const score = parseInt(draft.score, 10);
+    const slams = parseInt(draft.slams || '0', 10);
+    if (!Number.isFinite(score) || score < 0) {
+      Alert.alert('Score', 'Enter a valid day score (0 or more).');
+      return;
+    }
+    setSavingDay(dayNumber);
+    const res = await submitPlayerScore(token, { dayNumber, score, slams });
+    if (res.success) {
+      Alert.alert('Saved', `Day ${dayNumber} score submitted.`);
+      await loadScores(token);
+    } else {
+      Alert.alert('Not saved', res.error || 'Failed');
+    }
+    setSavingDay(null);
+  };
+
+  const updateDayDraft = (dayNumber: number, patch: Partial<{ score: string; slams: string }>) => {
+    setDayDrafts((prev) => ({
+      ...prev,
+      [dayNumber]: {
+        score: prev[dayNumber]?.score ?? '',
+        slams: prev[dayNumber]?.slams ?? '0',
+        ...patch,
+      },
+    }));
+  };
+
+  const renderMatchDayScore = (dayNumber: number) => {
+    const submitted = (scoreInfo?.scores || []).find((s: any) => s.dayNumber === dayNumber);
+    const published = (scoreInfo?.publishedDays || []).some(
+      (d: any) => d.dayNumber === dayNumber && d.published,
+    );
+    const eligible = Number(scoreInfo?.eligibleDay) === dayNumber;
+    const canEdit = Boolean(scoreInfo?.windowOpen) && eligible;
+    const draft = dayDrafts[dayNumber] || {
+      score: submitted != null ? String(submitted.score) : '',
+      slams: submitted != null ? String(submitted.slams ?? 0) : '0',
+    };
+    const saving = savingDay === dayNumber;
+
+    let body: React.ReactNode;
+    if (published && !submitted) {
+      body = <Text style={styles.cardScoreLocked}>Walkover</Text>;
+    } else if (canEdit) {
+      body = (
+        <>
+          <View style={styles.cardScoreInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardScoreLabel}>SCORE</Text>
+              <TextInput
+                style={styles.cardScoreInput}
+                keyboardType="number-pad"
+                value={draft.score}
+                onChangeText={(t) => updateDayDraft(dayNumber, { score: t.replace(/[^\d]/g, '') })}
+                placeholder="0"
+                placeholderTextColor="#64748b"
+              />
+            </View>
+            <View style={{ width: 88 }}>
+              <Text style={styles.cardScoreLabel}>SLAMS</Text>
+              <TextInput
+                style={styles.cardScoreInput}
+                keyboardType="number-pad"
+                value={draft.slams}
+                onChangeText={(t) => updateDayDraft(dayNumber, { slams: t.replace(/[^\d]/g, '') })}
+                placeholder="0"
+                placeholderTextColor="#64748b"
+              />
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.cardScoreSave, saving && { opacity: 0.55 }]}
+            onPress={() => void saveDayScore(dayNumber)}
+            disabled={saving}
+          >
+            <Text style={styles.cardScoreSaveText}>
+              {saving ? 'SAVING…' : submitted ? 'UPDATE SCORE' : 'SUBMIT SCORE'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.cardScoreHint}>Until 8:00pm IST · you can overwrite until then</Text>
+        </>
+      );
+    } else if (submitted) {
+      body = (
+        <Text style={styles.cardScoreLocked}>
+          Score {submitted.score} · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+        </Text>
+      );
+    } else {
+      const reason =
+        Number(scoreInfo?.eligibleDay) > 0 && Number(scoreInfo.eligibleDay) < dayNumber
+          ? `Submit Day ${scoreInfo.eligibleDay} first`
+          : scoreInfo?.windowReason || 'Opens after the match · until 8:00pm IST';
+      body = <Text style={styles.cardScoreHint}>{reason}</Text>;
+    }
+
+    return (
+      <View style={styles.cardScoreBox}>
+        <Text style={styles.cardScoreTitle}>DAY {dayNumber} SCORE</Text>
+        {body}
+      </View>
+    );
+  };
 
   const loadCombis = async (authToken: string) => {
     setCombisLoading(true);
@@ -209,6 +360,7 @@ export default function App() {
           if (matchRes.team) setMyTeam((prev) => ({ ...(prev || matchRes.team!), ...matchRes.team! }));
         }
         await loadCombis(res.token);
+        await loadScores(res.token);
         setScreen('matches');
       } else {
         Alert.alert('Login Failed', res.error || 'Invalid credentials');
@@ -317,6 +469,7 @@ export default function App() {
                 if (matchRes.success && matchRes.matches) {
                   setMatches(matchRes.matches);
                 }
+                await loadScores(token);
               }
             }}
           >
@@ -328,13 +481,21 @@ export default function App() {
           active="matches"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onScores={() => {
+            setScreen('scores');
+            if (token) void loadScores(token);
+          }}
           onVideos={() => {
             setScreen('videos');
             if (token) void loadVideos(token);
           }}
         />
 
-        <ScrollView style={styles.matchList} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.matchList}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {matches.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
@@ -348,15 +509,13 @@ export default function App() {
               const isLive = match.status === 'LIVE';
               const isDone = match.status === 'COMPLETED';
               return (
-              <TouchableOpacity
+              <View
                 key={match.matchId || match.label}
                 style={[
                   styles.matchCard,
                   isLive && styles.matchCardLive,
                   isDone && styles.matchCardDone,
                 ]}
-                onPress={() => handleSelectMatch(match)}
-                activeOpacity={isLive ? 0.85 : 1}
               >
                 <View style={styles.matchCardHeader}>
                   <View style={styles.dayCol}>
@@ -381,11 +540,11 @@ export default function App() {
                     {match.teamLogo ? (
                       <Image source={{ uri: match.teamLogo }} style={styles.teamLogo} />
                     ) : (
-                      <View style={styles.teamAvatar}>
-                        <Text style={styles.teamAvatarText}>
-                          {(match.teamTag || match.teamName || 'T1').slice(0, 3).toUpperCase()}
-                        </Text>
-                      </View>
+                    <View style={styles.teamAvatar}>
+                      <Text style={styles.teamAvatarText}>
+                        {(match.teamTag || match.teamName || 'T1').slice(0, 3).toUpperCase()}
+                      </Text>
+                    </View>
                     )}
                     <Text style={styles.teamNameText} numberOfLines={1}>
                       {match.teamName}
@@ -404,11 +563,11 @@ export default function App() {
                     {match.opponentLogo ? (
                       <Image source={{ uri: match.opponentLogo }} style={styles.teamLogo} />
                     ) : (
-                      <View style={[styles.teamAvatar, { backgroundColor: '#3b82f6' }]}>
-                        <Text style={styles.teamAvatarText}>
-                          {(match.opponentTag || match.opponentName || 'T2').slice(0, 3).toUpperCase()}
-                        </Text>
-                      </View>
+                    <View style={[styles.teamAvatar, { backgroundColor: '#3b82f6' }]}>
+                      <Text style={styles.teamAvatarText}>
+                        {(match.opponentTag || match.opponentName || 'T2').slice(0, 3).toUpperCase()}
+                      </Text>
+                    </View>
                     )}
                     <Text style={styles.teamNameText} numberOfLines={1}>
                       {match.opponentName}
@@ -417,7 +576,11 @@ export default function App() {
                   </View>
                 </View>
 
-                <View style={styles.goLiveRow}>
+                <TouchableOpacity
+                  style={styles.goLiveRow}
+                  onPress={() => handleSelectMatch(match)}
+                  activeOpacity={match.canGoLive ? 0.85 : 1}
+                >
                   <Text
                     style={[
                       styles.goLiveText,
@@ -440,13 +603,14 @@ export default function App() {
                           ? '🔴 GO LIVE ON YOUTUBE →'
                           : '🔴 GO LIVE →'}
                   </Text>
-                </View>
+                </TouchableOpacity>
+
+                {renderMatchDayScore(match.dayNumber)}
 
                 {match.latestYoutubeUrl ? (
                   <TouchableOpacity
                     style={styles.ytLinkRow}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
+                    onPress={() => {
                       Linking.openURL(match.latestYoutubeUrl!).catch(() =>
                         Alert.alert('Error', 'Could not open YouTube.'),
                       );
@@ -457,7 +621,7 @@ export default function App() {
                     </Text>
                   </TouchableOpacity>
                 ) : null}
-              </TouchableOpacity>
+              </View>
               );
             })
           )}
@@ -471,6 +635,8 @@ export default function App() {
             setMatches([]);
             setCombiDays([]);
             setMyTeam(null);
+            setScoreInfo(null);
+            setDayDrafts({});
           }}
         >
           <Text style={styles.logoutText}>SIGN OUT</Text>
@@ -508,6 +674,10 @@ export default function App() {
           active="combis"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onScores={() => {
+            setScreen('scores');
+            if (token) void loadScores(token);
+          }}
           onVideos={() => {
             setScreen('videos');
             if (token) void loadVideos(token, { player: videoPlayerFilter, day: videoDayFilter });
@@ -661,6 +831,145 @@ export default function App() {
     );
   }
 
+  if (screen === 'scores') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>DAY SCORE</Text>
+            <Text style={styles.headerSubtitle}>Submit by 8:00 PM IST · captains can fill the team</Text>
+          </View>
+        </View>
+        <TabBar
+          active="scores"
+          onMatches={() => setScreen('matches')}
+          onCombis={() => setScreen('combis')}
+          onScores={() => setScreen('scores')}
+          onVideos={() => {
+            setScreen('videos');
+            if (token) void loadVideos(token);
+          }}
+        />
+        <ScrollView style={styles.matchList} contentContainerStyle={{ padding: 16, gap: 12 }}>
+          {scoreInfo?.editionStats ? (
+            <View style={styles.scoreStatsRow}>
+              <View style={styles.scoreStatBox}>
+                <Text style={styles.scoreStatNum}>{scoreInfo.editionStats.wins ?? 0}</Text>
+                <Text style={styles.scoreStatLabel}>WINS</Text>
+              </View>
+              <View style={styles.scoreStatBox}>
+                <Text style={styles.scoreStatNum}>{scoreInfo.editionStats.slams ?? 0}</Text>
+                <Text style={styles.scoreStatLabel}>SLAMS</Text>
+              </View>
+              <View style={styles.scoreStatBox}>
+                <Text style={styles.scoreStatNum}>{scoreInfo.editionStats.averageBonuses ?? 0}</Text>
+                <Text style={styles.scoreStatLabel}>AVG BONUS</Text>
+              </View>
+            </View>
+          ) : null}
+          <Text style={styles.headerSubtitle}>Day {scoreInfo?.eligibleDay || scoreDay} (locked)</Text>
+          {(scoreInfo?.scores || []).map((s: any) => (
+            <Text key={s.dayNumber} style={styles.tabText}>Day {s.dayNumber}: {s.score} ({s.slams} slams)</Text>
+          ))}
+          {scoreInfo?.windowOpen === false && scoreInfo?.windowReason ? (
+            <Text style={styles.tabText}>{scoreInfo.windowReason}</Text>
+          ) : null}
+          <TextInput style={styles.input} placeholder="Score" placeholderTextColor="#64748b" keyboardType="number-pad" value={scoreValue} onChangeText={setScoreValue} editable={scoreInfo?.windowOpen !== false} />
+          <TextInput style={styles.input} placeholder="Slams" placeholderTextColor="#64748b" keyboardType="number-pad" value={slamValue} onChangeText={setSlamValue} editable={scoreInfo?.windowOpen !== false} />
+          <TouchableOpacity
+            style={styles.loginButton}
+            disabled={scoreBusy || scoreInfo?.windowOpen === false}
+            onPress={async () => {
+              if (!token) return;
+              setScoreBusy(true);
+              const res = await submitPlayerScore(token, {
+                dayNumber: scoreInfo?.eligibleDay || scoreDay,
+                score: parseInt(scoreValue, 10),
+                slams: parseInt(slamValue || '0', 10),
+              });
+              if (res.success) {
+                Alert.alert('Saved', 'Day score submitted.');
+                await loadScores(token);
+              } else {
+                Alert.alert('Not saved', res.error || 'Failed');
+              }
+              setScoreBusy(false);
+            }}
+          >
+            <Text style={styles.loginButtonText}>{scoreBusy ? 'SAVING…' : scoreInfo?.windowOpen === false ? 'WINDOW CLOSED' : 'SAVE SCORE'}</Text>
+          </TouchableOpacity>
+          {teamRows.length > 0 ? (
+            <View style={{ marginTop: 12, gap: 10 }}>
+              <Text style={styles.headerSubtitle}>Team scores — captains can fill teammates before 8pm</Text>
+              {teamRows.map((row, idx) => (
+                <View key={row.userId} style={styles.teamScoreRow}>
+                  <Text style={styles.tabText}>{row.name}{row.missingPrior ? ' · needs earlier day' : row.score !== '' ? ' · submitted' : ' · empty'}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="Score"
+                      placeholderTextColor="#64748b"
+                      keyboardType="number-pad"
+                      value={row.score}
+                      editable={scoreInfo?.windowOpen !== false && !row.missingPrior}
+                      onChangeText={(text) => {
+                        const next = [...teamRows];
+                        next[idx] = { ...row, score: text };
+                        setTeamRows(next);
+                      }}
+                    />
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="Slams"
+                      placeholderTextColor="#64748b"
+                      keyboardType="number-pad"
+                      value={row.slams}
+                      editable={scoreInfo?.windowOpen !== false && !row.missingPrior}
+                      onChangeText={(text) => {
+                        const next = [...teamRows];
+                        next[idx] = { ...row, slams: text };
+                        setTeamRows(next);
+                      }}
+                    />
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={styles.loginButton}
+                disabled={teamBusy || scoreInfo?.windowOpen === false}
+                onPress={async () => {
+                  if (!token) return;
+                  setTeamBusy(true);
+                  const filled = teamRows.filter((r) => r.score !== '' && !r.missingPrior);
+                  const res = await submitPlayerScore(token, {
+                    dayNumber: scoreInfo?.eligibleDay || scoreDay,
+                    score: parseInt(scoreValue || '0', 10),
+                    slams: parseInt(slamValue || '0', 10),
+                    rows: filled.map((r) => ({
+                      userId: r.userId,
+                      score: parseInt(r.score, 10),
+                      slams: parseInt(r.slams || '0', 10),
+                    })),
+                  });
+                  if (res.success) {
+                    Alert.alert('Saved', 'Team scores submitted.');
+                    await loadScores(token);
+                  } else {
+                    Alert.alert('Not saved', res.error || 'Failed');
+                  }
+                  setTeamBusy(false);
+                }}
+              >
+                <Text style={styles.loginButtonText}>{teamBusy ? 'SAVING TEAM…' : scoreInfo?.windowOpen === false ? 'WINDOW CLOSED' : 'SAVE TEAM SCORES'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   // ==========================================
   // SCREEN 2c: YOUTUBE CHANNEL VIDEOS
   // ==========================================
@@ -687,6 +996,10 @@ export default function App() {
           active="videos"
           onMatches={() => setScreen('matches')}
           onCombis={() => setScreen('combis')}
+          onScores={() => {
+            setScreen('scores');
+            if (token) void loadScores(token);
+          }}
           onVideos={() => setScreen('videos')}
         />
 
@@ -870,7 +1183,7 @@ export default function App() {
         </View>
       </View>
 
-      <View style={styles.webviewLoading}>
+            <View style={styles.webviewLoading}>
         <Text style={styles.emptyIcon}>📺</Text>
         <Text style={styles.emptyText}>Go live as {playerName}</Text>
         <Text style={styles.emptySubtext}>
@@ -946,6 +1259,34 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 15,
     color: '#f1f5f9',
+  },
+  scoreStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  scoreStatBox: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  scoreStatNum: {
+    color: '#f8fafc',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  scoreStatLabel: {
+    color: '#64748b',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 4,
+    letterSpacing: 0.6,
+  },
+  teamScoreRow: {
+    gap: 6,
   },
   loginButton: {
     backgroundColor: '#f59e0b',
@@ -1165,6 +1506,65 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#f59e0b',
     letterSpacing: 1,
+  },
+  cardScoreBox: {
+    marginTop: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  cardScoreTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#f59e0b',
+    letterSpacing: 1.2,
+  },
+  cardScoreInputs: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cardScoreLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  cardScoreInput: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  cardScoreSave: {
+    backgroundColor: '#f59e0b',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  cardScoreSaveText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  cardScoreHint: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  cardScoreLocked: {
+    fontSize: 14,
+    color: '#f8fafc',
+    fontWeight: '800',
   },
   ytLinkRow: {
     marginTop: 8,

@@ -161,6 +161,55 @@ export async function fetchPlayerCombis() {
   };
 }
 
+export type DayScoreInfo = {
+  success: boolean;
+  scores: Array<{ dayNumber: number; score: number; slams: number }>;
+  eligibleDay?: number | null;
+  maxDay?: number;
+  windowOpen?: boolean;
+  windowReason?: string | null;
+  published?: boolean;
+  publishedDays?: Array<{ dayNumber: number; published: boolean }>;
+  cutoffIso?: string;
+  editionTitle?: string;
+  error?: string;
+};
+
+export async function fetchPlayerScores(): Promise<DayScoreInfo> {
+  const current = getSession();
+  if (!current?.token) {
+    throw new Error('Please log in.');
+  }
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
+    headers: { Authorization: `Bearer ${current.token}` },
+  });
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to load scores.');
+  }
+  return data as DayScoreInfo;
+}
+
+export async function submitPlayerDayScore(dayNumber: number, score: number, slams: number) {
+  const current = getSession();
+  if (!current?.token) {
+    throw new Error('Please log in.');
+  }
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${current.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ dayNumber, score, slams }),
+  });
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to save score.');
+  }
+  return data;
+}
+
 export async function fetchChannelVideos(opts?: { player?: string; day?: number | 'ALL' | null }) {
   const current = getSession();
   if (!current?.token) {

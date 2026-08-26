@@ -210,6 +210,33 @@ export async function createStreamSession(matchId: string, token: string): Promi
   }
 }
 
+export async function getPlayerScores(token: string) {
+  try {
+    const res = await fetch(`${API_BASE}/api/mobile/scores`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
+  }
+}
+
+export async function submitPlayerScore(
+  token: string,
+  payload: { dayNumber: number; score: number; slams: number; rows?: Array<{ userId: string; score: number; slams: number }> },
+) {
+  try {
+    const res = await fetch(`${API_BASE}/api/mobile/scores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
+  }
+}
+
 export async function stopStreamSession(streamId: string, videoUrl: string | undefined, token: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${API_BASE}/api/mobile/stream/stop`, {

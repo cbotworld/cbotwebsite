@@ -130,6 +130,8 @@ export type WebsitePagesCms = {
   leaderboard: WebsitePageHeading;
   hallOfFame: WebsitePageHeading;
   teamsPlayers: WebsitePageHeading;
+  playerScores: WebsitePageHeading;
+  standings: WebsitePageHeading;
 };
 
 export type WebsiteFooterCms = {
@@ -152,6 +154,8 @@ export type WebsiteFooterCms = {
 export const PUBLIC_COMBIS_PATH = '/combis';
 export const PUBLIC_SCHEDULE_PATH = '/schedule';
 export const PUBLIC_TEAMS_PLAYERS_PATH = '/teams-and-players';
+export const PUBLIC_PLAYER_SCORES_PATH = '/player-scores';
+export const PUBLIC_STANDINGS_PATH = '/standings';
 
 const COMBIS_PATH_ALIASES = new Set([
   PUBLIC_COMBIS_PATH,
@@ -185,8 +189,19 @@ export function isPublicTeamsPlayersPath(pathname?: string | null) {
   return path === PUBLIC_TEAMS_PLAYERS_PATH;
 }
 
+export function isPublicPlayerScoresPath(pathname?: string | null) {
+  return pathOnly(pathname) === PUBLIC_PLAYER_SCORES_PATH;
+}
+
+export function isPublicStandingsPath(pathname?: string | null) {
+  return pathOnly(pathname) === PUBLIC_STANDINGS_PATH;
+}
+
 export function pinPublicNavHrefs(nav: WebsiteNavCms): WebsiteNavCms {
   const editionHref = (nav.editionButtonHref || '').trim();
+  // Combis/schedule hrefs are CMS-editable labels but must stay on canonical routes.
+  // Player Scores and Standings have no WebsiteNavCms href fields — Navbar uses
+  // PUBLIC_PLAYER_SCORES_PATH / PUBLIC_STANDINGS_PATH so CMS cannot 404 those pages.
   return {
     ...nav,
     combisHref: PUBLIC_COMBIS_PATH,
@@ -298,6 +313,16 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       badge: 'Rosters',
       title: 'Teams & Players',
       subtitle: 'Every franchise and every registered player in the current edition.',
+    },
+    playerScores: {
+      badge: 'Day scores',
+      title: 'Player Scores',
+      subtitle: 'Published at 8:00 PM IST each match day so captains can set combis.',
+    },
+    standings: {
+      badge: 'Points tables',
+      title: 'Team Standings',
+      subtitle: 'Separate tables per stage, plus golf-style player ranking.',
     },
   },
   nav: {
@@ -517,6 +542,8 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
         leaderboard: mergeSection(DEFAULT_WEBSITE_CMS.pages.leaderboard, parsed.pages?.leaderboard),
         hallOfFame: mergeSection(DEFAULT_WEBSITE_CMS.pages.hallOfFame, parsed.pages?.hallOfFame),
         teamsPlayers: mergeSection(DEFAULT_WEBSITE_CMS.pages.teamsPlayers, parsed.pages?.teamsPlayers),
+        playerScores: mergeSection(DEFAULT_WEBSITE_CMS.pages.playerScores, parsed.pages?.playerScores),
+        standings: mergeSection(DEFAULT_WEBSITE_CMS.pages.standings, parsed.pages?.standings),
       },
       nav: pinPublicNavHrefs(mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav)),
       hero: {

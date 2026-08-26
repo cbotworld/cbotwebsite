@@ -155,6 +155,9 @@ export async function updatePlayerProfileDetails(userId: string, data: {
       }
     });
 
+    const session = await getServerSession(authOptions);
+    const changedById = (session?.user as any)?.id || userId;
+
     let updatedUser;
     if (existing) {
       updatedUser = await prisma.user.update({
@@ -173,6 +176,10 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           ...(data.country !== undefined && { country: data.country }),
         },
       });
+      if (data.average !== undefined) {
+        const { recordPlayerAverageChange } = await import('@/lib/actions/playerScoreActions');
+        await recordPlayerAverageChange(existing.id, Number(data.average), changedById);
+      }
     } else {
       // Create user record in DB if first time edit
       const pin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -195,6 +202,10 @@ export async function updatePlayerProfileDetails(userId: string, data: {
           country: data.country || undefined,
         }
       });
+      if (data.average !== undefined) {
+        const { recordPlayerAverageChange } = await import('@/lib/actions/playerScoreActions');
+        await recordPlayerAverageChange(updatedUser.id, Number(data.average), changedById);
+      }
     }
 
     revalidatePath('/dashboard/organizer');

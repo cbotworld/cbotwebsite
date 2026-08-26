@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { MOCK_TEAMS, MOCK_MATCHES } from '@/lib/mock-data';
 import { submitScoreReport } from '@/lib/actions/matchActions';
+import { getMyDayScores, submitPlayerDayScore } from '@/lib/actions/playerScoreActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -114,6 +115,27 @@ export default function PlayerClient({
         ? initialTeammates
         : currentTeam?.members?.map((m: any) => m.user) || [];
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [dayScore, setDayScore] = React.useState('');
+  const [daySlams, setDaySlams] = React.useState('0');
+  const [dayScoreMsg, setDayScoreMsg] = React.useState<string | null>(null);
+  const [dayScoreBusy, setDayScoreBusy] = React.useState(false);
+  const [myDayInfo, setMyDayInfo] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    getMyDayScores().then((res) => setMyDayInfo(res)).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    if (!myDayInfo?.eligibleDay) return;
+    const existing = (myDayInfo.scores || []).find((s: any) => s.dayNumber === myDayInfo.eligibleDay);
+    if (existing) {
+      setDayScore(String(existing.score));
+      setDaySlams(String(existing.slams ?? 0));
+    } else {
+      setDayScore('');
+      setDaySlams('0');
+    }
+  }, [myDayInfo]);
   const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
 
   React.useEffect(() => {
@@ -708,6 +730,7 @@ export default function PlayerClient({
         <TabsList className="mb-4 flex flex-wrap h-auto gap-2 p-1">
           <TabsTrigger value="profile"><UserCheck className="h-4 w-4 mr-2" /> Profile</TabsTrigger>
           <TabsTrigger value="team"><Users className="h-4 w-4 mr-2" /> My Team</TabsTrigger>
+          <TabsTrigger value="day-score" className="text-amber-500 data-[state=active]:text-amber-600"><Target className="h-4 w-4 mr-2" /> Day Score</TabsTrigger>
           <TabsTrigger value="submit-score" className="text-amber-500 data-[state=active]:text-amber-600"><Send className="h-4 w-4 mr-2" /> Submit Score</TabsTrigger>
         </TabsList>
 
@@ -790,6 +813,58 @@ export default function PlayerClient({
             </Card>
         </TabsContent>
 
+        <TabsContent value="day-score">
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
+              </CardTitle>
+              <CardDescription>
+                Personal score and slams for Day {myDayInfo?.eligibleDay || 1}. Closes at 8:00pm IST.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-md">
+              {myDayInfo?.scores?.length ? (
+                <div className="text-xs text-muted-foreground space-y-1">
+                  {myDayInfo.scores.map((s: any) => (
+                    <div key={s.dayNumber}>Day {s.dayNumber}: {s.score} ({s.slams} slams)</div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-bold block mb-1">Day</label>
+                  <Input type="number" value={myDayInfo?.eligibleDay || 1} disabled />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Score</label>
+                  <Input type="number" min={0} value={dayScore} onChange={(e) => setDayScore(e.target.value)} placeholder="0" disabled={myDayInfo?.windowOpen === false} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Slams</label>
+                  <Input type="number" min={0} max={50} value={daySlams} onChange={(e) => setDaySlams(e.target.value)} disabled={myDayInfo?.windowOpen === false} />
+                </div>
+              </div>
+              {myDayInfo?.windowOpen === false && myDayInfo?.windowReason ? (
+                <p className="text-xs text-amber-400 font-semibold">{myDayInfo.windowReason}</p>
+              ) : null}
+              {dayScoreMsg && <p className="text-xs font-semibold">{dayScoreMsg}</p>}
+              <Button
+                disabled={dayScoreBusy || myDayInfo?.windowOpen === false}
+                onClick={async () => {
+                  setDayScoreBusy(true);
+                  setDayScoreMsg(null);
+                  const res = await submitPlayerDayScore(myDayInfo?.eligibleDay || 1, parseInt(dayScore, 10), parseInt(daySlams || '0', 10));
+                  setDayScoreMsg(res.success ? 'Saved.' : res.error || 'Failed');
+                  if (res.success) setMyDayInfo(await getMyDayScores());
+                  setDayScoreBusy(false);
+                }}
+              >
+                {dayScoreBusy ? 'Saving…' : myDayInfo?.windowOpen === false ? 'Window closed' : `Save Day ${myDayInfo?.eligibleDay || 1}`}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="submit-score">
             <Card className="border-amber-500/30">

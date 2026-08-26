@@ -279,3 +279,45 @@ export interface ScoreReport {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string;
 }
+
+export interface PlayerDayScoreRow {
+  userId: string;
+  dayNumber: number;
+  score: number;
+  slams: number;
+}
+
+export interface PlayerAverageLogRow {
+  userId: string;
+  average: number;
+  effectiveFrom: string;
+}
+
+export interface StageStandingRow {
+  teamId: string;
+  teamName: string;
+  teamTag?: string;
+  eventPts: number;
+  slamBonus: number;
+  avgBonus: number;
+  total: number;
+  matchesWon: number;
+  rank: number;
+}
+
+export interface PlayerRankingRow {
+  userId: string;
+  name: string;
+  teamId: string;
+  teamName: string;
+  daysCounted: number;
+  walkovers: number;
+  totalScore: number;
+  rank: number;
+}
+
+export interface EditionProfileStats {
+  wins: number;
+  slams: number;
+  averageBonuses: number;
+}

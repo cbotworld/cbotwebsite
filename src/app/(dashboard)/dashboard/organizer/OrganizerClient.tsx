@@ -19,7 +19,10 @@ import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe } from 'lucide-react';
+import AverageHistoryGraph from '@/components/player/AverageHistoryGraph';
 import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
+import OrganizerScoresPanel from '@/components/organizer/OrganizerScoresPanel';
+import { getEditionProfileStatsForUser } from '@/lib/actions/playerScoreActions';
 import SpocExhibitionTeamsPanel from '@/components/organizer/SpocExhibitionTeamsPanel';
 import WebsiteCmsPanel from '@/components/organizer/WebsiteCmsPanel';
 import { isCalendarDayCompleted } from '@/lib/tournament-stages';
@@ -183,6 +186,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [editUserCity, setEditUserCity] = React.useState('');
   const [editUserState, setEditUserState] = React.useState('');
   const [editUserCountry, setEditUserCountry] = React.useState('');
+  const [editUserAvgHistory, setEditUserAvgHistory] = React.useState<Array<{ effectiveFrom: string; average: number }>>([]);
 
   // PIN Reset State
   const [resetPinModalOpen, setResetPinModalOpen] = React.useState(false);
@@ -675,7 +679,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setEditUserCity(usr.city || '');
     setEditUserState(usr.state || '');
     setEditUserCountry(usr.country || '');
+    setEditUserAvgHistory([]);
     setEditUserModalOpen(true);
+    getEditionProfileStatsForUser(usr.id)
+      .then((res) => setEditUserAvgHistory(res.history || []))
+      .catch(() => setEditUserAvgHistory([]));
   };
 
   const handleSaveEditUserSubmit = async (e: React.FormEvent) => {
@@ -940,6 +948,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         <TabsList className="flex flex-wrap h-auto w-full gap-1 p-1.5 bg-card border border-border rounded-2xl">
           <TabsTrigger value="players" className="text-xs font-bold gap-1.5 px-3 py-2">
             <KeyRound className="h-3.5 w-3.5" /> Players
+          </TabsTrigger>
+          <TabsTrigger value="scores" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Trophy className="h-3.5 w-3.5" /> Scores
           </TabsTrigger>
           <TabsTrigger value="teams" className="text-xs font-bold gap-1.5 px-3 py-2">
             <Users className="h-3.5 w-3.5" /> Teams
@@ -1269,6 +1280,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         usersList={usersList}
         onTeamsChange={setTeamsList}
       />
+      </TabsContent>
+
+      <TabsContent value="scores" className="mt-4">
+        <OrganizerScoresPanel users={usersList} />
       </TabsContent>
 
       <TabsContent value="players" forceMount className="mt-4">
@@ -1830,6 +1845,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 placeholder="e.g. 4.23"
                 className="font-mono text-xs font-black text-emerald-400 border-emerald-500/40"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">A change saved today applies from tomorrow IST. Today’s matches keep the current average.</p>
             </div>
             <div>
               <label className="text-xs font-bold text-amber-400 block mb-1">Target Score (Tgt)</label>
@@ -1843,6 +1859,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               />
             </div>
           </div>
+
+          <AverageHistoryGraph
+            history={editUserAvgHistory}
+            note="Date-wise log for this edition. Lower average is better."
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

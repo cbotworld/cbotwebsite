@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,12 +10,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {
   fetchPlayerSchedule,
+  fetchPlayerScores,
   getSession,
   setSession,
+  submitPlayerDayScore,
+  type DayScoreInfo,
   type MatchDetails,
   type MobileTeam,
 } from '../api/website';
@@ -31,6 +35,18 @@ export function DashboardScreen({ navigation }: Props) {
   const [matches, setMatches] = useState<MatchDetails[]>([]);
   const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scoreInfo, setScoreInfo] = useState<DayScoreInfo | null>(null);
+  const [dayDrafts, setDayDrafts] = useState<Record<number, { score: string; slams: string }>>({});
+  const [savingDay, setSavingDay] = useState<number | null>(null);
+
+  const applyScores = (scores: DayScoreInfo) => {
+    setScoreInfo(scores);
+    const drafts: Record<number, { score: string; slams: string }> = {};
+    for (const s of scores.scores || []) {
+      drafts[s.dayNumber] = { score: String(s.score), slams: String(s.slams ?? 0) };
+    }
+    setDayDrafts(drafts);
+  };
 
   const load = useCallback(async () => {
     if (!getSession()?.token) {
@@ -43,6 +59,11 @@ export function DashboardScreen({ navigation }: Props) {
       setMatches(res.matches);
       setTeam(res.team);
       setWarning(res.warning || (res.matches.length === 0 ? 'No fixtures found for your team.' : null));
+      try {
+        applyScores(await fetchPlayerScores());
+      } catch {
+        // Schedule should still show if scores fail.
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not load schedule.';
       setWarning(message);
@@ -70,6 +91,99 @@ export function DashboardScreen({ navigation }: Props) {
     navigation.navigate('Live', { name: playerName, day: match.label });
   };
 
+  const saveDayScore = async (dayNumber: number) => {
+    const draft = dayDrafts[dayNumber] || { score: '', slams: '0' };
+    const score = parseInt(draft.score, 10);
+    const slams = parseInt(draft.slams || '0', 10);
+    if (!Number.isFinite(score) || score < 0) {
+      Alert.alert('Score', 'Enter a valid day score (0 or more).');
+      return;
+    }
+    setSavingDay(dayNumber);
+    try {
+      await submitPlayerDayScore(dayNumber, score, Number.isFinite(slams) ? slams : 0);
+      Alert.alert('Saved', `Day ${dayNumber} score submitted.`);
+      applyScores(await fetchPlayerScores());
+    } catch (e) {
+      Alert.alert('Not saved', e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSavingDay(null);
+    }
+  };
+
+  const renderDayScore = (dayNumber: number) => {
+    const submitted = (scoreInfo?.scores || []).find((s) => s.dayNumber === dayNumber);
+    const published = (scoreInfo?.publishedDays || []).some((d) => d.dayNumber === dayNumber && d.published);
+    const canEdit = Boolean(scoreInfo?.windowOpen) && Number(scoreInfo?.eligibleDay) === dayNumber;
+    const draft = dayDrafts[dayNumber] || { score: '', slams: '0' };
+    const saving = savingDay === dayNumber;
+    let body: ReactNode;
+    if (published && !submitted) {
+      body = <Text style={styles.scoreLocked}>Walkover</Text>;
+    } else if (canEdit) {
+      body = (
+        <>
+          <View style={styles.scoreInputs}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.scoreLabel}>SCORE</Text>
+              <TextInput
+                style={styles.scoreInput}
+                keyboardType="number-pad"
+                value={draft.score}
+                onChangeText={(t) =>
+                  setDayDrafts((prev) => ({
+                    ...prev,
+                    [dayNumber]: { score: t.replace(/[^\d]/g, ''), slams: prev[dayNumber]?.slams ?? '0' },
+                  }))
+                }
+                placeholder="0"
+                placeholderTextColor="#64748b"
+              />
+            </View>
+            <View style={{ width: 88 }}>
+              <Text style={styles.scoreLabel}>SLAMS</Text>
+              <TextInput
+                style={styles.scoreInput}
+                keyboardType="number-pad"
+                value={draft.slams}
+                onChangeText={(t) =>
+                  setDayDrafts((prev) => ({
+                    ...prev,
+                    [dayNumber]: { score: prev[dayNumber]?.score ?? '', slams: t.replace(/[^\d]/g, '') },
+                  }))
+                }
+                placeholder="0"
+                placeholderTextColor="#64748b"
+              />
+            </View>
+          </View>
+          <Pressable style={[styles.scoreSave, saving && { opacity: 0.55 }]} onPress={() => void saveDayScore(dayNumber)} disabled={saving}>
+            <Text style={styles.scoreSaveText}>{saving ? 'SAVING…' : submitted ? 'UPDATE SCORE' : 'SUBMIT SCORE'}</Text>
+          </Pressable>
+          <Text style={styles.scoreHint}>Until 8:00pm IST · you can overwrite until then</Text>
+        </>
+      );
+    } else if (submitted) {
+      body = (
+        <Text style={styles.scoreLocked}>
+          Score {submitted.score} · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+        </Text>
+      );
+    } else {
+      const reason =
+        Number(scoreInfo?.eligibleDay) > 0 && Number(scoreInfo?.eligibleDay) < dayNumber
+          ? `Submit Day ${scoreInfo?.eligibleDay} first`
+          : scoreInfo?.windowReason || 'Opens after the match · until 8:00pm IST';
+      body = <Text style={styles.scoreHint}>{reason}</Text>;
+    }
+    return (
+      <View style={styles.scoreBox}>
+        <Text style={styles.scoreTitle}>DAY {dayNumber} SCORE</Text>
+        {body}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -91,7 +205,7 @@ export function DashboardScreen({ navigation }: Props) {
           <Text style={styles.muted}>Loading your match schedule…</Text>
         </View>
       ) : (
-        <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {warning ? <Text style={styles.warning}>{warning}</Text> : null}
           {matches.map((match) => {
             const isLive = match.status === 'LIVE';
@@ -164,6 +278,7 @@ export function DashboardScreen({ navigation }: Props) {
                           : 'GO LIVE'}
                   </Text>
                 </Pressable>
+                {renderDayScore(match.dayNumber)}
                 {match.latestYoutubeUrl ? (
                   <Pressable
                     style={styles.ytBtn}
@@ -274,6 +389,38 @@ const styles = StyleSheet.create({
   },
   goLiveOff: { backgroundColor: '#1e293b' },
   goLiveText: { color: '#fff', fontWeight: '900', letterSpacing: 1 },
+  scoreBox: {
+    marginTop: 10,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  scoreTitle: { fontSize: 10, fontWeight: '900', color: '#f59e0b', letterSpacing: 1.2 },
+  scoreInputs: { flexDirection: 'row', gap: 8 },
+  scoreLabel: { fontSize: 9, fontWeight: '800', color: '#64748b', letterSpacing: 0.8, marginBottom: 4 },
+  scoreInput: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  scoreSave: {
+    backgroundColor: '#f59e0b',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  scoreSaveText: { color: '#0f172a', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
+  scoreHint: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  scoreLocked: { fontSize: 14, color: '#f8fafc', fontWeight: '800' },
   ytBtn: {
     marginTop: 8,
     backgroundColor: 'rgba(239,68,68,0.12)',

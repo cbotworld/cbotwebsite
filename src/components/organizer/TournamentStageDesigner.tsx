@@ -17,6 +17,7 @@ import {
   groupKey,
   groupLabel,
   createTournamentStage,
+  insertIndexForNewStage,
   layoutStageDays,
   stageSpanDays,
   leagueIndexOf,
@@ -368,11 +369,14 @@ export default function TournamentStageDesigner({
   };
 
   const addStage = (kind: StageKind) => {
-    if (kind !== 'LEAGUE' && stages.some((s) => s.kind === kind)) return;
-    const knockoutAt = stages.findIndex((s) => s.kind === 'QUALIFIER' || s.kind === 'FINALS');
-    const insertAt = knockoutAt === -1 ? stages.length : knockoutAt;
+    const qualifierCount = stages.filter((s) => s.kind === 'QUALIFIER').length;
+    if (kind === 'QUALIFIER') {
+      if (qualifierCount >= 2) return;
+    } else if (kind !== 'LEAGUE' && stages.some((s) => s.kind === kind)) return;
+    const insertAt = insertIndexForNewStage(stages, kind);
     const leagueIndex = kind === 'LEAGUE' ? stages.filter((s) => s.kind === 'LEAGUE').length + 1 : 1;
-    const created = createTournamentStage(kind, insertAt + 1, teams.length || 8, leagueIndex);
+    const kindIndex = kind === 'QUALIFIER' ? qualifierCount + 1 : leagueIndex;
+    const created = createTournamentStage(kind, insertAt + 1, teams.length || 8, kindIndex);
     const next = [...stages];
     next.splice(insertAt, 0, created);
     setConfig((prev) => ({ ...prev, stages: layoutStageDays(next, lastDoneDay) }));
@@ -969,9 +973,9 @@ export default function TournamentStageDesigner({
                     <Plus className="h-3.5 w-3.5" /> Add league
                   </Button>
                 ) : null}
-                {!stages.some((s) => s.kind === 'QUALIFIER') ? (
+                {stages.filter((s) => s.kind === 'QUALIFIER').length < 2 ? (
                   <Button type="button" variant="outline" size="sm" className="h-8 text-[11px] font-bold" onClick={() => addStage('QUALIFIER')}>
-                    <Plus className="h-3.5 w-3.5" /> Add qualifiers
+                    <Plus className="h-3.5 w-3.5" /> {stages.some((s) => s.kind === 'QUALIFIER') ? 'Add 2nd qualifier' : 'Add qualifiers'}
                   </Button>
                 ) : null}
                 {!stages.some((s) => s.kind === 'FINALS') ? (
