@@ -7,6 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Search, Calendar, Crown, ArrowRight } from 'lucide-react';
+import { formatIsoDateLabel } from '@/lib/combi-cutoff';
+
+const START_LABEL_OPTS: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+
+function editionStartLabel(ed: any) {
+  try {
+    const map = typeof ed.dayDates === 'string' ? JSON.parse(ed.dayDates) : ed.dayDates;
+    const d1 = map?.[1] || map?.['1'];
+    if (d1) return formatIsoDateLabel(String(d1), START_LABEL_OPTS);
+  } catch {}
+  const fallback = ed.tournamentStartDate || ed.startDate;
+  return fallback ? formatIsoDateLabel(String(fallback), START_LABEL_OPTS) : '—';
+}
 
 export default function EditionsClient({ editions }: { editions: any[] }) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -71,7 +84,7 @@ export default function EditionsClient({ editions }: { editions: any[] }) {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1 font-semibold">
                       <Calendar className="h-3.5 w-3.5 text-amber-500" /> 
-                      {new Date(ed.tournamentStartDate || ed.startDate || Date.now()).toLocaleDateString()}
+                      {editionStartLabel(ed)}
                     </span>
                     <span className="font-bold text-foreground">
                       {ed.teams?.length || 0} / {ed.maxTeams} Teams

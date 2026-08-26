@@ -11,9 +11,8 @@ import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments'
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
-import { officialCombiCalendarDate } from '@/lib/combi-cutoff';
+import { combiCalendarDate } from '@/lib/combi-cutoff';
 import * as XLSX from 'xlsx';
-
 interface TeamInfo {
   name: string;
   tag: string;
@@ -342,7 +341,7 @@ function calendarDateForDay(
   dayNumber: number,
   dayDates?: Record<number, string> | Record<string, string>
 ) {
-  return officialCombiCalendarDate(dayNumber, dayDates);
+  return combiCalendarDate(dayNumber, dayDates);
 }
 
 function toCombiDay(
@@ -380,17 +379,23 @@ function buildCombiSchedule(opts?: {
   stages?: Array<{ startDay?: number; durationDays?: number; kind?: string; name?: string }>;
 }): DayCombiFixture[] {
   const dates = opts?.dayDates;
-  const official = officialMatchDays().map((d) =>
-    toCombiDay(
+  const official = officialMatchDays().map((d) => {
+    const calendarDate = calendarDateForDay(d.dayNumber, dates);
+    // The monument keeps its own play window only while it still falls on its original
+    // day; once the organizer moves the calendar, the window follows the new date.
+    const onOriginalDate = d.endIso.slice(0, 10) === calendarDate;
+    const startIso = onOriginalDate ? d.startIso : `${addDaysIsoDate(calendarDate, -1)}T20:00:00+05:30`;
+    const endIso = onOriginalDate ? d.endIso : `${calendarDate}T20:00:00+05:30`;
+    return toCombiDay(
       d.dayNumber,
       d.title,
-      d.startIso,
-      d.endIso,
-      d.timeRange,
+      startIso,
+      endIso,
+      onOriginalDate ? d.timeRange : formatDayRange(startIso, endIso),
       d.matches,
-      calendarDateForDay(d.dayNumber, dates)
-    )
-  );
+      calendarDate
+    );
+  });
   const byDay = new Map(official.map((d) => [d.dayNumber, d]));
 
   (opts?.pairings || []).forEach((p) => {
@@ -485,7 +490,7 @@ function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, team
 
 export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?: any[] }) {
   const [dbTeams, setDbTeams] = React.useState<any[]>(initialTeams);
-  const [selectedDayNum, setSelectedDayNum] = React.useState<number>(0);
+  const [pickedDayNum, setPickedDayNum] = React.useState<number>(0);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
   const [scheduleMeta, setScheduleMeta] = React.useState<{
     totalDays?: number;
@@ -506,14 +511,16 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
     [scheduleMeta]
   );
 
-  React.useEffect(() => {
-    if (!scheduleDays.length) return;
+  // Derived rather than stored, so the very first paint already shows a real day
+  // instead of "Day 0" while the schedule loads.
+  const selectedDayNum = React.useMemo(() => {
+    if (pickedDayNum && scheduleDays.some((d) => d.dayNumber === pickedDayNum)) return pickedDayNum;
+    if (!scheduleDays.length) return 1;
     const now = Date.now();
     const live = scheduleDays.find((d) => monumentStatus(d, now) === 'live');
     const revealed = [...scheduleDays].reverse().find((d) => now >= new Date(d.cutoffIso).getTime());
-    const next = live?.dayNumber || revealed?.dayNumber || scheduleDays[0].dayNumber;
-    setSelectedDayNum((prev) => (prev && scheduleDays.some((d) => d.dayNumber === prev) ? prev : next));
-  }, [scheduleDays]);
+    return live?.dayNumber || revealed?.dayNumber || scheduleDays[0].dayNumber;
+  }, [pickedDayNum, scheduleDays]);
 
   // Update captain names and sync teams
   React.useEffect(() => {
@@ -691,7 +698,7 @@ export default function DailyCombisClient({ initialTeams = [] }: { initialTeams?
               return (
                 <button
                   key={d.dayNumber}
-                  onClick={() => setSelectedDayNum(d.dayNumber)}
+                  onClick={() => setPickedDayNum(d.dayNumber)}
                   className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all flex items-center gap-2 border ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/30 scale-105'

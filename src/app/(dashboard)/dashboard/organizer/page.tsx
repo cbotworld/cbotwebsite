@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import OrganizerClient from './OrganizerClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@/lib/mock-data';
+import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 
 export const revalidate = 0;
 
@@ -57,6 +58,11 @@ export default async function OrganizerPage() {
       }),
       getWebsiteCmsContent(),
     ]);
+
+    // Only the edition the dashboard opens on; archived ones keep their own dates.
+    await ensureOfficialDayDates(
+      editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0],
+    );
   } catch (e) {
     console.error('Database connection error in OrganizerPage fallback to mocks', e);
   }

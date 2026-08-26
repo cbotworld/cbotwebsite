@@ -11,9 +11,14 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/componen
 import { Avatar } from '@/components/ui/avatar';
 import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
-import { isCombiSubmissionLocked, officialCombiCalendarDate } from '@/lib/combi-cutoff';
+import {
+  buildDayDatesMap,
+  currentCombiDayNumber,
+  formatIsoDateLabel,
+  isCombiSubmissionLocked,
+  normalizeDayDates,
+} from '@/lib/combi-cutoff';
 import PlayerClient from '../player/PlayerClient';
-
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
   return isCombiSubmissionLocked(dayNum, dayDatesMap);
 }
@@ -142,7 +147,11 @@ export default function CaptainClient({
     if (initialActiveEdition?.isSpocTeam && initialActiveEdition?.spocMatchDays?.length) {
       return initialActiveEdition.spocMatchDays[0].dayNumber;
     }
-    return 1;
+    return currentCombiDayNumber(
+      initialActiveEdition?.totalDays || 15,
+      new Date(),
+      initialActiveEdition?.dayDates,
+    );
   });
   const [dayLineupModalOpen, setDayLineupModalOpen] = React.useState(false);
   const [roundLineups, setRoundLineups] = React.useState<Array<{ playerIds: string[] }>>([]);
@@ -154,17 +163,13 @@ export default function CaptainClient({
   const [combiFilter, setCombiFilter] = React.useState<string>('ALL');
 
   const dayDatesMap: Record<number, string> = React.useMemo(() => {
-    let map: Record<number, string> = {};
-    if (initialActiveEdition?.dayDates) {
-      try {
-        map = JSON.parse(initialActiveEdition.dayDates);
-      } catch (e) {}
-    }
-
-    const total = initialActiveEdition?.totalDays || 15;
-    for (let i = 1; i <= total; i++) {
-      map[i] = officialCombiCalendarDate(i, map);
-    }
+    const totalDays = initialActiveEdition?.totalDays || 15;
+    const stored = normalizeDayDates(initialActiveEdition?.dayDates);
+    const map = buildDayDatesMap(totalDays, stored?.[1]);
+    Object.entries(stored ?? {}).forEach(([key, date]) => {
+      const day = Number(key);
+      if (day >= 1 && day <= totalDays) map[day] = date;
+    });
     return map;
   }, [initialActiveEdition]);
 
@@ -479,11 +484,11 @@ export default function CaptainClient({
               const isSelected = dayNum === selectedDayNumber;
               const isLocked = isDayLocked(dayNum, dayDatesMap);
               const rawDate = dayDatesMap[dayNum];
-              const formattedDate = rawDate && !isNaN(new Date(rawDate).getTime())
-                ? new Date(rawDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+              const formattedDate = rawDate
+                ? formatIsoDateLabel(rawDate, { day: 'numeric', month: 'short' })
                 : '';
-              const formattedDateFull = rawDate && !isNaN(new Date(rawDate).getTime())
-                ? new Date(rawDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+              const formattedDateFull = rawDate
+                ? formatIsoDateLabel(rawDate, { weekday: 'short', day: 'numeric', month: 'short' })
                 : '';
               const spocMeta = spocDayMeta.get(dayNum);
 
@@ -646,8 +651,8 @@ export default function CaptainClient({
               <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
                 <Send className={`h-5 w-5 ${isSpocTeam ? 'text-violet-400' : 'text-amber-500'}`} />
                 {isSpocTeam ? 'Spoc Exhibition' : 'Day'} {selectedDayNumber} Combi
-                {dayDatesMap[selectedDayNumber] && !isNaN(new Date(dayDatesMap[selectedDayNumber]).getTime())
-                  ? ` (${new Date(dayDatesMap[selectedDayNumber]).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})`
+                {dayDatesMap[selectedDayNumber]
+                  ? ` (${formatIsoDateLabel(dayDatesMap[selectedDayNumber], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})`
                   : ''}{' '}
                 — {roundsPerDay} events
               </h2>

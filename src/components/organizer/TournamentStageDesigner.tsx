@@ -30,6 +30,8 @@ import {
   suggestFinalsPairings,
   suggestLeaguePairings,
   suggestQualifierPairings,
+  suggestRoundRobinPairings,
+  nextRoundRobinPairing,
   nextQualifierPairing,
   nextFinalsPairing,
   nextSpocExhibitionPairing,
@@ -40,14 +42,9 @@ import {
   teamIdsBookedOnDay,
   type SuggestedPairing,
 } from '@/lib/tournament-stages';
-import { officialCombiCalendarDate } from '@/lib/combi-cutoff';
+import { combiCalendarDate, formatIsoDateLabel } from '@/lib/combi-cutoff';
 import type { QualifierPairing, ScheduleMode, StageKind, StageSeeding, TournamentStage, TournamentStageConfig } from '@/types';
-import {
-  BICENTENNIAL_MONUMENTS,
-  monumentStatus,
-  roundRobinMatchCount,
-  seedRoyalCarromLeague,
-} from '@/lib/bicentennial-monuments';
+import { seedRoyalCarromLeague } from '@/lib/bicentennial-monuments';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -578,6 +575,67 @@ export default function TournamentStageDesigner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.kind, active?.id, leagueGroupSignature]);
 
+  const [rrPairings, setRrPairings] = React.useState<SuggestedPairing[]>([]);
+
+  const applyRrPairings = (next: SuggestedPairing[]) => {
+    const enriched = next.map((p) => ({
+      ...p,
+      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
+      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
+    }));
+    setRrPairings(enriched);
+    updateStage({ matchPairings: enriched });
+  };
+
+  const slotRrPairings = (pairings: SuggestedPairing[]) =>
+    assignScheduleSlots(pairings, {
+      mode: scheduleMode,
+      eventsPerDay,
+      dayDates,
+      startDay: active?.startDay || 1,
+      durationDays: active?.durationDays || 7,
+    });
+
+  React.useEffect(() => {
+    if (active?.kind !== 'ROUND_ROBIN') return;
+    if (active.matchPairings?.length) {
+      setRrPairings(active.matchPairings);
+      return;
+    }
+    if (stageMatches.length) {
+      applyRrPairings(
+        slotRrPairings(
+          stageMatches.map((m, idx) => ({
+            stage: 'ROUND_ROBIN',
+            label: `Round Robin · Match ${idx + 1}`,
+            team1Id: m.team1Id || '',
+            team2Id: m.team2Id || '',
+            team1Name: m.team1?.name,
+            team2Name: m.team2?.name,
+            round: m.round,
+          })),
+        ),
+      );
+      return;
+    }
+    applyRrPairings(slotRrPairings(suggestRoundRobinPairings(teams)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.kind, active?.id, teams.length]);
+
+  // Each match stays on its own event day, but the clock time follows the
+  // organizer's calendar, so moving the start date moves every fixture with it.
+  const dayDatesSignature = JSON.stringify(dayDates || {});
+  React.useEffect(() => {
+    if (active?.kind !== 'ROUND_ROBIN' || !rrPairings.length) return;
+    const realigned = rrPairings.map((pair) =>
+      pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+    );
+    if (realigned.some((p, i) => p.scheduledTime !== rrPairings[i].scheduledTime)) {
+      applyRrPairings(realigned);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayDatesSignature, active?.kind]);
+
   const suggestedQualifiers = React.useMemo(() => {
     const league = [...stages].reverse().find((s) => s.kind === 'LEAGUE');
     if (!league?.groups?.length) return [];
@@ -678,9 +736,37 @@ export default function TournamentStageDesigner({
   }, [active?.kind, active?.id]);
 
   const allDraftPairings = React.useMemo(
-    () => [...leaguePairings, ...qualifierPairings, ...finalsPairings, ...spocPairings],
-    [leaguePairings, qualifierPairings, finalsPairings, spocPairings],
+    () => [...rrPairings, ...leaguePairings, ...qualifierPairings, ...finalsPairings, ...spocPairings],
+    [rrPairings, leaguePairings, qualifierPairings, finalsPairings, spocPairings],
   );
+
+  /** Round robin fixtures bucketed into the stage's event days, with dates from the organizer's calendar. */
+  const rrDayGroups = React.useMemo(() => {
+    const start = Math.max(1, active?.startDay || 1);
+    const span = Math.max(1, active?.durationDays || 7);
+    const entriesOf = (day: number) =>
+      rrPairings.map((pair, idx) => ({ pair, idx })).filter(({ pair }) => pair.dayNumber === day);
+    return Array.from({ length: span }, (_, i) => start + i).map((day) => ({
+      day,
+      entries: entriesOf(day),
+      locked: isCalendarDayCompleted(day, dayDates),
+      live: day === currentEventDay,
+      dateLabel: formatIsoDateLabel(combiCalendarDate(day, dayDates), {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      }),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rrPairings, active?.startDay, active?.durationDays, dayDatesSignature, currentEventDay]);
+
+  const rrUnassigned = React.useMemo(() => {
+    const start = Math.max(1, active?.startDay || 1);
+    const end = start + Math.max(1, active?.durationDays || 7) - 1;
+    return rrPairings
+      .map((pair, idx) => ({ pair, idx }))
+      .filter(({ pair }) => !pair.dayNumber || pair.dayNumber < start || pair.dayNumber > end);
+  }, [rrPairings, active?.startDay, active?.durationDays]);
 
   const takenIdsFor = (pair: SuggestedPairing | undefined) =>
     teamIdsBookedOnDay(
@@ -692,6 +778,7 @@ export default function TournamentStageDesigner({
     scheduleMode,
     stages: config.stages.map((s, idx) => {
       if (idx !== activeIndex) return s;
+      if (s.kind === 'ROUND_ROBIN') return { ...s, matchPairings: rrPairings };
       if (s.kind === 'LEAGUE') return { ...s, matchPairings: leaguePairings };
       if (s.kind === 'QUALIFIER') return { ...s, matchPairings: qualifierPairings };
       if (s.kind === 'FINALS') return { ...s, matchPairings: finalsPairings };
@@ -746,7 +833,7 @@ export default function TournamentStageDesigner({
     () =>
       Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => ({
         day,
-        date: officialCombiCalendarDate(day, dayDates),
+        date: combiCalendarDate(day, dayDates),
         completed: day !== currentEventDay && isCalendarDayCompleted(day, dayDates),
       })),
     [totalDays, dayDates, currentEventDay]
@@ -755,7 +842,8 @@ export default function TournamentStageDesigner({
   if (!editionId) return null;
 
   const dbRrCount = matches.filter((m) => m.stage === 'ROUND_ROBIN').length;
-  const rrCount = Math.max(dbRrCount, roundRobinMatchCount());
+  const teamCount = teams.length || 0;
+  const rrCount = Math.max(dbRrCount, rrPairings.length, (teamCount * (teamCount - 1)) / 2);
 
   return (
     <>
@@ -1022,38 +1110,127 @@ export default function TournamentStageDesigner({
 
               {active?.kind === 'ROUND_ROBIN' && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-black text-amber-500 uppercase tracking-wider">
-                    <Users className="h-4 w-4" /> Stage 1 · Round Robin · {teams.length || 8} teams
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-amber-500 uppercase tracking-wider">
+                      <Users className="h-4 w-4" /> {active.name || 'Round Robin'} · {teams.length || 0} teams
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold text-muted-foreground">{rrPairings.length} matches</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-[11px] font-bold h-9"
+                        onClick={() => applyRrPairings(slotRrPairings(suggestRoundRobinPairings(teams)))}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" /> Auto-fill fixtures
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-[11px] font-bold h-9"
+                        onClick={() => applyRrPairings([...rrPairings, nextRoundRobinPairing(rrPairings)])}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add match
+                      </Button>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Bicentennial Monuments 1–7 are Stage 1. Each day has 4 matches so every team plays once. Completed monument days are locked.
+                    Every team plays each other once. Each day follows the event start date above, so changing that
+                    date moves these fixtures with it. Days that have finished stay locked.
                   </p>
                   <div className="space-y-2">
-                    {BICENTENNIAL_MONUMENTS.map((monument) => {
-                      const status = monumentStatus(monument);
-                      return (
-                        <div key={monument.monumentNumber} className="rounded-xl border border-border bg-card p-3 space-y-2">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-500">
-                              Day {monument.monumentNumber} · {monument.title}
-                            </span>
-                            <span className="text-[10px] font-bold text-muted-foreground">
-                              {status === 'completed' ? 'Completed · locked' : status === 'live' ? 'Live' : 'Upcoming'} · {monument.matches.length} matches
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">{monument.timeRange}</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            {monument.matches.map((match, idx) => (
-                              <div key={`${monument.monumentNumber}-${idx}`} className="text-[11px] font-semibold text-muted-foreground">
-                                <span className="text-emerald-400">{match.team1}</span>
-                                <span className="text-[10px] font-black mx-1">VS</span>
-                                <span className="text-rose-400">{match.team2}</span>
-                              </div>
-                            ))}
-                          </div>
+                    {rrDayGroups.map(({ day, entries, locked, live, dateLabel }) => (
+                      <div key={day} className="rounded-xl border border-border bg-card p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-500">
+                            Day {day}
+                            {dateLabel ? ` · ${dateLabel}` : ''}
+                          </span>
+                          <span className="text-[10px] font-bold text-muted-foreground">
+                            {locked ? 'Completed · locked' : live ? 'Live' : 'Upcoming'} · {entries.length} matches
+                          </span>
                         </div>
-                      );
-                    })}
+                        <div className="space-y-2">
+                          {entries.map(({ pair, idx }) => (
+                            <EditablePairingRow
+                              key={`rr-${day}-${idx}`}
+                              label={pair.label || `Round Robin · Match ${idx + 1}`}
+                              team1Id={pair.team1Id}
+                              team2Id={pair.team2Id}
+                              teams={teams}
+                              meta={formatPairingSlot(pair)}
+                              dayNumber={pair.dayNumber}
+                              dayOptions={dayOptions}
+                              locked={isDayLocked(pair.dayNumber)}
+                              onDay={(nextDay) => {
+                                if (isDayLocked(nextDay) || isDayLocked(pair.dayNumber)) return;
+                                const copy = [...rrPairings];
+                                copy[idx] = retargetPairingDay(copy[idx], nextDay, dayDates);
+                                applyRrPairings(copy);
+                              }}
+                              onTeam1={(id) => {
+                                const copy = [...rrPairings];
+                                copy[idx] = { ...copy[idx], team1Id: id };
+                                applyRrPairings(copy);
+                              }}
+                              onTeam2={(id) => {
+                                const copy = [...rrPairings];
+                                copy[idx] = { ...copy[idx], team2Id: id };
+                                applyRrPairings(copy);
+                              }}
+                              onRemove={() => applyRrPairings(rrPairings.filter((_, i) => i !== idx))}
+                              warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), teams)}
+                              takenIds={takenIdsFor(pair)}
+                            />
+                          ))}
+                          {entries.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground px-1">
+                              No matches on this day yet. Add a match, or auto-fill the fixtures.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {rrUnassigned.length > 0 && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-500">
+                          Not assigned to a day yet
+                        </span>
+                        {rrUnassigned.map(({ pair, idx }) => (
+                          <EditablePairingRow
+                            key={`rr-free-${idx}`}
+                            label={pair.label || `Round Robin · Match ${idx + 1}`}
+                            team1Id={pair.team1Id}
+                            team2Id={pair.team2Id}
+                            teams={teams}
+                            meta={formatPairingSlot(pair)}
+                            dayNumber={pair.dayNumber}
+                            dayOptions={dayOptions}
+                            onDay={(nextDay) => {
+                              if (isDayLocked(nextDay)) return;
+                              const copy = [...rrPairings];
+                              copy[idx] = retargetPairingDay(copy[idx], nextDay, dayDates);
+                              applyRrPairings(copy);
+                            }}
+                            onTeam1={(id) => {
+                              const copy = [...rrPairings];
+                              copy[idx] = { ...copy[idx], team1Id: id };
+                              applyRrPairings(copy);
+                            }}
+                            onTeam2={(id) => {
+                              const copy = [...rrPairings];
+                              copy[idx] = { ...copy[idx], team2Id: id };
+                              applyRrPairings(copy);
+                            }}
+                            onRemove={() => applyRrPairings(rrPairings.filter((_, i) => i !== idx))}
+                            warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), teams)}
+                            takenIds={takenIdsFor(pair)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -22,9 +22,14 @@ import TournamentStageDesigner from '@/components/organizer/TournamentStageDesig
 import SpocExhibitionTeamsPanel from '@/components/organizer/SpocExhibitionTeamsPanel';
 import WebsiteCmsPanel from '@/components/organizer/WebsiteCmsPanel';
 import { isCalendarDayCompleted } from '@/lib/tournament-stages';
+import {
+  OFFICIAL_DAY1_CALENDAR,
+  buildDayDatesMap,
+  normalizeDayDates,
+  toCalendarDate,
+} from '@/lib/combi-cutoff';
 import { filterMainTeams, filterSpocTeams, isMainTournamentTeam } from '@/lib/spoc-teams';
 import type { WebsiteCmsContent } from '@/lib/website-cms';
-
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
   const [scoreReports, setScoreReports] = React.useState(initialScoreReports);
@@ -243,22 +248,25 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   };
 
   const [totalDays, setTotalDays] = React.useState<number>(15);
-  const [startDate, setStartDate] = React.useState<string>('2026-08-10');
+  const [startDate, setStartDate] = React.useState<string>(OFFICIAL_DAY1_CALENDAR);
   const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
 
+  /** Consecutive days from the chosen start, with any already-set days kept as they are. */
   const generateDefaultDayDates = (startStr: string, numDays: number, existingMap: Record<number, string> = {}) => {
-    const map: Record<number, string> = { ...existingMap };
-    const baseDate = startStr && !isNaN(new Date(startStr).getTime()) ? new Date(startStr) : new Date('2026-08-10');
-    
-    for (let i = 1; i <= numDays; i++) {
-      if (!map[i]) {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + (i - 1));
-        map[i] = d.toISOString().split('T')[0];
-      }
-    }
+    const start = toCalendarDate(startStr) || OFFICIAL_DAY1_CALENDAR;
+    const map = buildDayDatesMap(numDays, start);
+    Object.entries(existingMap).forEach(([key, value]) => {
+      const day = Number(key);
+      const date = toCalendarDate(value);
+      if (day >= 1 && day <= numDays && date) map[day] = date;
+    });
     return map;
   };
+
+  const selectedEdition =
+    editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0];
+  const selectedEditionId = selectedEdition?.id || '';
+  const tournamentInProgress = String(selectedEdition?.status || '').toUpperCase() === 'IN_PROGRESS';
 
   const handleDaysNeeded = React.useCallback((days: number) => {
     if (days < 1) return;
@@ -274,18 +282,18 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const handleStartDateChange = React.useCallback((date: string) => {
     setStartDate(date);
     setDayDatesMap((map) => {
+      // Days already played keep the dates they were played on. A tournament that has
+      // not started has no history to protect, so every day follows the new start date.
       const preserved: Record<number, string> = {};
-      Object.entries(map).forEach(([k, v]) => {
-        const day = Number(k);
-        if (isCalendarDayCompleted(day, map)) preserved[day] = v;
-      });
+      if (tournamentInProgress) {
+        Object.entries(map).forEach(([k, v]) => {
+          const day = Number(k);
+          if (isCalendarDayCompleted(day, map)) preserved[day] = v;
+        });
+      }
       return generateDefaultDayDates(date, totalDays, preserved);
     });
-  }, [totalDays]);
-
-  const selectedEdition =
-    editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0];
-  const selectedEditionId = selectedEdition?.id || '';
+  }, [totalDays, tournamentInProgress]);
 
   React.useEffect(() => {
     if (selectedEdition) {
@@ -312,14 +320,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       const numDays = selectedEdition.totalDays || 15;
       setTotalDays(numDays);
 
-      let loadedMap: Record<number, string> = {};
-      if (selectedEdition.dayDates) {
-        try {
-          loadedMap = JSON.parse(selectedEdition.dayDates);
-        } catch (e) {}
-      }
-      
-      const firstDate = loadedMap[1] || (selectedEdition.tournamentStartDate ? new Date(selectedEdition.tournamentStartDate).toISOString().split('T')[0] : '2026-08-10');
+      const loadedMap = normalizeDayDates(selectedEdition.dayDates) ?? {};
+      const firstDate =
+        loadedMap[1] || toCalendarDate(selectedEdition.tournamentStartDate) || OFFICIAL_DAY1_CALENDAR;
       setStartDate(firstDate);
       setDayDatesMap(generateDefaultDayDates(firstDate, numDays, loadedMap));
     }

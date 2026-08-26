@@ -13,8 +13,9 @@ import {
 import {
   combiCutoffIso,
   isCombiSubmissionLocked,
-  officialCombiCalendarDate,
+  combiCalendarDate,
 } from '@/lib/combi-cutoff';
+import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 
 export const dynamic = 'force-dynamic';
 
@@ -250,7 +251,7 @@ export async function GET(request: NextRequest) {
 
     const canEdit = canEditCombis(user.role, team.captainId, user.id);
     const days = dayNumbers.map((dayNumber) => {
-      const calendarDate = officialCombiCalendarDate(dayNumber, dayDates);
+      const calendarDate = combiCalendarDate(dayNumber, dayDates);
       const cutoffIso = combiCutoffIso(dayNumber, dayDates);
       const revealed = now >= new Date(cutoffIso).getTime();
       const entry = saved[String(dayNumber)] || saved[dayNumber as any];
@@ -381,16 +382,11 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    let dayDatesMap: Record<string, string> = {};
-    if (edition?.dayDates) {
-      try {
-        dayDatesMap = JSON.parse(edition.dayDates);
-      } catch {
-        dayDatesMap = {};
-      }
-    }
-    if (isCombiSubmissionLocked(dayNumber, dayDatesMap)) {
-      const dateStr = officialCombiCalendarDate(dayNumber, dayDatesMap);
+    const scheduledEdition = await ensureOfficialDayDates(edition);
+    const editionDayDates = (scheduledEdition as any)?.dayDates ?? null;
+
+    if (isCombiSubmissionLocked(dayNumber, editionDayDates)) {
+      const dateStr = combiCalendarDate(dayNumber, editionDayDates);
       return NextResponse.json(
         {
           success: false,

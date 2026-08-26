@@ -4,7 +4,13 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-
+import {
+  addDaysIsoDate,
+  buildDayDatesMap,
+  calendarDateToUtcDate,
+  istCalendarDateFromMs,
+  normalizeDayDates,
+} from '@/lib/combi-cutoff';
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
@@ -47,6 +53,11 @@ export async function createEdition(formData: FormData, organizerId: string) {
     const number = currentCount + 1; 
     const titleVal = title || `CBOT Edition #${number}`;
 
+    // Placeholder calendar starting a week out, in IST calendar days rather than a raw
+    // instant, so the seeded start date and Day 1 always name the same day.
+    const seedTotalDays = 15;
+    const seedDayDates = buildDayDatesMap(seedTotalDays, addDaysIsoDate(istCalendarDateFromMs(Date.now()), 7));
+
     const newEdition = await prisma.edition.create({
       data: {
         number,
@@ -56,8 +67,10 @@ export async function createEdition(formData: FormData, organizerId: string) {
         themeDescription: description,
         format,
         status: 'REGISTRATION_OPEN',
-        tournamentStartDate: new Date(Date.now() + 86400000 * 7),
-        tournamentEndDate: new Date(Date.now() + 86400000 * 10),
+        totalDays: seedTotalDays,
+        dayDates: JSON.stringify(seedDayDates),
+        tournamentStartDate: calendarDateToUtcDate(seedDayDates[1]),
+        tournamentEndDate: calendarDateToUtcDate(seedDayDates[seedTotalDays]),
         prizePool,
         maxTeams,
         rules: rulesVal,
@@ -143,9 +156,22 @@ export async function updateEdition(editionId: string, formData: FormData) {
 
     const totalDaysRaw = formData.get('totalDays') as string;
     const totalDays = totalDaysRaw ? parseInt(totalDaysRaw, 10) : undefined;
-    const dayDates = formData.get('dayDates') as string;
-
     const existing = await prisma.edition.findUnique({ where: { id: editionId } });
+    const scheduleDays = totalDays ?? existing?.totalDays ?? 15;
+    const submittedDates = formData.get('dayDates') as string | null;
+
+    // The organizer's calendar is the source of truth. The 200th edition dates are
+    // only a fallback for an edition that has never had any dates set.
+    const chosen = normalizeDayDates(submittedDates) ?? normalizeDayDates(existing?.dayDates);
+    const dayDatesMap = buildDayDatesMap(scheduleDays, chosen?.[1]);
+    for (const [day, date] of Object.entries(chosen ?? {})) {
+      const num = Number(day);
+      if (num >= 1 && num <= scheduleDays) dayDatesMap[num] = date;
+    }
+    const dayDates = JSON.stringify(dayDatesMap);
+    // Stored at UTC midnight so a later date-only read can never slide back a day.
+    const startDate = calendarDateToUtcDate(dayDatesMap[1]);
+    const endDate = calendarDateToUtcDate(dayDatesMap[scheduleDays] || dayDatesMap[1]);
 
     let updatedEdition;
     if (existing) {
@@ -160,7 +186,9 @@ export async function updateEdition(editionId: string, formData: FormData) {
           maxTeams,
           rules: rulesVal,
           ...(totalDays !== undefined ? { totalDays } : {}),
-          ...(dayDates !== undefined ? { dayDates } : {}),
+          dayDates,
+          ...(startDate ? { tournamentStartDate: startDate } : {}),
+          ...(endDate ? { tournamentEndDate: endDate } : {}),
         }
       });
     } else {
@@ -180,7 +208,9 @@ export async function updateEdition(editionId: string, formData: FormData) {
           maxTeams,
           rules: rulesVal,
           totalDays: totalDays ?? 15,
-          dayDates: dayDates ?? undefined,
+          dayDates,
+          ...(startDate ? { tournamentStartDate: startDate } : {}),
+          ...(endDate ? { tournamentEndDate: endDate } : {}),
           organizerId,
         }
       });

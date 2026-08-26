@@ -1,7 +1,7 @@
 import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
 import { coherentMatchSides, resolveTeamFace, type TeamCatalogEntry } from '@/lib/team-identity';
 import { stageSpanDays } from '@/lib/tournament-stages';
-import { officialCombiCalendarDate } from '@/lib/combi-cutoff';
+import { combiCalendarDate } from '@/lib/combi-cutoff';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -90,7 +90,7 @@ export function calendarDateForDay(
   dayNumber: number,
   dayDates?: Record<number, string> | Record<string, string>
 ) {
-  return officialCombiCalendarDate(dayNumber, dayDates);
+  return combiCalendarDate(dayNumber, dayDates);
 }
 
 export function formatDayRange(startIso: string, endIso: string) {

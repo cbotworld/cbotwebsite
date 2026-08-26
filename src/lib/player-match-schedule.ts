@@ -11,7 +11,6 @@ import { buildOrganizerScheduleDays, calendarDateForDay, addDaysIsoDate, formatD
 import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
-
 export async function getPlayerMatchSchedule(
   userId: string,
   opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' },

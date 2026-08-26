@@ -13,6 +13,7 @@ import {
   TEAM_TYPE_SPOC,
 } from '@/lib/spoc-teams';
 import { listCaptainDesks } from '@/lib/mobile-team';
+import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 
 export const revalidate = 0;
 
@@ -60,6 +61,8 @@ export default async function CaptainPage() {
       orderBy: { name: 'asc' } 
     }),
   ]);
+
+  await ensureOfficialDayDates(activeEdition);
 
   // Build ordered round format list
   const savedRoundFormats: string[] = (activeEdition as any)?.patterns?.map(

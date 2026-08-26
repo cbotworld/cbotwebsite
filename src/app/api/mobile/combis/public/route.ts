@@ -5,8 +5,7 @@ import { officialMatchDays } from '@/lib/bicentennial-monuments';
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
-import { combiCutoffIso, officialCombiCalendarDate } from '@/lib/combi-cutoff';
-
+import { combiCutoffIso, combiCalendarDate } from '@/lib/combi-cutoff';
 export const dynamic = 'force-dynamic';
 
 export async function OPTIONS() {
@@ -182,7 +181,7 @@ export async function GET() {
     );
 
     const days = Array.from({ length: totalDays }, (_, i) => i + 1).map((dayNumber) => {
-      const calendarDate = officialCombiCalendarDate(dayNumber, dayDates);
+      const calendarDate = combiCalendarDate(dayNumber, dayDates);
       const cutoffIso = combiCutoffIso(dayNumber, dayDates);
       const revealed = now >= new Date(cutoffIso).getTime();
       const bucket = matchesByDay.get(dayNumber);

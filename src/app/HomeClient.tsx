@@ -16,6 +16,7 @@ import {
 } from '@/lib/website-cms';
 import { SponsorAvatar } from '@/components/layout/SponsorAvatar';
 import { withImageCacheBust } from '@/lib/safe-image-url';
+import { currentCombiDayNumber } from '@/lib/combi-cutoff';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -87,56 +88,10 @@ export default function HomeClient({
 
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
 
-  const currentDayNumber = React.useMemo(() => {
-    const now = new Date();
-
-    if (currentEdition?.dayDates) {
-      try {
-        const map: Record<number, string> = typeof currentEdition.dayDates === 'string'
-          ? JSON.parse(currentEdition.dayDates)
-          : currentEdition.dayDates;
-
-        // Day N ends on date D_N at 8:00 PM IST (20:00).
-        // Day N starts on (D_N - 1 day) at 8:00 PM IST (20:00).
-        // For example:
-        // Day 1: ends 10-08-2026 20:00
-        // Day 2: 10-08-2026 20:00 to 11-08-2026 20:00
-        // Day 3: 11-08-2026 20:00 to 12-08-2026 20:00
-        const entries = Object.entries(map)
-          .map(([k, v]) => ({ dayNum: Number(k), dateStr: v }))
-          .sort((a, b) => a.dayNum - b.dayNum);
-
-        for (const { dayNum, dateStr } of entries) {
-          const endTime = new Date(`${dateStr}T20:00:00+05:30`).getTime();
-          const startTime = endTime - 24 * 60 * 60 * 1000;
-
-          if (now.getTime() >= startTime && now.getTime() < endTime) {
-            return Math.max(1, dayNum);
-          }
-        }
-
-        // If before Day 1 window
-        if (entries.length > 0) {
-          const firstEndTime = new Date(`${entries[0].dateStr}T20:00:00+05:30`).getTime();
-          if (now.getTime() < firstEndTime) return 1;
-        }
-      } catch (e) {
-        console.error('Error parsing dayDates:', e);
-      }
-    }
-
-    // Fallback: Day 1 ends on 10-08-2026 20:00:00+05:30. Day 2 = 10-08 20:00 to 11-08 20:00.
-    const day1EndDate = new Date('2026-08-10T20:00:00+05:30').getTime();
-    const nowMs = now.getTime();
-
-    if (nowMs < day1EndDate) {
-      return 1;
-    }
-
-    const diffMs = nowMs - day1EndDate;
-    const dayIndex = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 2;
-    return Math.min(Math.max(dayIndex, 1), currentEdition?.totalDays || 15);
-  }, [currentEdition]);
+  const currentDayNumber = React.useMemo(
+    () => currentCombiDayNumber(currentEdition?.totalDays || 15, new Date(), currentEdition?.dayDates),
+    [currentEdition],
+  );
 
   const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
   const [activeSponsorPoster, setActiveSponsorPoster] = React.useState<string | null>(null);

@@ -3,10 +3,8 @@
 import { prisma } from '@/lib/prisma';
 import { MatchLineupSlot } from '@/types';
 import { revalidatePath } from 'next/cache';
-import {
-  isCombiSubmissionLocked,
-  officialCombiCalendarDate,
-} from '@/lib/combi-cutoff';
+import { isCombiSubmissionLocked, combiCalendarDate } from '@/lib/combi-cutoff';
+import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 
 export async function submitMatchLineup(data: {
   matchId: string;
@@ -258,19 +256,14 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
   try {
     const activeEdition = await prisma.edition.findFirst({
       orderBy: { number: 'desc' },
-      select: { dayDates: true }
+      select: { id: true, status: true, dayDates: true, totalDays: true }
     });
 
-    let dayDatesMap: Record<string, string> = {};
-    if (activeEdition?.dayDates) {
-      try {
-        dayDatesMap = JSON.parse(activeEdition.dayDates);
-      } catch {
-        dayDatesMap = {};
-      }
-    }
-    if (isCombiSubmissionLocked(dayNumber, dayDatesMap)) {
-      const dateStr = officialCombiCalendarDate(dayNumber, dayDatesMap);
+    const scheduledEdition = await ensureOfficialDayDates(activeEdition);
+    const editionDayDates = scheduledEdition?.dayDates ?? null;
+
+    if (isCombiSubmissionLocked(dayNumber, editionDayDates)) {
+      const dateStr = combiCalendarDate(dayNumber, editionDayDates);
       return {
         success: false,
         error: `Submissions for Day ${dayNumber} closed at 9:30 PM IST on ${dateStr}. This combi is locked.`,

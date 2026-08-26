@@ -375,6 +375,27 @@ export function circlePairings(
   return out;
 }
 
+/** Single round robin across every team: each team plays all the others once. */
+export function suggestRoundRobinPairings(
+  teams: Array<{ id: string; name: string; tag?: string | null }>
+): SuggestedPairing[] {
+  return circlePairings(teams.map((t) => t.id), 'ROUND_ROBIN', 'Round Robin', teams);
+}
+
+export function nextRoundRobinPairing(existing: SuggestedPairing[]): SuggestedPairing {
+  const n = existing.length + 1;
+  const lastRound = Math.max(0, ...existing.map((p) => p.round || 0));
+  return {
+    stage: 'ROUND_ROBIN',
+    label: `Round Robin · Match ${n}`,
+    team1Id: '',
+    team2Id: '',
+    team1Name: '',
+    team2Name: '',
+    round: lastRound || 1,
+  };
+}
+
 export function suggestLeaguePairings(
   groups: LeagueGroupConfig[],
   teams: Array<{ id: string; name: string; tag?: string | null }>,
@@ -627,19 +648,17 @@ export function isCalendarDayCompleted(
   dayDates: Record<number, string> | Record<string, string>,
   today = new Date()
 ): boolean {
+  // This edition's own calendar decides. Falling back to the 200th edition's
+  // windows first would mark a future tournament's days as already played.
+  const dates = normalizeDayDates(dayDates);
+  const calendarEnd = dates[dayNumber] ? calendarDateEndMs(dates[dayNumber]) : NaN;
+  if (Number.isFinite(calendarEnd)) return today.getTime() >= calendarEnd;
+
   const monumentDone = isMonumentDayCompleted(dayNumber, today);
   if (monumentDone !== null) return monumentDone;
-  const dates = normalizeDayDates(dayDates);
-  const dateStr = dates[dayNumber];
   const sequentialEnd = sequentialPlayEndMs(dayNumber);
-  const calendarEnd = dateStr ? calendarDateEndMs(dateStr) : NaN;
-  const ends = [sequentialEnd, calendarEnd].filter(
-    (ms): ms is number => typeof ms === 'number' && Number.isFinite(ms)
-  );
-  if (!ends.length) return false;
-  // Lock only after BOTH the 8pm–8pm sequence and the scheduled date have ended.
-  // An early calendar date (e.g. Day 15 on 22 Aug) must not lock the current live day.
-  return today.getTime() >= Math.max(...ends);
+  if (sequentialEnd === null) return false;
+  return today.getTime() >= sequentialEnd;
 }
 
 export function defaultDurationForKind(kind: StageKind): number {
