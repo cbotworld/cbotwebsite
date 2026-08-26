@@ -88,6 +88,46 @@ export type WebsiteLegacyCms = {
 export type WebsiteNavCms = {
   editionButtonLabel: string;
   editionButtonHref: string;
+  combisLabel: string;
+  combisHref: string;
+  scheduleLabel: string;
+  scheduleHref: string;
+};
+
+/**
+ * Site-wide brand tokens. These are composed into page titles, metadata and
+ * chrome so renaming an edition only has to happen in one place.
+ */
+export type WebsiteSiteCms = {
+  brandName: string;
+  shortName: string;
+  brandTagline: string;
+  organizationName: string;
+  founderName: string;
+  editionLabel: string;
+  editionSeriesName: string;
+  metaTitle: string;
+  metaDescription: string;
+  metaKeywords: string;
+  ogUrl: string;
+  whatsappNumber: string;
+  whatsappMessage: string;
+};
+
+export type WebsitePageHeading = {
+  badge: string;
+  title: string;
+  subtitle: string;
+};
+
+export type WebsitePagesCms = {
+  schedule: WebsitePageHeading;
+  videos: WebsitePageHeading;
+  fixtures: WebsitePageHeading;
+  about: WebsitePageHeading;
+  editions: WebsitePageHeading;
+  leaderboard: WebsitePageHeading;
+  hallOfFame: WebsitePageHeading;
 };
 
 export type WebsiteFooterCms = {
@@ -107,6 +147,8 @@ export type WebsiteFooterCms = {
 };
 
 export type WebsiteCmsContent = {
+  site: WebsiteSiteCms;
+  pages: WebsitePagesCms;
   hero: WebsiteHeroCms;
   nav: WebsiteNavCms;
   sponsors: WebsiteSponsorsCms;
@@ -138,9 +180,71 @@ const DEFAULT_GOLD_SPONSORS: NamedSponsor[] = [
 ];
 
 export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
+  site: {
+    brandName: 'CBOT World',
+    shortName: 'CBOT',
+    brandTagline: 'Connect Carrom Enthusiasts Worldwide',
+    organizationName: 'Carrom Balu Online Tournament',
+    founderName: 'Carrom Balu',
+    editionLabel: '200th Edition',
+    editionSeriesName: 'Cornerstones of Carrom',
+    metaTitle: 'CBOT World - Carrom Balu Online Tournament',
+    metaDescription:
+      'The ultimate online Carrom esports tournament platform for Organizers, Captains, and Players. Live brackets, automated match scoring, and global leaderboards.',
+    metaKeywords:
+      'Carrom, CBOT, CBOT World, Carrom Balu, Online Tournament, Esports, Match Scoring, Tournament Brackets',
+    ogUrl: 'https://cbot.gg',
+    whatsappNumber: '6594519986',
+    whatsappMessage:
+      'Hi Carrom Balu! I would like to know more about CBOT (Carrom Balu Online Tournament).',
+  },
+  pages: {
+    schedule: {
+      badge: '✨ 200th Edition',
+      title: 'Official Match Fixtures',
+      subtitle: 'Carrom Balu Online Tournament',
+    },
+    videos: {
+      badge: '🏆 Bicentennial 200th Edition Video Center',
+      title: 'Live & Recorded Match Videos | CBOT 200th Bicentennial Edition',
+      subtitle:
+        'Watch all official live streams and recorded match videos day-wise across all 20 tournament days of the CBOT 200th Edition.',
+    },
+    fixtures: {
+      badge: 'Official Fixtures & Public Schedule',
+      title: 'Cornerstones of Carrom (Edition #200) Schedule',
+      subtitle:
+        'Inspect upcoming round-robin, league group, qualifier, and finals fixtures, plus table numbers and time slots.',
+    },
+    about: {
+      badge: 'About Carrom Balu Online Tournament',
+      title: 'Pioneering Competitive Online Carrom Since August 2020',
+      subtitle: '',
+    },
+    editions: {
+      badge: 'CBOT Archive',
+      title: 'Tournament Editions Archive',
+      subtitle: 'Browse full historic records of the Carrom Balu Online Tournament.',
+    },
+    leaderboard: {
+      badge: 'Global Rankings',
+      title: 'Carrom Balu Champions',
+      subtitle: 'Official player ELO ratings, queen strike statistics, and team win-rate leaderboards.',
+    },
+    hallOfFame: {
+      badge: 'Hall of Fame',
+      title: 'Legendary Champions',
+      subtitle:
+        'Honoring the greatest strikers, captains, and visionaries in the history of the Carrom Balu Online Tournament.',
+    },
+  },
   nav: {
     editionButtonLabel: '200th Edition',
     editionButtonHref: '/edition-200-combis',
+    combisLabel: 'Daily Team Combis',
+    combisHref: '/edition-200-combis',
+    scheduleLabel: 'Match Schedule',
+    scheduleHref: '/edition-200-schedule',
   },
   hero: {
     badgeText: 'Celebrating 200th Edition',
@@ -340,6 +444,16 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
   try {
     const parsed = JSON.parse(raw) as Partial<WebsiteCmsContent>;
     return {
+      site: mergeSection(DEFAULT_WEBSITE_CMS.site, parsed.site),
+      pages: {
+        schedule: mergeSection(DEFAULT_WEBSITE_CMS.pages.schedule, parsed.pages?.schedule),
+        videos: mergeSection(DEFAULT_WEBSITE_CMS.pages.videos, parsed.pages?.videos),
+        fixtures: mergeSection(DEFAULT_WEBSITE_CMS.pages.fixtures, parsed.pages?.fixtures),
+        about: mergeSection(DEFAULT_WEBSITE_CMS.pages.about, parsed.pages?.about),
+        editions: mergeSection(DEFAULT_WEBSITE_CMS.pages.editions, parsed.pages?.editions),
+        leaderboard: mergeSection(DEFAULT_WEBSITE_CMS.pages.leaderboard, parsed.pages?.leaderboard),
+        hallOfFame: mergeSection(DEFAULT_WEBSITE_CMS.pages.hallOfFame, parsed.pages?.hallOfFame),
+      },
       nav: mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav),
       hero: mergeSection(DEFAULT_WEBSITE_CMS.hero, parsed.hero),
       sponsors: {

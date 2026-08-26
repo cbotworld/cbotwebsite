@@ -1,1 +1,1 @@
-export { default, metadata } from '../editions/200th-videos/page';
+export { default, generateMetadata } from '../editions/200th-videos/page';

@@ -83,7 +83,7 @@ export default async function HomePage() {
         allTeams={[]}
         players={[]}
         matches={[]}
-        currentEditionName="Edition #200"
+        currentEditionName={DEFAULT_WEBSITE_CMS.site.editionLabel}
         editionPosterUrl={null}
         currentEdition={null}
         websiteCms={DEFAULT_WEBSITE_CMS}

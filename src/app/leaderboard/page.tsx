@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import LeaderboardClient from './LeaderboardClient';
 
 export const revalidate = 3600; // Cache rankings for up to 1 hour; revalidated on-demand via actions
@@ -6,6 +7,7 @@ export const revalidate = 3600; // Cache rankings for up to 1 hour; revalidated 
 export default async function LeaderboardPage() {
   let users: any[] = [];
   let sortedTeams: any[] = [];
+  const cms = await getWebsiteCmsContent();
 
   try {
     users = await prisma.user.findMany({
@@ -22,5 +24,5 @@ export default async function LeaderboardPage() {
     console.error('Database connection error in LeaderboardPage', err);
   }
 
-  return <LeaderboardClient players={users} teams={sortedTeams} />;
+  return <LeaderboardClient players={users} teams={sortedTeams} pageCms={cms.pages.leaderboard} />;
 }

@@ -16,6 +16,8 @@ import {
   type WebsiteLegacyCms,
   type WebsiteFooterCms,
   type WebsiteNavCms,
+  type WebsiteSiteCms,
+  type WebsitePagesCms,
 } from '@/lib/website-cms';
 import { updateEditionBranding } from '@/lib/actions/tournamentActions';
 import { safePublicImageUrl } from '@/lib/safe-image-url';
@@ -55,19 +57,21 @@ export async function updateWebsiteHeroCms(data: WebsiteHeroCms, editionId?: str
   if (!auth.ok) return { success: false, error: auth.error };
 
   try {
-    if ((data.posterUrl || '').startsWith('data:')) {
-      return {
-        success: false,
-        error:
-          'The tournament poster is still an inline preview. Click Replace Image, wait for a public URL (not “Inline image”), then save.',
-      };
-    }
-
     const current = await getWebsiteCmsContent();
-    const posterUrl = safePublicImageUrl(data.posterUrl) || '';
-    const bannerImage = (data.bannerImage || '').startsWith('data:')
-      ? current.hero.bannerImage
-      : data.bannerImage || '';
+
+    // An inline (data:) image can't be stored, but it must not block the text
+    // edits in the same form - keep the previous image and warn instead.
+    const posterIsInline = (data.posterUrl || '').startsWith('data:');
+    const bannerIsInline = (data.bannerImage || '').startsWith('data:');
+    const posterUrl = posterIsInline
+      ? current.hero.posterUrl || ''
+      : safePublicImageUrl(data.posterUrl) || '';
+    const bannerImage = bannerIsInline ? current.hero.bannerImage : data.bannerImage || '';
+
+    const stillInline = [posterIsInline && 'poster', bannerIsInline && 'banner'].filter(
+      Boolean,
+    ) as string[];
+
     const hero = { ...current.hero, ...data, posterUrl, bannerImage };
     await saveWebsiteCms({ ...current, hero });
 
@@ -78,7 +82,13 @@ export async function updateWebsiteHeroCms(data: WebsiteHeroCms, editionId?: str
       });
     }
 
-    return { success: true, hero };
+    return {
+      success: true,
+      hero,
+      warning: stillInline.length
+        ? `Text saved, but the ${stillInline.join(' and ')} image is still an inline preview and was left unchanged. Click Replace Image, wait for a public URL, then save again.`
+        : undefined,
+    };
   } catch (error) {
     console.error('[updateWebsiteHeroCms]', error);
     return { success: false, error: 'Failed to save hero content' };
@@ -145,13 +155,72 @@ export async function updateWebsiteNavCms(data: WebsiteNavCms) {
   const auth = await requireOrganizer();
   if (!auth.ok) return { success: false, error: auth.error };
   try {
-    const label = (data.editionButtonLabel || '').trim() || '200th Edition';
-    const href = (data.editionButtonHref || '').trim() || '/edition-200-combis';
-    await saveCmsPatch({ nav: { editionButtonLabel: label, editionButtonHref: href } });
+    // Fall back to what is already stored rather than the 200th-edition
+    // default, so clearing a field cannot silently drag the site back to it.
+    const current = (await getWebsiteCmsContent()).nav;
+    const keep = (key: keyof WebsiteNavCms) =>
+      (data[key] || '').trim() || current[key] || DEFAULT_WEBSITE_CMS.nav[key];
+
+    await saveCmsPatch({
+      nav: {
+        editionButtonLabel: keep('editionButtonLabel'),
+        editionButtonHref: keep('editionButtonHref'),
+        combisLabel: keep('combisLabel'),
+        combisHref: keep('combisHref'),
+        scheduleLabel: keep('scheduleLabel'),
+        scheduleHref: keep('scheduleHref'),
+      },
+    });
     return { success: true };
   } catch (error) {
     console.error('[updateWebsiteNavCms]', error);
     return { success: false, error: 'Failed to save navigation button' };
+  }
+}
+
+export async function updateWebsiteSiteCms(data: WebsiteSiteCms) {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return { success: false, error: auth.error };
+  try {
+    // Brand tokens feed page titles and metadata everywhere, so a blank field
+    // keeps the stored value instead of rendering an empty site name.
+    const current = (await getWebsiteCmsContent()).site;
+    const keep = (key: keyof WebsiteSiteCms) =>
+      (data[key] || '').trim() || current[key] || DEFAULT_WEBSITE_CMS.site[key];
+
+    await saveCmsPatch({
+      site: {
+        brandName: keep('brandName'),
+        shortName: keep('shortName'),
+        brandTagline: keep('brandTagline'),
+        organizationName: keep('organizationName'),
+        founderName: keep('founderName'),
+        editionLabel: keep('editionLabel'),
+        editionSeriesName: keep('editionSeriesName'),
+        metaTitle: keep('metaTitle'),
+        metaDescription: keep('metaDescription'),
+        metaKeywords: keep('metaKeywords'),
+        ogUrl: keep('ogUrl'),
+        whatsappNumber: keep('whatsappNumber'),
+        whatsappMessage: keep('whatsappMessage'),
+      },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[updateWebsiteSiteCms]', error);
+    return { success: false, error: 'Failed to save site branding' };
+  }
+}
+
+export async function updateWebsitePagesCms(data: WebsitePagesCms) {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return { success: false, error: auth.error };
+  try {
+    await saveCmsPatch({ pages: { ...(await getWebsiteCmsContent()).pages, ...data } });
+    return { success: true };
+  } catch (error) {
+    console.error('[updateWebsitePagesCms]', error);
+    return { success: false, error: 'Failed to save page headings' };
   }
 }
 

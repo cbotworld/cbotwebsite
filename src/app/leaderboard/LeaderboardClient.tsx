@@ -9,8 +9,17 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trophy, Crown, Download, Globe, Users, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { generateRankingReportCSV } from '@/lib/actions/reportActions';
+import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 
-export default function LeaderboardClient({ players, teams }: { players: any[], teams: any[] }) {
+export default function LeaderboardClient({
+  players,
+  teams,
+  pageCms = DEFAULT_WEBSITE_CMS.pages.leaderboard,
+}: {
+  players: any[],
+  teams: any[],
+  pageCms?: WebsitePageHeading,
+}) {
   const [countryFilter, setCountryFilter] = React.useState('Global');
   const [isDownloading, setIsDownloading] = React.useState(false);
 
@@ -42,11 +51,11 @@ export default function LeaderboardClient({ players, teams }: { players: any[], 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 max-w-7xl mx-auto border-b pb-6">
         <div className="text-left space-y-1">
           <Badge variant="carrom" className="px-4 py-1 font-bold">
-            <Trophy className="h-3.5 w-3.5 mr-1 inline" /> Global Rankings
+            <Trophy className="h-3.5 w-3.5 mr-1 inline" /> {pageCms.badge}
           </Badge>
-          <h1 className="text-4xl font-black tracking-tight">Carrom Balu Champions</h1>
+          <h1 className="text-4xl font-black tracking-tight">{pageCms.title}</h1>
           <p className="text-muted-foreground text-sm">
-            Official player ELO ratings, queen strike statistics, and team win-rate leaderboards.
+            {pageCms.subtitle}
           </p>
         </div>
 

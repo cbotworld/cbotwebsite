@@ -15,9 +15,21 @@ import { UserRole } from '@/types';
 export function Navbar({
   editionButtonLabel = '200th Edition',
   editionButtonHref = '/edition-200-combis',
+  combisLabel = 'Daily Team Combis',
+  combisHref = '/edition-200-combis',
+  scheduleLabel = 'Match Schedule',
+  scheduleHref = '/edition-200-schedule',
+  brandName = 'CBOT World',
+  brandTagline = 'Connect Carrom Enthusiasts Worldwide',
 }: {
   editionButtonLabel?: string;
   editionButtonHref?: string;
+  combisLabel?: string;
+  combisHref?: string;
+  scheduleLabel?: string;
+  scheduleHref?: string;
+  brandName?: string;
+  brandTagline?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -83,11 +95,19 @@ export function Navbar({
     await signOut({ callbackUrl: '/login' });
   };
 
-  // Determine active sub-pages for Google-style secondary nav
-  const is200thPage = pathname.includes('200') || pathname.includes('combis') || pathname.includes('schedule') || pathname.includes('videos');
-  const isCombisActive = pathname === '/edition-200-combis' || pathname === '/editions/200th-combis';
-  const isScheduleActive = pathname === '/edition-200-schedule' || pathname === '/editions/200th-schedule';
-  const isVideosActive = pathname === '/edition-200-videos' || pathname === '/editions/200th-videos';
+  // Determine active sub-pages for Google-style secondary nav. The organizer can
+  // repoint these links from the CMS, so match the configured hrefs as well as
+  // the legacy edition routes.
+  const isEditionPage =
+    pathname === combisHref ||
+    pathname === scheduleHref ||
+    pathname === editionButtonHref ||
+    pathname.includes('200') ||
+    pathname.includes('combis') ||
+    pathname.includes('schedule') ||
+    pathname.includes('videos');
+  const isCombisActive = pathname === combisHref || pathname === '/editions/200th-combis';
+  const isScheduleActive = pathname === scheduleHref || pathname === '/editions/200th-schedule';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
@@ -137,21 +157,21 @@ export function Navbar({
           />
           <div className="flex flex-col justify-center leading-tight">
             <span className="text-lg sm:text-2xl font-black tracking-wider bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-clip-text text-transparent leading-none">
-              CBOT World
+              {brandName}
             </span>
             <span className="hidden min-[420px]:block text-[8.5px] sm:text-[10.5px] font-extrabold text-amber-500/90 tracking-wider uppercase leading-none whitespace-nowrap mt-0.5">
-              Connect Carrom Enthusiasts Worldwide
+              {brandTagline}
             </span>
           </div>
         </Link>
 
         {/* Desktop Right Actions */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
-          {/* 200th Edition Page Direct Link */}
+          {/* Current edition page direct link */}
           <Link
             href={editionButtonHref}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black transition-all group shadow-sm ${
-              is200thPage
+              isEditionPage
                 ? 'bg-amber-500 text-slate-950 border border-amber-400 shadow-amber-500/20'
                 : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-400'
             }`}
@@ -243,13 +263,13 @@ export function Navbar({
       <CountryBanner />
 
       {/* Google-Style Secondary Sub-Navbar Bar (BEHAVIOR: Appears BELOW country scroll) */}
-      {is200thPage && (
+      {isEditionPage && (
         <div className="w-full border-t border-border/40 bg-card/90 backdrop-blur-xl px-4 sm:px-8 overflow-x-auto scrollbar-none shadow-md">
           <div className="mx-auto flex max-w-7xl items-center gap-6 sm:gap-8 text-xs sm:text-sm font-bold text-muted-foreground whitespace-nowrap pt-1">
             
             {/* Sub-Tab 1: Daily Team Combis */}
             <Link
-              href="/edition-200-combis"
+              href={combisHref}
               className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
                 isCombisActive
                   ? 'text-amber-400 font-black'
@@ -257,7 +277,7 @@ export function Navbar({
               }`}
             >
               <span>⚔️</span>
-              <span>Daily Team Combis</span>
+              <span>{combisLabel}</span>
               {isCombisActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
@@ -265,7 +285,7 @@ export function Navbar({
 
             {/* Sub-Tab 2: Match Schedule */}
             <Link
-              href="/edition-200-schedule"
+              href={scheduleHref}
               className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
                 isScheduleActive
                   ? 'text-amber-400 font-black'
@@ -273,7 +293,7 @@ export function Navbar({
               }`}
             >
               <span>📅</span>
-              <span>Match Schedule</span>
+              <span>{scheduleLabel}</span>
               {isScheduleActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
@@ -306,7 +326,7 @@ export function Navbar({
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <Link
-                href="/edition-200-combis"
+                href={combisHref}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isCombisActive
@@ -317,7 +337,7 @@ export function Navbar({
                 <span>⚔️</span> Combis
               </Link>
               <Link
-                href="/edition-200-schedule"
+                href={scheduleHref}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isScheduleActive

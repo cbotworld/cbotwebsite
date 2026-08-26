@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   updateWebsiteHeroCms,
   updateWebsiteNavCms,
+  updateWebsiteSiteCms,
+  updateWebsitePagesCms,
   updateWebsiteSponsorsCms,
   updateWebsiteSpecialSponsorsCms,
   updateWebsiteGoldSponsorsCms,
@@ -29,6 +31,9 @@ import {
   type SpecialThanksChip,
   type WebsiteCmsContent,
   type WebsiteNavCms,
+  type WebsiteSiteCms,
+  type WebsitePagesCms,
+  type WebsitePageHeading,
 } from '@/lib/website-cms';
 
 type Props = {
@@ -36,8 +41,20 @@ type Props = {
   currentEditionId?: string | null;
 };
 
+const PAGE_HEADING_FIELDS: Array<{ key: keyof WebsitePagesCms; label: string }> = [
+  { key: 'schedule', label: 'Match schedule page' },
+  { key: 'videos', label: 'Videos page' },
+  { key: 'fixtures', label: 'Fixtures page' },
+  { key: 'about', label: 'About page' },
+  { key: 'editions', label: 'Editions archive page' },
+  { key: 'leaderboard', label: 'Leaderboard page' },
+  { key: 'hallOfFame', label: 'Hall of Fame page' },
+];
+
 export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props) {
   const [nav, setNav] = React.useState<WebsiteNavCms>(initialCms.nav);
+  const [site, setSite] = React.useState<WebsiteSiteCms>(initialCms.site);
+  const [pages, setPages] = React.useState<WebsitePagesCms>(initialCms.pages);
   const [hero, setHero] = React.useState(initialCms.hero);
   const [sponsors, setSponsors] = React.useState(initialCms.sponsors);
   const [specialSponsors, setSpecialSponsors] = React.useState(initialCms.specialSponsors);
@@ -45,6 +62,8 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
   const [legacy, setLegacy] = React.useState(initialCms.legacy);
   const [footer, setFooter] = React.useState(initialCms.footer);
   const [savingNav, setSavingNav] = React.useState(false);
+  const [savingSite, setSavingSite] = React.useState(false);
+  const [savingPages, setSavingPages] = React.useState(false);
   const [savingHero, setSavingHero] = React.useState(false);
   const [savingSponsors, setSavingSponsors] = React.useState(false);
   const [savingSpecial, setSavingSpecial] = React.useState(false);
@@ -53,19 +72,38 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
   const [savingFooter, setSavingFooter] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
 
+  const seededRef = React.useRef(initialCms);
+
+  // The organizer dashboard revalidates on every server action, so a fresh
+  // `initialCms` object arrives constantly - including when a *different* CMS
+  // section is saved. Only adopt server values for sections that still match
+  // what we last seeded, otherwise unsaved typing is wiped before it is saved.
   React.useEffect(() => {
-    setNav(initialCms.nav);
-    setHero(initialCms.hero);
-    setSponsors(initialCms.sponsors);
-    setSpecialSponsors(initialCms.specialSponsors);
-    setGoldSponsors(initialCms.goldSponsors);
-    setLegacy(initialCms.legacy);
-    setFooter(initialCms.footer);
+    const seeded = seededRef.current;
+    if (seeded === initialCms) return;
+    seededRef.current = initialCms;
+
+    const adopt = <T,>(current: T, lastSeeded: T, incoming: T): T =>
+      JSON.stringify(current) === JSON.stringify(lastSeeded) ? incoming : current;
+
+    setNav((prev) => adopt(prev, seeded.nav, initialCms.nav));
+    setSite((prev) => adopt(prev, seeded.site, initialCms.site));
+    setPages((prev) => adopt(prev, seeded.pages, initialCms.pages));
+    setHero((prev) => adopt(prev, seeded.hero, initialCms.hero));
+    setSponsors((prev) => adopt(prev, seeded.sponsors, initialCms.sponsors));
+    setSpecialSponsors((prev) => adopt(prev, seeded.specialSponsors, initialCms.specialSponsors));
+    setGoldSponsors((prev) => adopt(prev, seeded.goldSponsors, initialCms.goldSponsors));
+    setLegacy((prev) => adopt(prev, seeded.legacy, initialCms.legacy));
+    setFooter((prev) => adopt(prev, seeded.footer, initialCms.footer));
   }, [initialCms]);
 
   const showMessage = (text: string) => {
     setMessage(text);
     window.setTimeout(() => setMessage(null), 3500);
+  };
+
+  const updatePageHeading = (key: keyof WebsitePagesCms, patch: Partial<WebsitePageHeading>) => {
+    setPages((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   };
 
   const updateStat = (index: number, patch: Partial<HeroStat>) => {
@@ -82,11 +120,29 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
     showMessage(res.success ? 'Navbar edition button saved. Refresh the site to see it.' : res.error || 'Save failed');
   };
 
+  const saveSite = async () => {
+    setSavingSite(true);
+    const res = await updateWebsiteSiteCms(site);
+    setSavingSite(false);
+    showMessage(res.success ? 'Site branding saved across the whole website.' : res.error || 'Save failed');
+  };
+
+  const savePages = async () => {
+    setSavingPages(true);
+    const res = await updateWebsitePagesCms(pages);
+    setSavingPages(false);
+    showMessage(res.success ? 'Page headings saved.' : res.error || 'Save failed');
+  };
+
   const saveHero = async () => {
     setSavingHero(true);
     const res = await updateWebsiteHeroCms(hero, currentEditionId || undefined);
     setSavingHero(false);
-    showMessage(res.success ? 'Hero section saved. Refresh the homepage to see the new poster.' : res.error || 'Save failed');
+    showMessage(
+      res.success
+        ? res.warning || 'Hero section saved and live on the homepage.'
+        : res.error || 'Save failed',
+    );
   };
 
   const saveSponsors = async () => {
@@ -284,7 +340,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
             <Globe className="h-5 w-5 text-amber-500" /> Website CMS
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Edit the navbar edition button, homepage hero, sponsors, legacy videos, and footer. Team logos still come from Teams tab. Sponsor images are optional — initials show when empty.
+            Edit site-wide branding, page headings, the navbar edition button, homepage hero, sponsors, legacy videos, and footer. Site &amp; Brand renames the edition everywhere at once. Team logos still come from the Teams tab. Sponsor images are optional — initials show when empty.
           </p>
         </div>
         {message && (
@@ -294,8 +350,14 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
         )}
       </div>
 
-      <Tabs defaultValue="hero" className="space-y-4">
+      <Tabs defaultValue="site" className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1.5 bg-card border border-border rounded-2xl">
+          <TabsTrigger value="site" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Globe className="h-3.5 w-3.5" /> Site &amp; Brand
+          </TabsTrigger>
+          <TabsTrigger value="pages" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <LayoutTemplate className="h-3.5 w-3.5" /> Page Headings
+          </TabsTrigger>
           <TabsTrigger value="hero" className="text-xs font-bold gap-1.5 px-3 py-2">
             <ImageIcon className="h-3.5 w-3.5" /> Hero Section
           </TabsTrigger>
@@ -315,6 +377,130 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
             <LayoutTemplate className="h-3.5 w-3.5" /> Footer
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="site" className="space-y-4">
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-base font-black">Site-wide branding</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                These names are reused across every page, the navbar, the footer and the browser/SEO
+                title. Changing the edition label here renames it everywhere at once.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold block mb-1">Brand name (navbar &amp; footer)</label>
+                  <Input value={site.brandName} onChange={(e) => setSite({ ...site, brandName: e.target.value })} placeholder="CBOT World" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Short name / abbreviation</label>
+                  <Input value={site.shortName} onChange={(e) => setSite({ ...site, shortName: e.target.value })} placeholder="CBOT" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold block mb-1">Navbar tagline</label>
+                  <Input value={site.brandTagline} onChange={(e) => setSite({ ...site, brandTagline: e.target.value })} placeholder="Connect Carrom Enthusiasts Worldwide" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Organization name</label>
+                  <Input value={site.organizationName} onChange={(e) => setSite({ ...site, organizationName: e.target.value })} placeholder="Carrom Balu Online Tournament" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Founder name</label>
+                  <Input value={site.founderName} onChange={(e) => setSite({ ...site, founderName: e.target.value })} placeholder="Carrom Balu" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Edition label</label>
+                  <Input value={site.editionLabel} onChange={(e) => setSite({ ...site, editionLabel: e.target.value })} placeholder="e.g. 201st Edition" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Edition series name</label>
+                  <Input value={site.editionSeriesName} onChange={(e) => setSite({ ...site, editionSeriesName: e.target.value })} placeholder="e.g. Cornerstones of Carrom" />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60 space-y-3">
+                <div className="text-xs font-black uppercase tracking-widest text-amber-500">
+                  Search engine &amp; sharing
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Browser / SEO title</label>
+                  <Input value={site.metaTitle} onChange={(e) => setSite({ ...site, metaTitle: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">SEO description</label>
+                  <Input value={site.metaDescription} onChange={(e) => setSite({ ...site, metaDescription: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">SEO keywords (comma separated)</label>
+                  <Input value={site.metaKeywords} onChange={(e) => setSite({ ...site, metaKeywords: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Site URL</label>
+                  <Input value={site.ogUrl} onChange={(e) => setSite({ ...site, ogUrl: e.target.value })} placeholder="https://cbot.gg" />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60 space-y-3">
+                <div className="text-xs font-black uppercase tracking-widest text-amber-500">
+                  Floating WhatsApp button
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold block mb-1">WhatsApp number (no + or spaces)</label>
+                    <Input value={site.whatsappNumber} onChange={(e) => setSite({ ...site, whatsappNumber: e.target.value })} placeholder="6594519986" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Pre-filled message</label>
+                    <Input value={site.whatsappMessage} onChange={(e) => setSite({ ...site, whatsappMessage: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              <Button type="button" variant="carrom" size="sm" className="font-bold" onClick={() => void saveSite()} disabled={savingSite}>
+                {savingSite ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                Save site branding
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pages" className="space-y-4">
+          <Card className="border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-base font-black">Page headings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                The badge, title and description shown at the top of each public page.
+              </p>
+              {PAGE_HEADING_FIELDS.map(({ key, label }) => (
+                <div key={key} className="rounded-xl border border-border/60 p-3 space-y-2">
+                  <div className="text-xs font-black uppercase tracking-widest text-amber-500">{label}</div>
+                  <Input
+                    value={pages[key].badge}
+                    onChange={(e) => updatePageHeading(key, { badge: e.target.value })}
+                    placeholder="Badge"
+                  />
+                  <Input
+                    value={pages[key].title}
+                    onChange={(e) => updatePageHeading(key, { title: e.target.value })}
+                    placeholder="Title"
+                  />
+                  <Input
+                    value={pages[key].subtitle}
+                    onChange={(e) => updatePageHeading(key, { subtitle: e.target.value })}
+                    placeholder="Description"
+                  />
+                </div>
+              ))}
+              <Button type="button" variant="carrom" size="sm" className="font-bold" onClick={() => void savePages()} disabled={savingPages}>
+                {savingPages ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                Save page headings
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="hero" className="space-y-4">
           <Card className="border-amber-500/30">
@@ -341,6 +527,46 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
                     onChange={(e) => setNav({ ...nav, editionButtonHref: e.target.value })}
                     placeholder="/edition-200-combis"
                   />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60 space-y-3">
+                <div className="text-xs font-black uppercase tracking-widest text-amber-500">
+                  Edition sub-navigation tabs
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Combis tab text</label>
+                    <Input
+                      value={nav.combisLabel}
+                      onChange={(e) => setNav({ ...nav, combisLabel: e.target.value })}
+                      placeholder="Daily Team Combis"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Combis tab link</label>
+                    <Input
+                      value={nav.combisHref}
+                      onChange={(e) => setNav({ ...nav, combisHref: e.target.value })}
+                      placeholder="/edition-200-combis"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Schedule tab text</label>
+                    <Input
+                      value={nav.scheduleLabel}
+                      onChange={(e) => setNav({ ...nav, scheduleLabel: e.target.value })}
+                      placeholder="Match Schedule"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">Schedule tab link</label>
+                    <Input
+                      value={nav.scheduleHref}
+                      onChange={(e) => setNav({ ...nav, scheduleHref: e.target.value })}
+                      placeholder="/edition-200-schedule"
+                    />
+                  </div>
                 </div>
               </div>
               <Button type="button" variant="carrom" size="sm" className="font-bold" onClick={() => void saveNav()} disabled={savingNav}>

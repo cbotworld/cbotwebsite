@@ -4,32 +4,39 @@ import './globals.css';
 import { Providers } from './providers';
 import { NavbarWithCms } from '@/components/layout/NavbarWithCms';
 import { FooterWithCms } from '@/components/layout/FooterWithCms';
-import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
+import { WhatsAppButtonWithCms } from '@/components/ui/WhatsAppButtonWithCms';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
-export const metadata: Metadata = {
-  title: 'CBOT World - Carrom Balu Online Tournament',
-  description: 'The ultimate online Carrom esports tournament platform for Organizers, Captains, and Players. Live brackets, automated match scoring, and global leaderboards.',
-  keywords: ['Carrom', 'CBOT', 'CBOT World', 'Carrom Balu', 'Online Tournament', 'Esports', 'Match Scoring', 'Tournament Brackets'],
-  authors: [{ name: 'CBOT Team' }],
-  icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
-  },
-  openGraph: {
-    title: 'CBOT World - Carrom Balu Online Tournament',
-    description: 'Competitive Carrom tournament portal with visual interactive brackets and real-time match statistics.',
-    url: 'https://cbot.gg',
-    siteName: 'CBOT World',
-    images: [{ url: '/logo.png', width: 500, height: 500, alt: 'Carrom Balu Online Tournament Logo' }],
-    type: 'website',
-  },
-  verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { site } = await getWebsiteCmsContent();
+  return {
+    title: site.metaTitle,
+    description: site.metaDescription,
+    keywords: site.metaKeywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
+    authors: [{ name: `${site.shortName} Team` }],
+    icons: {
+      icon: '/logo.png',
+      shortcut: '/logo.png',
+      apple: '/logo.png',
+    },
+    openGraph: {
+      title: site.metaTitle,
+      description: site.metaDescription,
+      url: site.ogUrl,
+      siteName: site.brandName,
+      images: [{ url: '/logo.png', width: 500, height: 500, alt: `${site.organizationName} Logo` }],
+      type: 'website',
+    },
+    verification: {
+      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    },
+  };
+}
 
 export default function RootLayout({
   children,
@@ -43,7 +50,7 @@ export default function RootLayout({
           <NavbarWithCms />
           <main className="flex-1">{children}</main>
           <FooterWithCms />
-          <WhatsAppButton />
+          <WhatsAppButtonWithCms />
         </Providers>
       </body>
     </html>

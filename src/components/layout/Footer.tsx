@@ -6,9 +6,13 @@ import { DEFAULT_WEBSITE_CMS, type WebsiteFooterCms } from '@/lib/website-cms';
 
 type FooterProps = {
   footerCms?: WebsiteFooterCms;
+  brandName?: string;
 };
 
-export function Footer({ footerCms = DEFAULT_WEBSITE_CMS.footer }: FooterProps) {
+export function Footer({
+  footerCms = DEFAULT_WEBSITE_CMS.footer,
+  brandName = DEFAULT_WEBSITE_CMS.site.brandName,
+}: FooterProps) {
   const pathname = usePathname();
   if (pathname?.includes('/live')) {
     return null;
@@ -22,7 +26,7 @@ export function Footer({ footerCms = DEFAULT_WEBSITE_CMS.footer }: FooterProps) 
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Carrom Balu Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <span className="text-lg font-black tracking-tight bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                CBOT World
+                {brandName}
               </span>
             </div>
             <p className="text-muted-foreground text-xs leading-relaxed max-w-sm">

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
@@ -7,10 +8,14 @@ import { Trophy, Star, Shield, Award } from 'lucide-react';
 export const revalidate = 3600;
 
 export default async function HallOfFamePage() {
-  const members = await prisma.hallOfFame.findMany({
-    include: { user: true },
-    orderBy: { inductionYear: 'desc' }
-  });
+  const [members, cms] = await Promise.all([
+    prisma.hallOfFame.findMany({
+      include: { user: true },
+      orderBy: { inductionYear: 'desc' }
+    }),
+    getWebsiteCmsContent(),
+  ]);
+  const pageCms = cms.pages.hallOfFame;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 space-y-10">
@@ -18,13 +23,13 @@ export default async function HallOfFamePage() {
       {/* Header */}
       <div className="text-center space-y-4 max-w-3xl mx-auto">
         <Badge variant="carrom" className="px-5 py-1.5 font-bold text-sm">
-          <Star className="h-4 w-4 mr-1.5 inline" /> CBOT Hall of Fame
+          <Star className="h-4 w-4 mr-1.5 inline" /> {cms.site.shortName} {pageCms.badge}
         </Badge>
         <h1 className="text-4xl md:text-5xl font-black tracking-tight text-amber-500">
-          Legendary Champions
+          {pageCms.title}
         </h1>
         <p className="text-muted-foreground md:text-lg">
-          Honoring the greatest strikers, captains, and visionaries in the history of the Carrom Balu Online Tournament.
+          {pageCms.subtitle}
         </p>
       </div>
 

@@ -3,25 +3,28 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 
-const WHATSAPP_NUMBER = '6594519986'; // +65 94519986 (no + or spaces)
-const WHATSAPP_MESSAGE = encodeURIComponent(
-  'Hi Carrom Balu! I would like to know more about CBOT (Carrom Balu Online Tournament).'
-);
-const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`;
-
-export function WhatsAppButton() {
+export function WhatsAppButton({
+  phoneNumber = '6594519986', // +65 94519986 (no + or spaces)
+  message = 'Hi Carrom Balu! I would like to know more about CBOT (Carrom Balu Online Tournament).',
+  contactName = 'Carrom Balu',
+}: {
+  phoneNumber?: string;
+  message?: string;
+  contactName?: string;
+}) {
   const pathname = usePathname();
   if (pathname?.includes('/live')) {
     return null;
   }
+  const href = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
   return (
     <a
-      href={WHATSAPP_URL}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Chat with Carrom Balu on WhatsApp"
+      aria-label={`Chat with ${contactName} on WhatsApp`}
       className="whatsapp-float-btn group"
-      title="Message Carrom Balu on WhatsApp"
+      title={`Message ${contactName} on WhatsApp`}
     >
       {/* WhatsApp SVG Icon */}
       <svg
@@ -35,7 +38,7 @@ export function WhatsAppButton() {
 
       {/* Tooltip / Label */}
       <span className="whatsapp-float-label">
-        Message Carrom Balu
+        Message {contactName}
       </span>
     </a>
   );

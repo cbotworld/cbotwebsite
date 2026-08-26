@@ -1,11 +1,12 @@
 import { getEditions } from '@/lib/actions/tournamentActions';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import EditionsClient from './EditionsClient';
 
 export const revalidate = 3600;
 
 export default async function EditionsPage() {
-  const res = await getEditions();
+  const [res, cms] = await Promise.all([getEditions(), getWebsiteCmsContent()]);
   const editions = res.success && res.editions ? res.editions : [];
 
-  return <EditionsClient editions={editions} />;
+  return <EditionsClient editions={editions} pageCms={cms.pages.editions} />;
 }

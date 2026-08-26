@@ -10,8 +10,19 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Calendar, Clock, MapPin, Trophy, Shield, Filter, Search, ArrowRight, Video, Flame, Sparkles } from 'lucide-react';
 import { Match } from '@/types';
 import { formatMatchStage } from '@/lib/tournament-stages';
+import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 
-export default function FixturesClient({ initialMatches }: { initialMatches: any[] }) {
+export default function FixturesClient({
+  initialMatches,
+  pageCms = DEFAULT_WEBSITE_CMS.pages.fixtures,
+  scheduleHref = DEFAULT_WEBSITE_CMS.nav.scheduleHref,
+  scheduleLabel = DEFAULT_WEBSITE_CMS.nav.scheduleLabel,
+}: {
+  initialMatches: any[];
+  pageCms?: WebsitePageHeading;
+  scheduleHref?: string;
+  scheduleLabel?: string;
+}) {
   const [stageFilter, setStageFilter] = React.useState<string>('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
 
@@ -36,19 +47,19 @@ export default function FixturesClient({ initialMatches }: { initialMatches: any
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="CBOT Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <Badge variant="carrom" className="font-extrabold px-3 py-1">
-                <Calendar className="h-3.5 w-3.5 mr-1" /> Official Fixtures & Public Schedule
+                <Calendar className="h-3.5 w-3.5 mr-1" /> {pageCms.badge}
               </Badge>
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight">Cornerstones of Carrom (Edition #200) Schedule</h1>
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight">{pageCms.title}</h1>
             <p className="text-muted-foreground text-sm max-w-2xl">
-              Inspect upcoming round-robin, league group, qualifier, and finals fixtures, plus table numbers and time slots.
+              {pageCms.subtitle}
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/edition-200-schedule">
+            <Link href={scheduleHref}>
               <Button variant="carrom" className="font-extrabold text-xs shadow-lg w-full sm:w-auto border border-amber-400 gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-300" /> View Bicentennial Monuments Schedule
+                <Sparkles className="h-4 w-4 text-amber-300" /> View {scheduleLabel}
               </Button>
             </Link>
             <Link href="/live">

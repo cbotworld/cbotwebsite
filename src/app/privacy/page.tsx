@@ -2,13 +2,19 @@ import * as React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { Metadata } from 'next';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy — CBOT',
-  description: 'Privacy Policy for CBOT (Carrom Balu Online Tournament).',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { site } = await getWebsiteCmsContent();
+  return {
+    title: `Privacy Policy — ${site.shortName}`,
+    description: `Privacy Policy for ${site.shortName} (${site.organizationName}).`,
+  };
+}
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage() {
+  const { site } = await getWebsiteCmsContent();
+
   return (
     <div className="min-h-screen bg-background text-foreground py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-8 bg-card/40 border border-border/60 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md">
@@ -31,7 +37,7 @@ export default function PrivacyPolicyPage() {
         {/* Content */}
         <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
           <p>
-            Carrom Balu Online Tournament (CBOT) is committed to protecting your privacy. This policy outlines how we handle player and participant information.
+            {`${site.organizationName} (${site.shortName}) is committed to protecting your privacy. This policy outlines how we handle player and participant information.`}
           </p>
 
           <div className="space-y-2">

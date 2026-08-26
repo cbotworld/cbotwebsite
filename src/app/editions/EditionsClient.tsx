@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Search, Calendar, Crown, ArrowRight } from 'lucide-react';
 import { formatIsoDateLabel } from '@/lib/combi-cutoff';
+import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 
 const START_LABEL_OPTS: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
 
@@ -21,7 +22,13 @@ function editionStartLabel(ed: any) {
   return fallback ? formatIsoDateLabel(String(fallback), START_LABEL_OPTS) : '—';
 }
 
-export default function EditionsClient({ editions }: { editions: any[] }) {
+export default function EditionsClient({
+  editions,
+  pageCms = DEFAULT_WEBSITE_CMS.pages.editions,
+}: {
+  editions: any[];
+  pageCms?: WebsitePageHeading;
+}) {
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const filteredEditions = editions.filter((ed) => {
@@ -36,10 +43,10 @@ export default function EditionsClient({ editions }: { editions: any[] }) {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <Badge variant="carrom" className="mb-2">CBOT Archive</Badge>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">Tournament Editions Archive</h1>
+          <Badge variant="carrom" className="mb-2">{pageCms.badge}</Badge>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">{pageCms.title}</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Browse full historic records of the Carrom Balu Online Tournament.
+            {pageCms.subtitle}
           </p>
         </div>
         <div className="text-right font-mono text-sm font-bold text-amber-500 bg-amber-500/10 px-4 py-2 rounded-xl border border-amber-500/30">

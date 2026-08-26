@@ -27,6 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
 export const TEAMS_DATA: Record<string, {
   name: string;
@@ -136,9 +137,11 @@ export interface CleanPlayerVideo {
 export default function VideosClient({
   initialMatches = [],
   initialStreams = [],
+  badgeText = DEFAULT_WEBSITE_CMS.pages.videos.badge,
 }: {
   initialMatches: any[];
   initialStreams: any[];
+  badgeText?: string;
 }) {
   const [selectedDay, setSelectedDay] = React.useState<number | 'ALL'>('ALL');
   const [selectedTeam, setSelectedTeam] = React.useState<string | 'ALL'>('ALL');
@@ -341,7 +344,7 @@ export default function VideosClient({
             <div className="flex items-center gap-2 flex-wrap">
               <img src="/logo.png" alt="CBOT Logo" className="h-10 w-10 object-contain drop-shadow-md" />
               <Badge variant="carrom" className="font-extrabold px-3 py-1 text-xs">
-                🏆 Bicentennial 200th Edition Video Center
+                {badgeText}
               </Badge>
               {liveCount > 0 && (
                 <Badge className="bg-rose-600 text-white font-black text-xs px-3 py-1 gap-1.5 animate-pulse shadow-lg shadow-rose-600/40">

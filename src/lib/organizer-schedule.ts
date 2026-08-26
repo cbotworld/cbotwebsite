@@ -270,13 +270,18 @@ export function liveFixtureTitle(
   if (!focus) return 'MATCH SCHEDULE';
   const stage = stageForDay(focus.dayNumber, stages);
   const kind = stage?.kind || focus.stageKind;
+  const configured = (stage?.name || focus.stageName || '').trim();
+  if (configured) {
+    const upper = configured.toUpperCase();
+    return upper.includes('FIXTURE') ? upper : `${upper} FIXTURE`;
+  }
   if (kind === 'ROUND_ROBIN' || (!kind && focus.dayNumber <= 7)) {
-    return 'BICENTENNIAL MONUMENTS FIXTURE';
+    return 'ROUND ROBIN FIXTURE';
   }
   if (kind === 'LEAGUE' || (!kind && focus.dayNumber >= 8 && focus.dayNumber <= 10)) {
-    return 'ROYAL CARROMS FIXTURE';
+    return 'LEAGUE FIXTURE';
   }
-  const name = (stage?.name || focus.stageName || focus.title).toUpperCase();
+  const name = focus.title.toUpperCase();
   return name.includes('FIXTURE') ? name : `${name} FIXTURE`;
 }
 
@@ -322,12 +327,24 @@ export function buildOrganizerScheduleDays(opts?: {
     const stage = stageForDay(dayNumber, stages);
     const allSpoc = matches.length > 0 && matches.every((m) => m.isSpocExhibition);
     const calendarDate = calendarDateForDay(dayNumber, dates);
+
+    // The seeded fixtures carry the original edition's dates. Once this edition's
+    // own calendar moves a day, recompute its 8pm-8pm window from that date so a
+    // relocated tournament is not judged against the old schedule.
+    const seededEndDate = endIso.slice(0, 10);
+    const moved = Boolean(calendarDate) && calendarDate !== seededEndDate;
+    const playStartIso = moved ? `${addDaysIsoDate(calendarDate, -1)}T20:00:00+05:30` : startIso;
+    const playEndIso = moved ? `${calendarDate}T20:00:00+05:30` : endIso;
+
+    // A stage name configured by the organizer always outranks the seeded title.
+    const stageTitle = stage?.name ? `${stage.name.toUpperCase()} · DAY ${dayNumber}` : title;
+
     byDay.set(dayNumber, {
       dayNumber,
-      title: allSpoc ? `SPOC EXHIBITION · DAY ${dayNumber}` : title,
-      timeRange,
-      startIso,
-      endIso,
+      title: allSpoc ? `SPOC EXHIBITION · DAY ${dayNumber}` : stageTitle,
+      timeRange: moved ? formatDayRange(playStartIso, playEndIso) : timeRange,
+      startIso: playStartIso,
+      endIso: playEndIso,
       calendarDate,
       stageName: allSpoc ? 'Spoc Exhibition' : stage?.name || kindShort(stage?.kind),
       stageKind: allSpoc ? 'SPOC_EXHIBITION' : stage?.kind || '',
