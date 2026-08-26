@@ -84,7 +84,7 @@ export default async function TeamsPage() {
                 <div className="flex flex-wrap gap-2">
                   {team.members?.map((mem) => (
                     <Badge key={mem.id} variant="outline" className="text-xs py-1 px-2.5 gap-1.5">
-                      <Avatar src={mem.user.image || undefined} fallback={mem.user.name || 'P'} size="sm" className="h-5 w-5" />
+                      <Avatar fallback={mem.user.name || 'P'} size="sm" className="h-5 w-5" />
                       {mem.user.name} ({mem.user.id === team.captainId ? 'CAPTAIN' : 'PLAYER'})
                     </Badge>
                   ))}

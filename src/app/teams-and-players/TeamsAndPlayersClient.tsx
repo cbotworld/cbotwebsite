@@ -157,7 +157,7 @@ function TeamSection({
                       key={member.id}
                       className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-1.5"
                     >
-                      <Avatar src={member.image} fallback={member.name} size="sm" className="h-7 w-7" />
+                      <Avatar fallback={member.name} size="sm" className="h-7 w-7" />
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold truncate">{member.name}</div>
                         {member.username ? (

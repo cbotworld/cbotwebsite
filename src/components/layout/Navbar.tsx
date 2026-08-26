@@ -181,17 +181,6 @@ export function Navbar({
 
         {/* Desktop Right Actions */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
-          <Link
-            href={PUBLIC_TEAMS_PLAYERS_PATH}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all border ${
-              isTeamsPlayersActive
-                ? 'bg-amber-500 text-slate-950 border-amber-400'
-                : 'bg-muted/40 text-foreground border-border/60 hover:border-amber-500/40 hover:bg-muted'
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" />
-            <span>Teams &amp; Players</span>
-          </Link>
           {/* Current edition page direct link */}
           <Link
             href={editionButtonHref}
@@ -411,15 +400,6 @@ export function Navbar({
               }`}
             >
               <Home className="h-4 w-4 text-amber-400" /> {shortName} Arena Home
-            </Link>
-            <Link
-              href={PUBLIC_TEAMS_PLAYERS_PATH}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                isTeamsPlayersActive ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
-              }`}
-            >
-              <Users className="h-4 w-4 text-amber-400" /> Teams &amp; Players
             </Link>
 
             {session?.user ? (

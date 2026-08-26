@@ -3,6 +3,20 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+const GENERIC_AVATAR =
+  /photo-1534528741775-53994a69daeb|api\.dicebear\.com|ui-avatars\.com/i;
+
+function twoLetterName(value: string) {
+  const letters = (value || '').replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (letters.length >= 2) return letters.slice(0, 2);
+  if (letters.length === 1) return letters;
+  return '?';
+}
+
+function isGenericAvatarSrc(src?: string) {
+  return !src || GENERIC_AVATAR.test(src);
+}
+
 export function Avatar({
   src,
   alt,
@@ -19,14 +33,15 @@ export function Avatar({
   const [error, setError] = React.useState(false);
 
   const sizeClasses = {
-    sm: 'h-8 w-8 text-xs font-black',
-    md: 'h-10 w-10 text-sm font-black',
-    lg: 'h-12 w-12 text-base font-black',
-    xl: 'h-16 w-16 text-xl font-black',
+    sm: 'h-8 w-8 text-[10px] font-black',
+    md: 'h-10 w-10 text-xs font-black',
+    lg: 'h-12 w-12 text-sm font-black',
+    xl: 'h-16 w-16 text-lg font-black',
   };
 
   const isSystemLogo = src === '/logo.png' || src === '/tectangle-logo.png';
-  const firstLetter = (fallback || alt || 'P').trim().charAt(0).toUpperCase();
+  const initials = twoLetterName(fallback || alt || 'P');
+  const showPhoto = Boolean(src) && !error && !isGenericAvatarSrc(src);
 
   return (
     <div
@@ -39,19 +54,19 @@ export function Avatar({
         className
       )}
     >
-      {src && !error ? (
+      {showPhoto ? (
         <img
           src={src}
           alt={alt || fallback}
           className={cn(
-            "aspect-square h-full w-full",
-            isSystemLogo ? "object-contain p-0.5" : "object-cover"
+            'aspect-square h-full w-full',
+            isSystemLogo ? 'object-contain p-0.5' : 'object-cover'
           )}
           onError={() => setError(true)}
         />
       ) : (
-        <span className="leading-none text-center font-black drop-shadow-sm">
-          {firstLetter}
+        <span className="leading-none text-center font-black tracking-tight drop-shadow-sm">
+          {initials}
         </span>
       )}
     </div>
