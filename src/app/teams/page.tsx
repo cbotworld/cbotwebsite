@@ -33,9 +33,9 @@ export default async function TeamsPage() {
             Official team franchises competing across CBOT editions.
           </p>
         </div>
-        <Link href="/register">
+        <Link href="/teams-and-players">
           <Button variant="carrom" className="font-bold text-xs">
-            + Register New Team
+            View Teams &amp; Players
           </Button>
         </Link>
       </div>

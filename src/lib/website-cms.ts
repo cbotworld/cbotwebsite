@@ -129,6 +129,7 @@ export type WebsitePagesCms = {
   editions: WebsitePageHeading;
   leaderboard: WebsitePageHeading;
   hallOfFame: WebsitePageHeading;
+  teamsPlayers: WebsitePageHeading;
 };
 
 export type WebsiteFooterCms = {
@@ -242,6 +243,11 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       title: 'Legendary Champions',
       subtitle:
         'Honoring the greatest strikers, captains, and visionaries in the history of the Carrom Balu Online Tournament.',
+    },
+    teamsPlayers: {
+      badge: 'Rosters',
+      title: 'Teams & Players',
+      subtitle: 'Every franchise and every registered player in the current edition.',
     },
   },
   nav: {
@@ -460,6 +466,7 @@ export function parseWebsiteCms(raw: string | null | undefined): WebsiteCmsConte
         editions: mergeSection(DEFAULT_WEBSITE_CMS.pages.editions, parsed.pages?.editions),
         leaderboard: mergeSection(DEFAULT_WEBSITE_CMS.pages.leaderboard, parsed.pages?.leaderboard),
         hallOfFame: mergeSection(DEFAULT_WEBSITE_CMS.pages.hallOfFame, parsed.pages?.hallOfFame),
+        teamsPlayers: mergeSection(DEFAULT_WEBSITE_CMS.pages.teamsPlayers, parsed.pages?.teamsPlayers),
       },
       nav: mergeSection(DEFAULT_WEBSITE_CMS.nav, parsed.nav),
       hero: mergeSection(DEFAULT_WEBSITE_CMS.hero, parsed.hero),

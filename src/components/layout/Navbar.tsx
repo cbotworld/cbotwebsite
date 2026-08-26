@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { Menu, X, LayoutDashboard, ChevronDown, LogOut, Loader2, Home, Trophy, Calendar, Swords } from 'lucide-react';
+import { Menu, X, LayoutDashboard, ChevronDown, LogOut, Loader2, Home, Trophy, Calendar, Swords, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { VisitorCounter } from '@/components/layout/VisitorCounter';
@@ -169,6 +169,17 @@ export function Navbar({
 
         {/* Desktop Right Actions */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
+          <Link
+            href="/teams-and-players"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all border ${
+              pathname === '/teams-and-players'
+                ? 'bg-amber-500 text-slate-950 border-amber-400'
+                : 'bg-muted/40 text-foreground border-border/60 hover:border-amber-500/40 hover:bg-muted'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" />
+            <span>Teams &amp; Players</span>
+          </Link>
           {/* Current edition page direct link */}
           <Link
             href={editionButtonHref}
@@ -364,6 +375,15 @@ export function Navbar({
               }`}
             >
               <Home className="h-4 w-4 text-amber-400" /> {shortName} Arena Home
+            </Link>
+            <Link
+              href="/teams-and-players"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                pathname === '/teams-and-players' ? 'bg-amber-500/20 text-amber-400 font-black' : 'hover:bg-muted text-foreground'
+              }`}
+            >
+              <Users className="h-4 w-4 text-amber-400" /> Teams &amp; Players
             </Link>
 
             {session?.user ? (

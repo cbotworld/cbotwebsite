@@ -241,7 +241,8 @@ export default function HomeClient({
             <div className="absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
             <div className="flex animate-marquee gap-5 w-max">
               {marqueeItems.map((team, i) => (
-                <div
+                <Link
+                  href="/teams-and-players"
                   key={`${team.id}-${i}`}
                   className="relative flex-shrink-0 h-64 w-auto rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-105 hover:-translate-y-1"
                   title={team.name}
@@ -253,7 +254,7 @@ export default function HomeClient({
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none" />
-                </div>
+                </Link>
               ))}
             </div>
           </div>

@@ -493,6 +493,7 @@ export async function addOrUpdateEditionTeam(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
     // The homepage marquee and fixtures render team posters and are ISR-cached,
     // so they have to be invalidated too or a new logo stays hidden for an hour.
     revalidatePath('/', 'layout');
@@ -631,6 +632,7 @@ export async function updateTeamRosterAndCaptain(data: {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
     // The homepage marquee and fixtures render team posters and are ISR-cached,
     // so they have to be invalidated too or a new logo stays hidden for an hour.
     revalidatePath('/', 'layout');
@@ -762,6 +764,7 @@ export async function autoAssignPlayersToTeams(editionId: string) {
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
     // The homepage marquee and fixtures render team posters and are ISR-cached,
     // so they have to be invalidated too or a new logo stays hidden for an hour.
     revalidatePath('/', 'layout');
@@ -797,6 +800,7 @@ export async function deleteTeam(teamId: string) {
     await syncCaptainRole({ previousCaptainId: doomed?.captainId || null });
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
     // The homepage marquee and fixtures render team posters and are ISR-cached,
     // so they have to be invalidated too or a new logo stays hidden for an hour.
     revalidatePath('/', 'layout');
@@ -980,6 +984,7 @@ export async function startNewTournament(opts: {
     revalidatePath('/edition-200-schedule');
     revalidatePath('/edition-200-combis');
     revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
 
     return { success: true, title };
   } catch (error: any) {

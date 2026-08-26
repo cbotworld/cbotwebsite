@@ -51,6 +51,7 @@ const PAGE_HEADING_FIELDS: Array<{ key: keyof WebsitePagesCms; label: string }> 
   { key: 'editions', label: 'Editions archive page' },
   { key: 'leaderboard', label: 'Leaderboard page' },
   { key: 'hallOfFame', label: 'Hall of Fame page' },
+  { key: 'teamsPlayers', label: 'Teams & Players page' },
 ];
 
 export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props) {
