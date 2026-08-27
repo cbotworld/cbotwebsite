@@ -448,7 +448,6 @@ export async function getMyDayScoresForUser(userId: string) {
     });
   }
   let eligibleDay =
-    days.find((d) => d.windowOpen && !d.submitted)?.dayNumber ||
     days.find((d) => d.windowOpen)?.dayNumber ||
     nextEligibleDay(submittedDays, maxDay);
   if (!isScoreSubmitOpen(eligibleDay, edition.dayDates)) {
