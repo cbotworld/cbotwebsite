@@ -65,7 +65,10 @@ function MatchDayScoreBox({
   const submitted = (scoreInfo?.scores || []).find((s) => s.dayNumber === dayNumber);
   const published = (scoreInfo?.publishedDays || []).some((d) => d.dayNumber === dayNumber && d.published);
   const dayWindow = (scoreInfo?.days || []).find((d) => d.dayNumber === dayNumber);
-  const canEdit = dayWindow ? dayWindow.windowOpen : !published;
+  // Use per-day window if available, otherwise fall back to global windowOpen (only true for eligibleDay)
+  const canEdit = dayWindow != null
+    ? dayWindow.windowOpen
+    : (scoreInfo?.eligibleDay === dayNumber ? Boolean(scoreInfo?.windowOpen) : !published);
   const stats = submitted ? parseBoardDrafts(boardsFromSaved(submitted)) : null;
 
   let body: ReactNode;

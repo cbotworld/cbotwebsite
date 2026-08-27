@@ -537,6 +537,7 @@ export type DayScoreInfo = {
     slams: number;
     boards?: Array<{ score?: number; slams?: number }>;
   }>;
+  days?: Array<{ dayNumber: number; windowOpen: boolean; windowReason: string | null; submitted: boolean }>;
   eligibleDay?: number | null;
   maxDay?: number;
   windowOpen?: boolean;
