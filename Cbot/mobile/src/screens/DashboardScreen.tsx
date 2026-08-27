@@ -98,7 +98,7 @@ function MatchDayScoreBox({
       </Text>
     );
   } else {
-    body = <Text style={styles.scoreHint}>{SCORE_EDIT_PLAYER_CLOSED}</Text>;
+    body = <Text style={styles.scoreHint}>{dayWindow?.windowReason || SCORE_EDIT_PLAYER_CLOSED}</Text>;
   }
 
   return (

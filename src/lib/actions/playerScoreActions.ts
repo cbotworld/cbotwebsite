@@ -148,7 +148,23 @@ async function userOnEditionTeam(userId: string, editionId: string) {
   return Boolean(team);
 }
 
-function describeScoreWindow(day: number, dayDates: any) {
+async function playerHasGoneLive(userId: string, editionId?: string): Promise<boolean> {
+  const count = await prisma.liveStream.count({
+    where: {
+      playerId: userId,
+      ...(editionId ? { editionId } : {}),
+    },
+  });
+  return count > 0;
+}
+
+function describeScoreWindow(day: number, dayDates: any, hasGoneLive = true) {
+  if (day > 1 && !hasGoneLive) {
+    return {
+      windowOpen: false,
+      windowReason: `Go live at least once to submit scores for Day ${day}.`,
+    };
+  }
   if (isScoreSubmitOpen(day, dayDates)) {
     return { windowOpen: true, windowReason: null as string | null };
   }
@@ -176,6 +192,16 @@ export async function submitPlayerDayScoreForUser(
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const day = Number(dayNumber);
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
+
+  if (day > 1) {
+    const hasLive = await playerHasGoneLive(userId, edition.id);
+    if (!hasLive) {
+      return {
+        success: false as const,
+        error: `Please go live at least once before submitting scores for Day ${day}.`,
+      };
+    }
+  }
 
   if (!isScoreSubmitOpen(day, edition.dayDates)) {
     return {
@@ -403,6 +429,7 @@ export async function getMyDayScoresForUser(userId: string) {
     where: { editionId: edition.id, userId },
     orderBy: { dayNumber: 'asc' },
   });
+  const hasGoneLive = await playerHasGoneLive(userId, edition.id);
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const submittedDays = scores.map((s) => s.dayNumber);
   const days: Array<{
@@ -412,7 +439,7 @@ export async function getMyDayScoresForUser(userId: string) {
     submitted: boolean;
   }> = [];
   for (let d = 1; d <= maxDay; d += 1) {
-    const windowForDay = describeScoreWindow(d, edition.dayDates);
+    const windowForDay = describeScoreWindow(d, edition.dayDates, hasGoneLive);
     days.push({
       dayNumber: d,
       windowOpen: windowForDay.windowOpen,
@@ -429,7 +456,7 @@ export async function getMyDayScoresForUser(userId: string) {
       }
     }
   }
-  const window = describeScoreWindow(eligibleDay, edition.dayDates);
+  const window = describeScoreWindow(eligibleDay, edition.dayDates, hasGoneLive);
   const publishedFlags: Array<{ dayNumber: number; published: boolean }> = [];
   for (let d = 1; d <= maxDay; d += 1) {
     publishedFlags.push({ dayNumber: d, published: isDayScorePublished(d, edition.dayDates) });
