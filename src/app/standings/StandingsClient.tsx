@@ -68,7 +68,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-black">Player ranking</CardTitle>
-            <p className="text-xs text-muted-foreground">Ranked by current average, lowest first. If averages are equal, more matches won ranks higher, then more slams.</p>
+            <p className="text-xs text-muted-foreground">Ranked by current average until a day’s scores are revealed at 8:00pm IST. After that, ranking uses the published board average, lowest first. If averages are equal, more matches won ranks higher, then more slams.</p>
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (

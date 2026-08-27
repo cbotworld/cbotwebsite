@@ -5,8 +5,9 @@ import type {
   PlayerRankingRow,
   TournamentStage,
 } from '@/types';
-import { isDayScorePublished } from '@/lib/day-scoring';
+import { isDayScorePublished, todayIstCalendarDate } from '@/lib/day-scoring';
 import { editionBoardAverage, previewTargetBonus, roundAverage } from '@/lib/board-scores';
+import { averageForDay, logsForUser } from '@/lib/player-average';
 import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
 
@@ -52,9 +53,17 @@ export function rankPlayers(opts: {
     const stats = editionBoardAverage(submitted);
     const slams = submitted.reduce((sum, row) => sum + (row.slams || 0), 0);
     const boardAverage = stats.boardCount > 0 ? stats.average : null;
-    const current = Number(player.average);
+    const seed = averageForDay(
+      logsForUser(opts.logs, player.userId),
+      todayIstCalendarDate(now),
+      Number(player.average) || 0,
+    );
     const rankingAverage =
-      Number.isFinite(current) && current > 0 ? roundAverage(current) : boardAverage;
+      boardAverage != null
+        ? boardAverage
+        : Number.isFinite(seed) && seed > 0
+          ? roundAverage(seed)
+          : null;
     return {
       userId: player.userId,
       name: player.name,

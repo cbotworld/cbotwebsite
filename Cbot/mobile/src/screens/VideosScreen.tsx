@@ -47,7 +47,6 @@ function youtubeWatchUrl(video: ChannelVideo): string | null {
 export function VideosScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [allVideos, setAllVideos] = useState<ChannelVideo[]>([]);
-  const [edition, setEdition] = useState<{ title: string; number: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playerDraft, setPlayerDraft] = useState(route.params?.player || '');
   const [dayDraft, setDayDraft] = useState(route.params?.day ? String(route.params.day) : '');
@@ -60,11 +59,6 @@ export function VideosScreen({ navigation, route }: Props) {
     try {
       const res = await fetchChannelVideos();
       setAllVideos(res.videos);
-      setEdition(
-        res.edition?.title || res.edition?.number
-          ? { title: res.edition.title || `Edition ${res.edition.number}`, number: res.edition.number }
-          : null,
-      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load videos.');
     } finally {
@@ -143,20 +137,7 @@ export function VideosScreen({ navigation, route }: Props) {
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>CBOT WORLD</Text>
           <Text style={styles.title}>YouTube videos</Text>
-          {edition ? (
-            <View style={styles.editionChip} accessibilityRole="text">
-              <Text style={styles.editionChipKicker}>CURRENT EDITION</Text>
-              <Text style={styles.editionChipTitle} numberOfLines={1}>
-                {edition.title}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.editionChip}>
-              <Text style={styles.editionChipKicker}>CURRENT EDITION</Text>
-              <Text style={styles.editionChipTitle}>This cup only</Text>
-            </View>
-          )}
-          <Text style={styles.sub}>Search stays inside this edition. Past cups are not shown.</Text>
+          <Text style={styles.sub}>All CBOT WORLD videos. Search by player or day.</Text>
         </View>
         <HeaderActionButton label="Refresh" onPress={() => void load()} />
       </View>
@@ -252,7 +233,7 @@ export function VideosScreen({ navigation, route }: Props) {
           )}
           {videos.length === 0 ? (
             <Text style={styles.empty}>
-              {filterLabel ? `No videos found for ${filterLabel}.` : 'No videos for this edition yet. Check back after matches go live.'}
+              {filterLabel ? `No videos found for ${filterLabel}.` : 'No videos yet. Check back after matches go live.'}
             </Text>
           ) : null}
           {videos.map((v) => (
@@ -312,29 +293,6 @@ const styles = StyleSheet.create({
   },
   kicker: { fontSize: 11, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },
   title: { fontSize: 22, fontWeight: '900', color: '#f8fafc', marginTop: 2 },
-  editionChip: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    backgroundColor: 'rgba(245,158,11,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.45)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    maxWidth: '100%',
-  },
-  editionChipKicker: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#f59e0b',
-    letterSpacing: 1.2,
-  },
-  editionChipTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginTop: 1,
-  },
   sub: { fontSize: 12, color: '#94a3b8', marginTop: 8, lineHeight: 18 },
   fieldLabel: {
     fontSize: 10,

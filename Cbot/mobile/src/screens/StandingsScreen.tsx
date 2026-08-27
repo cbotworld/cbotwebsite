@@ -89,7 +89,6 @@ export function StandingsScreen(_props: Props) {
   const stage = blocks.find((b) => b.stageId === stageId) || blocks[0];
   const players = payload?.players || [];
   const placement = payload?.placement || [];
-  const rankingReady = players.some((row: any) => Number(row.boardCount) > 0);
   const days = open?.row?.days || [];
 
   return (
@@ -124,37 +123,40 @@ export function StandingsScreen(_props: Props) {
           <HeaderActionButton label="Try again" onPress={() => void load()} />
         </View>
       ) : tab === 'players' ? (
-        <ScrollView contentContainerStyle={styles.list}>
-          {players.length === 0 || !rankingReady ? (
-            <Text style={styles.empty}>Publishes after the first 8:00pm IST score lock.</Text>
+        <ScrollView contentContainerStyle={styles.list} horizontal={false}>
+          {players.length === 0 ? (
+            <Text style={styles.empty}>No players on the edition roster yet.</Text>
           ) : (
-            <>
+            <View style={styles.groupCard}>
+              <Text style={styles.groupTitle}>Player ranking</Text>
+              <Text style={styles.rankHint}>
+                Ranked by current average until a day’s scores are revealed at 8:00pm IST. After that, ranking uses the published board average, lowest first. If averages are equal, more matches won ranks higher, then more slams.
+              </Text>
               <View style={styles.tableHead}>
                 <Text style={[styles.th, styles.colRank]}>#</Text>
-                <Text style={[styles.th, styles.colName]}>PLAYER</Text>
+                <Text style={[styles.th, styles.colPlayer]}>PLAYER</Text>
+                <Text style={[styles.th, styles.colTeam]}>TEAM</Text>
                 <Text style={[styles.th, styles.colNum]}>SLAMS</Text>
-                <Text style={[styles.th, styles.colNum]}>WO</Text>
-                <Text style={[styles.th, styles.colNum]}>AVG</Text>
+                <Text style={[styles.th, styles.colWo]}>WO</Text>
+                <Text style={[styles.th, styles.colAvg]}>AVG</Text>
               </View>
               {players.map((row: any) => (
                 <View key={row.userId} style={styles.tableRow}>
                   <Text style={[styles.tdRank, styles.colRank]}>{row.rank}</Text>
-                  <View style={styles.colName}>
-                    <Text style={styles.tdName} numberOfLines={1}>
-                      {row.name}
-                    </Text>
-                    <Text style={styles.tdMeta} numberOfLines={1}>
-                      {row.teamName}
-                    </Text>
-                  </View>
+                  <Text style={[styles.tdName, styles.colPlayer]} numberOfLines={2}>
+                    {row.name}
+                  </Text>
+                  <Text style={[styles.td, styles.colTeam]} numberOfLines={2}>
+                    {row.teamName}
+                  </Text>
                   <Text style={[styles.td, styles.colNum]}>{row.slams ?? 0}</Text>
-                  <Text style={[styles.td, styles.colNum]}>{row.walkovers}</Text>
-                  <Text style={[styles.tdStrong, styles.colNum]}>
+                  <Text style={[styles.td, styles.colWo]}>{row.walkovers}</Text>
+                  <Text style={[styles.tdStrong, styles.colAvg]}>
                     {row.boardAverage == null ? '—' : Number(row.boardAverage).toFixed(2)}
                   </Text>
                 </View>
               ))}
-            </>
+            </View>
           )}
         </ScrollView>
       ) : blocks.length === 0 ? (
@@ -426,7 +428,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
-  groupTitle: { color: '#f8fafc', fontWeight: '900', fontSize: 16, marginBottom: 8 },
+  groupTitle: { color: '#f8fafc', fontWeight: '900', fontSize: 16, marginBottom: 4 },
+  rankHint: { color: '#94a3b8', fontSize: 11, fontWeight: '600', lineHeight: 16, marginBottom: 10 },
   tableHead: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 2 },
   tableRow: {
     flexDirection: 'row',
@@ -440,7 +443,11 @@ const styles = StyleSheet.create({
   thOn: { color: '#f59e0b' },
   colRank: { width: 22 },
   colName: { flex: 1, minWidth: 72, paddingRight: 4 },
-  colNum: { width: 48, textAlign: 'right' },
+  colPlayer: { flex: 1.15, minWidth: 64, paddingRight: 4 },
+  colTeam: { flex: 1, minWidth: 56, paddingRight: 4 },
+  colNum: { width: 40, textAlign: 'right' },
+  colWo: { width: 28, textAlign: 'right' },
+  colAvg: { width: 44, textAlign: 'right' },
   colStat: { width: 32, textAlign: 'center' },
   td: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
   tdOn: { color: '#fbbf24', fontWeight: '900' },

@@ -3,13 +3,13 @@
 export const SCORE_EDIT_PLAYER_UNTIL = '8:00pm IST';
 export const SCORE_EDIT_CAPTAIN_UNTIL = '9:30pm IST';
 
-export const SCORE_EDIT_RULES_TITLE = 'Who can edit scores on that day';
+export function playerScoreUntilNote(dayNumber: number) {
+  return `You can enter or change your score until ${SCORE_EDIT_PLAYER_UNTIL} of Day ${dayNumber}.`;
+}
 
-export const SCORE_EDIT_RULES = [
-  `Players — until ${SCORE_EDIT_PLAYER_UNTIL}`,
-  `Captains — until ${SCORE_EDIT_CAPTAIN_UNTIL}`,
-  'Organiser — anytime',
-] as const;
+export function captainScoreUntilNote(dayNumber: number) {
+  return `You can enter or change teammate scores until ${SCORE_EDIT_CAPTAIN_UNTIL} of Day ${dayNumber}.`;
+}
 
 export const SCORE_EDIT_PLAYER_HELP =
   `You can enter or change your boards until ${SCORE_EDIT_PLAYER_UNTIL} on this day. After that, your captain can fix them until ${SCORE_EDIT_CAPTAIN_UNTIL}, and the organiser can edit anytime.`;

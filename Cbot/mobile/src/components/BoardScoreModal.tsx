@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,9 +12,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SCORE_EDIT_PLAYER_HELP } from '../score-edit-policy';
+import { playerScoreUntilNote } from '../score-edit-policy';
 
 export const MAX_DAY_BOARDS = 10;
+export const DEFAULT_DAY_BOARDS = 3;
 
 export type BoardDraft = { score: string; slams: string };
 
@@ -28,6 +30,10 @@ export function emptyBoardDraft(): BoardDraft {
   return { score: '', slams: '0' };
 }
 
+export function emptyBoards(count = DEFAULT_DAY_BOARDS): BoardDraft[] {
+  return Array.from({ length: Math.max(1, count) }, () => emptyBoardDraft());
+}
+
 export function boardsFromSaved(row?: SavedDayScore | null): BoardDraft[] {
   const raw = row?.boards;
   if (Array.isArray(raw) && raw.length > 0) {
@@ -39,7 +45,7 @@ export function boardsFromSaved(row?: SavedDayScore | null): BoardDraft[] {
   if (row && row.score != null && Number.isFinite(Number(row.score))) {
     return [{ score: String(row.score), slams: String(row.slams ?? 0) }];
   }
-  return [emptyBoardDraft()];
+  return emptyBoards();
 }
 
 export function parseBoardDrafts(boards: BoardDraft[]) {
@@ -91,13 +97,31 @@ export function BoardScoreModal({
   onSave: (boards: Array<{ score: number; slams: number }>) => void;
 }) {
   const [boards, setBoards] = useState<BoardDraft[]>(
-    initialBoards.length ? initialBoards : [emptyBoardDraft()],
+    initialBoards.length ? initialBoards : emptyBoards(),
   );
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
-    setBoards(initialBoards.length ? initialBoards : [emptyBoardDraft()]);
+    setBoards(initialBoards.length ? initialBoards : emptyBoards());
   }, [visible, initialBoards]);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+      return;
+    }
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvt, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height || 0);
+    });
+    const hide = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [visible]);
 
   const stats = useMemo(() => parseBoardDrafts(boards), [boards]);
   const bonus = targetBonus(stats.boardCount ? stats.total : null, target);
@@ -108,24 +132,27 @@ export function BoardScoreModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={styles.overlay}
+        style={[styles.overlay, { paddingBottom: keyboardHeight }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
-          <Text style={styles.title}>{playerName ? `${playerName} · Day ${dayNumber}` : `Day ${dayNumber} boards`}</Text>
+        <View style={styles.card}>
+          <Text style={styles.title}>{playerName ? `${playerName} · Day ${dayNumber}` : `Day ${dayNumber} scores`}</Text>
           <Text style={styles.hint}>
-            {editNote || SCORE_EDIT_PLAYER_HELP} Enter each board. Total vs target decides target bonus. Max{' '}
-            {MAX_DAY_BOARDS} boards.
+            {editNote || playerScoreUntilNote(dayNumber)} Enter each board’s score and slams.
           </Text>
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 360 }}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            style={styles.boardList}
+          >
             {boards.map((board, idx) => (
               <View key={idx} style={styles.row}>
-                <Text style={styles.boardLabel}>B{idx + 1}</Text>
+                <Text style={styles.boardLabel}>BOARD {idx + 1}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>SCORE</Text>
+                  <Text style={styles.fieldLabel}>{idx === 0 ? 'SCORE' : ' '}</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="number-pad"
@@ -136,7 +163,7 @@ export function BoardScoreModal({
                   />
                 </View>
                 <View style={{ width: 72 }}>
-                  <Text style={styles.fieldLabel}>SLAM</Text>
+                  <Text style={styles.fieldLabel}>{idx === 0 ? 'SLAM' : ' '}</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="number-pad"
@@ -147,11 +174,11 @@ export function BoardScoreModal({
                   />
                 </View>
                 {boards.length > 1 ? (
-                  <Pressable onPress={() => setBoards((prev) => prev.filter((_, i) => i !== idx))}>
-                    <Text style={styles.remove}>✕</Text>
+                  <Pressable onPress={() => setBoards((prev) => prev.filter((_, i) => i !== idx))} hitSlop={8}>
+                    <Text style={styles.remove}>Remove</Text>
                   </Pressable>
                 ) : (
-                  <View style={{ width: 18 }} />
+                  <View style={{ width: 52 }} />
                 )}
               </View>
             ))}
@@ -198,23 +225,23 @@ export function BoardScoreModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
-  sheet: {
+  overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.72)' },
+  card: {
     backgroundColor: '#0f172a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(245,158,11,0.35)',
     padding: 16,
-    paddingBottom: 28,
     gap: 10,
+    maxHeight: '88%',
   },
+  boardList: { maxHeight: 280 },
   title: { color: '#fff', fontSize: 18, fontWeight: '900' },
   hint: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 10 },
-  boardLabel: { color: '#f59e0b', fontWeight: '900', width: 28, paddingBottom: 10, fontSize: 12 },
-  fieldLabel: { color: '#64748b', fontSize: 9, fontWeight: '800', marginBottom: 4 },
+  boardLabel: { color: '#94a3b8', fontWeight: '900', width: 64, paddingBottom: 10, fontSize: 10, letterSpacing: 0.4 },
+  fieldLabel: { color: '#64748b', fontSize: 9, fontWeight: '800', marginBottom: 4, minHeight: 12 },
   input: {
     backgroundColor: '#1e293b',
     borderWidth: 1,
@@ -225,7 +252,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height: 42,
   },
-  remove: { color: '#fb7185', fontWeight: '900', paddingBottom: 12, fontSize: 16 },
+  remove: { color: '#fb7185', fontWeight: '800', paddingBottom: 12, fontSize: 11, width: 52 },
   addBtn: {
     borderWidth: 1,
     borderColor: '#334155',

@@ -70,9 +70,9 @@ async function loadFullTeam(teamId: string) {
   return prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      captain: { select: { id: true, name: true, username: true, average: true } },
-      members: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true } } } },
-      spocMembers: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true } } } },
+      captain: { select: { id: true, name: true, username: true, average: true, target: true } },
+      members: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true, target: true } } } },
+      spocMembers: { include: { user: { select: { id: true, name: true, username: true, role: true, average: true, target: true } } } },
     },
   });
 }
@@ -169,13 +169,14 @@ export async function GET(request: NextRequest) {
     const totalDays = edition?.totalDays || 10;
     const now = Date.now();
 
-    const memberMap = new Map<string, { id: string; name: string; username?: string; average?: number | null }>();
+    const memberMap = new Map<string, { id: string; name: string; username?: string; average?: number | null; target?: number | null }>();
     if (team.captain) {
       memberMap.set(team.captain.id, {
         id: team.captain.id,
         name: team.captain.name || team.captain.username || 'Captain',
         username: team.captain.username,
         average: team.captain.average,
+        target: team.captain.target,
       });
     }
     const roster = isSpocTeam ? team.spocMembers : team.members;
@@ -186,6 +187,7 @@ export async function GET(request: NextRequest) {
         name: m.user.name || m.user.username || 'Player',
         username: m.user.username,
         average: m.user.average,
+        target: m.user.target,
       });
     }
 
@@ -241,7 +243,7 @@ export async function GET(request: NextRequest) {
     const scoreRows = canEdit && memberIds.length && edition?.id
       ? await prisma.playerDayScore.findMany({
           where: { editionId: edition.id, userId: { in: memberIds } },
-          select: { userId: true, dayNumber: true, score: true, slams: true },
+          select: { userId: true, dayNumber: true, score: true, slams: true, boards: true },
         })
       : [];
     const avgLogs = canEdit && memberIds.length && edition?.id
@@ -251,17 +253,22 @@ export async function GET(request: NextRequest) {
         })
       : [];
     const daysSubmitted = new Map<string, number[]>();
-    const scoreByUserDay = new Map<string, { score: number; slams: number }>();
+    const scoreByUserDay = new Map<string, { score: number; slams: number; boards: unknown }>();
     for (const row of scoreRows) {
       const list = daysSubmitted.get(row.userId) || [];
       list.push(row.dayNumber);
       daysSubmitted.set(row.userId, list);
-      scoreByUserDay.set(`${row.userId}:${row.dayNumber}`, { score: row.score, slams: row.slams });
+      scoreByUserDay.set(`${row.userId}:${row.dayNumber}`, {
+        score: row.score,
+        slams: row.slams,
+        boards: Array.isArray(row.boards) ? row.boards : [],
+      });
     }
     const members = Array.from(memberMap.values()).map((m) => {
       const dayStats: Record<string, {
         score: number | null;
         slams: number | null;
+        boards: unknown[];
         average: number;
         hasAvgBonus: boolean | null;
         missingPrior: boolean;
@@ -274,6 +281,7 @@ export async function GET(request: NextRequest) {
           dayStats[String(dayNumber)] = {
             score: row?.score ?? null,
             slams: row?.slams ?? null,
+            boards: Array.isArray(row?.boards) ? row.boards : [],
             average,
             hasAvgBonus: previewAvgBonus(row?.score ?? null, average),
             missingPrior: !hasSubmittedPriorDays(daysSubmitted.get(m.id) || [], dayNumber),

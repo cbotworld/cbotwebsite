@@ -11,15 +11,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EliteSponsorsStrip } from '../components/EliteSponsorsStrip';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
-import { ScoreEditBanner } from '../components/ScoreEditBanner';
-import { SCORE_EDIT_PLAYER_HELP } from '../score-edit-policy';
+import {
+  BoardScoreModal,
+  boardsFromSaved,
+  parseBoardDrafts,
+} from '../components/BoardScoreModal';
+import { playerScoreUntilNote } from '../score-edit-policy';
 import {
   fetchPlayerSchedule,
   fetchPlayerScores,
@@ -51,75 +54,59 @@ function currentMatchDay(matches: MatchDetails[], apiCurrent?: number) {
 function MatchDayScoreBox({
   dayNumber,
   scoreInfo,
-  draft,
   saving,
-  onChange,
-  onSave,
+  onOpenBoards,
 }: {
   dayNumber: number;
   scoreInfo: DayScoreInfo | null;
-  draft: { score: string; slams: string };
   saving: boolean;
-  onChange: (patch: { score?: string; slams?: string }) => void;
-  onSave: () => void;
+  onOpenBoards: () => void;
 }) {
   const submitted = (scoreInfo?.scores || []).find((s) => s.dayNumber === dayNumber);
   const published = (scoreInfo?.publishedDays || []).some((d) => d.dayNumber === dayNumber && d.published);
   const canEdit = Boolean(scoreInfo?.windowOpen) && Number(scoreInfo?.eligibleDay) === dayNumber;
+  const stats = submitted ? parseBoardDrafts(boardsFromSaved(submitted)) : null;
 
   let body: ReactNode;
   if (published && !submitted) {
-    body = <Text style={styles.scoreLocked}>Walkover</Text>;
+    body = <Text style={styles.scoreLocked}>Empty — walkover if still blank at 8:00pm IST.</Text>;
   } else if (canEdit) {
     body = (
       <>
-        <View style={styles.scoreInputs}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.scoreLabel}>SCORE</Text>
-            <TextInput
-              style={styles.scoreInput}
-              keyboardType="number-pad"
-              value={draft.score}
-              onChangeText={(t) => onChange({ score: t.replace(/[^\d]/g, '') })}
-              placeholder="0"
-              placeholderTextColor="#64748b"
-            />
-          </View>
-          <View style={{ width: 88 }}>
-            <Text style={styles.scoreLabel}>SLAMS</Text>
-            <TextInput
-              style={styles.scoreInput}
-              keyboardType="number-pad"
-              value={draft.slams}
-              onChangeText={(t) => onChange({ slams: t.replace(/[^\d]/g, '') })}
-              placeholder="0"
-              placeholderTextColor="#64748b"
-            />
-          </View>
-        </View>
-        <Pressable style={[styles.scoreSave, saving && { opacity: 0.55 }]} onPress={onSave} disabled={saving}>
-          <Text style={styles.scoreSaveText}>{saving ? 'SAVING…' : submitted ? 'UPDATE SCORE' : 'SUBMIT SCORE'}</Text>
+        {stats?.boardCount ? (
+          <Text style={styles.scoreLocked}>
+            {stats.total} pts · {stats.slams} slam{stats.slams === 1 ? '' : 's'} · {stats.boardCount} board
+            {stats.boardCount === 1 ? '' : 's'}
+          </Text>
+        ) : (
+          <Text style={styles.scoreHint}>No score yet. Enter scores and save.</Text>
+        )}
+        <Pressable style={[styles.scoreSave, saving && { opacity: 0.55 }]} onPress={onOpenBoards} disabled={saving}>
+          <Text style={styles.scoreSaveText}>
+            {saving ? 'SAVING…' : submitted ? 'UPDATE SCORES' : 'ENTER SCORES'}
+          </Text>
         </Pressable>
-        <Text style={styles.scoreHint}>{SCORE_EDIT_PLAYER_HELP}</Text>
+        <Text style={styles.scoreHint}>{playerScoreUntilNote(dayNumber)}</Text>
       </>
     );
   } else if (submitted) {
     body = (
       <Text style={styles.scoreLocked}>
-        Score {submitted.score} · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+        {submitted.score} pts · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
+        {stats?.boardCount ? ` · ${stats.boardCount} board${stats.boardCount === 1 ? '' : 's'}` : ''}
       </Text>
     );
   } else {
     const reason =
       Number(scoreInfo?.eligibleDay) > 0 && Number(scoreInfo?.eligibleDay) < dayNumber
         ? `Submit Day ${scoreInfo?.eligibleDay} first`
-        : scoreInfo?.windowReason || SCORE_EDIT_PLAYER_HELP;
+        : scoreInfo?.windowReason || playerScoreUntilNote(dayNumber);
     body = <Text style={styles.scoreHint}>{reason}</Text>;
   }
 
   return (
     <View style={styles.scoreBox}>
-      <Text style={styles.scoreTitle}>DAY {dayNumber} SCORE</Text>
+      <Text style={styles.scoreTitle}>DAY {dayNumber} SCORES</Text>
       {body}
     </View>
   );
@@ -136,8 +123,8 @@ export function DashboardScreen({ navigation }: Props) {
   const [playerView, setPlayerView] = useState<'MAIN' | 'SPOC'>('MAIN');
   const [playerTeams, setPlayerTeams] = useState<Array<{ id: string; name: string; kind: 'MAIN' | 'SPOC'; isCaptain?: boolean }>>([]);
   const [scoreInfo, setScoreInfo] = useState<DayScoreInfo | null>(null);
-  const [dayDrafts, setDayDrafts] = useState<Record<number, { score: string; slams: string }>>({});
   const [savingDay, setSavingDay] = useState<number | null>(null);
+  const [boardDay, setBoardDay] = useState<number | null>(null);
 
   const load = useCallback(async (view: 'MAIN' | 'SPOC' = playerView) => {
     if (!getSession()?.token) {
@@ -156,11 +143,6 @@ export function DashboardScreen({ navigation }: Props) {
       try {
         const scores = await fetchPlayerScores();
         setScoreInfo(scores);
-        const drafts: Record<number, { score: string; slams: string }> = {};
-        for (const s of scores.scores || []) {
-          drafts[s.dayNumber] = { score: String(s.score), slams: String(s.slams ?? 0) };
-        }
-        setDayDrafts(drafts);
       } catch {
         // Schedule should still show if scores fail.
       }
@@ -179,25 +161,13 @@ export function DashboardScreen({ navigation }: Props) {
     }, [load]),
   );
 
-  const saveDayScore = async (dayNumber: number) => {
-    const draft = dayDrafts[dayNumber] || { score: '', slams: '0' };
-    const score = parseInt(draft.score, 10);
-    const slams = parseInt(draft.slams || '0', 10);
-    if (!Number.isFinite(score) || score < 0) {
-      Alert.alert('Score', 'Enter a valid day score (0 or more).');
-      return;
-    }
+  const saveDayScore = async (dayNumber: number, boards: Array<{ score: number; slams: number }>) => {
     setSavingDay(dayNumber);
     try {
-      await submitPlayerDayScore(dayNumber, score, Number.isFinite(slams) ? slams : 0);
-      Alert.alert('Saved', `Day ${dayNumber} score submitted.`);
-      const scores = await fetchPlayerScores();
-      setScoreInfo(scores);
-      const drafts: Record<number, { score: string; slams: string }> = {};
-      for (const s of scores.scores || []) {
-        drafts[s.dayNumber] = { score: String(s.score), slams: String(s.slams ?? 0) };
-      }
-      setDayDrafts(drafts);
+      await submitPlayerDayScore(dayNumber, boards);
+      Alert.alert('Saved', `Day ${dayNumber} scores submitted.`);
+      setScoreInfo(await fetchPlayerScores());
+      setBoardDay(null);
     } catch (e) {
       Alert.alert('Not saved', e instanceof Error ? e.message : 'Failed');
     } finally {
@@ -292,7 +262,6 @@ export function DashboardScreen({ navigation }: Props) {
         />
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
-          <ScoreEditBanner />
           {playerTeams.filter((t) => t.kind === 'MAIN').length > 0 && playerTeams.some((t) => t.kind === 'SPOC') ? (
             <View style={styles.viewSwitch}>
               {(['MAIN', 'SPOC'] as const).map((view) => {
@@ -496,25 +465,27 @@ export function DashboardScreen({ navigation }: Props) {
                 <MatchDayScoreBox
                   dayNumber={match.dayNumber}
                   scoreInfo={scoreInfo}
-                  draft={dayDrafts[match.dayNumber] || { score: '', slams: '0' }}
                   saving={savingDay === match.dayNumber}
-                  onChange={(patch) =>
-                    setDayDrafts((prev) => ({
-                      ...prev,
-                      [match.dayNumber]: {
-                        score: prev[match.dayNumber]?.score ?? '',
-                        slams: prev[match.dayNumber]?.slams ?? '0',
-                        ...patch,
-                      },
-                    }))
-                  }
-                  onSave={() => void saveDayScore(match.dayNumber)}
+                  onOpenBoards={() => setBoardDay(match.dayNumber)}
                 />
               </View>
             );
           })}
         </ScrollView>
       )}
+      <BoardScoreModal
+        visible={boardDay != null}
+        dayNumber={boardDay || 1}
+        playerName={playerName}
+        target={scoreInfo?.target}
+        initialBoards={boardsFromSaved((scoreInfo?.scores || []).find((s) => s.dayNumber === boardDay))}
+        busy={boardDay != null && savingDay === boardDay}
+        editNote={boardDay ? playerScoreUntilNote(boardDay) : undefined}
+        onClose={() => setBoardDay(null)}
+        onSave={(boards) => {
+          if (boardDay != null) void saveDayScore(boardDay, boards);
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -276,9 +276,11 @@ export type CombiMember = {
   name: string;
   username?: string;
   average?: number | null;
+  target?: number | null;
   dayStats?: Record<string, {
     score: number | null;
     slams: number | null;
+    boards?: Array<{ score?: number; slams?: number }>;
     average: number;
     hasAvgBonus: boolean | null;
     missingPrior?: boolean;
@@ -529,7 +531,12 @@ export type EliteSponsorsPayload = {
 
 export type DayScoreInfo = {
   success: boolean;
-  scores: Array<{ dayNumber: number; score: number; slams: number }>;
+  scores: Array<{
+    dayNumber: number;
+    score: number;
+    slams: number;
+    boards?: Array<{ score?: number; slams?: number }>;
+  }>;
   eligibleDay?: number | null;
   maxDay?: number;
   windowOpen?: boolean;
@@ -538,6 +545,7 @@ export type DayScoreInfo = {
   publishedDays?: Array<{ dayNumber: number; published: boolean }>;
   cutoffIso?: string;
   editionTitle?: string;
+  target?: number | null;
   error?: string;
 };
 
@@ -550,11 +558,16 @@ export async function fetchPlayerScores(): Promise<DayScoreInfo> {
   return data as DayScoreInfo;
 }
 
-export async function submitPlayerDayScore(dayNumber: number, score: number, slams: number) {
+export async function submitPlayerDayScore(
+  dayNumber: number,
+  boards: Array<{ score: number; slams: number }>,
+) {
+  const total = boards.reduce((s, b) => s + b.score, 0);
+  const slams = boards.reduce((s, b) => s + b.slams, 0);
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ dayNumber, score, slams }),
+    body: JSON.stringify({ dayNumber, score: total, slams, boards }),
   });
   const data = await readJson(res);
   if (!data.success) throw new Error(data.error || 'Failed to save score.');
@@ -563,13 +576,22 @@ export async function submitPlayerDayScore(dayNumber: number, score: number, sla
 
 export async function submitTeamDayScores(
   dayNumber: number,
-  rows: Array<{ userId: string; score: number; slams: number }>,
+  rows: Array<{ userId: string; score?: number; slams?: number; boards: Array<{ score: number; slams: number }> }>,
   teamId?: string,
 ) {
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ dayNumber, rows, teamId }),
+    body: JSON.stringify({
+      dayNumber,
+      teamId,
+      rows: rows.map((r) => ({
+        userId: r.userId,
+        boards: r.boards,
+        score: r.score ?? r.boards.reduce((s, b) => s + b.score, 0),
+        slams: r.slams ?? r.boards.reduce((s, b) => s + b.slams, 0),
+      })),
+    }),
   });
   const data = await readJson(res);
   if (!data.success) throw new Error(data.error || 'Failed to save team scores.');

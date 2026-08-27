@@ -7,6 +7,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -64,9 +65,11 @@ export function ProfileScreen({ navigation }: Props) {
     age: session?.user.age != null ? String(session.user.age) : '',
     gender: session?.user.gender || '',
   });
+  const [pinOpen, setPinOpen] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!getSession()?.token) {
@@ -131,26 +134,45 @@ export function ProfileScreen({ navigation }: Props) {
     }
   };
 
+  const closePinModal = () => {
+    if (pinBusy) return;
+    setPinOpen(false);
+    setPinError(null);
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmPin('');
+  };
+
   const onChangePin = async () => {
+    if (!/^\d{4}$/.test(currentPin)) {
+      setPinError('Enter your current 4-digit PIN.');
+      return;
+    }
     if (!/^\d{4}$/.test(newPin)) {
-      setError('New PIN must be exactly 4 digits.');
+      setPinError('New PIN must be exactly 4 digits.');
       return;
     }
     if (newPin !== confirmPin) {
-      setError('New PIN and confirm PIN do not match.');
+      setPinError('New PIN and confirm PIN do not match.');
+      return;
+    }
+    if (currentPin === newPin) {
+      setPinError('New PIN must be different from your current PIN.');
       return;
     }
     setPinBusy(true);
+    setPinError(null);
     setError(null);
     setOk(null);
     try {
       const message = await changePin(currentPin, newPin);
-      setOk(message);
       setCurrentPin('');
       setNewPin('');
       setConfirmPin('');
+      setPinOpen(false);
+      setOk(message);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'PIN change failed.');
+      setPinError(e instanceof Error ? e.message : 'PIN change failed.');
     } finally {
       setPinBusy(false);
     }
@@ -297,12 +319,9 @@ export function ProfileScreen({ navigation }: Props) {
               {saving ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.buttonText}>SAVE PROFILE</Text>}
             </Pressable>
 
-            <Text style={styles.section}>CHANGE PIN</Text>
-            <Field label="CURRENT PIN" value={currentPin} onChange={setCurrentPin} keyboard="number-pad" secure maxLength={8} />
-            <Field label="NEW 4-DIGIT PIN" value={newPin} onChange={setNewPin} keyboard="number-pad" secure maxLength={4} />
-            <Field label="CONFIRM NEW PIN" value={confirmPin} onChange={setConfirmPin} keyboard="number-pad" secure maxLength={4} />
-            <Pressable style={[styles.secondary, pinBusy && styles.disabled]} onPress={() => void onChangePin()} disabled={pinBusy}>
-              {pinBusy ? <ActivityIndicator color="#f8fafc" /> : <Text style={styles.secondaryText}>UPDATE PIN</Text>}
+            <Text style={styles.section}>SECURITY</Text>
+            <Pressable style={styles.secondary} onPress={() => { setPinError(null); setPinOpen(true); }}>
+              <Text style={styles.secondaryText}>UPDATE PIN</Text>
             </Pressable>
 
             <Pressable style={styles.logout} onPress={logout}>
@@ -311,6 +330,55 @@ export function ProfileScreen({ navigation }: Props) {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      <Modal visible={pinOpen} transparent animationType="fade" onRequestClose={closePinModal}>
+        <KeyboardAvoidingView
+          style={styles.pinOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.pinBackdrop} onPress={closePinModal} />
+          <View style={styles.pinCard}>
+            <Text style={styles.pinKicker}>SECURITY</Text>
+            <Text style={styles.pinTitle}>Update PIN</Text>
+            <Text style={styles.pinHint}>Enter your current PIN, then a new 4-digit PIN twice.</Text>
+            <Field
+              label="CURRENT PIN"
+              value={currentPin}
+              onChange={(v) => setCurrentPin(v.replace(/[^\d]/g, '').slice(0, 4))}
+              keyboard="number-pad"
+              secure
+              maxLength={4}
+            />
+            <Field
+              label="NEW PIN"
+              value={newPin}
+              onChange={(v) => setNewPin(v.replace(/[^\d]/g, '').slice(0, 4))}
+              keyboard="number-pad"
+              secure
+              maxLength={4}
+            />
+            <Field
+              label="CONFIRM NEW PIN"
+              value={confirmPin}
+              onChange={(v) => setConfirmPin(v.replace(/[^\d]/g, '').slice(0, 4))}
+              keyboard="number-pad"
+              secure
+              maxLength={4}
+            />
+            {pinError ? <Text style={styles.error}>{pinError}</Text> : null}
+            <Pressable
+              style={[styles.button, pinBusy && styles.disabled]}
+              onPress={() => void onChangePin()}
+              disabled={pinBusy}
+            >
+              {pinBusy ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.buttonText}>SUBMIT</Text>}
+            </Pressable>
+            <Pressable style={styles.pinCancel} onPress={closePinModal} disabled={pinBusy}>
+              <Text style={styles.pinCancelText}>CANCEL</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -470,4 +538,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   logoutText: { color: '#fca5a5', fontWeight: '800', letterSpacing: 1.5 },
+  pinOverlay: { flex: 1, justifyContent: 'center', padding: 20 },
+  pinBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2,6,23,0.82)' },
+  pinCard: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 20,
+    padding: 18,
+  },
+  pinKicker: { fontSize: 11, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },
+  pinTitle: { fontSize: 20, fontWeight: '900', color: '#f8fafc', marginTop: 4 },
+  pinHint: { fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 14 },
+  pinCancel: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
+  pinCancelText: { color: '#94a3b8', fontWeight: '800', letterSpacing: 1.2 },
 });

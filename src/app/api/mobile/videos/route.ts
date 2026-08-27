@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { dayNumberFromMatchRef } from '@/lib/match-play-window';
+import { dayNumberFromVideoTitle } from '@/lib/current-edition';
+import { listOfficialChannelVideos } from '@/lib/youtube-live';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +40,14 @@ function thumbUrl(videoId: string | null | undefined) {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
-/** Public catalog: YouTube videos for the current edition only. No auth. */
+function playerFromTitle(title: string) {
+  const first = String(title || '')
+    .split(/[·|\-–]/)[0]
+    .trim();
+  return first || 'CBOT WORLD';
+}
+
+/** Public catalog: all official YouTube videos. No auth. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -46,36 +55,7 @@ export async function GET(request: NextRequest) {
     const dayQ = searchParams.get('day');
     const dayFilter = dayQ && dayQ !== 'ALL' ? Number(dayQ) : null;
 
-    const edition =
-      (await prisma.edition.findFirst({
-        where: {
-          number: { not: 200 },
-          status: { in: ['IN_PROGRESS', 'REGISTRATION_OPEN'] },
-        },
-        orderBy: { number: 'desc' },
-        select: { id: true, title: true, number: true },
-      })) ||
-      (await prisma.edition.findFirst({
-        where: { number: { not: 200 } },
-        orderBy: { number: 'desc' },
-        select: { id: true, title: true, number: true },
-      }));
-    if (!edition) {
-      return NextResponse.json(
-        {
-          success: true,
-          edition: null,
-          filters: { player: playerQ || null, day: dayFilter },
-          days: [],
-          videos: [],
-          count: 0,
-        },
-        { headers: mobileCorsHeaders },
-      );
-    }
-
     const streams = await prisma.liveStream.findMany({
-      where: { editionId: edition.id },
       orderBy: { createdAt: 'desc' },
       include: {
         player: { select: { id: true, name: true, username: true, image: true } },
@@ -89,6 +69,7 @@ export async function GET(request: NextRequest) {
             team2: { select: { name: true, tag: true } },
           },
         },
+        edition: { select: { title: true, number: true } },
       },
     });
 
@@ -114,7 +95,7 @@ export async function GET(request: NextRequest) {
         dayNumber,
         playerName,
         playerUsername: s.player?.username || null,
-        teamName: s.team?.name || s.match?.team1?.name || 'CBOT WORLD',
+        teamName: s.team?.name || s.match?.team1?.name || s.edition?.title || 'CBOT WORLD',
         teamTag: s.team?.tag || null,
         teamLogo: s.team?.logo || null,
         status: s.status,
@@ -123,7 +104,30 @@ export async function GET(request: NextRequest) {
         youtubeVideoId: videoId,
         thumbnailUrl: thumbUrl(videoId),
         recordedAt: s.recordedAt || s.createdAt,
-        title: `${playerName} · Day ${dayNumber || '?'} · ${s.team?.name || 'Match'}`,
+        title: `${playerName} · Day ${dayNumber || '?'} · ${s.team?.name || s.edition?.title || 'Match'}`,
+      });
+    }
+
+    const channelVideos = await listOfficialChannelVideos(300);
+    for (const v of channelVideos) {
+      if (!v.youtubeVideoId || seen.has(v.youtubeVideoId)) continue;
+      seen.add(v.youtubeVideoId);
+      mapped.push({
+        id: `yt-${v.youtubeVideoId}`,
+        source: 'channel' as const,
+        dayNumber: dayNumberFromVideoTitle(v.title),
+        playerName: playerFromTitle(v.title),
+        playerUsername: null,
+        teamName: 'CBOT WORLD',
+        teamTag: null,
+        teamLogo: null,
+        status: 'ENDED',
+        isLive: false,
+        youtubeUrl: v.youtubeUrl,
+        youtubeVideoId: v.youtubeVideoId,
+        thumbnailUrl: v.thumbnailUrl || thumbUrl(v.youtubeVideoId),
+        recordedAt: v.publishedAt || null,
+        title: v.title,
       });
     }
 
@@ -149,13 +153,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        edition: { id: edition.id, title: edition.title, number: edition.number },
+        edition: null,
         filters: { player: playerQ || null, day: dayFilter },
         days: allDays,
         videos,
         count: videos.length,
       },
-      { headers: mobileCorsHeaders },
+      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store' } },
     );
   } catch (error: any) {
     console.error('Mobile videos GET:', error);

@@ -33,8 +33,14 @@ import {
 } from '../api/website';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
-import { ScoreEditBanner } from '../components/ScoreEditBanner';
-import { SCORE_EDIT_CAPTAIN_HELP } from '../score-edit-policy';
+import {
+  BoardScoreModal,
+  boardsFromSaved,
+  parseBoardDrafts,
+  targetBonus,
+  type BoardDraft,
+} from '../components/BoardScoreModal';
+import { captainScoreUntilNote } from '../score-edit-policy';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 
 function displayEventName(name: string, format?: string, slots?: number) {
@@ -55,9 +61,9 @@ function splitPlayerNames(raw: string): string[] {
 type ScoreDraftRow = {
   userId: string;
   name: string;
-  score: string;
-  slams: string;
+  boards: BoardDraft[];
   average: number;
+  target: number;
   missingPrior: boolean;
 };
 
@@ -66,23 +72,46 @@ function memberDayStat(member: CombiMember | undefined, dayNumber?: number) {
   return member.dayStats?.[String(dayNumber)] || null;
 }
 
-function avgBonusLabel(score: string | number | null | undefined, average: number) {
-  if (score == null || score === '') return 'Avg —';
-  const n = typeof score === 'number' ? score : parseInt(String(score), 10);
-  if (!Number.isFinite(n)) return 'Avg —';
-  return n < (Number(average) || 0) ? 'Avg Yes' : 'Avg No';
+function scoreDraftFromMembers(members: CombiMember[], dayNumber: number): ScoreDraftRow[] {
+  return members.map((m) => {
+    const st = memberDayStat(m, dayNumber);
+    return {
+      userId: m.id,
+      name: m.name,
+      boards: boardsFromSaved({
+        score: st?.score ?? undefined,
+        slams: st?.slams ?? undefined,
+        boards: st?.boards,
+      }),
+      average: st?.average ?? m.average ?? 0,
+      target: Number(m.target) || 0,
+      missingPrior: Boolean(st?.missingPrior),
+    };
+  });
 }
 
 function memberScoreBits(member: CombiMember, dayNumber?: number, draft?: ScoreDraftRow) {
   const st = memberDayStat(member, dayNumber);
-  const score = draft?.score ?? (st?.score == null ? '' : String(st.score));
-  const slams = draft?.slams ?? (st?.slams == null ? '0' : String(st.slams));
+  const boards =
+    draft?.boards ||
+    boardsFromSaved({
+      score: st?.score ?? undefined,
+      slams: st?.slams ?? undefined,
+      boards: st?.boards,
+    });
+  const stats = parseBoardDrafts(boards);
   const average = draft?.average ?? st?.average ?? member.average ?? 0;
+  const target = draft?.target ?? (Number(member.target) || 0);
+  const bonus = targetBonus(stats.boardCount ? stats.total : null, target);
   return {
-    score,
-    slams,
+    score: stats.boardCount ? String(stats.total) : '',
+    slams: stats.boardCount ? String(stats.slams) : '0',
+    boards: stats.boardCount,
     average,
-    avgLabel: score === '' ? null : avgBonusLabel(score, average),
+    target,
+    bonus,
+    avgLabel:
+      stats.boardCount === 0 ? null : bonus === true ? 'Target Yes' : target > 0 ? 'Target No' : 'Target —',
   };
 }
 
@@ -113,6 +142,7 @@ export function CombisScreen({ navigation }: Props) {
   const [picker, setPicker] = useState<{ round: number; slot: number } | null>(null);
   const [pickerQuery, setPickerQuery] = useState('');
   const [scoreDraft, setScoreDraft] = useState<ScoreDraftRow[]>([]);
+  const [scorePlayerId, setScorePlayerId] = useState<string | null>(null);
   const [savingScores, setSavingScores] = useState(false);
   const [publicDays, setPublicDays] = useState<PublicCombiDay[]>([]);
   const [publicLoading, setPublicLoading] = useState(true);
@@ -211,19 +241,7 @@ export function CombisScreen({ navigation }: Props) {
       return Array.from({ length: meta.slots }, (_, si) => saved?.playerIds?.[si] || '');
     });
     setDraft(next);
-    setScoreDraft(
-      (data.members || []).map((m) => {
-        const st = memberDayStat(m, day.dayNumber);
-        return {
-          userId: m.id,
-          name: m.name,
-          score: st?.score == null ? '' : String(st.score),
-          slams: st?.slams == null ? '0' : String(st.slams),
-          average: st?.average ?? m.average ?? 0,
-          missingPrior: Boolean(st?.missingPrior),
-        };
-      }),
-    );
+    setScoreDraft(scoreDraftFromMembers(data.members || [], day.dayNumber));
     setSelected(day);
   };
 
@@ -285,42 +303,19 @@ export function CombisScreen({ navigation }: Props) {
     }
   };
 
-  const onSaveScores = async () => {
+  const onSavePlayerBoards = async (userId: string, boards: Array<{ score: number; slams: number }>) => {
     if (!data || !selected) return;
-    const filled = scoreDraft.filter((r) => r.score !== '' && !r.missingPrior);
-    if (filled.length === 0) {
-      Alert.alert('No scores', 'Enter at least one teammate score before saving.');
-      return;
-    }
     setSavingScores(true);
     try {
       await submitTeamDayScores(
         selected.dayNumber,
-        filled.map((r) => ({
-          userId: r.userId,
-          score: parseInt(r.score, 10),
-          slams: parseInt(r.slams || '0', 10),
-        })),
+        [{ userId, boards }],
         data.team?.id || deskId || undefined,
       );
-      Alert.alert('Saved', 'Team scores updated. You can still edit until 9:30 PM IST.');
       const payload = await load(data.team?.id || deskId);
-      const dayNum = selected.dayNumber;
-      if (payload) {
-        setScoreDraft(
-          (payload.members || []).map((m) => {
-            const st = memberDayStat(m, dayNum);
-            return {
-              userId: m.id,
-              name: m.name,
-              score: st?.score == null ? '' : String(st.score),
-              slams: st?.slams == null ? '0' : String(st.slams),
-              average: st?.average ?? m.average ?? 0,
-              missingPrior: Boolean(st?.missingPrior),
-            };
-          }),
-        );
-      }
+      if (payload) setScoreDraft(scoreDraftFromMembers(payload.members || [], selected.dayNumber));
+      setScorePlayerId(null);
+      Alert.alert('Saved', 'Boards updated. Target bonus is Yes when the day’s total is under that player’s target.');
     } catch (e) {
       Alert.alert('Scores not saved', e instanceof Error ? e.message : 'Could not save scores.');
     } finally {
@@ -647,69 +642,53 @@ export function CombisScreen({ navigation }: Props) {
 
             <Text style={styles.tapHint}>
               {editing
-                ? SCORE_EDIT_CAPTAIN_HELP
+                ? captainScoreUntilNote(selected?.dayNumber || 1)
                 : 'Tap a player name to open their YouTube videos for this day'}
             </Text>
             {editing && scoreDraft.length > 0 ? (
               <View style={styles.scoreCard}>
-                <ScoreEditBanner forCaptain />
                 <Text style={styles.roundName}>TEAM SCORES</Text>
-                <Text style={styles.scoreHint}>Avg Yes when the day’s score is under average.</Text>
-                {scoreDraft.map((row, idx) => (
-                  <View key={row.userId} style={styles.scoreRow}>
-                    <Text style={styles.scoreName} numberOfLines={1}>
-                      {row.name}
-                      {row.missingPrior ? ' · earlier day missing' : ''}
-                    </Text>
-                    <View style={styles.scoreInputs}>
-                      <TextInput
-                        style={styles.scoreInput}
-                        placeholder="Score"
-                        placeholderTextColor="#64748b"
-                        keyboardType="number-pad"
-                        editable={!row.missingPrior}
-                        value={row.score}
-                        onChangeText={(text) => {
-                          const next = [...scoreDraft];
-                          next[idx] = { ...row, score: text };
-                          setScoreDraft(next);
-                        }}
-                      />
-                      <TextInput
-                        style={styles.scoreInput}
-                        placeholder="Slams"
-                        placeholderTextColor="#64748b"
-                        keyboardType="number-pad"
-                        editable={!row.missingPrior}
-                        value={row.slams}
-                        onChangeText={(text) => {
-                          const next = [...scoreDraft];
-                          next[idx] = { ...row, slams: text };
-                          setScoreDraft(next);
-                        }}
-                      />
+                <Text style={styles.scoreHint}>
+                  {captainScoreUntilNote(selected?.dayNumber || 1)} Target bonus is Yes when the day’s total is under that player’s target.
+                </Text>
+                {scoreDraft.map((row) => {
+                  const stats = parseBoardDrafts(row.boards);
+                  const bonus = targetBonus(stats.boardCount ? stats.total : null, row.target);
+                  return (
+                    <Pressable
+                      key={row.userId}
+                      disabled={row.missingPrior || savingScores}
+                      onPress={() => setScorePlayerId(row.userId)}
+                      style={[styles.scorePlayerBtn, row.missingPrior && { opacity: 0.5 }]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.scoreName} numberOfLines={1}>
+                          {row.name}
+                          {row.missingPrior ? ' · earlier day missing' : ''}
+                        </Text>
+                        {stats.boardCount ? (
+                          <Text style={styles.scoreMeta}>
+                            {stats.total} pts · {stats.slams} slam{stats.slams === 1 ? '' : 's'} · {stats.boardCount} board
+                            {stats.boardCount === 1 ? '' : 's'} · Target {row.target > 0 ? row.target : 0}
+                          </Text>
+                        ) : (
+                          <Text style={styles.scoreMeta}>
+                            Empty — tap to enter scores · Target {row.target > 0 ? row.target : 0} (no bonus)
+                          </Text>
+                        )}
+                      </View>
                       <Text
                         style={[
                           styles.avgBadge,
-                          avgBonusLabel(row.score, row.average) === 'Avg Yes' && styles.avgBadgeYes,
+                          bonus === true && styles.avgBadgeYes,
                         ]}
                       >
-                        {avgBonusLabel(row.score, row.average)}
+                        {stats.boardCount === 0 ? '—' : bonus === true ? 'Bonus Yes' : row.target > 0 ? 'Bonus No' : '—'}
                       </Text>
-                    </View>
-                  </View>
-                ))}
-                <Pressable
-                  style={[styles.saveScores, savingScores && { opacity: 0.6 }]}
-                  disabled={savingScores}
-                  onPress={() => void onSaveScores()}
-                >
-                  {savingScores ? (
-                    <ActivityIndicator color="#0f172a" />
-                  ) : (
-                    <Text style={styles.saveText}>SAVE TEAM SCORES</Text>
-                  )}
-                </Pressable>
+                      <Text style={styles.scoreChevron}>›</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : null}
             {h2hEvents.map((evt, ri) => (
@@ -790,6 +769,7 @@ export function CombisScreen({ navigation }: Props) {
               style={styles.backBtn}
               onPress={() => {
                 closePicker();
+                setScorePlayerId(null);
                 setSelected(null);
               }}
             >
@@ -894,7 +874,7 @@ export function CombisScreen({ navigation }: Props) {
                             <Text
                               style={[
                                 styles.pickerChip,
-                                bits.avgLabel === 'Avg Yes' && styles.pickerChipYes,
+                                bits.avgLabel === 'Target Yes' && styles.pickerChipYes,
                               ]}
                             >
                               {bits.avgLabel}
@@ -917,6 +897,19 @@ export function CombisScreen({ navigation }: Props) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <BoardScoreModal
+        visible={Boolean(scorePlayerId)}
+        dayNumber={selected?.dayNumber || 1}
+        playerName={scoreDraft.find((r) => r.userId === scorePlayerId)?.name}
+        target={scoreDraft.find((r) => r.userId === scorePlayerId)?.target}
+        initialBoards={scoreDraft.find((r) => r.userId === scorePlayerId)?.boards || []}
+        busy={savingScores}
+        editNote={captainScoreUntilNote(selected?.dayNumber || 1)}
+        onClose={() => setScorePlayerId(null)}
+        onSave={(boards) => {
+          if (scorePlayerId) void onSavePlayerBoards(scorePlayerId, boards);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1123,21 +1116,23 @@ const styles = StyleSheet.create({
     borderColor: '#14532d',
   },
   scoreHint: { color: '#94a3b8', fontSize: 11, fontWeight: '600', marginBottom: 10, textAlign: 'center' },
-  scoreRow: { marginBottom: 10 },
-  scoreName: { color: '#e2e8f0', fontWeight: '800', fontSize: 12, marginBottom: 6 },
-  scoreInputs: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  scoreInput: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    color: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontWeight: '700',
+  scorePlayerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
   },
-  avgBadge: { color: '#94a3b8', fontWeight: '900', fontSize: 11, width: 64 },
+  scoreName: { color: '#e2e8f0', fontWeight: '800', fontSize: 13 },
+  scoreMeta: { color: '#94a3b8', fontWeight: '600', fontSize: 11, marginTop: 3 },
+  scoreChevron: { color: '#f59e0b', fontSize: 24, fontWeight: '700', lineHeight: 26 },
+  avgBadge: { color: '#94a3b8', fontWeight: '900', fontSize: 11, width: 72, textAlign: 'right' },
   avgBadgeYes: { color: '#34d399' },
-  saveScores: { backgroundColor: '#22c55e', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   save: { backgroundColor: '#f59e0b', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   saveText: { color: '#0f172a', fontWeight: '900', letterSpacing: 1.2 },
   pickerRoot: { flex: 1, justifyContent: 'flex-end' },

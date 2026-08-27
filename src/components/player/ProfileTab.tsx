@@ -13,6 +13,7 @@ import {
   Users, Lock, CheckCircle2, AlertCircle, Eye, EyeOff,
   Pencil, X, Save, User, Calendar
 } from 'lucide-react';
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
 interface ProfileTabProps {
@@ -138,7 +139,7 @@ export function ProfileTab({
       if (res.success) {
         setPinStatus({ ok: true, msg: '✅ PIN updated! Use your new PIN at next login.' });
         setCurrentPin(''); setNewPin(''); setConfirmPin('');
-        setTimeout(() => setShowPinSection(false), 3000);
+        setTimeout(() => { setShowPinSection(false); setPinStatus(null); }, 1600);
       } else {
         setPinStatus({ ok: false, msg: res.error || 'PIN update failed. Check your current PIN.' });
       }
@@ -436,16 +437,33 @@ export function ProfileTab({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!showPinSection ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-              onClick={() => setShowPinSection(true)}
-            >
-              <Shield className="h-4 w-4" /> Change My PIN
-            </Button>
-          ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+            onClick={() => { setPinStatus(null); setShowPinSection(true); }}
+          >
+            <Shield className="h-4 w-4" /> Update PIN
+          </Button>
+          <Dialog
+            open={showPinSection}
+            onOpenChange={(open) => {
+              if (isPinLoading) return;
+              setShowPinSection(open);
+              if (!open) {
+                setPinStatus(null);
+                setCurrentPin('');
+                setNewPin('');
+                setConfirmPin('');
+              }
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Update PIN</DialogTitle>
+              <DialogDescription>
+                Enter your current PIN, then a new 4-digit PIN twice.
+              </DialogDescription>
+            </DialogHeader>
             <form onSubmit={handlePinReset} className="space-y-4 max-w-sm">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Current PIN</label>
@@ -466,7 +484,7 @@ export function ProfileTab({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">New PIN (4 digits)</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">New PIN</label>
                 <div className="relative">
                   <Input
                     type={showNew ? 'text' : 'password'}
@@ -505,14 +523,14 @@ export function ProfileTab({
               )}
               <div className="flex gap-2">
                 <Button type="submit" variant="carrom" size="sm" disabled={isPinLoading || currentPin.length < 4 || newPin.length < 4 || confirmPin !== newPin} className="gap-1.5">
-                  <Shield className="h-3.5 w-3.5" />{isPinLoading ? 'Updating…' : 'Update PIN'}
+                  <Shield className="h-3.5 w-3.5" />{isPinLoading ? 'Updating…' : 'Submit'}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => { setShowPinSection(false); setPinStatus(null); setCurrentPin(''); setNewPin(''); setConfirmPin(''); }}>
+                <Button type="button" variant="outline" size="sm" disabled={isPinLoading} onClick={() => { setShowPinSection(false); setPinStatus(null); setCurrentPin(''); setNewPin(''); setConfirmPin(''); }}>
                   Cancel
                 </Button>
               </div>
             </form>
-          )}
+          </Dialog>
         </CardContent>
       </Card>
     </div>

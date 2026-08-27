@@ -29,6 +29,7 @@ import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
 import { countEventWinsForPlayer, editionProfileStats, rankPlayers } from '@/lib/player-ranking';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 function roleOf(session: any) {
   return String(session?.user?.role || '');
@@ -46,8 +47,10 @@ async function requireSession() {
 }
 
 export async function loadLatestEdition() {
-  const edition = await prisma.edition.findFirst({
-    orderBy: { number: 'desc' },
+  const current = await resolveCurrentEdition();
+  if (!current) return null;
+  const edition = await prisma.edition.findUnique({
+    where: { id: current.id },
     select: { id: true, title: true, number: true, dayDates: true, totalDays: true, status: true, tournamentStartDate: true },
   });
   return ensureOfficialDayDates(edition);

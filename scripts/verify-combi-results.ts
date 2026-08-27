@@ -136,8 +136,25 @@ const rankedCurrent = rankPlayers({
   now: new Date('2026-08-10T20:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
-assert(rankedCurrent[0].userId === 'a' && rankedCurrent[0].boardAverage === 18, 'current average ranks ahead of day scores');
-assert(rankedCurrent[1].userId === 'b' && rankedCurrent[1].boardAverage === 22, 'higher current average ranks second');
+assert(rankedCurrent[0].userId === 'b' && rankedCurrent[0].boardAverage === 10, 'revealed day scores rank, not seed average');
+assert(rankedCurrent[1].userId === 'a' && rankedCurrent[1].boardAverage === 40, 'higher published board average ranks second');
+
+const rankedBeforeReveal = rankPlayers({
+  players: [
+    { userId: 'a', name: 'A', teamId: 't', teamName: 'T', average: 18 },
+    { userId: 'b', name: 'B', teamId: 't', teamName: 'T', average: 22 },
+  ],
+  scores: [
+    { userId: 'a', dayNumber: 1, score: 40, slams: 0 },
+    { userId: 'b', dayNumber: 1, score: 10, slams: 0 },
+  ],
+  logs: [],
+  maxDay: 1,
+  now: new Date('2026-08-10T10:00:00+05:30'),
+  dayDates: { 1: '2026-08-10' },
+});
+assert(rankedBeforeReveal[0].userId === 'a' && rankedBeforeReveal[0].boardAverage === 18, 'before 8:00pm IST current average still ranks');
+assert(rankedBeforeReveal[1].userId === 'b' && rankedBeforeReveal[1].boardAverage === 22, 'unpublished day scores are ignored');
 
 const rankedBoards = rankPlayers({
   players: [
