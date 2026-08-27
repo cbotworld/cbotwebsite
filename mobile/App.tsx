@@ -48,6 +48,8 @@ type ChannelVideo = NonNullable<Awaited<ReturnType<typeof getChannelVideos>>['vi
 
 const LOCKED_PLAYER_LABELS = new Set([
   'not submitted yet',
+  'na',
+  'n/a',
   '—',
   '-',
   'locked until 9:30 pm ist',

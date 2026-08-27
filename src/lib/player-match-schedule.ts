@@ -310,7 +310,7 @@ export async function getPlayerMatchSchedule(
           : oppMissing
             ? 'Opponent is TBD until this stage is assigned.'
             : isPast
-            ? 'This match day is completed. Watch the saved YouTube video, or use Practice / Tie Breaker.'
+            ? 'Go Live is closed for this match day (closed at 8:00pm IST). Existing live sessions started before 8:00pm IST can continue recording.'
             : prerequisiteDay
               ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${dayNumber} unlocks.`
               : 'This day is not unlocked yet.',

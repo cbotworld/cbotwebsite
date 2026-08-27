@@ -27,23 +27,23 @@ export default function PlayerScoresClient({
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       <div>
         <Badge variant="carrom" className="mb-2">Day-wise scores</Badge>
-        <h1 className="text-3xl font-black tracking-tight">Player Scores</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {editionTitle} — this page publishes at 8:00pm IST so captains can set combis.
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Player Scores</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          {editionTitle} — this page publishes at 9:00pm IST so captains can set combis.
         </p>
         <ScoreEditRules />
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x scrollbar-none pb-1.5">
         {dayList.map((d) => (
           <button
             key={d.dayNumber}
             type="button"
             onClick={() => setDay(d.dayNumber)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black border ${
-              day === d.dayNumber ? 'bg-amber-500 text-slate-950 border-amber-400' : 'border-border text-muted-foreground'
+            className={`px-3 py-1.5 rounded-xl text-xs font-black border whitespace-nowrap shrink-0 transition-all ${
+              day === d.dayNumber ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' : 'border-border text-muted-foreground hover:text-foreground'
             }`}
           >
             Day {d.dayNumber}
@@ -59,7 +59,7 @@ export default function PlayerScoresClient({
       ) : !selected?.published ? (
         <Card className="border-amber-500/30">
           <CardContent className="p-6 text-sm font-semibold text-muted-foreground">
-            Day {day} publishes at 8:00pm IST on {selected?.calendarDate}. Scores stay hidden until then.
+            Day {day} publishes at 9:00pm IST on {selected?.calendarDate}. Scores stay hidden until then.
           </CardContent>
         </Card>
       ) : (

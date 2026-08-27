@@ -54,6 +54,57 @@ export function roundAverage(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Calculates updated player average using (Current average + today's average) / 2.
+ * If prior average is 0 or null, returns the day's average.
+ */
+export function computeUpdatedAverage(currentAverage: number | null | undefined, dayAverage: number): number {
+  const current = Number(currentAverage);
+  if (!Number.isFinite(current) || current <= 0) {
+    return roundAverage(dayAverage);
+  }
+  return roundAverage((current + dayAverage) / 2);
+}
+
+/**
+ * Calculates progressive edition average across submitted days in order using
+ * (Current average + that day's average) / 2 for each day.
+ */
+export function computeEditionRunningAverage(
+  initialAverage: number | null | undefined,
+  rows: Array<{ score: number; slams?: number; boards?: unknown; dayNumber?: number }>,
+) {
+  let totalScore = 0;
+  let boardCount = 0;
+  const initial = Number(initialAverage);
+  let running = Number.isFinite(initial) && initial > 0 ? initial : 0;
+  let daysProcessed = 0;
+
+  const sorted = [...rows].sort((a, b) => (Number(a.dayNumber) || 0) - (Number(b.dayNumber) || 0));
+  for (const row of sorted) {
+    const boards = normalizeBoards(row.boards, row.score, row.slams);
+    const agg = aggregateBoards(boards);
+    totalScore += agg.score;
+    boardCount += agg.boardCount;
+    if (agg.boardCount > 0) {
+      const dayAvg = agg.score / agg.boardCount;
+      if (running > 0) {
+        running = roundAverage((running + dayAvg) / 2);
+      } else {
+        running = roundAverage(dayAvg);
+      }
+      daysProcessed += 1;
+    }
+  }
+
+  return {
+    totalScore,
+    boardCount,
+    average: running > 0 ? running : 0,
+    daysProcessed,
+  };
+}
+
 export function editionBoardAverage(rows: Array<{ score: number; slams?: number; boards?: unknown }>) {
   let totalScore = 0;
   let boardCount = 0;
@@ -92,8 +143,8 @@ export function validateBoardsPayload(raw: unknown): { ok: true; boards: DayBoar
     if (!Number.isFinite(score) || score < 0 || !Number.isInteger(score)) {
       return { ok: false, error: `Board ${i + 1} score must be a whole number of 0 or more.` };
     }
-    if (!Number.isFinite(slams) || slams < 0 || !Number.isInteger(slams) || slams > 9) {
-      return { ok: false, error: `Board ${i + 1} slams must be a whole number from 0 to 9.` };
+    if (slams !== 0 && slams !== 1) {
+      return { ok: false, error: `Board ${i + 1} slam must be Yes (1) or No (0).` };
     }
     boards.push({ score, slams });
   }

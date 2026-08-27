@@ -139,25 +139,25 @@ export default function HomeClient({
                 <span>{hero.badgeText}</span>
               </div>
 
-              <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight sm:leading-none">
                 {hero.headlineLine1}
                 <br />
                 {hero.headlineLine2}{' '}
-                <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent block mt-2">
+                <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 bg-clip-text text-transparent block mt-1 sm:mt-2">
                   {hero.headlineAccent}
                 </span>
               </h1>
 
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-base sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
                 {hero.description}
               </p>
 
               {/* Stats ticker */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-8 border-t border-border/50">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-6 sm:pt-8 border-t border-border/50">
                 {hero.stats.map((s) => (
-                  <div key={s.label}>
-                    <div className={`text-2xl sm:text-3xl font-black ${statColorClass(s.color)}`}>{s.value}</div>
-                    <div className="text-xs text-muted-foreground font-medium mt-0.5">{s.label}</div>
+                  <div key={s.label} className="p-2 sm:p-0 rounded-xl bg-card/40 sm:bg-transparent border border-border/30 sm:border-none">
+                    <div className={`text-xl sm:text-3xl font-black ${statColorClass(s.color)}`}>{s.value}</div>
+                    <div className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-0.5">{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -172,10 +172,10 @@ export default function HomeClient({
             >
               <div className="relative mx-auto max-w-md flex flex-col gap-3">
                 <div className="flex items-center justify-between px-1">
-                  <Badge variant="carrom" className="px-3 py-1.5 font-extrabold text-[10px] uppercase tracking-widest shadow-lg">
+                  <Badge variant="carrom" className="px-2.5 sm:px-3 py-1 sm:py-1.5 font-extrabold text-[9px] sm:text-[10px] uppercase tracking-widest shadow-lg">
                     {hero.currentEditionBadge}
                   </Badge>
-                  <div className="flex items-center gap-1.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-extrabold px-3 py-1.5 rounded-full shadow-lg">
+                  <div className="flex items-center gap-1.5 bg-emerald-500/90 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-extrabold px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full shadow-lg">
                     <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping inline-block" />
                     DAY {currentDayNumber} — IN PROGRESS
                   </div>
@@ -236,21 +236,21 @@ export default function HomeClient({
         const marqueeItems = [...marqueeBaseItems, ...marqueeBaseItems, ...marqueeBaseItems];
 
         return (
-          <div className="relative w-full overflow-hidden py-8 border-y border-amber-500/10 bg-gradient-to-r from-background via-amber-500/5 to-background">
-            <div className="absolute left-0 top-0 h-full w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <div className="flex animate-marquee gap-5 w-max">
+          <div className="relative w-full overflow-hidden py-6 sm:py-8 border-y border-amber-500/10 bg-gradient-to-r from-background via-amber-500/5 to-background">
+            <div className="absolute left-0 top-0 h-full w-12 sm:w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 h-full w-12 sm:w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+            <div className="flex animate-marquee gap-3 sm:gap-5 w-max">
               {marqueeItems.map((team, i) => (
                 <Link
                   href="/teams-and-players"
                   key={`${team.id}-${i}`}
-                  className="relative flex-shrink-0 h-64 w-auto rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-105 hover:-translate-y-1"
+                  className="relative flex-shrink-0 h-48 sm:h-64 w-auto rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-105 hover:-translate-y-1"
                   title={team.name}
                 >
                   <img
                     src={team.img}
                     alt={team.name}
-                    className="h-64 w-auto object-contain rounded-xl"
+                    className="h-48 sm:h-64 w-auto object-contain rounded-xl"
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none" />
@@ -317,16 +317,16 @@ export default function HomeClient({
                   >
                     <div className="flex flex-col items-center justify-center gap-4 w-full">
                       {sponsor.layout === 'round' ? (
-                        <div className={`h-36 w-36 sm:h-40 sm:w-40 rounded-full border-4 ${accent.border} p-1 bg-slate-950 shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
+                        <div className={`h-32 w-32 sm:h-40 sm:w-40 rounded-full border-4 ${accent.border} p-1 bg-slate-950 shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
                           <img src={sponsor.logoUrl} alt={`${sponsor.name} Logo`} className="w-full h-full object-contain rounded-full drop-shadow-md" />
                         </div>
                       ) : (
-                        <div className={`h-32 w-56 sm:h-36 sm:w-64 rounded-2xl border-2 ${accent.border} p-3 bg-white shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
+                        <div className={`h-28 w-full max-w-[240px] sm:h-36 sm:w-64 rounded-2xl border-2 ${accent.border} p-2.5 sm:p-3 bg-white shadow-2xl ${accent.shadow} group-hover:scale-105 transition-all duration-300 flex items-center justify-center`}>
                           <img src={sponsor.logoUrl} alt={`${sponsor.name} Logo`} className="w-full h-full object-contain" />
                         </div>
                       )}
-                      <div className={`py-2 px-5 rounded-xl bg-slate-950/90 border ${accent.labelBorder} text-center shadow-lg transition-colors`}>
-                        <span className={`text-sm sm:text-base font-extrabold ${accent.labelText} tracking-wide`}>{sponsor.name}</span>
+                      <div className={`py-1.5 px-4 sm:py-2 sm:px-5 rounded-xl bg-slate-950/90 border ${accent.labelBorder} text-center shadow-lg transition-colors`}>
+                        <span className={`text-xs sm:text-base font-extrabold ${accent.labelText} tracking-wide`}>{sponsor.name}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -351,7 +351,7 @@ export default function HomeClient({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-10 sm:gap-20">
+          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-20">
             {[...specialSponsorsCms.sponsors]
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((sponsor, idx) => {
@@ -402,7 +402,7 @@ export default function HomeClient({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-start justify-center gap-6 sm:gap-8">
+          <div className="flex flex-wrap items-start justify-center gap-4 sm:gap-8">
             {[...goldSponsorsCms.sponsors]
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((sponsor, idx) => (
@@ -415,7 +415,7 @@ export default function HomeClient({
                   className="flex flex-col items-center gap-2 group"
                 >
                   <div className="relative">
-                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 overflow-hidden bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
+                    <div className="h-16 w-16 sm:h-24 sm:w-24 rounded-full border-2 border-amber-400/50 overflow-hidden bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-amber-600/20 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 group-hover:border-amber-400 group-hover:shadow-amber-400/30 transition-all duration-300">
                       <SponsorAvatar
                         name={sponsor.name}
                         imageUrl={sponsor.imageUrl}
@@ -425,7 +425,7 @@ export default function HomeClient({
                     </div>
                     <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-amber-400/20 via-yellow-400/15 to-amber-400/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
                   </div>
-                  <span className="text-xs font-bold text-amber-300/80 max-w-[90px] text-center leading-tight group-hover:text-amber-300 transition-colors">
+                  <span className="text-[11px] sm:text-xs font-bold text-amber-300/80 max-w-[80px] sm:max-w-[90px] text-center leading-tight group-hover:text-amber-300 transition-colors">
                     {sponsor.name}
                   </span>
                 </motion.div>
@@ -452,18 +452,18 @@ export default function HomeClient({
             className="w-full space-y-6"
           >
             {/* Milestone Navigation Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3">
               {legacyVideos.map((v, idx) => (
                 <button
                   key={v.id}
                   onClick={() => setActiveVideoIndex(idx)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-extrabold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[11px] sm:text-xs font-extrabold transition-all ${
                     activeVideoIndex === idx
                       ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 scale-105'
                       : 'bg-card border border-border text-muted-foreground hover:border-amber-500/50 hover:text-white'
                   }`}
                 >
-                  <Film className="h-3.5 w-3.5" />
+                  <Film className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
                   <span>{v.label}</span>
                 </button>
               ))}

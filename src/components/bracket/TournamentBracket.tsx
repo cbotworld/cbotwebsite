@@ -44,7 +44,7 @@ export function TournamentBracket({ matches, onSelectMatch }: TournamentBracketP
   };
 
   return (
-    <div className="w-full overflow-x-auto pb-6">
+    <div className="w-full overflow-x-auto touch-scroll-x pb-6">
       <div className="min-w-[850px] flex items-stretch justify-around gap-8 p-4">
         {rounds.map((roundNum, roundIdx) => {
           const roundMatches = roundsMap[roundNum];

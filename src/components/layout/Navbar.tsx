@@ -290,13 +290,13 @@ export function Navbar({
 
       {/* Google-Style Secondary Sub-Navbar Bar (BEHAVIOR: Appears BELOW country scroll) */}
       {isEditionPage && (
-        <div className="w-full border-t border-border/40 bg-card/90 backdrop-blur-xl px-4 sm:px-8 overflow-x-auto scrollbar-none shadow-md">
-          <div className="mx-auto flex max-w-7xl items-center gap-6 sm:gap-8 text-xs sm:text-sm font-bold text-muted-foreground whitespace-nowrap pt-1">
+        <div className="w-full border-t border-border/40 bg-card/90 backdrop-blur-xl px-3 sm:px-8 overflow-x-auto touch-scroll-x scrollbar-none shadow-md">
+          <div className="mx-auto flex max-w-7xl items-center gap-4 sm:gap-8 text-xs sm:text-sm font-bold text-muted-foreground whitespace-nowrap pt-1">
             
             {/* Sub-Tab 1: Daily Team Combis */}
             <Link
               href={combisHref || PUBLIC_COMBIS_PATH}
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
                 isCombisActive
                   ? 'text-amber-400 font-black'
                   : 'hover:text-foreground'
@@ -312,7 +312,7 @@ export function Navbar({
             {/* Sub-Tab 2: Match Schedule */}
             <Link
               href={scheduleHref || PUBLIC_SCHEDULE_PATH}
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
                 isScheduleActive
                   ? 'text-amber-400 font-black'
                   : 'hover:text-foreground'
@@ -328,7 +328,7 @@ export function Navbar({
             {/* Sub-Tab 3: Teams & Players */}
             <Link
               href={PUBLIC_TEAMS_PLAYERS_PATH}
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
                 isTeamsPlayersActive
                   ? 'text-amber-400 font-black'
                   : 'hover:text-foreground'
@@ -342,7 +342,7 @@ export function Navbar({
             </Link>
             <Link
               href={PUBLIC_PLAYER_SCORES_PATH}
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
                 isPlayerScoresActive ? 'text-amber-400 font-black' : 'hover:text-foreground'
               }`}
             >
@@ -354,7 +354,7 @@ export function Navbar({
             </Link>
             <Link
               href={PUBLIC_STANDINGS_PATH}
-              className={`relative py-2.5 px-1.5 flex items-center gap-2 transition-all ${
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
                 isStandingsActive ? 'text-amber-400 font-black' : 'hover:text-foreground'
               }`}
             >
@@ -370,7 +370,7 @@ export function Navbar({
 
       {/* Enhanced Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-amber-500/30 bg-background/98 backdrop-blur-2xl p-4 space-y-4 animate-in slide-in-from-top-4 shadow-2xl z-50">
+        <div className="md:hidden border-b border-amber-500/30 bg-background/98 backdrop-blur-2xl p-4 space-y-4 animate-in slide-in-from-top-4 shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
           {session?.user && (
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
               <Avatar fallback={session.user.name || 'U'} size="md" className="ring-2 ring-amber-500/50" />
@@ -388,7 +388,7 @@ export function Navbar({
             <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest px-1">
               🏆 {editionButtonLabel}
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 min-[440px]:grid-cols-3 gap-2">
               <Link
                 href={combisHref || PUBLIC_COMBIS_PATH}
                 onClick={() => setMobileMenuOpen(false)}
@@ -436,7 +436,7 @@ export function Navbar({
               <Link
                 href={PUBLIC_STANDINGS_PATH}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                className={`col-span-2 min-[440px]:col-span-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isStandingsActive
                     ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
                     : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'

@@ -51,11 +51,11 @@ export default function StandingsClient({ payload }: { payload: any }) {
   const slamBonusDays = open && (open.focus === 'slams' || open.focus === 'total') ? playerBonusCards(days, 'slams') : [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       <div>
         <Badge variant="carrom" className="mb-2">Standings</Badge>
-        <h1 className="text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           One table per organiser stage. Position is total points, then matches won if points are tied, then slams. Tap Event, Slams, Target+ or Total for the day-wise breakdown after each day completes.
         </p>
       </div>
@@ -68,7 +68,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-black">Player ranking</CardTitle>
-            <p className="text-xs text-muted-foreground">Ranked by current average until a day’s scores are revealed at 8:00pm IST. After that, ranking uses the published board average, lowest first. If averages are equal, more matches won ranks higher, then more slams.</p>
+            <p className="text-xs text-muted-foreground">Ranked by player average, lowest first (calculated as (current average + day average) / 2). Players with the same average share the same ranking.</p>
           </CardHeader>
           <CardContent>
             {players.length === 0 ? (
@@ -217,7 +217,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
           </DialogDescription>
         </DialogHeader>
         {!days.length ? (
-          <p className="text-sm text-muted-foreground">No completed days in this stage yet. Breakdown appears after 8:00pm IST (scores) and 9:30pm IST (event points).</p>
+          <p className="text-sm text-muted-foreground">No completed days in this stage yet. Breakdown appears after 9:00pm IST (scores) and 9:30pm IST (event points).</p>
         ) : (
           <div className="space-y-4">
             <Table>

@@ -362,29 +362,21 @@ function getTeamCombiForDay(
   const keyUpper = teamKey.trim().toUpperCase();
   const defaultCombi: any = isDay1 ? (OFFICIAL_TEAM_COMBIS[keyUpper] || {}) : {};
 
-  const notSubmittedFallback = isDay1 ? 'Player' : 'Not Submitted Yet';
-
   if (!teamsList || teamsList.length === 0) {
     return {
-      singles1: defaultCombi.singles1 || (isDay1 ? 'Player 1' : 'Not Submitted Yet'),
-      singles2: defaultCombi.singles2 || (isDay1 ? 'Player 2' : 'Not Submitted Yet'),
-      singles3: defaultCombi.singles3 || (isDay1 ? 'Player 3' : 'Not Submitted Yet'),
-      singles4: defaultCombi.singles4 || (isDay1 ? 'Player 4' : 'Not Submitted Yet'),
-      doubles1: defaultCombi.doubles1 || (isDay1 ? 'Doubles 1' : 'Not Submitted Yet'),
-      doubles2: defaultCombi.doubles2 || (isDay1 ? 'Doubles 2' : 'Not Submitted Yet'),
-      doubles3: defaultCombi.doubles3 || (isDay1 ? 'Doubles 3' : 'Not Submitted Yet'),
-      triples1: defaultCombi.triples1 || (isDay1 ? 'Triples 1' : 'Not Submitted Yet'),
-      triples2: defaultCombi.triples2 || (isDay1 ? 'Triples 2' : 'Not Submitted Yet'),
+      singles1: defaultCombi.singles1 || 'NA',
+      singles2: defaultCombi.singles2 || 'NA',
+      singles3: defaultCombi.singles3 || 'NA',
+      singles4: defaultCombi.singles4 || 'NA',
+      doubles1: defaultCombi.doubles1 || 'NA',
+      doubles2: defaultCombi.doubles2 || 'NA',
+      doubles3: defaultCombi.doubles3 || 'NA',
+      triples1: defaultCombi.triples1 || 'NA',
+      triples2: defaultCombi.triples2 || 'NA',
     };
   }
 
-  const team = teamsList.find((t: any) => {
-    if (!t || !t.name) return false;
-    const nameUpper = t.name.trim().toUpperCase();
-    const tagUpper = t.tag?.trim().toUpperCase();
-    const teamInfoName = TEAMS_INFO[keyUpper]?.name?.trim().toUpperCase();
-    return nameUpper === keyUpper || tagUpper === keyUpper || (teamInfoName && nameUpper === teamInfoName);
-  });
+  const team = findTeamByKey(teamKey, teamsList);
 
   if (team?.savedLineups) {
     try {
@@ -407,17 +399,17 @@ function getTeamCombiForDay(
           }
 
           if (rName && slots.includes(rName)) {
-            result[rName] = playersStr;
+            result[rName] = playersStr || 'NA';
           } else if (slots[idx]) {
             if (!result[slots[idx]]) {
-              result[slots[idx]] = playersStr;
+              result[slots[idx]] = playersStr || 'NA';
             }
           }
         });
 
         slots.forEach((s) => {
           if (!result[s]) {
-            result[s] = (defaultCombi as any)[s] || notSubmittedFallback;
+            result[s] = (defaultCombi as any)[s] || 'NA';
           }
         });
 
@@ -429,15 +421,15 @@ function getTeamCombiForDay(
   }
 
   return {
-    singles1: defaultCombi.singles1 || (isDay1 ? 'Player 1' : 'Not Submitted Yet'),
-    singles2: defaultCombi.singles2 || (isDay1 ? 'Player 2' : 'Not Submitted Yet'),
-    singles3: defaultCombi.singles3 || (isDay1 ? 'Player 3' : 'Not Submitted Yet'),
-    singles4: defaultCombi.singles4 || (isDay1 ? 'Player 4' : 'Not Submitted Yet'),
-    doubles1: defaultCombi.doubles1 || (isDay1 ? 'Doubles 1' : 'Not Submitted Yet'),
-    doubles2: defaultCombi.doubles2 || (isDay1 ? 'Doubles 2' : 'Not Submitted Yet'),
-    doubles3: defaultCombi.doubles3 || (isDay1 ? 'Doubles 3' : 'Not Submitted Yet'),
-    triples1: defaultCombi.triples1 || (isDay1 ? 'Triples 1' : 'Not Submitted Yet'),
-    triples2: defaultCombi.triples2 || (isDay1 ? 'Triples 2' : 'Not Submitted Yet'),
+    singles1: defaultCombi.singles1 || 'NA',
+    singles2: defaultCombi.singles2 || 'NA',
+    singles3: defaultCombi.singles3 || 'NA',
+    singles4: defaultCombi.singles4 || 'NA',
+    doubles1: defaultCombi.doubles1 || 'NA',
+    doubles2: defaultCombi.doubles2 || 'NA',
+    doubles3: defaultCombi.doubles3 || 'NA',
+    triples1: defaultCombi.triples1 || 'NA',
+    triples2: defaultCombi.triples2 || 'NA',
   };
 }
 
@@ -622,15 +614,15 @@ function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, team
   const c2 = getTeamCombiForDay(t2Key, dayNum, teamsList);
 
   return [
-    { label: 'Singles 1', leftPlayers: c1?.singles1 || 'Player 1', rightPlayers: c2?.singles1 || 'Player 1' },
-    { label: 'Singles 2', leftPlayers: c1?.singles2 || 'Player 2', rightPlayers: c2?.singles2 || 'Player 2' },
-    { label: 'Singles 3', leftPlayers: c1?.singles3 || 'Player 3', rightPlayers: c2?.singles3 || 'Player 3' },
-    { label: 'Singles 4', leftPlayers: c1?.singles4 || 'Player 4', rightPlayers: c2?.singles4 || 'Player 4' },
-    { label: 'Doubles 1', leftPlayers: c1?.doubles1 || 'Doubles 1', rightPlayers: c2?.doubles1 || 'Doubles 1' },
-    { label: 'Doubles 2', leftPlayers: c1?.doubles2 || 'Doubles 2', rightPlayers: c2?.doubles2 || 'Doubles 2' },
-    { label: 'Doubles 3', leftPlayers: c1?.doubles3 || 'Doubles 3', rightPlayers: c2?.doubles3 || 'Doubles 3' },
-    { label: 'Triples 1', leftPlayers: c1?.triples1 || 'Triples 1', rightPlayers: c2?.triples1 || 'Triples 1' },
-    { label: 'Triples 2', leftPlayers: c1?.triples2 || 'Triples 2', rightPlayers: c2?.triples2 || 'Triples 2' },
+    { label: 'Singles 1', leftPlayers: c1?.singles1 || 'NA', rightPlayers: c2?.singles1 || 'NA' },
+    { label: 'Singles 2', leftPlayers: c1?.singles2 || 'NA', rightPlayers: c2?.singles2 || 'NA' },
+    { label: 'Singles 3', leftPlayers: c1?.singles3 || 'NA', rightPlayers: c2?.singles3 || 'NA' },
+    { label: 'Singles 4', leftPlayers: c1?.singles4 || 'NA', rightPlayers: c2?.singles4 || 'NA' },
+    { label: 'Doubles 1', leftPlayers: c1?.doubles1 || 'NA', rightPlayers: c2?.doubles1 || 'NA' },
+    { label: 'Doubles 2', leftPlayers: c1?.doubles2 || 'NA', rightPlayers: c2?.doubles2 || 'NA' },
+    { label: 'Doubles 3', leftPlayers: c1?.doubles3 || 'NA', rightPlayers: c2?.doubles3 || 'NA' },
+    { label: 'Triples 1', leftPlayers: c1?.triples1 || 'NA', rightPlayers: c2?.triples1 || 'NA' },
+    { label: 'Triples 2', leftPlayers: c1?.triples2 || 'NA', rightPlayers: c2?.triples2 || 'NA' },
   ];
 }
 
@@ -769,10 +761,12 @@ export default function DailyCombisClient({
     const rows: any[] = [];
 
     activeMatches.forEach((match, matchIdx) => {
-      const t1Name = TEAMS_INFO[match.team1Key]?.name || match.team1Key;
-      const t1Capt = TEAMS_INFO[match.team1Key]?.captain || '';
-      const t2Name = TEAMS_INFO[match.team2Key]?.name || match.team2Key;
-      const t2Capt = TEAMS_INFO[match.team2Key]?.captain || '';
+      const dbTeam1 = findTeamByKey(match.team1Key, dbTeams);
+      const dbTeam2 = findTeamByKey(match.team2Key, dbTeams);
+      const t1Name = dbTeam1?.name || TEAMS_INFO[match.team1Key]?.name || match.team1Key;
+      const t1Capt = dbTeam1?.captain?.name || dbTeam1?.captain?.username || TEAMS_INFO[match.team1Key]?.captain || 'Captain';
+      const t2Name = dbTeam2?.name || TEAMS_INFO[match.team2Key]?.name || match.team2Key;
+      const t2Capt = dbTeam2?.captain?.name || dbTeam2?.captain?.username || TEAMS_INFO[match.team2Key]?.captain || 'Captain';
 
       match.events.forEach((evt) => {
         rows.push({
@@ -809,20 +803,20 @@ export default function DailyCombisClient({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
       {/* BANNER HEADER */}
-      <div className="relative rounded-3xl overflow-hidden border border-amber-500/40 bg-gradient-to-b from-amber-950/40 via-card to-background p-6 sm:p-10 shadow-2xl space-y-6">
+      <div className="relative rounded-3xl overflow-hidden border border-amber-500/40 bg-gradient-to-b from-amber-950/40 via-card to-background p-4 sm:p-8 lg:p-10 shadow-2xl space-y-6">
         <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 via-teal-500/5 to-amber-500/10 pointer-events-none blur-3xl" />
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-amber-500/20 pb-6 relative z-10">
-          <div className="space-y-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 border-b border-amber-500/20 pb-4 sm:pb-6 relative z-10">
+          <div className="space-y-1.5 sm:space-y-2">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="CBOT Logo" className="h-10 w-10 object-contain drop-shadow-md" />
-              <Badge variant="carrom" className="px-3.5 py-1 font-black text-xs uppercase tracking-widest bg-amber-500/20 text-amber-400 border-amber-500/40">
+              <img src="/logo.png" alt="CBOT Logo" className="h-8 w-8 sm:h-10 sm:w-10 object-contain drop-shadow-md" />
+              <Badge variant="carrom" className="px-2.5 sm:px-3.5 py-0.5 sm:py-1 font-black text-[10px] sm:text-xs uppercase tracking-widest bg-amber-500/20 text-amber-400 border-amber-500/40">
                 {pageCms.badge}
               </Badge>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">
+            <h1 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-foreground">
               {pageCms.title}
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-muted-foreground">
@@ -832,19 +826,19 @@ export default function DailyCombisClient({
 
           <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
             {isRevealed ? (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10">
-                <Unlock className="h-4 w-4 text-emerald-400 animate-pulse" />
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 shadow-lg shadow-emerald-500/10">
+                <Unlock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400 animate-pulse shrink-0" />
                 <div>
-                  <div className="text-xs font-black uppercase tracking-wider">Day {selectedDayNum} Combis Published</div>
-                  <div className="text-[10px] font-bold text-emerald-300/80">Auto-Revealed @ {activeDayFixture.cutoffDateStr}</div>
+                  <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider">Day {selectedDayNum} Combis Published</div>
+                  <div className="text-[9px] sm:text-[10px] font-bold text-emerald-300/80">Auto-Revealed @ {activeDayFixture.cutoffDateStr}</div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-500/20 border border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10">
-                <Lock className="h-4 w-4 text-amber-400 animate-bounce" />
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-amber-500/20 border border-amber-500/50 text-amber-400 shadow-lg shadow-amber-500/10">
+                <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400 animate-bounce shrink-0" />
                 <div>
-                  <div className="text-xs font-black uppercase tracking-wider">Day {selectedDayNum} Combis Locked</div>
-                  <div className="text-[10px] font-bold text-amber-300/80">Will Auto-Reveal @ {activeDayFixture.cutoffDateStr}</div>
+                  <div className="text-[11px] sm:text-xs font-black uppercase tracking-wider">Day {selectedDayNum} Combis Locked</div>
+                  <div className="text-[9px] sm:text-[10px] font-bold text-amber-300/80">Will Auto-Reveal @ {activeDayFixture.cutoffDateStr}</div>
                 </div>
               </div>
             )}
@@ -852,8 +846,8 @@ export default function DailyCombisClient({
         </div>
 
         {/* DAY SELECTOR TABS & SEARCH & EXCEL DOWNLOAD */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative z-10 pt-1">
-          <div className="flex items-center gap-2 flex-wrap w-full pb-2 md:pb-0">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 relative z-10 pt-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x scrollbar-none pb-1.5 w-full">
             {scheduleDays.map((d) => {
               const isSelected = d.dayNumber === selectedDayNum;
               const dCutoff = new Date(d.cutoffIso).getTime();
@@ -863,7 +857,7 @@ export default function DailyCombisClient({
                 <button
                   key={d.dayNumber}
                   onClick={() => setPickedDayNum(d.dayNumber)}
-                  className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all flex items-center gap-2 border ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl text-[11px] sm:text-xs font-black whitespace-nowrap transition-all flex items-center gap-1.5 border shrink-0 ${
                     isSelected
                       ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/30 scale-105'
                       : dRevealed
@@ -873,16 +867,16 @@ export default function DailyCombisClient({
                 >
                   <span>Day {d.dayNumber}</span>
                   {dRevealed ? (
-                    <CheckCircle2 className={`h-3.5 w-3.5 ${isSelected ? 'text-slate-950' : 'text-emerald-400'}`} />
+                    <CheckCircle2 className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isSelected ? 'text-slate-950' : 'text-emerald-400'}`} />
                   ) : (
-                    <Lock className={`h-3 w-3 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`} />
+                    <Lock className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`} />
                   )}
                 </button>
               );
             })}
           </div>
 
-          <div className="relative w-full md:w-72">
+          <div className="relative w-full md:w-72 shrink-0">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search player, captain or team..."
@@ -896,41 +890,41 @@ export default function DailyCombisClient({
 
       {/* REVEAL LOCK NOTICE (IF NOT YET 9:30 PM ON FUTURE DAY) */}
       {!isRevealed ? (
-        <div className="rounded-3xl border-2 border-amber-500/50 bg-amber-500/10 p-8 sm:p-12 text-center space-y-4 shadow-xl">
-          <div className="h-16 w-16 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center mx-auto text-amber-400 shadow-lg shadow-amber-500/20">
-            <Lock className="h-8 w-8 animate-pulse" />
+        <div className="rounded-3xl border-2 border-amber-500/50 bg-amber-500/10 p-6 sm:p-12 text-center space-y-4 shadow-xl">
+          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center mx-auto text-amber-400 shadow-lg shadow-amber-500/20">
+            <Lock className="h-6 w-6 sm:h-8 sm:w-8 animate-pulse" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-black text-amber-400">
+            <h2 className="text-lg sm:text-2xl font-black text-amber-400">
               Day {selectedDayNum} Team Combis are Currently Locked
             </h2>
-            <p className="text-sm font-bold text-muted-foreground max-w-lg mx-auto">
+            <p className="text-xs sm:text-sm font-bold text-muted-foreground max-w-lg mx-auto">
               Captains are currently saving their event match combinations. All combis for Day {selectedDayNum} will automatically publish on this website at <span className="text-amber-400 font-extrabold">{activeDayFixture.cutoffDateStr}</span>.
             </p>
           </div>
-          <Badge variant="carrom" className="px-4 py-1.5 font-black text-xs uppercase tracking-wider">
+          <Badge variant="carrom" className="px-3 sm:px-4 py-1 sm:py-1.5 font-black text-[10px] sm:text-xs uppercase tracking-wider">
             CUTOFF TIME: {activeDayFixture.cutoffDateStr}
           </Badge>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-gradient-to-r from-card via-card/90 to-background border border-emerald-500/30 rounded-2xl p-4 shadow-md">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gradient-to-r from-card via-card/90 to-background border border-emerald-500/30 rounded-2xl p-3 sm:p-4 shadow-md">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
                 <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
               </div>
-              <div>
-                <h3 className="text-sm font-black text-foreground">
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-sm font-black text-foreground truncate">
                   Official Day {selectedDayNum} Combinations Spreadsheet
                 </h3>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {activeDayFixture.title} · {activeDayFixture.calendarDate} · {activeDayFixture.dateStr}
+                <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">
+                  {activeDayFixture.title} · {activeDayFixture.calendarDate}
                 </p>
               </div>
             </div>
             <Button
               onClick={handleDownloadExcel}
-              className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-md flex items-center gap-2 border border-emerald-400 hover:scale-105 transition-all cursor-pointer shrink-0"
+              className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-md flex items-center justify-center gap-2 border border-emerald-400 hover:scale-105 transition-all cursor-pointer shrink-0"
             >
               <Download className="h-4 w-4 text-slate-950" />
               <span>Download Excel (.xlsx)</span>
@@ -938,7 +932,7 @@ export default function DailyCombisClient({
           </div>
 
           {/* MATCH CARDS GRID (2x2 LAYOUT TO FIT ALL 4 MATCHES IN FRAME) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
           {filteredMatches.length === 0 ? (
             <div className="lg:col-span-2 rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
               No matches scheduled for Day {selectedDayNum} yet.
@@ -949,10 +943,12 @@ export default function DailyCombisClient({
             const t2Face = resolveTeamFace({ name: match.team2Key });
             const t1Info = TEAMS_INFO[t1Face.name];
             const t2Info = TEAMS_INFO[t2Face.name];
+            const dbTeam1 = findTeamByKey(match.team1Key, dbTeams);
+            const dbTeam2 = findTeamByKey(match.team2Key, dbTeams);
             const t1 = {
               name: t1Face.name,
               tag: t1Face.tag,
-              captain: t1Info?.captain || 'Captain',
+              captain: dbTeam1?.captain?.name || dbTeam1?.captain?.username || t1Info?.captain || 'Captain',
               logo: t1Face.logo,
               color: t1Info?.color || t1Face.color || 'text-foreground',
               border: t1Info?.border || t1Face.border || 'border-border',
@@ -960,7 +956,7 @@ export default function DailyCombisClient({
             const t2 = {
               name: t2Face.name,
               tag: t2Face.tag,
-              captain: t2Info?.captain || 'Captain',
+              captain: dbTeam2?.captain?.name || dbTeam2?.captain?.username || t2Info?.captain || 'Captain',
               logo: t2Face.logo,
               color: t2Info?.color || t2Face.color || 'text-foreground',
               border: t2Info?.border || t2Face.border || 'border-border',
@@ -972,10 +968,10 @@ export default function DailyCombisClient({
                 className="rounded-2xl border border-border/80 bg-card shadow-xl overflow-hidden space-y-0 transition-all hover:border-amber-500/40"
               >
                 {/* REFINED MATCH HEADER */}
-                <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-3 border-b border-amber-500/20 grid grid-cols-12 gap-2 items-center relative">
+                <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-2.5 sm:px-4 py-2.5 sm:py-3 border-b border-amber-500/20 grid grid-cols-12 gap-1.5 sm:gap-2 items-center relative">
                   {/* Left Team */}
-                  <div className="col-span-5 flex items-center gap-3 min-w-0">
-                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                  <div className="col-span-5 flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
                       <img
                         src={t1.logo}
                         alt={t1.name}
@@ -983,10 +979,10 @@ export default function DailyCombisClient({
                       />
                     </div>
                     <div className="leading-tight min-w-0">
-                      <div className="text-xs sm:text-sm font-black text-foreground truncate">
-                        <span className={t1.color}>{t1.name}</span> <span className="text-[10px] opacity-80">({t1.tag})</span>
+                      <div className="text-[11px] sm:text-sm font-black text-foreground truncate">
+                        <span className={t1.color}>{t1.name}</span> <span className="text-[9px] sm:text-[10px] opacity-80">({t1.tag})</span>
                       </div>
-                      <div className="text-[10px] font-bold text-muted-foreground truncate mt-0.5">
+                      <div className="text-[9px] sm:text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t1.captain}</span>
                       </div>
                     </div>
@@ -994,22 +990,22 @@ export default function DailyCombisClient({
 
                   {/* Center VS Badge */}
                   <div className="col-span-2 flex items-center justify-center">
-                    <div className="h-8 w-8 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-xs font-black text-amber-400 shadow-md">
+                    <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-[10px] sm:text-xs font-black text-amber-400 shadow-md">
                       VS
                     </div>
                   </div>
 
                   {/* Right Team */}
-                  <div className="col-span-5 flex items-center justify-end gap-3 text-right min-w-0">
+                  <div className="col-span-5 flex items-center justify-end gap-2 sm:gap-3 text-right min-w-0">
                     <div className="leading-tight min-w-0">
-                      <div className="text-xs sm:text-sm font-black text-foreground truncate">
-                        <span className={t2.color}>{t2.name}</span> <span className="text-[10px] opacity-80">({t2.tag})</span>
+                      <div className="text-[11px] sm:text-sm font-black text-foreground truncate">
+                        <span className={t2.color}>{t2.name}</span> <span className="text-[9px] sm:text-[10px] opacity-80">({t2.tag})</span>
                       </div>
-                      <div className="text-[10px] font-bold text-muted-foreground truncate mt-0.5">
+                      <div className="text-[9px] sm:text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t2.captain}</span>
                       </div>
                     </div>
-                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                    <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
                       <img
                         src={t2.logo}
                         alt={t2.name}
@@ -1020,7 +1016,7 @@ export default function DailyCombisClient({
                 </div>
 
                 {/* 9 EVENT ROWS TABLE */}
-                <div className="p-2.5 space-y-1 bg-background/50">
+                <div className="p-1.5 sm:p-2.5 space-y-1 bg-background/50">
                   {match.events.map((evt, eIdx) => {
                     const isSingles = evt.label.toLowerCase().includes('singles');
                     const isDoubles = evt.label.toLowerCase().includes('doubles');
@@ -1028,17 +1024,17 @@ export default function DailyCombisClient({
                     return (
                       <div
                         key={eIdx}
-                        className="grid grid-cols-12 items-center gap-1.5 p-1.5 rounded-lg border border-border/40 bg-card/90 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all shadow-none"
+                        className="grid grid-cols-12 items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-lg border border-border/40 bg-card/90 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all shadow-none"
                       >
                         {/* Left Team Player(s) */}
-                        <div className="col-span-5 text-center font-extrabold text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-1" title={evt.leftPlayers}>
+                        <div className="col-span-5 text-center font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.leftPlayers}>
                           {evt.leftPlayers}
                         </div>
 
                         {/* Center Event Badge */}
                         <div className="col-span-2 flex items-center justify-center">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[8.5px] sm:text-[9.5px] font-black tracking-wider uppercase border whitespace-nowrap ${
+                            className={`px-1 sm:px-1.5 py-0.5 rounded text-[7.5px] min-[400px]:text-[8.5px] sm:text-[9.5px] font-black tracking-wider uppercase border whitespace-nowrap ${
                               isSingles
                                 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                                 : isDoubles
@@ -1051,7 +1047,7 @@ export default function DailyCombisClient({
                         </div>
 
                         {/* Right Team Player(s) */}
-                        <div className="col-span-5 text-center font-extrabold text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-1" title={evt.rightPlayers}>
+                        <div className="col-span-5 text-center font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.rightPlayers}>
                           {evt.rightPlayers}
                         </div>
                       </div>

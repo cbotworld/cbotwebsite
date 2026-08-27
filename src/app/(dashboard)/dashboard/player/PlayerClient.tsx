@@ -761,7 +761,7 @@ export default function PlayerClient({
                 <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
               </CardTitle>
               <CardDescription>
-                Choose a day. If you already submitted boards, they load here so you can update them until 8:00pm IST.
+                Choose a day. If you already submitted boards, they load here so you can update them until 9:00pm IST.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">

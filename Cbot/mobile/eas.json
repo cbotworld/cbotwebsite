@@ -13,7 +13,7 @@
       "env": {
         "EXPO_PUBLIC_WEBSITE_URL": "https://www.cbotworld.com",
         "EXPO_PUBLIC_API_BASE_URL": "https://www.cbotworld.com/api",
-        "EXPO_PUBLIC_APP_API_KEY": ""
+        "EXPO_PUBLIC_APP_API_KEY": "Wb]N(6U0aJD$;tFF"
       }
     },
     "preview": {
@@ -24,7 +24,7 @@
       "env": {
         "EXPO_PUBLIC_WEBSITE_URL": "https://www.cbotworld.com",
         "EXPO_PUBLIC_API_BASE_URL": "https://www.cbotworld.com/api",
-        "EXPO_PUBLIC_APP_API_KEY": ""
+        "EXPO_PUBLIC_APP_API_KEY": "Wb]N(6U0aJD$;tFF"
       }
     },
     "production": {
@@ -38,7 +38,7 @@
       "env": {
         "EXPO_PUBLIC_WEBSITE_URL": "https://www.cbotworld.com",
         "EXPO_PUBLIC_API_BASE_URL": "https://www.cbotworld.com/api",
-        "EXPO_PUBLIC_APP_API_KEY": ""
+        "EXPO_PUBLIC_APP_API_KEY": "Wb]N(6U0aJD$;tFF"
       }
     }
   },

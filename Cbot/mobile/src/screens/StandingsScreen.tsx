@@ -130,7 +130,7 @@ export function StandingsScreen(_props: Props) {
             <View style={styles.groupCard}>
               <Text style={styles.groupTitle}>Player ranking</Text>
               <Text style={styles.rankHint}>
-                Ranked by current average until a day’s scores are revealed at 8:00pm IST. After that, ranking uses the published board average, lowest first. If averages are equal, more matches won ranks higher, then more slams.
+                Ranked by player average, lowest first ((current average + day average) / 2). Players with equal averages share the same rank.
               </Text>
               <View style={styles.tableHead}>
                 <Text style={[styles.th, styles.colRank]}>#</Text>
@@ -269,7 +269,7 @@ export function StandingsScreen(_props: Props) {
           <ScrollView contentContainerStyle={styles.modalScroll}>
             {!days.length ? (
               <Text style={styles.empty}>
-                No completed days in this stage yet. Breakdown appears after 8:00pm IST (scores) and
+                No completed days in this stage yet. Breakdown appears after 9:00pm IST (scores) and
                 9:30pm IST (event points).
               </Text>
             ) : (

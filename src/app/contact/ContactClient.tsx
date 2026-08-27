@@ -38,24 +38,24 @@ export function ContactClient({
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8 sm:space-y-12">
       
       {/* Header */}
-      <div className="text-center space-y-3 max-w-2xl mx-auto">
-        <Badge variant="carrom" className="px-4 py-1 font-bold">Contact & Support</Badge>
-        <h1 className="text-4xl font-black tracking-tight">Get in Touch with CBOT Officials</h1>
-        <p className="text-muted-foreground text-sm">
+      <div className="text-center space-y-2 sm:space-y-3 max-w-2xl mx-auto">
+        <Badge variant="carrom" className="px-3.5 py-1 font-bold text-xs">Contact & Support</Badge>
+        <h1 className="text-2xl sm:text-4xl font-black tracking-tight">Get in Touch with CBOT Officials</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Have questions regarding team entries, referee score disputes, sponsorship, or tournament rules? Send us a message below.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         
         {/* Contact Form */}
-        <Card className="lg:col-span-7 p-6 border-border space-y-4">
+        <Card className="lg:col-span-7 p-4 sm:p-6 border-border space-y-4">
           <CardHeader className="p-0 mb-4">
-            <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Mail className="h-5 w-5 text-amber-500" /> Send Support Request
+            <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" /> Send Support Request
             </CardTitle>
           </CardHeader>
 
@@ -67,7 +67,7 @@ export function ContactClient({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="text-xs font-bold block mb-1">Your Name</label>
                   <Input required placeholder="Balu Master" />

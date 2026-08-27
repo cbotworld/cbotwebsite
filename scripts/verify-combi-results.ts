@@ -31,7 +31,29 @@ const emptyVsFilled = scoreOneEvent([], ['b'], scores, 'Singles 1');
 assert(emptyVsFilled.winnerTeam === 2 && emptyVsFilled.team2Pts === 2, 'empty vs filled');
 
 const bothEmpty = scoreOneEvent([], [], scores, 'Singles 1');
-assert(bothEmpty.reason === 'void' && bothEmpty.team1Pts === 0 && bothEmpty.team2Pts === 0, 'both empty void');
+assert(bothEmpty.reason === 'tie' && bothEmpty.team1Pts === 1 && bothEmpty.team2Pts === 1, 'both empty event gives 1 pt tie');
+
+// Combi submission tests:
+const noCombisBoth = scoreMatchDay([], [], [{ id: 'a', name: 'A' }], [{ id: 'b', name: 'B' }], scores);
+assert(noCombisBoth.team1EventPts === 1 && noCombisBoth.team2EventPts === 1 && noCombisBoth.matchWinner === 0, 'no combis by both gives 1 pt draw');
+
+const onlyT1Combi = scoreMatchDay(
+  [{ name: 'Singles 1', playerIds: ['a'] }],
+  [],
+  [{ id: 'a', name: 'A' }],
+  [{ id: 'b', name: 'B' }],
+  scores,
+);
+assert(onlyT1Combi.matchWinner === 1 && onlyT1Combi.team1EventPts === 2 && onlyT1Combi.team2EventPts === 0, 'only T1 submitted combi wins');
+
+const onlyT2Combi = scoreMatchDay(
+  [],
+  [{ name: 'Singles 1', playerIds: ['b'] }],
+  [{ id: 'a', name: 'A' }],
+  [{ id: 'b', name: 'B' }],
+  scores,
+);
+assert(onlyT2Combi.matchWinner === 2 && onlyT2Combi.team1EventPts === 0 && onlyT2Combi.team2EventPts === 2, 'only T2 submitted combi wins');
 
 assert(scoreOneEvent(['a', 'c'], ['b', 'd'], scores, 'Doubles 1').winnerTeam === 1, 'sum 38 vs 41');
 
@@ -99,7 +121,7 @@ const ranked = rankPlayers({
   ],
   logs: [],
   maxDay: 1,
-  now: new Date('2026-08-10T20:00:00+05:30'),
+  now: new Date('2026-08-10T21:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
 assert(ranked[0].userId === 'a' && ranked[0].rank === 1 && ranked[0].boardAverage === 20, 'lowest board average is rank 1');
@@ -115,12 +137,12 @@ const rankedWo = rankPlayers({
     { userId: 'b', average: 18, effectiveFrom: '2026-08-11' },
   ],
   maxDay: 1,
-  now: new Date('2026-08-10T20:00:00+05:30'),
+  now: new Date('2026-08-10T21:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
 const bRow = rankedWo.find((r) => r.userId === 'b');
-assert(bRow?.walkovers === 1 && bRow.boardAverage === 24 && bRow.boardCount === 0, 'walkover days are excluded from board count; current average still ranks');
-assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'lower current/board average ranks first');
+assert(bRow?.walkovers === 1 && bRow.boardAverage === 24.5 && bRow.boardCount === 0, 'walkover applies (highest avg + 1) day penalty');
+assert(rankedWo[0].userId === 'a' && rankedWo[0].rank === 1, 'submitted score ranks ahead of walkover penalty');
 
 const rankedCurrent = rankPlayers({
   players: [
@@ -133,11 +155,11 @@ const rankedCurrent = rankPlayers({
   ],
   logs: [],
   maxDay: 1,
-  now: new Date('2026-08-10T20:00:00+05:30'),
+  now: new Date('2026-08-10T21:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
-assert(rankedCurrent[0].userId === 'b' && rankedCurrent[0].boardAverage === 10, 'revealed day scores rank, not seed average');
-assert(rankedCurrent[1].userId === 'a' && rankedCurrent[1].boardAverage === 40, 'higher published board average ranks second');
+assert(rankedCurrent[0].userId === 'b' && rankedCurrent[0].boardAverage === 16, 'running average (22+10)/2=16 ranks first');
+assert(rankedCurrent[1].userId === 'a' && rankedCurrent[1].boardAverage === 29, 'running average (18+40)/2=29 ranks second');
 
 const rankedBeforeReveal = rankPlayers({
   players: [
@@ -153,25 +175,28 @@ const rankedBeforeReveal = rankPlayers({
   now: new Date('2026-08-10T10:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
-assert(rankedBeforeReveal[0].userId === 'a' && rankedBeforeReveal[0].boardAverage === 18, 'before 8:00pm IST current average still ranks');
+assert(rankedBeforeReveal[0].userId === 'a' && rankedBeforeReveal[0].boardAverage === 18, 'before 9:00pm IST current average still ranks');
 assert(rankedBeforeReveal[1].userId === 'b' && rankedBeforeReveal[1].boardAverage === 22, 'unpublished day scores are ignored');
 
 const rankedBoards = rankPlayers({
   players: [
     { userId: 'a', name: 'A', teamId: 't', teamName: 'T' },
     { userId: 'b', name: 'B', teamId: 't', teamName: 'T' },
+    { userId: 'c', name: 'C', teamId: 't', teamName: 'T' },
   ],
   scores: [
     { userId: 'a', dayNumber: 1, score: 40, slams: 0, boards: [{ score: 20, slams: 0 }, { score: 20, slams: 0 }] },
-    { userId: 'b', dayNumber: 1, score: 22, slams: 0, boards: [{ score: 22, slams: 0 }] },
+    { userId: 'b', dayNumber: 1, score: 20, slams: 0, boards: [{ score: 20, slams: 0 }] },
+    { userId: 'c', dayNumber: 1, score: 30, slams: 0, boards: [{ score: 30, slams: 0 }] },
   ],
   logs: [],
   maxDay: 1,
-  now: new Date('2026-08-10T20:00:00+05:30'),
+  now: new Date('2026-08-10T21:00:00+05:30'),
   dayDates: { 1: '2026-08-10' },
 });
-assert(rankedBoards[0].userId === 'a' && rankedBoards[0].boardAverage === 20, 'lower total-score/boards ranks first');
-assert(rankedBoards[1].userId === 'b' && rankedBoards[1].boardAverage === 22, 'higher average ranks second despite lower total');
+assert(rankedBoards[0].boardAverage === 20 && rankedBoards[0].rank === 1, 'player A rank 1 for avg 20');
+assert(rankedBoards[1].boardAverage === 20 && rankedBoards[1].rank === 1, 'player B shares rank 1 for same avg 20');
+assert(rankedBoards[2].boardAverage === 30 && rankedBoards[2].rank === 3, 'player C rank 3');
 
 const qfThenFinals: TournamentStage[] = [
   { id: 'rr', order: 1, kind: 'ROUND_ROBIN', name: 'Round Robin' },
@@ -242,15 +267,15 @@ function standingAt(nowIso: string) {
 }
 
 const beforeEight = standingAt('2026-08-10T19:59:00+05:30');
-const rrBeforeEight = beforeEight.find((b) => b.kind === 'ROUND_ROBIN')?.groups[0].rows.find((r) => r.teamId === 'main1');
-assert(rrBeforeEight?.eventPts === 0 && rrBeforeEight.slamBonus === 0 && rrBeforeEight.avgBonus === 0, 'slam/avg hidden before 8pm');
+const rrBeforeNine = beforeEight.find((b) => b.kind === 'ROUND_ROBIN')?.groups[0].rows.find((r) => r.teamId === 'main1');
+assert(rrBeforeNine?.eventPts === 0 && rrBeforeNine.slamBonus === 0 && rrBeforeNine.avgBonus === 0, 'slam/avg hidden before 9pm');
 
-const afterEight = standingAt('2026-08-10T20:00:00+05:30');
-const rrAfterEight = afterEight.find((b) => b.kind === 'ROUND_ROBIN')?.groups[0].rows.find((r) => r.teamId === 'main1');
-assert(rrAfterEight?.eventPts === 0, 'eventPts hidden until 9:30');
-assert(rrAfterEight?.slamBonus === 2 && rrAfterEight.avgBonus === 1, 'slam/avg after 8pm');
+const afterNine = standingAt('2026-08-10T21:00:00+05:30');
+const rrAfterNine = afterNine.find((b) => b.kind === 'ROUND_ROBIN')?.groups[0].rows.find((r) => r.teamId === 'main1');
+assert(rrAfterNine?.eventPts === 0, 'eventPts hidden until 9:30');
+assert(rrAfterNine?.slamBonus === 2 && rrAfterNine.avgBonus === 1, 'slam/avg after 9pm');
 assert(
-  rrAfterEight?.days?.some((d) => d.targetBonusPlayers?.some((p) => p.name === 'M1' && p.score === 20)),
+  rrAfterNine?.days?.some((d) => d.targetBonusPlayers?.some((p) => p.name === 'M1' && p.score === 20)),
   'target bonus popup lists the player by day',
 );
 

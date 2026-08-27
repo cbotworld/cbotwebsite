@@ -57,7 +57,7 @@ function parseDayDates(raw?: string | null) {
   }
 }
 
-function playersLabel(round: any, fallback = 'Not Submitted Yet') {
+function playersLabel(round: any, fallback = 'NA') {
   if (!round) return fallback;
   if (Array.isArray(round.players) && round.players.length > 0) {
     const names = round.players.map((p: any) => String(p || '').trim()).filter(Boolean);
@@ -284,7 +284,7 @@ export async function GET(request: NextRequest) {
             boards: Array.isArray(row?.boards) ? row.boards : [],
             average,
             hasAvgBonus: previewAvgBonus(row?.score ?? null, average),
-            missingPrior: !hasSubmittedPriorDays(daysSubmitted.get(m.id) || [], dayNumber),
+            missingPrior: false,
           };
         }
       }
@@ -316,8 +316,8 @@ export async function GET(request: NextRequest) {
           index: idx,
           name,
           format,
-          myPlayers: showMine ? playersLabel(myRound, revealed ? 'Not Submitted Yet' : '—') : '—',
-          opponentPlayers: showOpp ? playersLabel(oppRound, 'Not Submitted Yet') : revealed ? 'Not Submitted Yet' : 'Locked until 9:30 PM IST',
+          myPlayers: showMine ? playersLabel(myRound, revealed ? 'NA' : '—') : '—',
+          opponentPlayers: showOpp ? playersLabel(oppRound, 'NA') : revealed ? 'NA' : 'Locked until 9:30 PM IST',
         };
       });
 

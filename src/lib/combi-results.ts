@@ -72,10 +72,16 @@ export function scoreOneEvent(
   const empty1 = side1.length === 0;
   const empty2 = side2.length === 0;
   if (empty1 && empty2) {
-    return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 0, team2Pts: 0, reason: 'void', winnerTeam: 0 };
+    return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 1, team2Pts: 1, reason: 'tie', winnerTeam: 0 };
   }
-  const wo1 = empty1 || side1.some((id) => !scores[id]);
-  const wo2 = empty2 || side2.some((id) => !scores[id]);
+  if (empty1) {
+    return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 0, team2Pts: 2, reason: 'walkover', winnerTeam: 2 };
+  }
+  if (empty2) {
+    return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 2, team2Pts: 0, reason: 'walkover', winnerTeam: 1 };
+  }
+  const wo1 = side1.some((id) => !scores[id]);
+  const wo2 = side2.some((id) => !scores[id]);
   if (wo1 && wo2) {
     return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 0, team2Pts: 0, reason: 'double-walkover', winnerTeam: 0 };
   }
@@ -105,6 +111,81 @@ export function scoreMatchDay(
 ): MatchDayResult {
   const a = rounds1 || [];
   const b = rounds2 || [];
+
+  // Case 1: Both team captains did NOT submit combis — consider as a DRAW match and give 1 point each
+  if (a.length === 0 && b.length === 0) {
+    return {
+      team1EventPts: 1,
+      team2EventPts: 1,
+      matchWinner: 0,
+      events: [
+        {
+          name: 'Match Draw (No Combis Submitted)',
+          format: 'OTHER',
+          team1PlayerIds: [],
+          team2PlayerIds: [],
+          team1Pts: 1,
+          team2Pts: 1,
+          reason: 'tie',
+          winnerTeam: 0,
+        },
+      ],
+    };
+  }
+
+  // Case 2: Team 1 submitted combi, but Team 2 did NOT submit combi — consider submitted team (Team 1) as winner
+  if (a.length > 0 && b.length === 0) {
+    const events: EventResult[] = a.map((round, i) => {
+      const name = round.name || `Event ${i + 1}`;
+      const format = roundFormat(name);
+      const team1PlayerIds = resolveRoundPlayerIds(round, roster1);
+      return {
+        name,
+        format,
+        team1PlayerIds,
+        team2PlayerIds: [],
+        team1Pts: 2,
+        team2Pts: 0,
+        reason: 'walkover',
+        winnerTeam: 1,
+      };
+    });
+    const team1EventPts = events.reduce((sum, e) => sum + e.team1Pts, 0);
+    return {
+      team1EventPts,
+      team2EventPts: 0,
+      matchWinner: 1,
+      events,
+    };
+  }
+
+  // Case 3: Team 2 submitted combi, but Team 1 did NOT submit combi — consider submitted team (Team 2) as winner
+  if (b.length > 0 && a.length === 0) {
+    const events: EventResult[] = b.map((round, i) => {
+      const name = round.name || `Event ${i + 1}`;
+      const format = roundFormat(name);
+      const team2PlayerIds = resolveRoundPlayerIds(round, roster2);
+      return {
+        name,
+        format,
+        team1PlayerIds: [],
+        team2PlayerIds,
+        team1Pts: 0,
+        team2Pts: 2,
+        reason: 'walkover',
+        winnerTeam: 2,
+      };
+    });
+    const team2EventPts = events.reduce((sum, e) => sum + e.team2Pts, 0);
+    return {
+      team1EventPts: 0,
+      team2EventPts,
+      matchWinner: 2,
+      events,
+    };
+  }
+
+  // Case 4: Both teams submitted combis
   const n = Math.max(a.length, b.length);
   const events: EventResult[] = [];
   let team1EventPts = 0;

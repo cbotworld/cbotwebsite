@@ -54,15 +54,15 @@ export default function TeamsAndPlayersClient({
   const playerCount = [...mainTeams, ...spocTeams].reduce((sum, t) => sum + t.members.length, 0);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-border pb-6">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-border pb-4 sm:pb-6">
         <div>
           <Badge variant="carrom" className="mb-2">
             {pageCms.badge}
           </Badge>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">{pageCms.title}</h1>
-          <p className="text-muted-foreground text-sm mt-1 max-w-2xl">{pageCms.subtitle}</p>
-          <p className="text-xs font-bold text-amber-500 mt-2 uppercase tracking-wider">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight">{pageCms.title}</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1 max-w-2xl">{pageCms.subtitle}</p>
+          <p className="text-[11px] sm:text-xs font-bold text-amber-500 mt-2 uppercase tracking-wider">
             {editionTitle} · {teamCount} teams · {playerCount} players
           </p>
         </div>
@@ -72,7 +72,7 @@ export default function TeamsAndPlayersClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search a team or player"
-            className="pl-9 h-10 text-sm font-semibold"
+            className="pl-9 h-10 text-xs sm:text-sm font-semibold"
           />
         </div>
       </div>
@@ -98,9 +98,9 @@ function TeamSection({
 }) {
   if (empty) {
     return (
-      <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
-        <Users className="h-10 w-10 mx-auto mb-3 text-amber-500/40" />
-        <div className="font-black">No teams yet</div>
+      <div className="rounded-2xl border border-dashed border-border p-8 sm:p-10 text-center text-muted-foreground">
+        <Users className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-3 text-amber-500/40" />
+        <div className="font-black text-sm sm:text-base">No teams yet</div>
         <p className="text-xs mt-1">The organizer has not published franchises for this edition.</p>
       </div>
     );
@@ -108,7 +108,7 @@ function TeamSection({
 
   if (teams.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-dashed border-border p-6 sm:p-8 text-center text-xs sm:text-sm text-muted-foreground">
         No {title.toLowerCase()} match “{query}”.
       </div>
     );
@@ -117,20 +117,20 @@ function TeamSection({
   return (
     <section className="space-y-4">
       <h2 className="text-xs font-black uppercase tracking-widest text-amber-500">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {teams.map((team) => (
           <article
             key={team.id}
-            className="rounded-2xl border border-border bg-card p-5 space-y-4 hover:border-amber-500/40 transition-colors"
+            className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4 hover:border-amber-500/40 transition-colors"
           >
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-xl overflow-hidden bg-slate-950 border border-amber-500/40 p-1.5 shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-13 w-13 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950 border border-amber-500/40 p-1 sm:p-1.5 shrink-0">
                 <img src={team.logo} alt={team.name} className="h-full w-full object-contain" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-black truncate">{team.name}</h3>
-                  <Badge variant="carrom">{team.tag}</Badge>
+                  <h3 className="text-base sm:text-lg font-black truncate">{team.name}</h3>
+                  <Badge variant="carrom" className="text-[10px] sm:text-xs">{team.tag}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {team.captainName ? `Captain: ${team.captainName}` : 'Captain not assigned'}

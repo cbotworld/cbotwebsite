@@ -80,38 +80,38 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
         </div>
 
         {/* Match Header Scoreboard Card */}
-        <div className="rounded-3xl bg-slate-900/90 border border-amber-500/30 p-6 sm:p-8 shadow-2xl text-center relative overflow-hidden grid grid-cols-3 items-center gap-4">
+        <div className="rounded-3xl bg-slate-900/90 border border-amber-500/30 p-3.5 sm:p-8 shadow-2xl text-center relative overflow-hidden grid grid-cols-3 items-center gap-2 sm:gap-4">
           
           {/* Team 1 */}
-          <div className="space-y-2">
-            <div className="h-16 w-16 rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-1 mx-auto flex items-center justify-center shadow-lg">
+          <div className="space-y-1.5 sm:space-y-2 min-w-0">
+            <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-0.5 sm:p-1 mx-auto flex items-center justify-center shadow-lg">
               <img src={match?.team1?.logo || '/logo.png'} alt={team1Name} className="h-full w-full object-contain" />
             </div>
-            <h2 className="text-sm sm:text-base font-black text-amber-400 leading-tight">{team1Name}</h2>
+            <h2 className="text-xs sm:text-base font-black text-amber-400 leading-tight truncate" title={team1Name}>{team1Name}</h2>
           </div>
 
           {/* Center VS & Details */}
-          <div className="space-y-2">
-            <div className="text-xs font-black uppercase tracking-widest text-slate-400">Match ID: {matchId}</div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-500 font-mono">VS</div>
+          <div className="space-y-1 sm:space-y-2">
+            <div className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-400">Match #{matchId.slice(-4)}</div>
+            <div className="text-xl sm:text-3xl font-black text-slate-500 font-mono">VS</div>
             {match?.tableNumber && (
-              <Badge variant="outline" className="border-amber-500/30 text-amber-300/80 text-[11px] font-bold">
+              <Badge variant="outline" className="border-amber-500/30 text-amber-300/80 text-[9px] sm:text-[11px] font-bold px-1.5 py-0">
                 Table #{match.tableNumber}
               </Badge>
             )}
             {match?.winnerId && (
-              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 text-xs font-black">
-                <Trophy className="h-3.5 w-3.5" /> Winner: {match.winnerId === match.team1Id ? team1Name : team2Name}
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl bg-amber-500/20 text-amber-400 text-[10px] sm:text-xs font-black truncate max-w-full">
+                <Trophy className="h-3 w-3 shrink-0" /> <span className="truncate">{match.winnerId === match.team1Id ? team1Name : team2Name}</span>
               </div>
             )}
           </div>
 
           {/* Team 2 */}
-          <div className="space-y-2">
-            <div className="h-16 w-16 rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-1 mx-auto flex items-center justify-center shadow-lg">
+          <div className="space-y-1.5 sm:space-y-2 min-w-0">
+            <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-0.5 sm:p-1 mx-auto flex items-center justify-center shadow-lg">
               <img src={match?.team2?.logo || '/logo.png'} alt={team2Name} className="h-full w-full object-contain" />
             </div>
-            <h2 className="text-sm sm:text-base font-black text-emerald-400 leading-tight">{team2Name}</h2>
+            <h2 className="text-xs sm:text-base font-black text-emerald-400 leading-tight truncate" title={team2Name}>{team2Name}</h2>
           </div>
 
         </div>

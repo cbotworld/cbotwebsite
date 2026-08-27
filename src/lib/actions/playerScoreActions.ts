@@ -23,8 +23,15 @@ import {
   SCORE_EDIT_NOT_OPEN_YET,
   SCORE_EDIT_PLAYER_CLOSED,
 } from '@/lib/score-edit-policy';
+import {
+  computeEditionRunningAverage,
+  editionBoardAverage,
+  normalizeBoards,
+  previewTargetBonus,
+  resolveScoreInput,
+  type DayBoardScore,
+} from '@/lib/board-scores';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
-import { editionBoardAverage, normalizeBoards, previewTargetBonus, resolveScoreInput, type DayBoardScore } from '@/lib/board-scores';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
 import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
@@ -105,14 +112,25 @@ async function upsertDayScore(opts: {
 }
 
 async function refreshPlayerEditionAverage(editionId: string, userId: string, changedById: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { average: true },
+  });
   const rows = await prisma.playerDayScore.findMany({
     where: { editionId, userId },
-    select: { score: true, slams: true, boards: true },
+    orderBy: { dayNumber: 'asc' },
+    select: { score: true, slams: true, boards: true, dayNumber: true },
   });
-  const { average, boardCount } = editionBoardAverage(rows);
-  if (boardCount <= 0) return;
-  await prisma.user.update({ where: { id: userId }, data: { average } });
-  await recordPlayerAverageChange(userId, average, changedById, true);
+  if (!rows.length) return;
+  const logs = await prisma.playerAverageLog.findMany({
+    where: { editionId, userId },
+    orderBy: { effectiveFrom: 'asc' },
+  });
+  const seed = logs.length > 0 ? Number(logs[0].average) : Number(user?.average) || 0;
+  const stats = computeEditionRunningAverage(seed, rows);
+  if (stats.daysProcessed <= 0 || stats.average <= 0) return;
+  await prisma.user.update({ where: { id: userId }, data: { average: stats.average } });
+  await recordPlayerAverageChange(userId, stats.average, changedById, true);
 }
 
 async function userOnEditionTeam(userId: string, editionId: string) {
@@ -133,10 +151,6 @@ async function userOnEditionTeam(userId: string, editionId: string) {
 function describeScoreWindow(day: number, dayDates: any) {
   if (isScoreSubmitOpen(day, dayDates)) {
     return { windowOpen: true, windowReason: null as string | null };
-  }
-  const start = new Date(scoreWindowStartIso(day, dayDates)).getTime();
-  if (Number.isFinite(start) && Date.now() < start) {
-    return { windowOpen: false, windowReason: SCORE_EDIT_NOT_OPEN_YET };
   }
   return {
     windowOpen: false,
@@ -164,13 +178,9 @@ export async function submitPlayerDayScoreForUser(
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
 
   if (!isScoreSubmitOpen(day, edition.dayDates)) {
-    const start = new Date(scoreWindowStartIso(day, edition.dayDates)).getTime();
     return {
       success: false as const,
-      error:
-        Number.isFinite(start) && Date.now() < start
-          ? SCORE_EDIT_NOT_OPEN_YET
-          : SCORE_EDIT_PLAYER_CLOSED,
+      error: SCORE_EDIT_PLAYER_CLOSED,
     };
   }
 
@@ -236,9 +246,6 @@ export async function submitTeamDayScoresForActor(opts: {
     if (!memberIds.has(row.userId)) return { success: false as const, error: 'Can only enter scores for this team.' };
     const parsed = resolveScoreInput(row.score, row.slams, row.boards);
     if (!parsed.ok) return { success: false as const, error: parsed.error };
-    if (!hasSubmittedPriorDays(priorByUser.get(row.userId) || [], day)) {
-      return { success: false as const, error: 'A player is missing an earlier day. Organiser must fill that day first.' };
-    }
     await upsertDayScore({
       editionId: edition.id,
       userId: row.userId,
@@ -529,7 +536,7 @@ export async function getTeamDayScoresForActor(
         boards: Array.isArray(row?.boards) ? row.boards : [],
         hasTargetBonus: previewTargetBonus(score, u.target),
         hasAvgBonus: previewTargetBonus(score, u.target),
-        missingPrior: !hasSubmittedPriorDays(daysByUser.get(u.id) || [], dayNumber),
+        missingPrior: false,
       };
     }),
   };

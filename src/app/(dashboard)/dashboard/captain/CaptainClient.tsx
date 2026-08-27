@@ -545,7 +545,7 @@ export default function CaptainClient({
               <div className="min-w-0">
                 <div className="font-semibold truncate">{row.name}</div>
                 <div className="text-[10px] text-muted-foreground">
-                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — captain can still edit until 9:30pm IST' : 'Empty — walkover if still blank at 8:00pm IST'}
+                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — captain can still edit until 9:30pm IST' : 'Empty — walkover if still blank at 9:00pm IST'}
                 </div>
               </div>
               <BoardScoreEditor

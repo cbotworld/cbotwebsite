@@ -64,12 +64,13 @@ function MatchDayScoreBox({
 }) {
   const submitted = (scoreInfo?.scores || []).find((s) => s.dayNumber === dayNumber);
   const published = (scoreInfo?.publishedDays || []).some((d) => d.dayNumber === dayNumber && d.published);
-  const canEdit = Boolean(scoreInfo?.windowOpen) && Number(scoreInfo?.eligibleDay) === dayNumber;
+  const dayWindow = (scoreInfo?.days || []).find((d) => d.dayNumber === dayNumber);
+  const canEdit = dayWindow ? dayWindow.windowOpen : !published;
   const stats = submitted ? parseBoardDrafts(boardsFromSaved(submitted)) : null;
 
   let body: ReactNode;
   if (published && !submitted) {
-    body = <Text style={styles.scoreLocked}>Empty — walkover if still blank at 8:00pm IST.</Text>;
+    body = <Text style={styles.scoreLocked}>Empty — walkover if still blank at 9:00pm IST.</Text>;
   } else if (canEdit) {
     body = (
       <>
@@ -97,11 +98,7 @@ function MatchDayScoreBox({
       </Text>
     );
   } else {
-    const reason =
-      Number(scoreInfo?.eligibleDay) > 0 && Number(scoreInfo?.eligibleDay) < dayNumber
-        ? `Submit Day ${scoreInfo?.eligibleDay} first`
-        : scoreInfo?.windowReason || playerScoreUntilNote(dayNumber);
-    body = <Text style={styles.scoreHint}>{reason}</Text>;
+    body = <Text style={styles.scoreHint}>{SCORE_EDIT_PLAYER_CLOSED}</Text>;
   }
 
   return (
@@ -412,7 +409,7 @@ export function DashboardScreen({ navigation }: Props) {
                             {typeof match.myEvent.eventPts === 'number' ? ` · +${match.myEvent.eventPts} pts` : ''}
                           </Text>
                         ) : (
-                          <Text style={styles.eventHint}>Result posts after 8:00pm IST scores</Text>
+                          <Text style={styles.eventHint}>Result posts after 9:00pm IST scores</Text>
                         )}
                       </>
                     ) : (

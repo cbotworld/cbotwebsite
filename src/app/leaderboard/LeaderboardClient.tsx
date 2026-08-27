@@ -45,27 +45,27 @@ export default function LeaderboardClient({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 max-w-7xl mx-auto border-b pb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 max-w-7xl mx-auto border-b pb-6">
         <div className="text-left space-y-1">
-          <Badge variant="carrom" className="px-4 py-1 font-bold">
+          <Badge variant="carrom" className="px-3 sm:px-4 py-1 font-bold text-xs">
             <Trophy className="h-3.5 w-3.5 mr-1 inline" /> {pageCms.badge}
           </Badge>
-          <h1 className="text-4xl font-black tracking-tight">{pageCms.title}</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight">{pageCms.title}</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm">
             {pageCms.subtitle}
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
-            <Globe className="h-4 w-4 text-muted-foreground ml-2" />
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-muted p-1 rounded-lg flex-1 sm:flex-none">
+            <Globe className="h-4 w-4 text-muted-foreground ml-2 shrink-0" />
             <select 
               value={countryFilter}
               onChange={(e) => setCountryFilter(e.target.value)}
-              className="bg-transparent border-none text-sm font-bold focus:ring-0 cursor-pointer p-2"
+              className="bg-transparent border-none text-xs sm:text-sm font-bold focus:ring-0 cursor-pointer p-1.5 sm:p-2 w-full sm:w-auto"
             >
               <option value="Global">Global Rankings</option>
               <option value="India">India</option>
@@ -82,8 +82,8 @@ export default function LeaderboardClient({
               <option value="France">France</option>
             </select>
           </div>
-          <Button onClick={handleDownload} disabled={isDownloading} variant="outline" className="font-bold border-amber-500/30 text-amber-500">
-            <Download className="h-4 w-4 mr-2" /> {isDownloading ? 'Generating...' : 'Export CSV'}
+          <Button onClick={handleDownload} disabled={isDownloading} variant="outline" className="font-bold border-amber-500/30 text-amber-500 text-xs h-9 sm:h-10">
+            <Download className="h-3.5 w-3.5 mr-1.5" /> {isDownloading ? 'Generating...' : 'Export CSV'}
           </Button>
         </div>
       </div>

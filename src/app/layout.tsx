@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
@@ -8,6 +8,13 @@ import { WhatsAppButtonWithCms } from '@/components/ui/WhatsAppButtonWithCms';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#090d16',
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const { site } = await getWebsiteCmsContent();

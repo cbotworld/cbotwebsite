@@ -548,7 +548,7 @@ export function LiveScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   idleFill: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#05070d",
     alignItems: "center",
     justifyContent: "center",

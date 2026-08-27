@@ -202,8 +202,8 @@ export async function GET() {
             index,
             name: slot.name,
             format: slot.format,
-            leftPlayers: revealed ? leftSlots[slot.key] || 'Not Submitted Yet' : 'Locked until 9:30 PM IST',
-            rightPlayers: revealed ? rightSlots[slot.key] || 'Not Submitted Yet' : 'Locked until 9:30 PM IST',
+            leftPlayers: revealed ? leftSlots[slot.key] || 'NA' : 'Locked until 9:30 PM IST',
+            rightPlayers: revealed ? rightSlots[slot.key] || 'NA' : 'Locked until 9:30 PM IST',
           })),
         };
       });

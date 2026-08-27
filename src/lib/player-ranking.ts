@@ -6,7 +6,14 @@ import type {
   TournamentStage,
 } from '@/types';
 import { isDayScorePublished, todayIstCalendarDate } from '@/lib/day-scoring';
-import { editionBoardAverage, previewTargetBonus, roundAverage } from '@/lib/board-scores';
+import {
+  aggregateBoards,
+  computeEditionRunningAverage,
+  editionBoardAverage,
+  normalizeBoards,
+  previewTargetBonus,
+  roundAverage,
+} from '@/lib/board-scores';
 import { averageForDay, logsForUser } from '@/lib/player-average';
 import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
@@ -42,37 +49,74 @@ export function rankPlayers(opts: {
   const byKey = new Map<string, PlayerDayScoreRow>();
   for (const row of opts.scores) byKey.set(scoreKey(row.userId, row.dayNumber), row);
 
+  // Compute highest average among players for walkover penalty calculation
+  const allSeedAverages = opts.players
+    .map((p) => {
+      const seed = averageForDay(
+        logsForUser(opts.logs, p.userId),
+        todayIstCalendarDate(now),
+        Number(p.average) || 0,
+      );
+      return Number.isFinite(seed) && seed > 0 ? seed : 0;
+    })
+    .filter((a) => a > 0);
+
+  const highestAverage = allSeedAverages.length > 0 ? Math.max(...allSeedAverages) : 0;
+
   const rows: PlayerRankingRow[] = opts.players.map((player) => {
-    const submitted: PlayerDayScoreRow[] = [];
-    let walkovers = 0;
-    for (const day of days) {
-      const row = byKey.get(scoreKey(player.userId, day));
-      if (row) submitted.push(row);
-      else walkovers += 1;
-    }
-    const stats = editionBoardAverage(submitted);
-    const slams = submitted.reduce((sum, row) => sum + (row.slams || 0), 0);
-    const boardAverage = stats.boardCount > 0 ? stats.average : null;
     const seed = averageForDay(
       logsForUser(opts.logs, player.userId),
       todayIstCalendarDate(now),
       Number(player.average) || 0,
     );
+    
+    let running = Number.isFinite(seed) && seed > 0 ? seed : 0;
+    let totalScore = 0;
+    let boardCount = 0;
+    let slams = 0;
+    let walkovers = 0;
+    let daysProcessed = 0;
+
+    for (const day of days) {
+      const row = byKey.get(scoreKey(player.userId, day));
+      if (row) {
+        const boards = normalizeBoards(row.boards, row.score, row.slams);
+        const agg = aggregateBoards(boards);
+        totalScore += agg.score;
+        boardCount += agg.boardCount;
+        slams += row.slams || agg.slams || 0;
+        if (agg.boardCount > 0) {
+          const dayAvg = agg.score / agg.boardCount;
+          running = running > 0 ? roundAverage((running + dayAvg) / 2) : roundAverage(dayAvg);
+          daysProcessed += 1;
+        }
+      } else {
+        // Walkover: no score submitted by player or captain
+        walkovers += 1;
+        const playerBase = running > 0 ? running : seed > 0 ? seed : 0;
+        const maxRef = Math.max(highestAverage, playerBase);
+        const walkoverDayAvg = (maxRef > 0 ? maxRef : 25) + 1;
+        running = running > 0 ? roundAverage((running + walkoverDayAvg) / 2) : roundAverage(walkoverDayAvg);
+        daysProcessed += 1;
+      }
+    }
+
     const rankingAverage =
-      boardAverage != null
-        ? boardAverage
+      daysProcessed > 0
+        ? (running > 0 ? running : null)
         : Number.isFinite(seed) && seed > 0
           ? roundAverage(seed)
           : null;
+
     return {
       userId: player.userId,
       name: player.name,
       teamId: player.teamId,
       teamName: player.teamName,
-      daysCounted: submitted.length,
+      daysCounted: days.length - walkovers,
       walkovers,
-      totalScore: stats.totalScore,
-      boardCount: stats.boardCount,
+      totalScore,
+      boardCount,
       boardAverage: rankingAverage,
       matchesWon: player.matchesWon || 0,
       slams,
@@ -80,33 +124,30 @@ export function rankPlayers(opts: {
     };
   });
 
+  // Sort purely by average (lowest first). Slams and matches won are NOT considered.
   rows.sort((a, b) => {
     const aAvg = a.boardAverage;
     const bAvg = b.boardAverage;
-    if (aAvg == null && bAvg == null) return tieBreakPlayers(a, b);
+    if (aAvg == null && bAvg == null) return a.name.localeCompare(b.name);
     if (aAvg == null) return 1;
     if (bAvg == null) return -1;
     if (aAvg !== bAvg) return aAvg - bAvg;
-    return tieBreakPlayers(a, b);
+    return a.name.localeCompare(b.name);
   });
-  let lastKey = '';
+
+  // Players with the same average receive the same ranking
+  let lastAvg: number | null = null;
   let lastRank = 0;
   rows.forEach((row, i) => {
-    const key = `${row.boardAverage ?? 'x'}:${row.matchesWon}:${row.slams}`;
-    if (key === lastKey) row.rank = lastRank;
-    else {
+    if (row.boardAverage != null && row.boardAverage === lastAvg) {
+      row.rank = lastRank;
+    } else {
       lastRank = i + 1;
-      lastKey = key;
+      lastAvg = row.boardAverage;
       row.rank = lastRank;
     }
   });
   return rows;
-}
-
-function tieBreakPlayers(a: PlayerRankingRow, b: PlayerRankingRow) {
-  if (a.matchesWon !== b.matchesWon) return b.matchesWon - a.matchesWon;
-  if (a.slams !== b.slams) return b.slams - a.slams;
-  return a.name.localeCompare(b.name);
 }
 
 export function editionProfileStats(opts: {

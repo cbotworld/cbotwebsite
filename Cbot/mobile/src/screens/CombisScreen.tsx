@@ -55,7 +55,7 @@ function splitPlayerNames(raw: string): string[] {
   return String(raw || '')
     .split(',')
     .map((s) => s.trim())
-    .filter((s) => s && s !== '—' && s !== '-' && !/not submitted|locked until|player \d/i.test(s));
+    .filter((s) => s && s !== '—' && s !== '-' && s !== 'NA' && s !== 'N/A' && !/not submitted|locked until|player \d/i.test(s));
 }
 
 type ScoreDraftRow = {
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
   saveText: { color: '#0f172a', fontWeight: '900', letterSpacing: 1.2 },
   pickerRoot: { flex: 1, justifyContent: 'flex-end' },
   pickerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(2, 6, 23, 0.72)',
   },
   pickerSheet: {

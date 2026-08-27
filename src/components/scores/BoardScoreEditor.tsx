@@ -37,42 +37,96 @@ export function BoardScoreEditor({
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
       {boards.map((board, idx) => (
-        <div key={idx} className={`grid gap-2 items-end ${compact ? 'grid-cols-[4.5rem_1fr_4.5rem_auto]' : 'grid-cols-[5.5rem_1fr_5.5rem_auto]'}`}>
+        <div key={idx} className={`grid gap-2 items-end ${compact ? 'grid-cols-[4.5rem_1fr_6rem_auto]' : 'grid-cols-[5.5rem_1fr_6.5rem_auto]'}`}>
           <div className="text-[10px] font-black uppercase tracking-wide text-muted-foreground pb-2">
             Board {idx + 1}
           </div>
           <div>
             {!compact && idx === 0 ? <label className="text-[10px] font-bold block mb-1">Score</label> : null}
-            <Input
-              type="number"
-              min={0}
-              disabled={disabled}
-              value={board.score}
-              onChange={(e) => {
-                const next = [...boards];
-                next[idx] = { ...board, score: e.target.value };
-                onChange(next);
-              }}
-              placeholder="score"
-              className={compact ? 'h-8 text-xs' : ''}
-            />
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const currentVal = parseInt(board.score, 10) || 0;
+                  const nextVal = Math.max(0, currentVal - 1);
+                  const next = [...boards];
+                  next[idx] = { ...board, score: String(nextVal) };
+                  onChange(next);
+                }}
+                className={`h-10 w-10 shrink-0 ${compact ? 'h-8 w-8 text-xs' : ''}`}
+              >
+                −
+              </Button>
+              <Input
+                type="number"
+                min={0}
+                disabled={disabled}
+                value={board.score}
+                onChange={(e) => {
+                  const next = [...boards];
+                  next[idx] = { ...board, score: e.target.value };
+                  onChange(next);
+                }}
+                placeholder="score"
+                className={`text-center ${compact ? 'h-8 text-xs' : ''}`}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={disabled}
+                onClick={() => {
+                  const currentVal = parseInt(board.score, 10) || 0;
+                  const nextVal = currentVal + 1;
+                  const next = [...boards];
+                  next[idx] = { ...board, score: String(nextVal) };
+                  onChange(next);
+                }}
+                className={`h-10 w-10 shrink-0 ${compact ? 'h-8 w-8 text-xs' : ''}`}
+              >
+                +
+              </Button>
+            </div>
           </div>
           <div>
             {!compact && idx === 0 ? <label className="text-[10px] font-bold block mb-1">Slam</label> : null}
-            <Input
-              type="number"
-              min={0}
-              max={9}
-              disabled={disabled}
-              value={board.slams}
-              onChange={(e) => {
-                const next = [...boards];
-                next[idx] = { ...board, slams: e.target.value };
-                onChange(next);
-              }}
-              placeholder="0"
-              className={compact ? 'h-8 text-xs' : ''}
-            />
+            <div className={`flex items-center bg-slate-900 border border-slate-800 rounded-md p-0.5 gap-0.5 ${compact ? 'h-8' : 'h-10'}`}>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  const next = [...boards];
+                  next[idx] = { ...board, slams: '1' };
+                  onChange(next);
+                }}
+                className={`flex-1 h-full rounded text-[10px] font-bold transition-all uppercase ${
+                  board.slams === '1'
+                    ? 'bg-amber-500 text-slate-950 font-black'
+                    : 'text-slate-400 hover:text-slate-200'
+                } ${disabled ? 'opacity-50' : ''}`}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  const next = [...boards];
+                  next[idx] = { ...board, slams: '0' };
+                  onChange(next);
+                }}
+                className={`flex-1 h-full rounded text-[10px] font-bold transition-all uppercase ${
+                  board.slams !== '1'
+                    ? 'bg-slate-800 text-slate-200 font-extrabold'
+                    : 'text-slate-500 hover:text-slate-400'
+                } ${disabled ? 'opacity-50' : ''}`}
+              >
+                No
+              </button>
+            </div>
           </div>
           <div className="pb-0.5">
             {boards.length > 1 && !disabled ? (

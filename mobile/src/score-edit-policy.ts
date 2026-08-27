@@ -4,18 +4,18 @@ export const SCORE_EDIT_PLAYER_UNTIL = '8:00pm IST';
 export const SCORE_EDIT_CAPTAIN_UNTIL = '9:30pm IST';
 
 export function playerScoreUntilNote(dayNumber: number) {
-  return `You can enter or change your score until ${SCORE_EDIT_PLAYER_UNTIL} of Day ${dayNumber}.`;
+  return `You can enter or change your score anytime until ${SCORE_EDIT_PLAYER_UNTIL} of Day ${dayNumber}.`;
 }
 
 export function captainScoreUntilNote(dayNumber: number) {
-  return `You can enter or change teammate scores until ${SCORE_EDIT_CAPTAIN_UNTIL} of Day ${dayNumber}.`;
+  return `You can enter or change teammate scores anytime until ${SCORE_EDIT_CAPTAIN_UNTIL} of Day ${dayNumber}.`;
 }
 
 export const SCORE_EDIT_PLAYER_HELP =
-  `You can enter or change your boards until ${SCORE_EDIT_PLAYER_UNTIL} on this day. After that, your captain can fix them until ${SCORE_EDIT_CAPTAIN_UNTIL}, and the organiser can edit anytime.`;
+  `You can enter or change your boards anytime until ${SCORE_EDIT_PLAYER_UNTIL} on that day. After that, your captain can fix them until ${SCORE_EDIT_CAPTAIN_UNTIL}, and the organiser can edit anytime.`;
 
 export const SCORE_EDIT_CAPTAIN_HELP =
-  `Players lock at ${SCORE_EDIT_PLAYER_UNTIL}. Captains can still enter or fix teammate boards until ${SCORE_EDIT_CAPTAIN_UNTIL} on this day. After that, only the organiser can edit.`;
+  `Players lock at ${SCORE_EDIT_PLAYER_UNTIL}. Captains can still enter or fix teammate boards until ${SCORE_EDIT_CAPTAIN_UNTIL} on that day. After that, only the organiser can edit.`;
 
 export const SCORE_EDIT_ORGANISER_HELP =
   `You can enter or change any player’s boards anytime. Players may self-edit until ${SCORE_EDIT_PLAYER_UNTIL}; captains until ${SCORE_EDIT_CAPTAIN_UNTIL}.`;
@@ -26,4 +26,4 @@ export const SCORE_EDIT_PLAYER_CLOSED =
 export const SCORE_EDIT_CAPTAIN_CLOSED =
   `Captain window closed at ${SCORE_EDIT_CAPTAIN_UNTIL}. Ask the organiser — they can edit anytime.`;
 
-export const SCORE_EDIT_NOT_OPEN_YET = 'This day is not open yet (from midnight IST).';
+export const SCORE_EDIT_NOT_OPEN_YET = `Scores can be submitted anytime until ${SCORE_EDIT_PLAYER_UNTIL} of this day.`;

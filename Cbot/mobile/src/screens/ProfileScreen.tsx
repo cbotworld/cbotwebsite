@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: '#fca5a5', fontWeight: '800', letterSpacing: 1.5 },
   pinOverlay: { flex: 1, justifyContent: 'center', padding: 20 },
-  pinBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2,6,23,0.82)' },
+  pinBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2,6,23,0.82)' },
   pinCard: {
     backgroundColor: '#0f172a',
     borderWidth: 1,

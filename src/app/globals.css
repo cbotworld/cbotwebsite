@@ -76,11 +76,21 @@
   body {
     @apply bg-background text-foreground antialiased selection:bg-amber-500 selection:text-black;
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
+    width: 100%;
   }
   /* Offset anchor scroll for sticky navbar */
   [id] {
     scroll-margin-top: 72px;
   }
+}
+
+/* Touch momentum scroll for horizontal carousels & day selectors */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
 }
 
 /* Glassmorphism utilities */
@@ -117,8 +127,8 @@
 
 /* Custom Scrollbar for normal scroll containers */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -150,8 +160,8 @@
 /* ─── WhatsApp Floating Button ──────────────────────────────────── */
 .whatsapp-float-btn {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 20px;
+  right: 20px;
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -159,13 +169,22 @@
   background: #25D366;
   color: #fff;
   border-radius: 9999px;
-  padding: 14px 14px;
+  padding: 12px 12px;
   box-shadow: 0 8px 30px rgba(37, 211, 102, 0.45), 0 2px 8px rgba(0,0,0,0.25);
   text-decoration: none;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
-  max-width: 54px;
+  max-width: 48px;
   cursor: pointer;
+}
+
+@media (min-width: 640px) {
+  .whatsapp-float-btn {
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 14px;
+    max-width: 54px;
+  }
 }
 
 .whatsapp-float-btn:hover {

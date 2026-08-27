@@ -41,6 +41,12 @@ Cbot/mobile/*.keystore
 Cbot/mobile/eas-build-log*
 Cbot/mobile/eas-log-url.txt
 Cbot/mobile/eas-build-view.utf8.json
+Cbot/mobile/eas-build*
+*.jks
+*.keystore
+keystore.properties
+mobile/credentials/
+*.bin
 
 # debug logs
 npm-debug.log*

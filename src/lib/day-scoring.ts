@@ -8,10 +8,10 @@ import {
 import { stageSpanDays } from '@/lib/tournament-stages';
 import type { TournamentStage } from '@/types';
 
-export const SCORE_CUTOFF_HOUR = 20;
+export const SCORE_CUTOFF_HOUR = 21;
 
 export function scoreCutoffIso(dayNumber: number | string, dayDates?: DayDatesInput): string {
-  return `${combiCalendarDate(dayNumber, dayDates)}T20:00:00+05:30`;
+  return `${combiCalendarDate(dayNumber, dayDates)}T21:00:00+05:30`;
 }
 
 export function scoreWindowStartIso(dayNumber: number | string, dayDates?: DayDatesInput): string {
@@ -32,22 +32,20 @@ export function isScoreSubmitOpen(
   dayDates?: DayDatesInput,
   now = new Date(),
 ): boolean {
-  const start = new Date(scoreWindowStartIso(dayNumber, dayDates)).getTime();
   const cutoff = new Date(scoreCutoffIso(dayNumber, dayDates)).getTime();
   const t = now.getTime();
-  return Number.isFinite(start) && Number.isFinite(cutoff) && t >= start && t < cutoff;
+  return Number.isFinite(cutoff) && t < cutoff;
 }
 
-/** Captains may add/fix teammate scores from midnight until the 9:30pm IST combi lock. */
+/** Captains may add/fix teammate scores anytime until the 9:30pm IST combi lock on that day. */
 export function isCaptainScoreEditOpen(
   dayNumber: number | string,
   dayDates?: DayDatesInput,
   now = new Date(),
 ): boolean {
-  const start = new Date(scoreWindowStartIso(dayNumber, dayDates)).getTime();
   const cutoff = new Date(combiCutoffIso(dayNumber, dayDates)).getTime();
   const t = now.getTime();
-  return Number.isFinite(start) && Number.isFinite(cutoff) && t >= start && t < cutoff;
+  return Number.isFinite(cutoff) && t < cutoff;
 }
 
 export function previewAvgBonus(score: number | null | undefined, average: number): boolean | null {

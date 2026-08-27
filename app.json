@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "f4ca4f57-6593-4d04-9e02-ae5939b964ca"
+      }
+    },
+    "android": {
+      "package": "com.karthikipad.cbot"
+    }
+  }
+}
