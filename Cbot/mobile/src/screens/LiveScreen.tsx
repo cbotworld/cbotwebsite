@@ -256,7 +256,7 @@ export function LiveScreen({ route, navigation }: Props) {
           ? "Starting camera..."
           : `Starting camera (${retryCountRef.current}/${MAX_CAMERA_RETRIES})...`,
       );
-      streamStartRef.current(current.rtmpUrl);
+      streamStartRef.current();
     }, RETRY_DELAY_MS);
   }, [clearRetryTimer]);
 
@@ -338,9 +338,6 @@ export function LiveScreen({ route, navigation }: Props) {
         endIso,
         playMode,
       };
-      // #region agent log
-      fetch('http://127.0.0.1:7508/ingest/db8f6b00-655b-4c36-b33e-ef113afeb684',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'de811f'},body:JSON.stringify({sessionId:'de811f',runId:'post-fix',hypothesisId:'B',location:'LiveScreen.tsx:handleGoLive',message:'createBroadcast payload',data:{hasTeam:Boolean(teamName),hasOpponent:Boolean(opponentName),hasStage:Boolean(stage),hasWindow:Boolean(timeRange),hasEdition:Boolean(editionTitle),day},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const created = await createBroadcast(payload);
       setSession(created);
     } catch (error) {
@@ -354,11 +351,19 @@ export function LiveScreen({ route, navigation }: Props) {
   const stopCurrentStream = useCallback(async () => {
     cancelledRef.current = true;
     clearRetryTimer();
-    streamStopRef.current();
+    try {
+      streamStopRef.current();
+    } catch (err) {
+      console.warn("streamStopRef error:", err);
+    }
     await stopLiveKeepAlive();
     const broadcastId = sessionRef.current?.broadcastId;
     if (broadcastId) {
-      await endBroadcast(broadcastId);
+      try {
+        await endBroadcast(broadcastId);
+      } catch (err) {
+        console.warn("endBroadcast error:", err);
+      }
     }
     setSession(null);
     setIsFrontCamera(false);
