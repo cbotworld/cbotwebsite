@@ -11,7 +11,7 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: mobileCorsHeaders });
 }
 
-function publicProfile(user: any, team: any) {
+function publicProfile(user: any, team: any, calculatedAverage?: number) {
   return {
     user: {
       id: user.id,
@@ -29,7 +29,7 @@ function publicProfile(user: any, team: any) {
       age: user.age ?? null,
       gender: user.gender || '',
       image: user.image || null,
-      average: user.average ?? 0,
+      average: calculatedAverage !== undefined ? calculatedAverage : (user.average ?? 0),
       target: user.target ?? 0,
       rating: user.rating ?? 0,
       wins: 0,
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        ...publicProfile(user, team),
+        ...publicProfile(user, team, editionStats.average),
         editionStats,
         averageHistory: editionStats.history || [],
         targetHistory: editionStats.targetHistory || [],

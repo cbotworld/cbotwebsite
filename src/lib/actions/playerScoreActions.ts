@@ -905,9 +905,13 @@ export async function getEditionProfileStatsForUser(userId: string) {
     });
   }
 
+  const standings = await loadPublicStandings();
+  const playerRank = standings.players.find((p) => p.userId === userId);
+  const calculatedAverage = playerRank && playerRank.boardAverage != null ? Number(playerRank.boardAverage) : (user?.average || 0);
+
   return {
     ...stats,
-    average: user?.average || 0,
+    average: calculatedAverage,
     history: logsForUser(
       logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
       userId,

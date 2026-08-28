@@ -97,9 +97,6 @@ export function StandingsScreen(_props: Props) {
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>STANDINGS</Text>
           <Text style={styles.title}>{payload?.edition?.title || 'Team standings'}</Text>
-          <Text style={styles.sub}>
-            Position is total points, then matches won if points are tied, then slams. Tap Event, Slams, Target+ or Total for the day-wise breakdown.
-          </Text>
         </View>
         <HeaderActionButton label="Refresh" onPress={() => void load()} />
       </View>

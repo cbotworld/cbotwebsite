@@ -342,7 +342,9 @@ export function ProfileScreen({ navigation }: Props) {
 
             <View style={styles.statsRow}>
               <View style={styles.stat}>
-                <Text style={styles.statNum}>{user?.average ?? 0}</Text>
+                <Text style={styles.statNum}>
+                  {user?.average != null ? Number(user.average).toFixed(2) : '0.00'}
+                </Text>
                 <Text style={styles.statLbl}>AVG</Text>
               </View>
               <View style={styles.stat}>
