@@ -155,12 +155,13 @@ export function BoardScoreModal({
     (playerName ? `CONFIRM & SUBMIT FOR ${playerName.toUpperCase()}` : 'CONFIRM & SUBMIT BY PLAYER');
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={onClose}
-    >
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={onClose}
+      >
       <StatusBar barStyle="light-content" backgroundColor="#020617" />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView
@@ -476,8 +477,9 @@ export function BoardScoreModal({
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
-    {dialog}
+      </Modal>
+      {dialog}
+    </>
   );
 }
 

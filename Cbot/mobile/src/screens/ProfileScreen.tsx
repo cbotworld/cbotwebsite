@@ -434,8 +434,7 @@ export function ProfileScreen({ navigation }: Props) {
                 <Text style={[styles.pinKicker, { color: '#ef4444' }]}>DANGER ZONE</Text>
                 <Text style={styles.pinTitle}>Delete Account</Text>
                 <Text style={styles.pinHint}>
-                  This will permanently delete your account and all your scores, stats, and data.{'
-'}This cannot be undone.
+                  This will permanently delete your account and all your scores, stats, and data. This cannot be undone.
                 </Text>
                 <Field
                   label="TYPE YOUR USERNAME"
@@ -468,11 +467,8 @@ export function ProfileScreen({ navigation }: Props) {
                 <Text style={[styles.pinKicker, { color: '#ef4444' }]}>FINAL CONFIRMATION</Text>
                 <Text style={styles.pinTitle}>Are you sure?</Text>
                 <Text style={styles.pinHint}>
-                  You are about to permanently delete{'
-'}
-                  <Text style={{ color: '#f87171', fontWeight: '900' }}>@{deleteUsername}</Text>.{'
-'}
-                  All scores, stats, and data will be erased forever.
+                  You are about to permanently delete{' '}
+                  <Text style={{ color: '#f87171', fontWeight: '900' }}>@{deleteUsername}</Text>. All scores, stats, and data will be erased forever.
                 </Text>
                 {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
                 <Pressable
