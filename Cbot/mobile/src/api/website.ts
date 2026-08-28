@@ -611,3 +611,14 @@ export async function fetchEliteSponsors(): Promise<EliteSponsorsPayload> {
     eliteSponsors: Array.isArray(data.eliteSponsors) ? data.eliteSponsors : [],
   };
 }
+
+export async function deleteAccount(username: string, pin: string): Promise<string> {
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/account/delete`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ username, pin }),
+  });
+  const data = await readJson(res);
+  if (!data.success) throw new Error(data.error || 'Failed to delete account.');
+  return String(data.message || 'Account permanently deleted.');
+}

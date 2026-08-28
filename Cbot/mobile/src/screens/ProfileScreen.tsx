@@ -21,6 +21,7 @@ import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
 import {
   changePin,
+  deleteAccount,
   fetchProfile,
   getSession,
   saveProfile,
@@ -70,6 +71,14 @@ export function ProfileScreen({ navigation }: Props) {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // Delete account state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'form' | 'confirm'>('form');
+  const [deleteUsername, setDeleteUsername] = useState('');
+  const [deletePin, setDeletePin] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!getSession()?.token) {
@@ -190,6 +199,61 @@ export function ProfileScreen({ navigation }: Props) {
         },
       },
     ]);
+  };
+
+  const openDeleteModal = () => {
+    setDeleteUsername('');
+    setDeletePin('');
+    setDeleteError(null);
+    setDeleteStep('form');
+    setDeleteOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteBusy) return;
+    setDeleteOpen(false);
+    setDeleteStep('form');
+    setDeleteUsername('');
+    setDeletePin('');
+    setDeleteError(null);
+  };
+
+  const onDeleteProceed = () => {
+    const expectedUsername = (user?.username || '').toLowerCase();
+    if (!deleteUsername.trim()) {
+      setDeleteError('Enter your username.');
+      return;
+    }
+    if (deleteUsername.trim().toLowerCase() !== expectedUsername) {
+      setDeleteError('Username does not match your account.');
+      return;
+    }
+    if (!/^\d{4}$/.test(deletePin)) {
+      setDeleteError('Enter your 4-digit PIN.');
+      return;
+    }
+    setDeleteError(null);
+    setDeleteStep('confirm');
+  };
+
+  const onDeleteConfirm = async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount(deleteUsername.trim(), deletePin);
+      setDeleteOpen(false);
+      setSession(null);
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been permanently deleted.',
+        [{ text: 'OK', onPress: () => navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] }) }],
+      );
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Delete failed.');
+      setDeleteStep('form');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const user = profile?.user;
@@ -327,9 +391,87 @@ export function ProfileScreen({ navigation }: Props) {
             <Pressable style={styles.logout} onPress={logout}>
               <Text style={styles.logoutText}>SIGN OUT</Text>
             </Pressable>
+
+            <Text style={styles.section}>DANGER ZONE</Text>
+            <Pressable style={styles.deleteBtn} onPress={openDeleteModal}>
+              <Text style={styles.deleteBtnText}>DELETE ACCOUNT</Text>
+            </Pressable>
+            <Text style={styles.deleteHint}>Permanently removes your account, scores, and all data. This cannot be undone.</Text>
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      {/* ── Delete Account Modal ── */}
+      <Modal visible={deleteOpen} transparent animationType="fade" onRequestClose={closeDeleteModal}>
+        <KeyboardAvoidingView
+          style={styles.pinOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.pinBackdrop} onPress={closeDeleteModal} />
+          <View style={styles.pinCard}>
+            {deleteStep === 'form' ? (
+              <>
+                <Text style={[styles.pinKicker, { color: '#ef4444' }]}>DANGER ZONE</Text>
+                <Text style={styles.pinTitle}>Delete Account</Text>
+                <Text style={styles.pinHint}>
+                  This will permanently delete your account and all your scores, stats, and data.{'
+'}This cannot be undone.
+                </Text>
+                <Field
+                  label="TYPE YOUR USERNAME"
+                  value={deleteUsername}
+                  onChange={(v) => setDeleteUsername(v.replace(/\s/g, ''))}
+                  keyboard="default"
+                />
+                <Field
+                  label="TYPE YOUR PIN"
+                  value={deletePin}
+                  onChange={(v) => setDeletePin(v.replace(/[^\d]/g, '').slice(0, 4))}
+                  keyboard="number-pad"
+                  secure
+                  maxLength={4}
+                />
+                {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+                <Pressable
+                  style={[styles.deleteConfirmBtn, deleteBusy && styles.disabled]}
+                  onPress={onDeleteProceed}
+                  disabled={deleteBusy}
+                >
+                  <Text style={styles.deleteConfirmBtnText}>CONTINUE →</Text>
+                </Pressable>
+                <Pressable style={styles.pinCancel} onPress={closeDeleteModal} disabled={deleteBusy}>
+                  <Text style={styles.pinCancelText}>CANCEL</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.pinKicker, { color: '#ef4444' }]}>FINAL CONFIRMATION</Text>
+                <Text style={styles.pinTitle}>Are you sure?</Text>
+                <Text style={styles.pinHint}>
+                  You are about to permanently delete{'
+'}
+                  <Text style={{ color: '#f87171', fontWeight: '900' }}>@{deleteUsername}</Text>.{'
+'}
+                  All scores, stats, and data will be erased forever.
+                </Text>
+                {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+                <Pressable
+                  style={[styles.deleteConfirmBtn, deleteBusy && styles.disabled]}
+                  onPress={() => void onDeleteConfirm()}
+                  disabled={deleteBusy}
+                >
+                  {deleteBusy
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.deleteConfirmBtnText}>YES, DELETE PERMANENTLY</Text>}
+                </Pressable>
+                <Pressable style={styles.pinCancel} onPress={() => setDeleteStep('form')} disabled={deleteBusy}>
+                  <Text style={styles.pinCancelText}>GO BACK</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal visible={pinOpen} transparent animationType="fade" onRequestClose={closePinModal}>
         <KeyboardAvoidingView
@@ -538,6 +680,25 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   logoutText: { color: '#fca5a5', fontWeight: '800', letterSpacing: 1.5 },
+  deleteBtn: {
+    marginTop: 4,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#ef4444',
+    borderRadius: 14,
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  deleteBtnText: { color: '#ef4444', fontWeight: '900', letterSpacing: 1.5, fontSize: 13 },
+  deleteHint: { color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 8, marginBottom: 12 },
+  deleteConfirmBtn: {
+    backgroundColor: '#ef4444',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  deleteConfirmBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 1.2, fontSize: 13 },
   pinOverlay: { flex: 1, justifyContent: 'center', padding: 20 },
   pinBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2,6,23,0.82)' },
   pinCard: {
