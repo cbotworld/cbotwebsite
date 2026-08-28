@@ -9,7 +9,6 @@ import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   PermissionsAndroid,
   Platform,
@@ -39,7 +38,17 @@ function toSecureIngestionUrl(address: string): string {
   return address.replace(/^rtmp:\/\//i, "rtmps://");
 }
 
-function LiveIndicator({ duration, top, left }: { duration?: string; top: number; left: number }) {
+function LiveIndicator({
+  duration,
+  bitrate,
+  top,
+  left,
+}: {
+  duration?: string;
+  bitrate?: number;
+  top: number;
+  left: number;
+}) {
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -53,11 +62,38 @@ function LiveIndicator({ duration, top, left }: { duration?: string; top: number
     return () => animation.stop();
   }, [pulse]);
 
+  const bitrateLabel =
+    typeof bitrate === "number" && bitrate > 0
+      ? bitrate >= 1000
+        ? `${(bitrate / 1000).toFixed(1)} Mbps`
+        : `${bitrate} kbps`
+      : null;
+
   return (
     <View style={[styles.liveBadge, { top, left }]} pointerEvents="none">
       <Animated.View style={[styles.liveDot, { opacity: pulse }]} />
       <Text style={styles.liveBadgeText}>LIVE</Text>
       {duration ? <Text style={styles.liveBadgeTime}>{duration}</Text> : null}
+      {bitrateLabel ? (
+        <View style={styles.bitrateChip}>
+          <Text style={styles.bitrateText}>{bitrateLabel}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// Pill status bar shown below the live badge
+function StatusPill({ text, type }: { text: string; type: "info" | "warn" | "error" }) {
+  const bg =
+    type === "error"
+      ? "rgba(239,68,68,0.85)"
+      : type === "warn"
+        ? "rgba(245,158,11,0.85)"
+        : "rgba(15,23,42,0.75)";
+  return (
+    <View style={[styles.statusPill, { backgroundColor: bg }]}>
+      <Text style={styles.statusPillText}>{text}</Text>
     </View>
   );
 }
@@ -82,11 +118,12 @@ export function LiveScreen({ route, navigation }: Props) {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [session, setSession] = useState<BroadcastSession | null>(null);
-  const [statusText, setStatusText] = useState("Ready");
+  const [statusText, setStatusText] = useState("");
+  const [statusType, setStatusType] = useState<"info" | "warn" | "error">("info");
   const [busy, setBusy] = useState(false);
   const [isFrontCamera, setIsFrontCamera] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [publisherKey, setPublisherKey] = useState(0);
+  const [stopped, setStopped] = useState(false); // show post-stream "ended" screen
 
   const sessionRef = useRef<BroadcastSession | null>(null);
   const goLiveCalledRef = useRef(false);
@@ -110,6 +147,14 @@ export function LiveScreen({ route, navigation }: Props) {
   streamSwitchRef.current = stream.switchCamera;
   const streamToggleMuteRef = useRef(stream.toggleMute);
   streamToggleMuteRef.current = stream.toggleMute;
+
+  const setStatus = useCallback(
+    (text: string, type: "info" | "warn" | "error" = "info") => {
+      setStatusText(text);
+      setStatusType(type);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!getSession()?.token) {
@@ -142,7 +187,7 @@ export function LiveScreen({ route, navigation }: Props) {
         try {
           await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
         } catch {
-          // Notification permission is optional; the stream can still continue.
+          // Optional — stream continues without notification permission.
         }
       }
       if (cancelled) return;
@@ -155,13 +200,8 @@ export function LiveScreen({ route, navigation }: Props) {
           authorization: token ? `Bearer ${token}` : "",
           apiKey: config.appApiKey,
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7508/ingest/db8f6b00-655b-4c36-b33e-ef113afeb684',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'de811f'},body:JSON.stringify({sessionId:'de811f',runId:'pre-fix',hypothesisId:'D',location:'LiveScreen.tsx:startKeepAlive',message:'keep-alive start ok',data:{platform:Platform.OS},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-      } catch (error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7508/ingest/db8f6b00-655b-4c36-b33e-ef113afeb684',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'de811f'},body:JSON.stringify({sessionId:'de811f',runId:'pre-fix',hypothesisId:'D',location:'LiveScreen.tsx:startKeepAlive',message:'keep-alive start failed',data:{platform:Platform.OS,error:error instanceof Error ? error.message : String(error)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
+      } catch {
+        // Keep-alive is optional; stream continues.
       }
     })();
     return () => {
@@ -195,30 +235,30 @@ export function LiveScreen({ route, navigation }: Props) {
   }, []);
 
   const applyDefaultMute = useCallback(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7508/ingest/db8f6b00-655b-4c36-b33e-ef113afeb684',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'de811f'},body:JSON.stringify({sessionId:'de811f',runId:'pre-fix',hypothesisId:'C',location:'LiveScreen.tsx:applyDefaultMute',message:'mute on first streaming',data:{isMuted:isMutedRef.current,muteAlreadyApplied:muteAppliedRef.current,willMute:Boolean(isMutedRef.current && !muteAppliedRef.current)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!isMutedRef.current || muteAppliedRef.current) return;
     muteAppliedRef.current = true;
     streamToggleMuteRef.current();
   }, []);
 
-  const triggerGoLive = useCallback(async (broadcastId: string) => {
-    if (goLiveCalledRef.current) return;
-    goLiveCalledRef.current = true;
-    setStatusText("Going live on YouTube...");
+  const triggerGoLive = useCallback(
+    async (broadcastId: string) => {
+      if (goLiveCalledRef.current) return;
+      goLiveCalledRef.current = true;
+      setStatus("Going live on YouTube…", "info");
 
-    try {
-      await goLive(broadcastId);
-      setStatusText("Live on YouTube");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Go live request failed";
-      setStatusText("Streaming — YouTube may take a moment to go live");
-      console.warn("goLive:", message);
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+      try {
+        await goLive(broadcastId);
+        setStatus("🔴 Live on YouTube", "info");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Go live request failed";
+        setStatus("Streaming — YouTube may take a moment", "warn");
+        console.warn("goLive:", message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [setStatus],
+  );
 
   const scheduleStartAttempt = useCallback(() => {
     clearRetryTimer();
@@ -230,7 +270,7 @@ export function LiveScreen({ route, navigation }: Props) {
 
       retryCountRef.current += 1;
       if (retryCountRef.current > MAX_CAMERA_RETRIES) {
-        setStatusText("Camera failed to start");
+        setStatus("Camera failed to start — tap Stop and try again", "error");
         setBusy(false);
         const failed = sessionRef.current;
         void (async () => {
@@ -239,26 +279,23 @@ export function LiveScreen({ route, navigation }: Props) {
             try {
               await endBroadcast(failed.broadcastId);
             } catch {
-              // Ignore end errors so the player can retry GO LIVE.
+              // Ignore.
             }
           }
           setSession(null);
         })();
-        Alert.alert(
-          "Camera not ready",
-          "Could not start the camera for streaming. Close other camera apps and try again.",
-        );
         return;
       }
 
-      setStatusText(
+      setStatus(
         retryCountRef.current === 1
-          ? "Starting camera..."
-          : `Starting camera (${retryCountRef.current}/${MAX_CAMERA_RETRIES})...`,
+          ? "Starting camera…"
+          : `Starting camera (${retryCountRef.current}/${MAX_CAMERA_RETRIES})…`,
+        "info",
       );
       streamStartRef.current();
     }, RETRY_DELAY_MS);
-  }, [clearRetryTimer]);
+  }, [clearRetryTimer, setStatus]);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -295,16 +332,17 @@ export function LiveScreen({ route, navigation }: Props) {
       stream.handleConnectionFailed(event);
       const message = event.nativeEvent.msg ?? "RTMP connection failed";
 
+      // Camera not ready — retry silently
       if (message === "Camera not ready" && retryCountRef.current < MAX_CAMERA_RETRIES) {
         scheduleStartAttempt();
         return;
       }
 
-      setStatusText(message);
+      // All other connection errors — show inline, no alert popup
+      setStatus(message, "error");
       setBusy(false);
-      Alert.alert("Stream connection failed", message);
     },
-    [scheduleStartAttempt, stream],
+    [scheduleStartAttempt, setStatus, stream],
   );
 
   const handleConnectionSuccess = useCallback(
@@ -321,7 +359,8 @@ export function LiveScreen({ route, navigation }: Props) {
   const handleGoLive = useCallback(async () => {
     if (busy || stream.isStreaming) return;
     setBusy(true);
-    setStatusText("Creating YouTube broadcast...");
+    setStopped(false);
+    setStatus("Creating YouTube broadcast…", "info");
     allowLeaveRef.current = false;
 
     try {
@@ -342,27 +381,43 @@ export function LiveScreen({ route, navigation }: Props) {
       setSession(created);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create broadcast";
-      setStatusText(message);
-      Alert.alert("Go Live failed", message);
+      setStatus(message, "error");
       setBusy(false);
     }
-  }, [busy, day, editionTitle, endIso, name, opponentName, opponentTag, playMode, stage, stream.isStreaming, teamName, teamTag, timeRange]);
+  }, [
+    busy,
+    day,
+    editionTitle,
+    endIso,
+    name,
+    opponentName,
+    opponentTag,
+    playMode,
+    setStatus,
+    stage,
+    stream.isStreaming,
+    teamName,
+    teamTag,
+    timeRange,
+  ]);
 
   const stopCurrentStream = useCallback(async () => {
     cancelledRef.current = true;
     clearRetryTimer();
+    // Safe stop — swallow any HaishinKit state machine errors
     try {
       streamStopRef.current();
     } catch (err) {
-      console.warn("streamStopRef error:", err);
+      console.warn("streamStop swallowed:", err);
     }
     await stopLiveKeepAlive();
     const broadcastId = sessionRef.current?.broadcastId;
     if (broadcastId) {
+      // Safe end — swallow errors so teardown always completes
       try {
         await endBroadcast(broadcastId);
       } catch (err) {
-        console.warn("endBroadcast error:", err);
+        console.warn("endBroadcast swallowed:", err);
       }
     }
     setSession(null);
@@ -371,66 +426,46 @@ export function LiveScreen({ route, navigation }: Props) {
     muteAppliedRef.current = false;
     goLiveCalledRef.current = false;
     retryCountRef.current = 0;
-    setStatusText("Stream ended. Video will appear on YouTube shortly.");
   }, [clearRetryTimer]);
 
   const handleStop = useCallback(async () => {
     if (busy) return;
     setBusy(true);
-    setStatusText("Stopping stream...");
+    setStatus("Stopping stream…", "info");
 
     try {
       await stopCurrentStream();
       allowLeaveRef.current = true;
-      Alert.alert(
-        "Stream ended",
-        "Your recording will appear on the YouTube channel in a few minutes.",
-        [
-          {
-            text: "OK",
-            onPress: () => navigation.navigate(getSession()?.token ? "Main" : "Login"),
-          },
-        ],
-      );
+      setStopped(true); // show "ended" screen — no Alert popup
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to stop stream";
-      setStatusText(message);
-      Alert.alert("Stop failed", message);
+      setStatus(message, "error");
     } finally {
       setBusy(false);
     }
-  }, [busy, navigation, stopCurrentStream]);
+  }, [busy, setStatus, stopCurrentStream]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (event) => {
       if (allowLeaveRef.current || !sessionRef.current) return;
       event.preventDefault();
-      Alert.alert(
-        "You are live",
-        "Switching to another app keeps the stream going. Leave this screen only after you stop, or close Cbot to end.",
-        [
-          { text: "Stay live", style: "cancel" },
-          {
-            text: "Stop and leave",
-            style: "destructive",
-            onPress: () => {
-              void (async () => {
-                try {
-                  await stopCurrentStream();
-                } catch (error) {
-                  Alert.alert("Stop failed", error instanceof Error ? error.message : "Could not stop stream");
-                  return;
-                }
-                allowLeaveRef.current = true;
-                navigation.dispatch(event.data.action);
-              })();
-            },
-          },
-        ],
-      );
+      // Inline confirm without Alert by immediately stopping
+      void (async () => {
+        setBusy(true);
+        setStatus("Stopping stream…", "info");
+        try {
+          await stopCurrentStream();
+        } catch {
+          // Continue leaving regardless
+        } finally {
+          setBusy(false);
+        }
+        allowLeaveRef.current = true;
+        navigation.dispatch(event.data.action);
+      })();
     });
     return unsubscribe;
-  }, [navigation, stopCurrentStream]);
+  }, [navigation, setStatus, stopCurrentStream]);
 
   const handleFlipCamera = useCallback(() => {
     streamSwitchRef.current();
@@ -456,29 +491,59 @@ export function LiveScreen({ route, navigation }: Props) {
           { paddingTop: topInset, paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset },
         ]}
       >
-        <Text style={styles.permissionText}>Camera and microphone access are required.</Text>
+        <Text style={styles.permTitle}>Camera & Mic Access Needed</Text>
+        <Text style={styles.permissionText}>Grant camera and microphone access to start streaming.</Text>
         <Pressable
-          style={styles.button}
+          style={styles.goLiveButton}
           onPress={() => {
             requestCameraPermission();
             requestMicPermission();
           }}
         >
-          <Text style={styles.buttonText}>Grant permissions</Text>
+          <Text style={styles.recordButtonText}>GRANT ACCESS</Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  // ── Post-stream "ended" screen ──────────────────────────────────────────────
+  if (stopped) {
+    return (
+      <View style={styles.endedScreen}>
+        <View style={styles.endedCard}>
+          <Text style={styles.endedIcon}>✅</Text>
+          <Text style={styles.endedTitle}>Stream Ended</Text>
+          <Text style={styles.endedSub}>
+            Great job! Your video will appear on the YouTube channel in a few minutes.
+          </Text>
+          <Text style={styles.endedDay}>{day}</Text>
+          <Pressable
+            style={styles.endedBtn}
+            onPress={() => navigation.navigate(getSession()?.token ? "Main" : "Login")}
+          >
+            <Text style={styles.endedBtnText}>BACK TO DASHBOARD</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
   const ingestionUrl = session ? toSecureIngestionUrl(session.ingestionAddress) : "";
   const showStop = stream.isStreaming || Boolean(session);
-  const goHome = () => navigation.navigate(getSession()?.token ? "Main" : "Login");
+  const goHome = () => {
+    if (session) {
+      void handleStop();
+    } else {
+      navigation.navigate(getSession()?.token ? "Main" : "Login");
+    }
+  };
+  const bitrateKbps = typeof stream.statistics?.bitrate === "number" ? stream.statistics.bitrate : undefined;
 
   return (
     <View style={styles.container}>
       {session ? (
         <ExpoLiveStreamPublisherView
-          key={`publisher-${publisherKey}`}
+          key={`publisher-${session.broadcastId}`}
           ref={stream.ref}
           style={StyleSheet.absoluteFill}
           url={ingestionUrl}
@@ -486,7 +551,7 @@ export function LiveScreen({ route, navigation }: Props) {
           quality={VideoQuality.HD_720P}
           videoWidth={LIVE_VIDEO_WIDTH}
           videoHeight={LIVE_VIDEO_HEIGHT}
-          frontCamera={false}
+          frontCamera={isFrontCamera}
           onStreamStateChanged={handleStreamStateChanged}
           onConnectionFailed={handleConnectionFailed}
           onConnectionSuccess={handleConnectionSuccess}
@@ -494,55 +559,92 @@ export function LiveScreen({ route, navigation }: Props) {
           onBitrateUpdate={stream.handleBitrateUpdate}
         />
       ) : (
+        // ── Idle "ready" screen ──────────────────────────────────────────────
         <View style={styles.idleFill}>
           <Text style={styles.placeholderKicker}>READY TO STREAM</Text>
           <Text style={styles.placeholderDay}>{day}</Text>
+          {teamName ? (
+            <Text style={styles.placeholderMatch}>
+              {teamTag || teamName} vs {opponentTag || opponentName}
+            </Text>
+          ) : null}
+          {timeRange ? <Text style={styles.placeholderTime}>{timeRange}</Text> : null}
         </View>
       )}
 
       {session ? <StreamOverlay day={day} /> : null}
+
+      {/* LIVE badge with bitrate */}
       {stream.isStreaming ? (
-        <LiveIndicator duration={stream.statistics.durationFormatted} top={topInset + 44} left={leftInset} />
+        <LiveIndicator
+          duration={stream.statistics.durationFormatted}
+          bitrate={bitrateKbps}
+          top={topInset + 44}
+          left={leftInset}
+        />
       ) : null}
 
+      {/* Inline status pill (replaces Alert popups) */}
+      {statusText ? (
+        <View style={[styles.statusPillWrap, { top: stream.isStreaming ? topInset + 90 : topInset + 44 }]}>
+          <StatusPill text={statusText} type={statusType} />
+        </View>
+      ) : null}
+
+      {/* ← BACK / stop-and-leave */}
       <Pressable
         style={[styles.backButton, { top: topInset, left: leftInset }]}
         onPress={goHome}
-        accessibilityLabel="Back"
+        accessibilityLabel={session ? "Stop stream and go back" : "Back"}
       >
         <Text style={styles.backButtonText}>← BACK</Text>
       </Pressable>
 
+      {/* Top-right controls */}
       <View style={[styles.topRight, { top: topInset, right: rightInset }]}>
         {session ? (
           <>
             <Pressable
-              style={styles.controlButton}
+              style={[styles.controlButton, !isMuted && styles.controlButtonActive]}
               onPress={handleToggleMute}
               accessibilityLabel={isMuted ? "Unmute microphone" : "Mute microphone"}
             >
-              <Text style={styles.controlButtonText}>{isMuted ? "Unmute" : "Mute"}</Text>
+              <Text style={styles.controlButtonText}>{isMuted ? "🔇 Mute" : "🎤 Live"}</Text>
             </Pressable>
             <Pressable
               style={styles.controlButton}
               onPress={handleFlipCamera}
               accessibilityLabel={isFrontCamera ? "Switch to rear camera" : "Switch to front camera"}
             >
-              <Text style={styles.controlButtonText}>{isFrontCamera ? "Rear" : "Front"}</Text>
+              <Text style={styles.controlButtonText}>{isFrontCamera ? "↩ Rear" : "🤳 Front"}</Text>
             </Pressable>
           </>
         ) : null}
       </View>
 
+      {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
-        {!stream.isStreaming ? <Text style={styles.statusOverlay}>{statusText}</Text> : null}
         {!showStop ? (
-          <Pressable style={[styles.recordButton, styles.goLiveButton]} disabled={busy} onPress={handleGoLive}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.recordButtonText}>GO LIVE</Text>}
+          <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
+            {busy ? (
+              <View style={styles.busyRow}>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.recordButtonText}>  Setting up…</Text>
+              </View>
+            ) : (
+              <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
+            )}
           </Pressable>
         ) : (
-          <Pressable style={[styles.recordButton, styles.stopButton]} disabled={busy} onPress={handleStop}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.recordButtonText}>STOP STREAM</Text>}
+          <Pressable style={[styles.recordButton, styles.stopButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleStop()}>
+            {busy ? (
+              <View style={styles.busyRow}>
+                <ActivityIndicator color="#fff" />
+                <Text style={styles.recordButtonText}>  Stopping…</Text>
+              </View>
+            ) : (
+              <Text style={styles.recordButtonText}>⏹  STOP STREAM</Text>
+            )}
           </Pressable>
         )}
       </View>
@@ -552,27 +654,55 @@ export function LiveScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
+
+  // Idle screen
   idleFill: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "#05070d",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 48,
+    gap: 6,
   },
+  placeholderKicker: { color: "#f59e0b", fontWeight: "800", letterSpacing: 1.5, fontSize: 11 },
+  placeholderDay: { color: "#fff", fontSize: 34, fontWeight: "900", textAlign: "center" },
+  placeholderMatch: { color: "#94a3b8", fontSize: 15, fontWeight: "700", textAlign: "center", marginTop: 4 },
+  placeholderTime: { color: "#475569", fontSize: 12, fontWeight: "600", textAlign: "center" },
+
+  // Live badge
   liveBadge: {
     position: "absolute",
     zIndex: 20,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: "#dc2626",
     borderRadius: 999,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#fff" },
-  liveBadgeText: { color: "#fff", fontWeight: "900", letterSpacing: 1.8, fontSize: 14 },
-  liveBadgeTime: { color: "#fff", fontWeight: "700", fontSize: 13, opacity: 0.95 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fff" },
+  liveBadgeText: { color: "#fff", fontWeight: "900", letterSpacing: 1.8, fontSize: 13 },
+  liveBadgeTime: { color: "#fff", fontWeight: "700", fontSize: 12, opacity: 0.95 },
+  bitrateChip: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  bitrateText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+
+  // Status pill (replaces Alert)
+  statusPillWrap: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 25 },
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    maxWidth: "85%",
+  },
+  statusPillText: { color: "#fff", fontWeight: "700", fontSize: 12, textAlign: "center" },
+
+  // Buttons
   backButton: {
     position: "absolute",
     zIndex: 30,
@@ -584,21 +714,22 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.18)",
   },
   backButtonText: { color: "#fff", fontWeight: "800", fontSize: 12, letterSpacing: 0.6 },
-  topRight: {
-    position: "absolute",
-    zIndex: 30,
-    flexDirection: "row",
-    gap: 8,
-  },
+  topRight: { position: "absolute", zIndex: 30, flexDirection: "row", gap: 8 },
   controlButton: {
     backgroundColor: "rgba(15, 23, 42, 0.75)",
     borderRadius: 999,
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
-  controlButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  controlButtonActive: {
+    backgroundColor: "rgba(34,197,94,0.25)",
+    borderColor: "#22c55e",
+  },
+  controlButtonText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+
+  // Bottom bar
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -606,29 +737,56 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 30,
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
-  statusOverlay: {
-    color: "#e2e8f0",
-    fontWeight: "700",
-    fontSize: 13,
-    textShadowColor: "rgba(0,0,0,0.8)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
+  busyRow: { flexDirection: "row", alignItems: "center" },
   recordButton: {
     minWidth: 220,
     borderRadius: 999,
     paddingVertical: 16,
-    paddingHorizontal: 28,
+    paddingHorizontal: 32,
     alignItems: "center",
     justifyContent: "center",
   },
   goLiveButton: { backgroundColor: "#ef4444" },
   stopButton: { backgroundColor: "#7f1d1d" },
+  disabledButton: { opacity: 0.65 },
   recordButtonText: { color: "#fff", fontWeight: "900", letterSpacing: 1.6, fontSize: 16 },
-  placeholderKicker: { color: "#f59e0b", fontWeight: "800", letterSpacing: 1.5, fontSize: 11, marginBottom: 8 },
-  placeholderDay: { color: "#fff", fontSize: 28, fontWeight: "800", textAlign: "center" },
+
+  // Permissions screen
+  centered: { flex: 1, backgroundColor: "#0f172a", alignItems: "center", justifyContent: "center", padding: 32, gap: 14 },
+  permTitle: { color: "#f8fafc", fontWeight: "900", fontSize: 20 },
+  permissionText: { color: "#94a3b8", textAlign: "center", fontSize: 14 },
+
+  // Post-stream ended screen
+  endedScreen: { flex: 1, backgroundColor: "#020617", alignItems: "center", justifyContent: "center", padding: 24 },
+  endedCard: {
+    backgroundColor: "#0f172a",
+    borderRadius: 24,
+    padding: 28,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.3)",
+    maxWidth: 360,
+    width: "100%",
+    gap: 10,
+  },
+  endedIcon: { fontSize: 48 },
+  endedTitle: { color: "#f8fafc", fontSize: 26, fontWeight: "900" },
+  endedSub: { color: "#94a3b8", fontSize: 14, textAlign: "center", lineHeight: 20 },
+  endedDay: { color: "#f59e0b", fontWeight: "800", fontSize: 13, letterSpacing: 1 },
+  endedBtn: {
+    marginTop: 10,
+    backgroundColor: "#f59e0b",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    alignItems: "center",
+    width: "100%",
+  },
+  endedBtnText: { color: "#0f172a", fontWeight: "900", letterSpacing: 1.2 },
+
+  // General
   button: {
     borderRadius: 10,
     paddingVertical: 12,
@@ -637,13 +795,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#1e293b",
   },
   buttonText: { color: "#fff", fontWeight: "700" },
-  centered: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 16,
-  },
-  permissionText: { color: "#e2e8f0", textAlign: "center" },
 });
