@@ -188,6 +188,10 @@ export async function updatePlayerProfileDetails(userId: string, data: {
         const { recordPlayerAverageChange } = await import('@/lib/actions/playerScoreActions');
         await recordPlayerAverageChange(existing.id, Number(data.average), changedById);
       }
+      if (data.target !== undefined) {
+        const { recordPlayerTargetChange } = await import('@/lib/actions/playerScoreActions');
+        await recordPlayerTargetChange(existing.id, Number(data.target), changedById);
+      }
     } else {
       // Create user record in DB if first time edit
       const pin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -215,6 +219,10 @@ export async function updatePlayerProfileDetails(userId: string, data: {
       if (data.average !== undefined) {
         const { recordPlayerAverageChange } = await import('@/lib/actions/playerScoreActions');
         await recordPlayerAverageChange(updatedUser.id, Number(data.average), changedById);
+      }
+      if (data.target !== undefined) {
+        const { recordPlayerTargetChange } = await import('@/lib/actions/playerScoreActions');
+        await recordPlayerTargetChange(updatedUser.id, Number(data.target), changedById);
       }
     }
 

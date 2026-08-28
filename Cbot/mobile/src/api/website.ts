@@ -221,13 +221,21 @@ export type ProfilePayload = {
   };
   team: (MobileTeam & { isCaptain?: boolean; description?: string }) | null;
   editionStats?: EditionStatsPayload | null;
+  targetHistory?: Array<{ dayNumber: number; effectiveFrom: string; target: number; changedAt: string }>;
+  averageHistory?: Array<{ effectiveFrom: string; average: number }>;
 };
 
 export async function fetchProfile(): Promise<ProfilePayload> {
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/profile`, { headers: authHeaders() });
   const data = await readJson(res);
   if (!data.success) throw new Error(data.error || 'Failed to load profile.');
-  return { user: data.user, team: data.team || null, editionStats: data.editionStats || null };
+  return {
+    user: data.user,
+    team: data.team || null,
+    editionStats: data.editionStats || null,
+    targetHistory: data.targetHistory || [],
+    averageHistory: data.averageHistory || [],
+  };
 }
 
 export async function saveProfile(fields: {

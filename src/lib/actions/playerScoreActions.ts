@@ -33,7 +33,7 @@ import {
 } from '@/lib/board-scores';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
-import { combiCalendarDate } from '@/lib/combi-cutoff';
+import { combiCalendarDate, normalizeDayDates, OFFICIAL_DAY1_CALENDAR } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
 import { countEventWinsForPlayer, editionProfileStats, rankPlayers } from '@/lib/player-ranking';
 import { resolveCurrentEdition } from '@/lib/current-edition';
@@ -622,6 +622,52 @@ export async function recordPlayerAverageChange(
   revalidateScorePages();
 }
 
+export async function recordPlayerTargetChange(
+  userId: string,
+  newTarget: number,
+  changedById: string,
+  applyToday = false,
+) {
+  const edition = await loadLatestEdition();
+  if (!edition) return;
+  const next = Math.round(Number(newTarget));
+  if (!Number.isFinite(next)) return;
+  const logs = await prisma.playerTargetLog.findMany({
+    where: { editionId: edition.id, userId },
+    orderBy: [{ effectiveFrom: 'asc' }, { changedAt: 'asc' }],
+  });
+  const day1 = combiCalendarDate(1, edition.dayDates);
+  const effectiveFrom = applyToday ? todayIstCalendarDate() : averageChangeEffectiveFrom();
+  if (logs.length === 0) {
+    await prisma.playerTargetLog.create({
+      data: { editionId: edition.id, userId, target: next, effectiveFrom: day1, changedById },
+    });
+    revalidateScorePages();
+    return;
+  }
+  const latest = logs[logs.length - 1];
+  if (Number(latest.target) === next) return;
+  const sameDate = [...logs].reverse().find((row) => row.effectiveFrom === effectiveFrom);
+  if (sameDate) {
+    await prisma.playerTargetLog.update({
+      where: { id: sameDate.id },
+      data: { target: next, changedById },
+    });
+  } else {
+    await prisma.playerTargetLog.create({
+      data: {
+        editionId: edition.id,
+        userId,
+        target: next,
+        effectiveFrom,
+        changedById,
+      },
+    });
+  }
+  revalidateScorePages();
+}
+
+
 const emptyScoreboard = {
   edition: null as { id: string; title: string; number: number } | null,
   days: [] as Array<{ dayNumber: number; published: boolean; calendarDate: string }>,
@@ -791,10 +837,14 @@ export async function getAverageReviewPrompt() {
 
 export async function getEditionProfileStatsForUser(userId: string) {
   const edition = await loadLatestEdition();
-  if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], average: 0 };
+  if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0 };
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const scores = await prisma.playerDayScore.findMany({ where: { editionId: edition.id, userId } });
   const logs = await prisma.playerAverageLog.findMany({
+    where: { editionId: edition.id, userId },
+    orderBy: { effectiveFrom: 'asc' },
+  });
+  const targetLogs = await prisma.playerTargetLog.findMany({
     where: { editionId: edition.id, userId },
     orderBy: { effectiveFrom: 'asc' },
   });
@@ -823,6 +873,38 @@ export async function getEditionProfileStatsForUser(userId: string) {
     dayDates: edition.dayDates,
     eventWins: wins,
   });
+
+  const map = normalizeDayDates(edition.dayDates);
+  const targetHistory = targetLogs.map((log) => {
+    let dayNumber = 1;
+    const entry = map ? Object.entries(map).find(([_, date]) => date === log.effectiveFrom) : null;
+    if (entry) {
+      dayNumber = Number(entry[0]);
+    } else {
+      const day1 = map?.[1] ?? OFFICIAL_DAY1_CALENDAR;
+      const d1 = new Date(day1).getTime();
+      const dTarget = new Date(log.effectiveFrom).getTime();
+      if (Number.isFinite(d1) && Number.isFinite(dTarget)) {
+        dayNumber = Math.round((dTarget - d1) / (24 * 60 * 60 * 1000)) + 1;
+      }
+    }
+    return {
+      dayNumber,
+      effectiveFrom: log.effectiveFrom,
+      target: log.target,
+      changedAt: log.changedAt.toISOString(),
+    };
+  });
+
+  if (targetHistory.length === 0 && user?.target) {
+    targetHistory.push({
+      dayNumber: 1,
+      effectiveFrom: map?.[1] ?? OFFICIAL_DAY1_CALENDAR,
+      target: user.target,
+      changedAt: new Date(edition.tournamentStartDate || Date.now()).toISOString(),
+    });
+  }
+
   return {
     ...stats,
     average: user?.average || 0,
@@ -830,6 +912,7 @@ export async function getEditionProfileStatsForUser(userId: string) {
       logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
       userId,
     ),
+    targetHistory,
     editionTitle: edition.title,
   };
 }

@@ -66,7 +66,13 @@ export async function GET(request: NextRequest) {
     const { getEditionProfileStatsForUser } = await import('@/lib/actions/playerScoreActions');
     const editionStats = await getEditionProfileStatsForUser(user.id);
     return NextResponse.json(
-      { success: true, ...publicProfile(user, team), editionStats, averageHistory: editionStats.history || [] },
+      {
+        success: true,
+        ...publicProfile(user, team),
+        editionStats,
+        averageHistory: editionStats.history || [],
+        targetHistory: editionStats.targetHistory || [],
+      },
       { headers: mobileCorsHeaders },
     );
   } catch (error: any) {

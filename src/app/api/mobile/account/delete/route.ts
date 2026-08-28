@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
       await tx.hallOfFame.deleteMany({ where: { userId: uid } });
       await tx.playerCategoryHistory.deleteMany({ where: { userId: uid } });
       await tx.liveStream.deleteMany({ where: { playerId: uid } });
-      await tx.scoreReport.deleteMany({ where: { userId: uid } });
+      await tx.scoreReport.deleteMany({ where: { submittedByUserId: uid } });
+      await tx.playerTargetLog.deleteMany({ where: { userId: uid } });
       await tx.matchLineupSlotPlayer.deleteMany({ where: { userId: uid } });
       await tx.spocTeamMember.deleteMany({ where: { userId: uid } });
       await tx.editionParticipant.deleteMany({ where: { userId: uid } });

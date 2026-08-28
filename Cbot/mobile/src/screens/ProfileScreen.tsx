@@ -351,6 +351,25 @@ export function ProfileScreen({ navigation }: Props) {
               </View>
             </View>
 
+            {profile?.targetHistory && profile.targetHistory.length > 0 ? (
+              <View style={styles.historyCard}>
+                <Text style={styles.historyKicker}>TARGET CHANGE LOG</Text>
+                <View style={styles.historyList}>
+                  {profile.targetHistory.map((item, index) => (
+                    <View key={index} style={styles.historyRow}>
+                      <View style={styles.historyDayCol}>
+                        <Text style={styles.historyDayLabel}>DAY {item.dayNumber}</Text>
+                        <Text style={styles.historyDate}>Effective: {item.effectiveFrom}</Text>
+                      </View>
+                      <View style={styles.historyValCol}>
+                        <Text style={styles.historyValText}>{item.target} pts</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
             <Text style={styles.section}>YOUR DETAILS</Text>
             <Field label="BIO" value={form.bio} onChange={(v) => setForm({ ...form, bio: v })} multiline />
             <Field label="WHATSAPP / PHONE" value={form.whatsApp} onChange={(v) => setForm({ ...form, whatsApp: v })} keyboard="phone-pad" />
@@ -713,4 +732,51 @@ const styles = StyleSheet.create({
   pinHint: { fontSize: 12, color: '#94a3b8', marginTop: 4, marginBottom: 14 },
   pinCancel: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
   pinCancelText: { color: '#94a3b8', fontWeight: '800', letterSpacing: 1.2 },
+  historyCard: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 18,
+  },
+  historyKicker: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#f59e0b',
+    letterSpacing: 1.2,
+    marginBottom: 12,
+  },
+  historyList: {
+    gap: 10,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#1e293b',
+  },
+  historyDayCol: {
+    flexDirection: 'column',
+  },
+  historyDayLabel: {
+    color: '#f1f5f9',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  historyDate: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  historyValCol: {
+    alignItems: 'flex-end',
+  },
+  historyValText: {
+    color: '#f59e0b',
+    fontSize: 15,
+    fontWeight: '900',
+  },
 });

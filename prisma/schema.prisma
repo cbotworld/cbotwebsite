@@ -59,6 +59,7 @@ model User {
   liveStreams         LiveStream[]           @relation("PlayerLiveStreams")
   playerDayScores     PlayerDayScore[]
   averageLogs         PlayerAverageLog[]     @relation("AverageLogs")
+  targetLogs          PlayerTargetLog[]      @relation("TargetLogs")
 }
 
 model Account {
@@ -140,6 +141,7 @@ model Edition {
   liveStreams           LiveStream[]
   playerDayScores       PlayerDayScore[]
   averageLogs           PlayerAverageLog[]
+  targetLogs            PlayerTargetLog[]
 }
 
 model EditionParticipant {
@@ -474,6 +476,20 @@ model PlayerAverageLog {
   changedById   String
   edition       Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
   user          User     @relation("AverageLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([editionId, userId, effectiveFrom])
+}
+
+model PlayerTargetLog {
+  id            String   @id @default(cuid())
+  editionId     String
+  userId        String
+  target        Int
+  effectiveFrom String
+  changedAt     DateTime @default(now())
+  changedById   String
+  edition       Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  user          User     @relation("TargetLogs", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([editionId, userId, effectiveFrom])
 }
