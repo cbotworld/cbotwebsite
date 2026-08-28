@@ -4,7 +4,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -42,6 +41,7 @@ import {
 } from '../components/BoardScoreModal';
 import { captainScoreUntilNote } from '../score-edit-policy';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { useAppDialog } from '../components/AppDialog';
 
 function displayEventName(name: string, format?: string, slots?: number) {
   const raw = String(name || '').trim();
@@ -149,6 +149,7 @@ export function CombisScreen({ navigation }: Props) {
   const [publicError, setPublicError] = useState<string | null>(null);
   const [selectedPublicDay, setSelectedPublicDay] = useState<number | null>(null);
   const [deskId, setDeskId] = useState<string | null>(null);
+  const { dialog, showSuccess, showError, showWarn } = useAppDialog();
 
   const loggedIn = Boolean(getSession()?.token);
   const captainDesks: CaptainDesk[] = data?.captainDesks || [];
@@ -277,12 +278,12 @@ export function CombisScreen({ navigation }: Props) {
     if (!data || !selected) return;
     const incomplete = draft.some((ids) => ids.some((id) => !id));
     if (incomplete) {
-      Alert.alert('Incomplete combi', 'Pick a player for every slot before saving.');
+      showWarn('Incomplete Combi', 'Pick a player for every slot before saving.');
       return;
     }
     const ids = draft.flat();
     if (new Set(ids).size !== ids.length) {
-      Alert.alert('Duplicate player', 'A player can only appear once in the day combi.');
+      showWarn('Duplicate Player', 'A player can only appear once in the day combi.');
       return;
     }
     setSaving(true);
@@ -293,11 +294,11 @@ export function CombisScreen({ navigation }: Props) {
         players: draft[ri].map((id) => memberName(id)),
       }));
       await saveCombi(selected.dayNumber, rounds, data.team?.id || deskId || undefined);
-      Alert.alert('Saved', `Day ${selected.dayNumber} combi submitted.`);
+      showSuccess('Combi Saved! ✅', `Day ${selected.dayNumber} combi submitted.`);
       setSelected(null);
       await load(data.team?.id || deskId);
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : 'Could not save combi.');
+      showError('Save Failed', e instanceof Error ? e.message : 'Could not save combi.');
     } finally {
       setSaving(false);
     }
@@ -315,9 +316,9 @@ export function CombisScreen({ navigation }: Props) {
       const payload = await load(data.team?.id || deskId);
       if (payload) setScoreDraft(scoreDraftFromMembers(payload.members || [], selected.dayNumber));
       setScorePlayerId(null);
-      Alert.alert('Saved', 'Boards updated. Target bonus is Yes when the day’s total is under that player’s target.');
+      showSuccess('Boards Saved! 🎯', "Boards updated. Target bonus is Yes when the day's total is under that player's target.");
     } catch (e) {
-      Alert.alert('Scores not saved', e instanceof Error ? e.message : 'Could not save scores.');
+      showError('Scores Not Saved', e instanceof Error ? e.message : 'Could not save scores.');
     } finally {
       setSavingScores(false);
     }
@@ -910,6 +911,7 @@ export function CombisScreen({ navigation }: Props) {
           if (scorePlayerId) void onSavePlayerBoards(scorePlayerId, boards);
         }}
       />
+      {dialog}
     </SafeAreaView>
   );
 }

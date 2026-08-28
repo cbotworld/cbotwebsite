@@ -4,7 +4,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -18,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { fetchChannelVideos, type ChannelVideo } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { useAppDialog } from '../components/AppDialog';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -52,6 +52,7 @@ export function VideosScreen({ navigation, route }: Props) {
   const [dayDraft, setDayDraft] = useState(route.params?.day ? String(route.params.day) : '');
   const [playerFilter, setPlayerFilter] = useState(route.params?.player || '');
   const [dayFilter, setDayFilter] = useState<number | 'ALL'>(route.params?.day || 'ALL');
+  const { dialog, showWarn, showError } = useAppDialog();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,13 +115,13 @@ export function VideosScreen({ navigation, route }: Props) {
   const openVideo = async (video: ChannelVideo) => {
     const url = youtubeWatchUrl(video);
     if (!url) {
-      Alert.alert('YouTube', 'This video does not have a YouTube link yet.');
+      showWarn('No Video Yet', 'This video does not have a YouTube link yet.');
       return;
     }
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('YouTube', 'Could not open YouTube. Please try again.');
+      showError('Could Not Open', 'Could not open YouTube. Please try again.');
     }
   };
 
@@ -269,6 +270,7 @@ export function VideosScreen({ navigation, route }: Props) {
           ))}
         </ScrollView>
       )}
+      {dialog}
     </SafeAreaView>
   );
 }

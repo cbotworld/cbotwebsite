@@ -4,7 +4,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -29,6 +28,7 @@ import {
   type ProfilePayload,
 } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { useAppDialog } from '../components/AppDialog';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -79,6 +79,7 @@ export function ProfileScreen({ navigation }: Props) {
   const [deletePin, setDeletePin] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { dialog, showConfirm, showSuccess } = useAppDialog();
 
   const load = useCallback(async () => {
     if (!getSession()?.token) {
@@ -188,17 +189,15 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   const logout = () => {
-    Alert.alert('Sign out', 'You will need your username and PIN to sign in again.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: () => {
-          setSession(null);
-          navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] });
-        },
+    showConfirm(
+      'Sign Out',
+      'You will need your username and PIN to sign in again.',
+      () => {
+        setSession(null);
+        navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] });
       },
-    ]);
+      { confirmLabel: 'Sign out', confirmStyle: 'danger', cancelLabel: 'Cancel' },
+    );
   };
 
   const openDeleteModal = () => {
@@ -243,10 +242,10 @@ export function ProfileScreen({ navigation }: Props) {
       await deleteAccount(deleteUsername.trim(), deletePin);
       setDeleteOpen(false);
       setSession(null);
-      Alert.alert(
+      showSuccess(
         'Account Deleted',
         'Your account has been permanently deleted.',
-        [{ text: 'OK', onPress: () => navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] }) }],
+        () => navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] }),
       );
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : 'Delete failed.');
@@ -521,6 +520,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {dialog}
     </SafeAreaView>
   );
 }

@@ -4,7 +4,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -33,6 +32,7 @@ import {
   type MobileTeam,
 } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
+import { useAppDialog } from '../components/AppDialog';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -125,6 +125,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [scoreInfo, setScoreInfo] = useState<DayScoreInfo | null>(null);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [boardDay, setBoardDay] = useState<number | null>(null);
+  const { dialog, showSuccess, showError, showWarn } = useAppDialog();
 
   const load = useCallback(async (view: 'MAIN' | 'SPOC' = playerView) => {
     if (!getSession()?.token) {
@@ -149,7 +150,7 @@ export function DashboardScreen({ navigation }: Props) {
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not load schedule.';
       setWarning(message);
-      Alert.alert('Schedule', message);
+      showWarn('Schedule Error', message);
     } finally {
       setLoading(false);
     }
@@ -165,11 +166,11 @@ export function DashboardScreen({ navigation }: Props) {
     setSavingDay(dayNumber);
     try {
       await submitPlayerDayScore(dayNumber, boards);
-      Alert.alert('Saved', `Day ${dayNumber} scores submitted.`);
+      showSuccess('Scores Saved! 🎯', `Day ${dayNumber} scores submitted successfully.`);
       setScoreInfo(await fetchPlayerScores());
       setBoardDay(null);
     } catch (e) {
-      Alert.alert('Not saved', e instanceof Error ? e.message : 'Failed');
+      showError('Not Saved', e instanceof Error ? e.message : 'Failed to save scores.');
     } finally {
       setSavingDay(null);
     }
@@ -200,8 +201,8 @@ export function DashboardScreen({ navigation }: Props) {
     if (mode === 'match') {
       const liveNow = match.status === 'LIVE' || match.dayNumber === currentDay;
       if (!liveNow && !match.canGoLive) {
-        Alert.alert(
-          `${match.label} is locked`,
+        showWarn(
+          `${match.label} Locked`,
           match.lockedReason ||
             (match.prerequisiteDay
               ? `Go live on Day ${match.prerequisiteDay} and save at least one YouTube video first.`
@@ -486,6 +487,7 @@ export function DashboardScreen({ navigation }: Props) {
           if (boardDay != null) void saveDayScore(boardDay, boards);
         }}
       />
+      {dialog}
     </SafeAreaView>
   );
 }

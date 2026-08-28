@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playerScoreUntilNote } from '../score-edit-policy';
+import { useAppDialog } from './AppDialog';
 
 export const MAX_DAY_BOARDS = 10;
 export const DEFAULT_DAY_BOARDS = 3;
@@ -112,6 +112,7 @@ export function BoardScoreModal({
   const stats = useMemo(() => parseBoardDrafts(boards), [boards]);
   const bonus = targetBonus(stats.boardCount ? stats.total : null, target);
   const tgt = Number(target) || 0;
+  const { dialog, showWarn, showConfirm } = useAppDialog();
 
   const update = (idx: number, patch: Partial<BoardDraft>) => {
     setBoards((prev) => prev.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
@@ -129,29 +130,23 @@ export function BoardScoreModal({
 
   const handleConfirmAndSubmit = () => {
     if (!stats.filled.length) {
-      Alert.alert('Incomplete Scores', 'Please enter at least one board score before submitting.');
+      showWarn('Incomplete Scores', 'Please enter at least one board score before submitting.');
       return;
     }
 
     const bonusLabel = tgt > 0 ? (bonus === true ? 'Yes (+1 Bonus)' : 'No') : 'N/A';
     const targetText = tgt > 0 ? `${tgt} pts` : 'No Target';
 
-    Alert.alert(
+    showConfirm(
       'Confirm Score Submission',
-      `Please confirm the details for Day ${dayNumber}:\n\n` +
-        `• Total Score: ${stats.total} pts\n` +
-        `• Total Slams: ${stats.slams}\n` +
-        `• Target Bonus: ${bonusLabel}\n` +
-        `• Target: ${targetText}\n` +
-        `• No. of Boards: ${stats.boardCount}\n\n` +
-        `Do you want to confirm and submit now?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm & Submit',
-          onPress: () => onSave(stats.filled),
-        },
-      ]
+      `Day ${dayNumber} — please confirm:\n\n` +
+        `Total Score: ${stats.total} pts\n` +
+        `Total Slams: ${stats.slams}\n` +
+        `Target Bonus: ${bonusLabel}\n` +
+        `Target: ${targetText}\n` +
+        `Boards: ${stats.boardCount}`,
+      () => onSave(stats.filled),
+      { confirmLabel: 'Confirm & Submit', cancelLabel: 'Cancel' },
     );
   };
 
@@ -482,6 +477,7 @@ export function BoardScoreModal({
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
+    {dialog}
   );
 }
 
