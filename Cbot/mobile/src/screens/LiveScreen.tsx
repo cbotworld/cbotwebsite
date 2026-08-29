@@ -528,7 +528,11 @@ export function LiveScreen({ route, navigation }: Props) {
     );
   }
 
-  const ingestionUrl = session ? toSecureIngestionUrl(session.ingestionAddress) : "";
+  const ingestionUrl = session
+    ? Platform.OS === "ios"
+      ? session.ingestionAddress
+      : toSecureIngestionUrl(session.ingestionAddress)
+    : "";
   const showStop = stream.isStreaming || Boolean(session);
   const goHome = () => {
     if (session) {

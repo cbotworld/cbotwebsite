@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Platform, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,6 +16,7 @@ import { VideosScreen } from "./src/screens/VideosScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { LiveScreen } from "./src/screens/LiveScreen";
 import { UpdateAppModal } from "./src/components/UpdateAppModal";
+import { ReportIssueModal } from "./src/components/ReportIssueModal";
 import { MainTabParamList, RootStackParamList } from "./src/navigation/types";
 import { unlockAppOrientation } from "./src/utils/optionalScreenOrientation";
 import { fetchAppVersion, restoreSession } from "./src/api/website";
@@ -64,75 +65,109 @@ function TabLabel({ label, color }: { label: string; color: string }) {
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 8);
+  const [reportVisible, setReportVisible] = useState(false);
 
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: "#f59e0b",
-        tabBarInactiveTintColor: "#64748b",
-        tabBarStyle: {
-          backgroundColor: "#020617",
-          borderTopColor: "#1e293b",
-          borderTopWidth: 1,
-          height: 56 + bottom,
-          paddingBottom: bottom,
-          paddingTop: 8,
-        },
+  const ReportButton = () => (
+    <Pressable
+      onPress={() => setReportVisible(true)}
+      hitSlop={10}
+      style={{
+        marginRight: 14,
+        backgroundColor: '#1e293b',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
       }}
     >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{
-          tabBarLabel: ({ color }) => <TabLabel label="MATCHES" color={color} />,
-          tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons name={focused ? "trophy" : "trophy-outline"} size={size || 22} color={color} />
-          ),
+      <Text style={{ fontSize: 13 }}>🚩</Text>
+      <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>REPORT</Text>
+    </Pressable>
+  );
+
+  return (
+    <>
+      <ReportIssueModal visible={reportVisible} onClose={() => setReportVisible(false)} />
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: true,
+          headerStyle: { backgroundColor: '#0f172a' },
+          headerTitleStyle: { color: '#f59e0b', fontWeight: '900', fontSize: 15, letterSpacing: 1 },
+          headerTitleAlign: 'left',
+          headerShadowVisible: false,
+          headerRight: () => <ReportButton />,
+          tabBarHideOnKeyboard: true,
+          tabBarActiveTintColor: "#f59e0b",
+          tabBarInactiveTintColor: "#64748b",
+          tabBarStyle: {
+            backgroundColor: "#020617",
+            borderTopColor: "#1e293b",
+            borderTopWidth: 1,
+            height: 56 + bottom,
+            paddingBottom: bottom,
+            paddingTop: 8,
+          },
         }}
-      />
-      <Tab.Screen
-        name="Combis"
-        component={CombisScreen}
-        options={{
-          tabBarLabel: ({ color }) => <TabLabel label="COMBIS" color={color} />,
-          tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons name={focused ? "grid" : "grid-outline"} size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Standings"
-        component={StandingsScreen}
-        options={{
-          tabBarLabel: ({ color }) => <TabLabel label="STAND" color={color} />,
-          tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons name={focused ? "podium" : "podium-outline"} size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Videos"
-        component={VideosScreen}
-        options={{
-          tabBarLabel: ({ color }) => <TabLabel label="VIDEOS" color={color} />,
-          tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size || 22} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarLabel: ({ color }) => <TabLabel label="PROFILE" color={color} />,
-          tabBarIcon: ({ color, focused, size }) => (
-            <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={size || 22} color={color} />
-          ),
-        }}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            title: 'CBOT',
+            tabBarLabel: ({ color }) => <TabLabel label="MATCHES" color={color} />,
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? "trophy" : "trophy-outline"} size={size || 22} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Combis"
+          component={CombisScreen}
+          options={{
+            title: 'COMBIS',
+            tabBarLabel: ({ color }) => <TabLabel label="COMBIS" color={color} />,
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? "grid" : "grid-outline"} size={size || 22} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Standings"
+          component={StandingsScreen}
+          options={{
+            title: 'STANDINGS',
+            tabBarLabel: ({ color }) => <TabLabel label="STAND" color={color} />,
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? "podium" : "podium-outline"} size={size || 22} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Videos"
+          component={VideosScreen}
+          options={{
+            title: 'VIDEOS',
+            tabBarLabel: ({ color }) => <TabLabel label="VIDEOS" color={color} />,
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? "play-circle" : "play-circle-outline"} size={size || 22} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            title: 'PROFILE',
+            tabBarLabel: ({ color }) => <TabLabel label="PROFILE" color={color} />,
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={size || 22} color={color} />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+    </>
   );
 }
 

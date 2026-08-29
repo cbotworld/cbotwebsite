@@ -21,7 +21,7 @@ import {
   boardsFromSaved,
   parseBoardDrafts,
 } from '../components/BoardScoreModal';
-import { playerScoreUntilNote } from '../score-edit-policy';
+import { playerScoreUntilNote, SCORE_EDIT_PLAYER_CLOSED } from '../score-edit-policy';
 import {
   fetchPlayerSchedule,
   fetchPlayerScores,

@@ -513,6 +513,7 @@ export function CombisScreen({ navigation }: Props) {
                                     key={`a-${idx}-${evt.index}-${name}`}
                                     onPress={() => openVideosForPlayer(name, day.dayNumber)}
                                     style={styles.playerChip}
+                                    hitSlop={12}
                                   >
                                     <Text style={styles.h2hPlayers}>{name}</Text>
                                   </Pressable>
@@ -529,6 +530,7 @@ export function CombisScreen({ navigation }: Props) {
                                     key={`b-${idx}-${evt.index}-${name}`}
                                     onPress={() => openVideosForPlayer(name, day.dayNumber)}
                                     style={styles.playerChip}
+                                    hitSlop={12}
                                   >
                                     <Text style={styles.h2hPlayers}>{name}</Text>
                                   </Pressable>
@@ -699,7 +701,7 @@ export function CombisScreen({ navigation }: Props) {
                   <View style={styles.h2hSide}>
                     {splitPlayerNames(evt.myPlayers).length ? (
                       splitPlayerNames(evt.myPlayers).map((name) => (
-                        <Pressable key={`l-${ri}-${name}`} onPress={() => openVideosForPlayer(name, selected?.dayNumber)} style={styles.playerChip}>
+                        <Pressable key={`l-${ri}-${name}`} onPress={() => openVideosForPlayer(name, selected?.dayNumber)} style={styles.playerChip} hitSlop={12}>
                           <Text style={styles.h2hPlayers}>{name}</Text>
                         </Pressable>
                       ))
@@ -711,7 +713,7 @@ export function CombisScreen({ navigation }: Props) {
                   <View style={styles.h2hSide}>
                     {splitPlayerNames(evt.opponentPlayers).length ? (
                       splitPlayerNames(evt.opponentPlayers).map((name) => (
-                        <Pressable key={`r-${ri}-${name}`} onPress={() => openVideosForPlayer(name, selected?.dayNumber)} style={styles.playerChip}>
+                        <Pressable key={`r-${ri}-${name}`} onPress={() => openVideosForPlayer(name, selected?.dayNumber)} style={styles.playerChip} hitSlop={12}>
                           <Text style={styles.h2hPlayers}>{name}</Text>
                         </Pressable>
                       ))
@@ -777,140 +779,141 @@ export function CombisScreen({ navigation }: Props) {
               <Text style={styles.backBtnText}>BACK</Text>
             </Pressable>
           </View>
+         
+          <Modal
+            visible={Boolean(picker)}
+            transparent
+            animationType="fade"
+            onRequestClose={closePicker}
+          >
+            <KeyboardAvoidingView
+              style={styles.pickerRoot}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
+              <Pressable style={styles.pickerBackdrop} onPress={closePicker} />
+              <View style={styles.pickerSheet}>
+                <View style={styles.pickerHandle} />
+                <View style={styles.pickerHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pickerKicker}>CHOOSE PLAYER</Text>
+                    <Text style={styles.pickerTitle} numberOfLines={1}>
+                      {pickerEventLabel}
+                      {picker && pickerRound && pickerRound.slots > 1 ? ` · Slot ${picker.slot + 1}` : ''}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {pickerSlotId ? (
+                      <Pressable
+                        onPress={() => picker && setSlot(picker.round, picker.slot, '')}
+                        style={styles.pickerClearBtn}
+                      >
+                        <Text style={styles.pickerClearText}>Clear</Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable onPress={closePicker} style={styles.pickerCloseBtn} hitSlop={8}>
+                      <Text style={styles.pickerCloseText}>✕</Text>
+                    </Pressable>
+                  </View>
+                </View>
 
+                <View style={styles.pickerSearchWrap}>
+                  <TextInput
+                    value={pickerQuery}
+                    onChangeText={setPickerQuery}
+                    placeholder="Search name…"
+                    placeholderTextColor="#64748b"
+                    autoCorrect={false}
+                    style={styles.pickerSearch}
+                  />
+                </View>
+
+                <ScrollView
+                  style={styles.pickerScroll}
+                  keyboardShouldPersistTaps="always"
+                  nestedScrollEnabled
+                >
+                  {(data?.members || []).length === 0 ? (
+                    <Text style={styles.empty}>No roster loaded for this team.</Text>
+                  ) : pickerMembers.length === 0 ? (
+                    <Text style={styles.empty}>No player matches that search.</Text>
+                  ) : (
+                    pickerMembers.map((m: CombiMember) => {
+                      const selectedHere = pickerSlotId === m.id;
+                      const taken = usedIds.has(m.id) && !selectedHere;
+                      const bits = memberScoreBits(
+                        m,
+                        selected?.dayNumber,
+                        scoreDraft.find((r) => r.userId === m.id),
+                      );
+                      return (
+                        <Pressable
+                          key={m.id}
+                          disabled={taken}
+                          onPress={() => picker && setSlot(picker.round, picker.slot, m.id)}
+                          style={[
+                            styles.pickerRow,
+                            selectedHere && styles.pickerRowOn,
+                            taken && styles.pickerRowTaken,
+                          ]}
+                          hitSlop={10}
+                        >
+                          <View style={[styles.pickerAvatar, selectedHere && styles.pickerAvatarOn]}>
+                            <Text style={styles.pickerAvatarText}>{nameInitials(m.name)}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.pickerName} numberOfLines={1}>
+                              {m.name}
+                            </Text>
+                            <View style={styles.pickerChips}>
+                              <Text style={styles.pickerChip}>
+                                {bits.score === '' ? 'No score' : `${bits.score} pts`}
+                              </Text>
+                              <Text style={styles.pickerChip}>
+                                {bits.score === '' ? '—' : `${bits.slams} slams`}
+                              </Text>
+                              {bits.avgLabel ? (
+                                <Text
+                                  style={[
+                                    styles.pickerChip,
+                                    bits.avgLabel === 'Target Yes' && styles.pickerChipYes,
+                                  ]}
+                                >
+                                  {bits.avgLabel}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                          {taken ? (
+                            <Text style={styles.pickerTaken}>In combi</Text>
+                          ) : selectedHere ? (
+                            <Text style={styles.pickerCheck}>✓</Text>
+                          ) : (
+                            <Text style={styles.pickerPick}>Select</Text>
+                          )}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+
+          <BoardScoreModal
+            visible={Boolean(scorePlayerId)}
+            dayNumber={selected?.dayNumber || 1}
+            playerName={scoreDraft.find((r) => r.userId === scorePlayerId)?.name}
+            target={scoreDraft.find((r) => r.userId === scorePlayerId)?.target}
+            initialBoards={scoreDraft.find((r) => r.userId === scorePlayerId)?.boards || []}
+            busy={savingScores}
+            editNote={captainScoreUntilNote(selected?.dayNumber || 1)}
+            onClose={() => setScorePlayerId(null)}
+            onSave={(boards) => {
+              if (scorePlayerId) void onSavePlayerBoards(scorePlayerId, boards);
+            }}
+          />
         </SafeAreaView>
       </Modal>
-
-      <Modal
-        visible={Boolean(picker)}
-        transparent
-        animationType="fade"
-        onRequestClose={closePicker}
-      >
-        <KeyboardAvoidingView
-          style={styles.pickerRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <Pressable style={styles.pickerBackdrop} onPress={closePicker} />
-          <View style={styles.pickerSheet}>
-            <View style={styles.pickerHandle} />
-            <View style={styles.pickerHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pickerKicker}>CHOOSE PLAYER</Text>
-                <Text style={styles.pickerTitle} numberOfLines={1}>
-                  {pickerEventLabel}
-                  {picker && pickerRound && pickerRound.slots > 1 ? ` · Slot ${picker.slot + 1}` : ''}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {pickerSlotId ? (
-                  <Pressable
-                    onPress={() => picker && setSlot(picker.round, picker.slot, '')}
-                    style={styles.pickerClearBtn}
-                  >
-                    <Text style={styles.pickerClearText}>Clear</Text>
-                  </Pressable>
-                ) : null}
-                <Pressable onPress={closePicker} style={styles.pickerCloseBtn} hitSlop={8}>
-                  <Text style={styles.pickerCloseText}>✕</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.pickerSearchWrap}>
-              <TextInput
-                value={pickerQuery}
-                onChangeText={setPickerQuery}
-                placeholder="Search name…"
-                placeholderTextColor="#64748b"
-                autoCorrect={false}
-                style={styles.pickerSearch}
-              />
-            </View>
-
-            <ScrollView
-              style={styles.pickerScroll}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-            >
-              {(data?.members || []).length === 0 ? (
-                <Text style={styles.empty}>No roster loaded for this team.</Text>
-              ) : pickerMembers.length === 0 ? (
-                <Text style={styles.empty}>No player matches that search.</Text>
-              ) : (
-                pickerMembers.map((m: CombiMember) => {
-                  const selectedHere = pickerSlotId === m.id;
-                  const taken = usedIds.has(m.id) && !selectedHere;
-                  const bits = memberScoreBits(
-                    m,
-                    selected?.dayNumber,
-                    scoreDraft.find((r) => r.userId === m.id),
-                  );
-                  return (
-                    <Pressable
-                      key={m.id}
-                      disabled={taken}
-                      onPress={() => picker && setSlot(picker.round, picker.slot, m.id)}
-                      style={[
-                        styles.pickerRow,
-                        selectedHere && styles.pickerRowOn,
-                        taken && styles.pickerRowTaken,
-                      ]}
-                    >
-                      <View style={[styles.pickerAvatar, selectedHere && styles.pickerAvatarOn]}>
-                        <Text style={styles.pickerAvatarText}>{nameInitials(m.name)}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pickerName} numberOfLines={1}>
-                          {m.name}
-                        </Text>
-                        <View style={styles.pickerChips}>
-                          <Text style={styles.pickerChip}>
-                            {bits.score === '' ? 'No score' : `${bits.score} pts`}
-                          </Text>
-                          <Text style={styles.pickerChip}>
-                            {bits.score === '' ? '—' : `${bits.slams} slams`}
-                          </Text>
-                          {bits.avgLabel ? (
-                            <Text
-                              style={[
-                                styles.pickerChip,
-                                bits.avgLabel === 'Target Yes' && styles.pickerChipYes,
-                              ]}
-                            >
-                              {bits.avgLabel}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
-                      {taken ? (
-                        <Text style={styles.pickerTaken}>In combi</Text>
-                      ) : selectedHere ? (
-                        <Text style={styles.pickerCheck}>✓</Text>
-                      ) : (
-                        <Text style={styles.pickerPick}>Select</Text>
-                      )}
-                    </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-      <BoardScoreModal
-        visible={Boolean(scorePlayerId)}
-        dayNumber={selected?.dayNumber || 1}
-        playerName={scoreDraft.find((r) => r.userId === scorePlayerId)?.name}
-        target={scoreDraft.find((r) => r.userId === scorePlayerId)?.target}
-        initialBoards={scoreDraft.find((r) => r.userId === scorePlayerId)?.boards || []}
-        busy={savingScores}
-        editNote={captainScoreUntilNote(selected?.dayNumber || 1)}
-        onClose={() => setScorePlayerId(null)}
-        onSave={(boards) => {
-          if (scorePlayerId) void onSavePlayerBoards(scorePlayerId, boards);
-        }}
-      />
       {dialog}
     </SafeAreaView>
   );
@@ -1053,8 +1056,8 @@ const styles = StyleSheet.create({
   h2hRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   h2hSide: { flex: 1, paddingVertical: 4, alignItems: 'center', gap: 6 },
   playerChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   tapHint: {
     color: '#64748b',
@@ -1153,6 +1156,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1e293b',
     borderBottomWidth: 0,
+    zIndex: 10,
+    elevation: 10,
   },
   pickerHandle: {
     alignSelf: 'center',
