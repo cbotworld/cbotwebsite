@@ -2,14 +2,14 @@
   "expo": {
     "name": "CBOT Live Stream",
     "slug": "cbot-live-stream",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cbotworld.livestream",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSCameraUsageDescription": "CBOT needs camera access to record your Carrom board match.",
         "NSMicrophoneUsageDescription": "CBOT needs microphone access to record audio during the match."
@@ -20,7 +20,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.cbotworld.livestream",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

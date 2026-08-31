@@ -111,7 +111,55 @@ async function upsertDayScore(opts: {
   });
 }
 
+export async function recalculateAndPopulateAveragesForEndedDays(editionId: string) {
+  const edition = await prisma.edition.findUnique({
+    where: { id: editionId },
+    select: { id: true, dayDates: true },
+  });
+  if (!edition) return;
+
+  const scores = await prisma.playerDayScore.findMany({
+    where: { editionId },
+    select: { userId: true, dayNumber: true, score: true, slams: true, boards: true },
+    orderBy: { dayNumber: 'asc' },
+  });
+
+  const endedScores = scores.filter((s) => isDayScorePublished(s.dayNumber, edition.dayDates));
+
+  if (endedScores.length === 0) {
+    await prisma.playerAverageLog.deleteMany({ where: { editionId } });
+    const teams = await prisma.team.findMany({
+      where: { editionId },
+      include: { members: { select: { userId: true } }, spocMembers: { select: { userId: true } } },
+    });
+    const allMemberIds = [
+      ...new Set(teams.flatMap((t) => [...t.members.map((m) => m.userId), ...t.spocMembers.map((m) => m.userId)])),
+    ];
+    if (allMemberIds.length > 0) {
+      await prisma.user.updateMany({
+        where: { id: { in: allMemberIds } },
+        data: { average: 0 },
+      });
+    }
+    return;
+  }
+
+  const userIdsWithScores = new Set(endedScores.map((s) => s.userId));
+  for (const userId of userIdsWithScores) {
+    const userEndedRows = endedScores.filter((s) => s.userId === userId);
+    const stats = computeEditionRunningAverage(0, userEndedRows);
+    if (stats.daysProcessed > 0 && stats.average > 0) {
+      await prisma.user.update({ where: { id: userId }, data: { average: stats.average } });
+      await recordPlayerAverageChange(userId, stats.average, 'SYSTEM', true);
+    }
+  }
+}
+
 async function refreshPlayerEditionAverage(editionId: string, userId: string, changedById: string) {
+  const edition = await prisma.edition.findUnique({
+    where: { id: editionId },
+    select: { dayDates: true },
+  });
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { average: true },
@@ -122,12 +170,17 @@ async function refreshPlayerEditionAverage(editionId: string, userId: string, ch
     select: { score: true, slams: true, boards: true, dayNumber: true },
   });
   if (!rows.length) return;
+
+  // Average is ONLY calculated after day end (when score cutoff is reached / published)
+  const endedRows = rows.filter((r) => isDayScorePublished(r.dayNumber, edition?.dayDates));
+  if (!endedRows.length) return;
+
   const logs = await prisma.playerAverageLog.findMany({
     where: { editionId, userId },
     orderBy: { effectiveFrom: 'asc' },
   });
   const seed = logs.length > 0 ? Number(logs[0].average) : Number(user?.average) || 0;
-  const stats = computeEditionRunningAverage(seed, rows);
+  const stats = computeEditionRunningAverage(seed, endedRows);
   if (stats.daysProcessed <= 0 || stats.average <= 0) return;
   await prisma.user.update({ where: { id: userId }, data: { average: stats.average } });
   await recordPlayerAverageChange(userId, stats.average, changedById, true);
@@ -737,6 +790,7 @@ export async function getPublicStandings() {
 async function loadPublicStandings() {
   const edition = await loadLatestEdition();
   if (!edition) return { edition: null, blocks: [], players: [], placement: [], stages: [] };
+  await recalculateAndPopulateAveragesForEndedDays(edition.id);
   const config = await loadStageConfig(edition.id);
   const maxDay = calendarDaysInEdition(config.stages, edition.totalDays);
   const teams = await prisma.team.findMany({

@@ -64,13 +64,8 @@ export function rankPlayers(opts: {
   const highestAverage = allSeedAverages.length > 0 ? Math.max(...allSeedAverages) : 0;
 
   const rows: PlayerRankingRow[] = opts.players.map((player) => {
-    const seed = averageForDay(
-      logsForUser(opts.logs, player.userId),
-      todayIstCalendarDate(now),
-      Number(player.average) || 0,
-    );
-    
-    let running = Number.isFinite(seed) && seed > 0 ? seed : 0;
+    const seed = 0;
+    let running = 0;
     let totalScore = 0;
     let boardCount = 0;
     let slams = 0;

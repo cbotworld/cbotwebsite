@@ -43,10 +43,11 @@ export async function POST(request: NextRequest) {
     let comment: string;
     let imageBase64: string | null = null;
     let imageMime: string = 'image/jpeg';
-
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
 
-    if (contentType.includes('multipart/form-data')) {
+    const reqContentType = request.headers.get('content-type') || '';
+
+    if (reqContentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       name = String(formData.get('name') || user?.name || '').trim();
       email = String(formData.get('email') || user?.email || '').trim();
