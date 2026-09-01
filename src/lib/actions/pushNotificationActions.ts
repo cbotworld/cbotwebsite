@@ -110,12 +110,18 @@ export async function sendCustomPushNotification(input: {
 
   const result = await sendPushNotifications(notifications);
 
+  const isSuccess = result.sent > 0;
+  let statusDetail = `Sent: ${result.sent}, Failed: ${result.failed}`;
+  if (result.sent === 0 && result.failed > 0) {
+    statusDetail += ` — FCM/APNs credentials not configured in Expo Dashboard.`;
+  }
+
   return {
-    success: true,
+    success: isSuccess,
     sent: result.sent,
     failed: result.failed,
     invalidTokensRemoved: result.invalidTokensRemoved,
     totalTokens: tokens.length,
-    message: `Push notification dispatched! Sent: ${result.sent}, Failed/Invalid: ${result.failed}`,
+    message: `Push notification summary: ${statusDetail}`,
   };
 }

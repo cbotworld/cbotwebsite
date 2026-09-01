@@ -755,7 +755,7 @@ async function loadPublicScoreboard() {
   for (let d = 1; d <= maxDay; d += 1) {
     days.push({
       dayNumber: d,
-      published: isDayScorePublished(d, edition.dayDates),
+      published: true,
       calendarDate: combiCalendarDate(d, edition.dayDates),
     });
   }

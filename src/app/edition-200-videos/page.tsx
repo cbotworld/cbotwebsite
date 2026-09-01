@@ -1,1 +1,5 @@
-export { default, generateMetadata } from '../editions/200th-videos/page';
+import { redirect } from 'next/navigation';
+
+export default function Edition200VideosPage() {
+  redirect('/combis');
+}

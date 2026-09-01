@@ -764,12 +764,11 @@ export default function PlayerClient({
                 Choose a day. If you already submitted boards, they load here so you can update them until 9:00pm IST.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-md">
-              <ScoreEditRules note={SCORE_EDIT_PLAYER_HELP} />
+            <CardContent className="space-y-4 max-w-xl">
               <div>
-                <label className="text-xs font-bold block mb-1">Day</label>
+                <label className="text-xs font-bold block mb-1.5">Select Day</label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold"
+                  className="w-full h-11 rounded-xl border border-amber-500/30 bg-background px-3 text-sm font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   value={selectedScoreDay}
                   onChange={(e) => setSelectedScoreDay(parseInt(e.target.value, 10) || 1)}
                 >
@@ -802,8 +801,14 @@ export default function PlayerClient({
                   {(myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowReason || SCORE_EDIT_PLAYER_HELP}
                 </p>
               ) : null}
-              {dayScoreMsg && <p className="text-xs font-semibold">{dayScoreMsg}</p>}
+              {dayScoreMsg && (
+                <div className={`p-3 rounded-xl text-xs font-bold ${dayScoreMsg === 'Saved.' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                  {dayScoreMsg}
+                </div>
+              )}
               <Button
+                variant="carrom"
+                className="w-full font-black py-5 text-base justify-center shadow-lg shadow-amber-500/20"
                 disabled={
                   dayScoreBusy ||
                   (myDayInfo?.days || []).find((d: any) => d.dayNumber === selectedScoreDay)?.windowOpen === false
