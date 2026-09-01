@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { signIn, getSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,6 +142,13 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <div className="text-center text-xs text-muted-foreground pt-4 border-t border-border mt-4">
+            Don't have an account?{' '}
+            <Link href="/register" className="text-amber-500 font-bold hover:underline">
+              Create Account with Email OTP
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

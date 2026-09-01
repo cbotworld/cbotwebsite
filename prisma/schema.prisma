@@ -60,6 +60,7 @@ model User {
   playerDayScores     PlayerDayScore[]
   averageLogs         PlayerAverageLog[]     @relation("AverageLogs")
   targetLogs          PlayerTargetLog[]      @relation("TargetLogs")
+  pushTokens          UserPushToken[]
 }
 
 model Account {
@@ -498,6 +499,17 @@ model SystemSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+model UserPushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // "ios" | "android"
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 

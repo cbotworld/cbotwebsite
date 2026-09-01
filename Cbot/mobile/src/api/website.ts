@@ -648,3 +648,48 @@ export async function deleteAccount(username: string, pin: string): Promise<stri
   if (!data.success) throw new Error(data.error || 'Failed to delete account.');
   return String(data.message || 'Account permanently deleted.');
 }
+
+export async function sendEmailOtp(email: string, name: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (config.appApiKey) headers['X-App-Key'] = config.appApiKey;
+
+  const res = await fetch(`${config.websiteBaseUrl}/api/auth/send-otp`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ email, name }),
+  });
+  const data = await res.json().catch(() => ({ success: false, error: 'Network error or invalid server response.' }));
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Failed to send verification OTP.');
+  }
+  return data;
+}
+
+export async function verifyEmailOtp(payload: {
+  email: string;
+  otp: string;
+  name: string;
+  mobile: string;
+  pin: string;
+}) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (config.appApiKey) headers['X-App-Key'] = config.appApiKey;
+
+  const res = await fetch(`${config.websiteBaseUrl}/api/auth/verify-otp`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({ success: false, error: 'Network error or invalid server response.' }));
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Invalid OTP verification code.');
+  }
+  if (data.token && data.user) {
+    setSession({
+      token: data.token,
+      user: data.user,
+      team: null,
+    });
+  }
+  return data;
+}

@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { config } from '../config';
 import { RootStackParamList } from '../navigation/types';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+import { sendEmailOtp, verifyEmailOtp } from '../api/website';
 
 const logo = require('../../assets/logo.png');
 
@@ -65,15 +66,7 @@ export function RegisterScreen({ navigation }: Props) {
 
     setBusy(true);
     try {
-      const res = await fetch(`${config.websiteBaseUrl}/api/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send verification OTP.');
-      }
+      await sendEmailOtp(email.trim(), name.trim());
       setStep(2);
       setResendTimer(60);
     } catch (err: any) {
@@ -92,21 +85,13 @@ export function RegisterScreen({ navigation }: Props) {
 
     setBusy(true);
     try {
-      const res = await fetch(`${config.websiteBaseUrl}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          otp: otp.trim(),
-          name: name.trim(),
-          mobile: mobile.trim(),
-          pin,
-        }),
+      const data = await verifyEmailOtp({
+        email: email.trim(),
+        otp: otp.trim(),
+        name: name.trim(),
+        mobile: mobile.trim(),
+        pin,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Invalid OTP code.');
-      }
 
       setCreds({ username: data.username, pin: data.pin || pin });
       setStep(3);
