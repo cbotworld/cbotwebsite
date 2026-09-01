@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { loginPlayer } from '../api/website';
+import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { RootStackParamList } from '../navigation/types';
 
 const logo = require('../../assets/logo.png');
@@ -86,6 +87,7 @@ export function LoginScreen({ navigation }: Props) {
     setError(null);
     try {
       await loginPlayer(username.trim(), pin);
+      void registerForPushNotificationsAsync();
       navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed.');
@@ -170,6 +172,13 @@ export function LoginScreen({ navigation }: Props) {
           <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={onLogin} disabled={busy}>
             {busy ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.buttonText}>SIGN IN</Text>}
           </Pressable>
+
+          <Pressable style={styles.registerLink} onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.registerLinkText}>
+              New Player? <Text style={styles.registerLinkBold}>Create Account</Text>
+            </Text>
+          </Pressable>
+
           <Pressable
             style={styles.skip}
             onPress={() => {
@@ -243,7 +252,10 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { fontSize: 14, fontWeight: '900', color: '#0f172a', letterSpacing: 2 },
-  skip: { marginTop: 16, alignItems: 'center', paddingVertical: 10 },
+  skip: { marginTop: 12, alignItems: 'center', paddingVertical: 10 },
   skipText: { color: '#94a3b8', fontWeight: '800', fontSize: 12, letterSpacing: 1.2 },
+  registerLink: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
+  registerLinkText: { color: '#94a3b8', fontSize: 13 },
+  registerLinkBold: { color: '#f59e0b', fontWeight: '800' },
   error: { color: '#fca5a5', marginTop: 12, textAlign: 'center' },
 });

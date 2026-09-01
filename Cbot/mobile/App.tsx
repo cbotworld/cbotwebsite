@@ -9,6 +9,7 @@ import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LoginScreen } from "./src/screens/LoginScreen";
+import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CombisScreen } from "./src/screens/CombisScreen";
 import { StandingsScreen } from "./src/screens/StandingsScreen";
@@ -20,6 +21,7 @@ import { ReportIssueModal } from "./src/components/ReportIssueModal";
 import { MainTabParamList, RootStackParamList } from "./src/navigation/types";
 import { unlockAppOrientation } from "./src/utils/optionalScreenOrientation";
 import { fetchAppVersion, restoreSession } from "./src/api/website";
+import { registerForPushNotificationsAsync } from "./src/utils/notifications";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -177,6 +179,7 @@ export default function App() {
     currentVersion: string;
     latestVersion: string;
     storeUrl: string;
+    platform: string;
   } | null>(null);
 
   useEffect(() => {
@@ -184,25 +187,37 @@ export default function App() {
     void (async () => {
       await restoreSession();
       setReady(true);
+      void registerForPushNotificationsAsync();
     })();
   }, []);
 
   useEffect(() => {
     if (!ready) return;
-    if (Platform.OS !== "android") return;
     if (Constants.appOwnership === "expo") return;
 
     const currentVersion =
-      Constants.nativeAppVersion || Constants.expoConfig?.version || "";
-    if (!currentVersion) return;
+      Constants.nativeAppVersion || Constants.expoConfig?.version || "1.3";
+    const currentBuild =
+      Constants.nativeBuildVersion || "30";
 
-    void fetchAppVersion(currentVersion)
+    void fetchAppVersion({
+      currentVersion,
+      currentBuild,
+      platform: Platform.OS,
+    })
       .then((res) => {
         if (res.updateAvailable && res.latestVersion) {
+          const formattedCurrent = res.currentBuild
+            ? `v${res.currentVersion || currentVersion} (build ${res.currentBuild})`
+            : `v${res.currentVersion || currentVersion}`;
+          const formattedLatest = res.latestBuild
+            ? `v${res.latestVersion} (build ${res.latestBuild})`
+            : `v${res.latestVersion}`;
           setStoreUpdate({
-            currentVersion,
-            latestVersion: res.latestVersion,
+            currentVersion: formattedCurrent,
+            latestVersion: formattedLatest,
             storeUrl: res.storeUrl,
+            platform: res.platform || Platform.OS,
           });
         }
       })
@@ -226,6 +241,7 @@ export default function App() {
           }}
         >
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
             name="Live"
@@ -238,7 +254,8 @@ export default function App() {
         visible={Boolean(storeUpdate)}
         currentVersion={storeUpdate?.currentVersion || ""}
         latestVersion={storeUpdate?.latestVersion || ""}
-        storeUrl={storeUpdate?.storeUrl || "https://play.google.com/store/apps/details?id=com.cbotworld"}
+        storeUrl={storeUpdate?.storeUrl || (Platform.OS === "ios" ? "https://apps.apple.com/app/id6742533036" : "https://play.google.com/store/apps/details?id=com.cbotworld")}
+        platform={storeUpdate?.platform || Platform.OS}
         onLater={() => setStoreUpdate(null)}
       />
     </SafeAreaProvider>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "703571492264",
+    "project_id": "cbotworld-3a370",
+    "storage_bucket": "cbotworld-3a370.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:703571492264:android:e9ce64933683363ef6b19d",
+        "android_client_info": {
+          "package_name": "com.cbotworld"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqug4eTJaRw-8LISdQZ1XQpYzz4nJjnAY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

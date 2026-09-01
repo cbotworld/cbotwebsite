@@ -1,23 +1,36 @@
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export function UpdateAppModal({
   visible,
   currentVersion,
   latestVersion,
   storeUrl,
+  platform = Platform.OS,
   onLater,
 }: {
   visible: boolean;
   currentVersion: string;
   latestVersion: string;
   storeUrl: string;
+  platform?: string;
   onLater: () => void;
 }) {
+  const isIos = platform === 'ios';
+  const platformName = isIos ? 'APP STORE' : 'GOOGLE PLAY';
+
   const openStore = async () => {
-    const market = 'market://details?id=com.cbotworld';
+    const market = isIos
+      ? storeUrl
+      : 'market://details?id=com.cbotworld';
     try {
-      const can = await Linking.canOpenURL(market);
-      await Linking.openURL(can ? market : storeUrl);
+      if (!isIos) {
+        const can = await Linking.canOpenURL(market);
+        if (can) {
+          await Linking.openURL(market);
+          return;
+        }
+      }
+      await Linking.openURL(storeUrl);
     } catch {
       await Linking.openURL(storeUrl).catch(() => undefined);
     }
@@ -27,17 +40,16 @@ export function UpdateAppModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onLater}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.kicker}>GOOGLE PLAY</Text>
-          <Text style={styles.title}>Update Cbot</Text>
+          <Text style={styles.kicker}>{platformName} UPDATE AVAILABLE</Text>
+          <Text style={styles.title}>Update Cbot App</Text>
           <Text style={styles.body}>
-            Version {latestVersion} is on Google Play. You have {currentVersion}. Update now to get
-            the latest matches, scores, and videos.
+            A new version ({latestVersion}) is available on {isIos ? 'the App Store / TestFlight' : 'Google Play'}. You currently have {currentVersion}. Update now to get the latest features, streaming, and match schedules.
           </Text>
           <Pressable style={styles.primary} onPress={() => void openStore()}>
-            <Text style={styles.primaryText}>UPDATE APP</Text>
+            <Text style={styles.primaryText}>UPDATE APP NOW</Text>
           </Pressable>
           <Pressable style={styles.later} onPress={onLater}>
-            <Text style={styles.laterText}>LATER</Text>
+            <Text style={styles.laterText}>DOWNLOAD LATER</Text>
           </Pressable>
         </View>
       </View>

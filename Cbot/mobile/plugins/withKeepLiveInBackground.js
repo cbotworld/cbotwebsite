@@ -1,4 +1,4 @@
-const { withAndroidManifest, withDangerousMod, withInfoPlist } =
+const { withAndroidManifest, withDangerousMod } =
   require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
@@ -127,13 +127,6 @@ function withKeepLiveInBackground(config) {
       needed.forEach((item) => current.add(item));
       main.$['android:configChanges'] = [...current].join('|');
     }
-    return mod;
-  });
-
-  config = withInfoPlist(config, (mod) => {
-    const modes = new Set(mod.modResults.UIBackgroundModes || []);
-    modes.add('audio');
-    mod.modResults.UIBackgroundModes = [...modes];
     return mod;
   });
 

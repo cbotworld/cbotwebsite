@@ -29,20 +29,27 @@
         {
           "photosPermission": "Cbot needs photo access to attach screenshots to issue reports."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#f59e0b"
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cbotworld",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Cbot needs camera access to live stream to YouTube.",
         "NSMicrophoneUsageDescription": "Cbot needs microphone access to live stream to YouTube.",
         "NSPhotoLibraryUsageDescription": "Cbot needs photo library access to attach screenshots to issue reports.",
-        "UIBackgroundModes": [
-          "audio"
-        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationLandscapeLeft",
@@ -58,11 +65,13 @@
     },
     "android": {
       "package": "com.cbotworld",
-      "versionCode": 25,
+      "versionCode": 30,
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
-        "foregroundImage": "./assets/android-icon-foreground.png"
+        "backgroundColor": "#1c0205",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
         "android.permission.CAMERA",

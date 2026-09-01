@@ -125,13 +125,28 @@ export async function restoreSession() {
   }
 }
 
-export async function fetchAppVersion(currentVersion: string): Promise<{
+export async function fetchAppVersion(opts: {
+  currentVersion: string;
+  currentBuild?: string;
+  platform?: string;
+} | string): Promise<{
   updateAvailable: boolean;
   latestVersion: string | null;
+  latestBuild: string | null;
   currentVersion: string | null;
+  currentBuild: string | null;
   storeUrl: string;
+  platform: string;
 }> {
-  const params = new URLSearchParams({ current: currentVersion });
+  const currentVersionStr = typeof opts === 'string' ? opts : opts.currentVersion;
+  const currentBuildStr = typeof opts === 'string' ? undefined : opts.currentBuild;
+  const platformStr = typeof opts === 'string' ? undefined : opts.platform;
+
+  const params = new URLSearchParams({
+    current: currentVersionStr,
+    ...(currentBuildStr ? { build: currentBuildStr } : {}),
+    ...(platformStr ? { platform: platformStr } : {}),
+  });
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/app-version?${params}`, {
     headers: { 'Content-Type': 'application/json' },
   });
@@ -139,9 +154,12 @@ export async function fetchAppVersion(currentVersion: string): Promise<{
   if (!data.success) throw new Error(data.error || 'Could not check app version.');
   return {
     updateAvailable: Boolean(data.updateAvailable),
-    latestVersion: data.latestVersion || null,
-    currentVersion: data.currentVersion || currentVersion,
+    latestVersion: data.latestVersion || data.latestBuild || null,
+    latestBuild: data.latestBuild || null,
+    currentVersion: data.currentVersion || currentVersionStr,
+    currentBuild: data.currentBuild || currentBuildStr || null,
     storeUrl: data.storeUrl || 'https://play.google.com/store/apps/details?id=com.cbotworld',
+    platform: data.platform || platformStr || 'android',
   };
 }
 

@@ -140,11 +140,20 @@ export function ReportIssueModal({ visible, onClose }: Props) {
       for (let i = 0; i < images.length; i++) {
         const img = images[i];
         const filename = img.uri.split('/').pop() ?? `screenshot_${i + 1}.jpg`;
-        formData.append('image', {
-          uri: img.uri,
-          name: filename,
-          type: img.mime,
-        } as unknown as Blob);
+
+        // React Native 0.86+ (new architecture) on iOS requires a real Blob,
+        // not the legacy { uri, name, type } object hack.
+        // fetch() the local file URI to get a proper Blob.
+        // We re-wrap with the known MIME from image-picker because Android's
+        // fetch() on file:// URIs can return 'application/octet-stream'.
+        try {
+          const fileResponse = await fetch(img.uri);
+          const rawBlob = await fileResponse.blob();
+          const typedBlob = new Blob([rawBlob], { type: img.mime || 'image/jpeg' });
+          formData.append('image', typedBlob, filename);
+        } catch (blobErr) {
+          console.warn('[ReportIssue] Failed to read image blob, skipping:', blobErr);
+        }
       }
 
       const headers: Record<string, string> = {};

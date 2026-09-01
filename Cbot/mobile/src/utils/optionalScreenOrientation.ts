@@ -30,16 +30,37 @@ export async function unlockAppOrientation() {
   await module.unlockAsync();
 }
 
-export async function lockAppOrientation(orientation: "portrait" | "landscape") {
+export async function lockAppOrientation(orientation: "portrait" | "landscape"): Promise<boolean> {
   const module = getOptionalScreenOrientation();
-  if (!module) return false;
+  if (!module) {
+    console.warn("[ScreenOrientation] Module not available — cannot lock to", orientation);
+    return false;
+  }
 
-  await module.lockAsync(
+  const lockValue =
     orientation === "landscape"
       ? module.OrientationLock.LANDSCAPE
-      : module.OrientationLock.PORTRAIT_UP,
-  );
-  return true;
+      : module.OrientationLock.PORTRAIT_UP;
+
+  // First attempt
+  try {
+    await module.lockAsync(lockValue);
+    console.log("[ScreenOrientation] Locked to", orientation);
+    return true;
+  } catch (err) {
+    console.warn("[ScreenOrientation] First lock attempt failed:", err);
+  }
+
+  // Retry once after a short delay — iOS sometimes needs a moment after mount
+  try {
+    await new Promise((r) => setTimeout(r, 400));
+    await module.lockAsync(lockValue);
+    console.log("[ScreenOrientation] Locked to", orientation, "(retry)");
+    return true;
+  } catch (err) {
+    console.error("[ScreenOrientation] Retry also failed:", err);
+    return false;
+  }
 }
 
 export function hasScreenOrientationSupport() {

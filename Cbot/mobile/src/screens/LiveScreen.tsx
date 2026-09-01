@@ -16,7 +16,9 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBroadcast, endBroadcast, goLive, type BroadcastSession } from "../api/client";
 import { getSession } from "../api/website";
 import { config } from "../config";
@@ -36,6 +38,16 @@ const LIVE_VIDEO_HEIGHT = 720;
 
 function toSecureIngestionUrl(address: string): string {
   return address.replace(/^rtmp:\/\//i, "rtmps://");
+}
+
+/**
+ * HaishinKit 2.0 on iOS has a known TLS socket bug with rtmps:// connections
+ * (RTMPConnection.Error error 1 = socketErrorOccurred). YouTube still accepts
+ * plain rtmp:// on port 1935, so we downgrade to plain RTMP on iOS only.
+ * Android uses RootEncoder which handles rtmps:// correctly.
+ */
+function toPlainIngestionUrl(address: string): string {
+  return address.replace(/^rtmps:\/\//i, "rtmp://");
 }
 
 function LiveIndicator({
@@ -111,6 +123,7 @@ export function LiveScreen({ route, navigation }: Props) {
   const endIso = route.params?.endIso || "";
   const playMode = route.params?.playMode || "match";
   const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
   const topInset = Math.max(insets.top, 12);
   const bottomInset = Math.max(insets.bottom, 16);
   const leftInset = Math.max(insets.left, 8);
@@ -124,6 +137,13 @@ export function LiveScreen({ route, navigation }: Props) {
   const [isFrontCamera, setIsFrontCamera] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [stopped, setStopped] = useState(false); // show post-stream "ended" screen
+  const [orientationLocked, setOrientationLocked] = useState(true); // assume success initially
+
+  // On iOS, if the native orientation lock failed, detect portrait and apply a
+  // CSS-level 90° rotation so the UI and camera preview always appear landscape.
+  const isPortraitWindow = winW < winH;
+  const needsManualRotation =
+    Platform.OS === "ios" && !orientationLocked && isPortraitWindow;
 
   const sessionRef = useRef<BroadcastSession | null>(null);
   const goLiveCalledRef = useRef(false);
@@ -165,7 +185,12 @@ export function LiveScreen({ route, navigation }: Props) {
   useEffect(() => {
     requestCameraPermission();
     requestMicPermission();
-    void lockAppOrientation("landscape");
+    void lockAppOrientation("landscape").then((locked) => {
+      setOrientationLocked(locked);
+      if (!locked) {
+        console.warn("[LiveScreen] Orientation lock failed — will use transform fallback");
+      }
+    });
     return () => {
       void unlockAppOrientation();
     };
@@ -331,9 +356,28 @@ export function LiveScreen({ route, navigation }: Props) {
     (event: { nativeEvent: { msg: string } }) => {
       stream.handleConnectionFailed(event);
       const message = event.nativeEvent.msg ?? "RTMP connection failed";
+      console.warn(
+        "[LiveScreen] Connection failed —",
+        "msg:", message,
+        "retryCount:", retryCountRef.current,
+        "platform:", Platform.OS,
+      );
 
-      // Camera not ready — retry silently
+      // Camera not ready — retry silently (up to MAX_CAMERA_RETRIES)
       if (message === "Camera not ready" && retryCountRef.current < MAX_CAMERA_RETRIES) {
+        scheduleStartAttempt();
+        return;
+      }
+
+      // On iOS, also retry RTMP connection errors a few times
+      // (transient socket errors can happen even with plain rtmp://)
+      if (
+        Platform.OS === "ios" &&
+        retryCountRef.current < 5 &&
+        (message.includes("RTMPConnection") || message.includes("socket") || message.includes("Error error"))
+      ) {
+        console.log("[LiveScreen] iOS RTMP error — scheduling retry", retryCountRef.current + 1);
+        setStatus(`Reconnecting (${retryCountRef.current + 1}/5)…`, "warn");
         scheduleStartAttempt();
         return;
       }
@@ -378,6 +422,12 @@ export function LiveScreen({ route, navigation }: Props) {
         playMode,
       };
       const created = await createBroadcast(payload);
+      console.log(
+        "[LiveScreen] Broadcast created —",
+        "platform:", Platform.OS,
+        "rawIngestion:", created.ingestionAddress,
+        "streamName:", created.streamName,
+      );
       setSession(created);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create broadcast";
@@ -530,9 +580,19 @@ export function LiveScreen({ route, navigation }: Props) {
 
   const ingestionUrl = session
     ? Platform.OS === "ios"
-      ? session.ingestionAddress
-      : toSecureIngestionUrl(session.ingestionAddress)
+      ? toPlainIngestionUrl(session.ingestionAddress)   // iOS: rtmp:// (HaishinKit TLS bug)
+      : toSecureIngestionUrl(session.ingestionAddress)  // Android: rtmps://
     : "";
+
+  // Diagnostic: log the final URL being passed to the native RTMP publisher
+  if (session && ingestionUrl) {
+    console.log(
+      "[LiveScreen] Using ingestion URL:",
+      ingestionUrl,
+      "| streamKey:", session.streamName,
+      "| platform:", Platform.OS,
+    );
+  }
   const showStop = stream.isStreaming || Boolean(session);
   const goHome = () => {
     if (session) {
@@ -543,114 +603,140 @@ export function LiveScreen({ route, navigation }: Props) {
   };
   const bitrateKbps = typeof stream.statistics?.bitrate === "number" ? stream.statistics.bitrate : undefined;
 
+  // When the native orientation lock fails on iOS and the phone is held in portrait,
+  // apply a 90° clockwise rotation so the entire UI renders in landscape.
+  const rotateWrapperStyle = needsManualRotation
+    ? {
+        width: winH,
+        height: winW,
+        transform: [{ rotate: "90deg" as const }],
+        transformOrigin: "center" as const,
+        position: "absolute" as const,
+        top: (winH - winW) / 2,
+        left: -(winH - winW) / 2,
+      }
+    : undefined;
+
   return (
     <View style={styles.container}>
-      {session ? (
-        <ExpoLiveStreamPublisherView
-          key={`publisher-${session.broadcastId}`}
-          ref={stream.ref}
-          style={StyleSheet.absoluteFill}
-          url={ingestionUrl}
-          streamKey={session.streamName}
-          quality={VideoQuality.HD_720P}
-          videoWidth={LIVE_VIDEO_WIDTH}
-          videoHeight={LIVE_VIDEO_HEIGHT}
-          frontCamera={isFrontCamera}
-          onStreamStateChanged={handleStreamStateChanged}
-          onConnectionFailed={handleConnectionFailed}
-          onConnectionSuccess={handleConnectionSuccess}
-          onDisconnect={stream.handleDisconnect}
-          onBitrateUpdate={stream.handleBitrateUpdate}
-        />
-      ) : (
-        // ── Idle "ready" screen ──────────────────────────────────────────────
-        <View style={styles.idleFill}>
-          <Text style={styles.placeholderKicker}>READY TO STREAM</Text>
-          <Text style={styles.placeholderDay}>{day}</Text>
-          {teamName ? (
-            <Text style={styles.placeholderMatch}>
-              {teamTag || teamName} vs {opponentTag || opponentName}
-            </Text>
-          ) : null}
-          {timeRange ? <Text style={styles.placeholderTime}>{timeRange}</Text> : null}
-        </View>
-      )}
-
-      {session ? <StreamOverlay day={day} /> : null}
-
-      {/* LIVE badge with bitrate */}
-      {stream.isStreaming ? (
-        <LiveIndicator
-          duration={stream.statistics.durationFormatted}
-          bitrate={bitrateKbps}
-          top={topInset + 44}
-          left={leftInset}
-        />
-      ) : null}
-
-      {/* Inline status pill (replaces Alert popups) */}
-      {statusText ? (
-        <View style={[styles.statusPillWrap, { top: stream.isStreaming ? topInset + 90 : topInset + 44 }]}>
-          <StatusPill text={statusText} type={statusType} />
-        </View>
-      ) : null}
-
-      {/* ← BACK / stop-and-leave */}
-      <Pressable
-        style={[styles.backButton, { top: topInset, left: leftInset }]}
-        onPress={goHome}
-        accessibilityLabel={session ? "Stop stream and go back" : "Back"}
-      >
-        <Text style={styles.backButtonText}>← BACK</Text>
-      </Pressable>
-
-      {/* Top-right controls */}
-      <View style={[styles.topRight, { top: topInset, right: rightInset }]}>
+      <View style={rotateWrapperStyle ?? StyleSheet.absoluteFill}>
         {session ? (
-          <>
-            <Pressable
-              style={[styles.controlButton, !isMuted && styles.controlButtonActive]}
-              onPress={handleToggleMute}
-              accessibilityLabel={isMuted ? "Unmute microphone" : "Mute microphone"}
-            >
-              <Text style={styles.controlButtonText}>{isMuted ? "🔇 Mute" : "🎤 Live"}</Text>
-            </Pressable>
-            <Pressable
-              style={styles.controlButton}
-              onPress={handleFlipCamera}
-              accessibilityLabel={isFrontCamera ? "Switch to rear camera" : "Switch to front camera"}
-            >
-              <Text style={styles.controlButtonText}>{isFrontCamera ? "↩ Rear" : "🤳 Front"}</Text>
-            </Pressable>
-          </>
-        ) : null}
-      </View>
-
-      {/* Bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
-        {!showStop ? (
-          <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
-            {busy ? (
-              <View style={styles.busyRow}>
-                <ActivityIndicator color="#fff" />
-                <Text style={styles.recordButtonText}>  Setting up…</Text>
-              </View>
-            ) : (
-              <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
-            )}
-          </Pressable>
+          <ExpoLiveStreamPublisherView
+            key={`publisher-${session.broadcastId}`}
+            ref={stream.ref}
+            style={StyleSheet.absoluteFill}
+            url={ingestionUrl}
+            streamKey={session.streamName}
+            quality={VideoQuality.HD_720P}
+            videoWidth={LIVE_VIDEO_WIDTH}
+            videoHeight={LIVE_VIDEO_HEIGHT}
+            frontCamera={isFrontCamera}
+            onStreamStateChanged={handleStreamStateChanged}
+            onConnectionFailed={handleConnectionFailed}
+            onConnectionSuccess={handleConnectionSuccess}
+            onDisconnect={stream.handleDisconnect}
+            onBitrateUpdate={stream.handleBitrateUpdate}
+          />
         ) : (
-          <Pressable style={[styles.recordButton, styles.stopButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleStop()}>
-            {busy ? (
-              <View style={styles.busyRow}>
-                <ActivityIndicator color="#fff" />
-                <Text style={styles.recordButtonText}>  Stopping…</Text>
-              </View>
-            ) : (
-              <Text style={styles.recordButtonText}>⏹  STOP STREAM</Text>
-            )}
-          </Pressable>
+          // ── Idle "ready" screen ──────────────────────────────────────────────
+          <View style={styles.idleFill}>
+            <Text style={styles.placeholderKicker}>READY TO STREAM</Text>
+            <Text style={styles.placeholderDay}>{day}</Text>
+            {teamName ? (
+              <Text style={styles.placeholderMatch}>
+                {teamTag || teamName} vs {opponentTag || opponentName}
+              </Text>
+            ) : null}
+            {timeRange ? <Text style={styles.placeholderTime}>{timeRange}</Text> : null}
+          </View>
         )}
+
+        {session ? <StreamOverlay day={day} /> : null}
+
+        {/* LIVE badge with bitrate */}
+        {stream.isStreaming ? (
+          <LiveIndicator
+            duration={stream.statistics.durationFormatted}
+            bitrate={bitrateKbps}
+            top={topInset + 44}
+            left={leftInset}
+          />
+        ) : null}
+
+        {/* Inline status pill (replaces Alert popups) */}
+        {statusText ? (
+          <View style={[styles.statusPillWrap, { top: stream.isStreaming ? topInset + 90 : topInset + 44 }]}>
+            <StatusPill text={statusText} type={statusType} />
+          </View>
+        ) : null}
+
+        {/* ← BACK / stop-and-leave */}
+        <Pressable
+          style={[styles.backButton, { top: topInset, left: leftInset }]}
+          onPress={goHome}
+          accessibilityLabel={session ? "Stop stream and go back" : "Back"}
+        >
+          <Text style={styles.backButtonText}>← BACK</Text>
+        </Pressable>
+
+        {/* Top-right controls */}
+        <View style={[styles.topRight, { top: topInset, right: rightInset }]}>
+          {session ? (
+            <>
+              <Pressable
+                style={[styles.controlButton, !isMuted && styles.controlButtonActive]}
+                onPress={handleToggleMute}
+                accessibilityLabel={isMuted ? "Unmute microphone" : "Mute microphone"}
+              >
+                <View style={styles.controlButtonInner}>
+                  <Ionicons
+                    name={isMuted ? "mic-off" : "mic"}
+                    size={18}
+                    color={isMuted ? "#f87171" : "#4ade80"}
+                  />
+                  <Text style={styles.controlButtonText}>{isMuted ? "Muted" : "Live"}</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                style={styles.controlButton}
+                onPress={handleFlipCamera}
+                accessibilityLabel={isFrontCamera ? "Switch to rear camera" : "Switch to front camera"}
+              >
+                <View style={styles.controlButtonInner}>
+                  <Ionicons name="camera-reverse-outline" size={20} color="#fff" />
+                  <Text style={styles.controlButtonText}>{isFrontCamera ? "Rear" : "Front"}</Text>
+                </View>
+              </Pressable>
+            </>
+          ) : null}
+        </View>
+
+        {/* Bottom bar */}
+        <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
+          {!showStop ? (
+            <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
+              {busy ? (
+                <View style={styles.busyRow}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.recordButtonText}>  Setting up…</Text>
+                </View>
+              ) : (
+                <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable style={[styles.recordButton, styles.stopButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleStop()}>
+              {busy ? (
+                <View style={styles.busyRow}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.recordButtonText}>  Stopping…</Text>
+                </View>
+              ) : (
+                <Text style={styles.recordButtonText}>⏹  STOP STREAM</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -730,6 +816,11 @@ const styles = StyleSheet.create({
   controlButtonActive: {
     backgroundColor: "rgba(34,197,94,0.25)",
     borderColor: "#22c55e",
+  },
+  controlButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   controlButtonText: { color: "#fff", fontWeight: "700", fontSize: 13 },
 
