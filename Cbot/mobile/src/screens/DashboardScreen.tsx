@@ -228,7 +228,7 @@ export function DashboardScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>PLAYER DASHBOARD</Text>
@@ -493,15 +493,15 @@ export function DashboardScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 6,
+    paddingTop: 6,
+    paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#35080c',
+    borderBottomColor: '#1e293b',
     gap: 12,
   },
   headerTitle: { fontSize: 10, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },

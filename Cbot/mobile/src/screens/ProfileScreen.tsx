@@ -260,7 +260,7 @@ export function ProfileScreen({ navigation }: Props) {
   const initials = (user?.name || 'P').replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'P';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
@@ -578,7 +578,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,

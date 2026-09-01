@@ -86,18 +86,19 @@ function MainTabs() {
 
   const ReportButton = () => (
     <Pressable
-      style={{
+      style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: 'rgba(239, 68, 68, 0.18)',
+        backgroundColor: pressed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.18)',
         borderColor: '#ef4444',
         borderWidth: 1,
         borderRadius: 12,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        marginRight: 12,
-      }}
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginRight: 14,
+      })}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       onPress={() => setReportVisible(true)}
     >
       <Ionicons name="flag" size={14} color="#f87171" />
@@ -127,6 +128,7 @@ function MainTabs() {
             paddingBottom: bottom,
             paddingTop: 8,
           },
+          sceneStyle: { backgroundColor: '#020617' },
         }}
       >
         <Tab.Screen

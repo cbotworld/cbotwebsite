@@ -133,7 +133,7 @@ export function VideosScreen({ navigation, route }: Props) {
     .join(' · ');
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>CBOT WORLD</Text>
@@ -276,7 +276,7 @@ export function VideosScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,

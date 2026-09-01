@@ -18,7 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell } from 'lucide-react';
+import { PushNotificationTab } from '@/components/organizer/PushNotificationTab';
 import AverageHistoryGraph from '@/components/player/AverageHistoryGraph';
 import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
 import OrganizerScoresPanel from '@/components/organizer/OrganizerScoresPanel';
@@ -972,6 +973,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <TabsTrigger value="website-cms" className="text-xs font-bold gap-1.5 px-3 py-2">
             <Globe className="h-3.5 w-3.5" /> Website CMS
           </TabsTrigger>
+          <TabsTrigger value="push-notifications" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <Bell className="h-3.5 w-3.5 text-amber-500" /> Push Notifications
+          </TabsTrigger>
         </TabsList>
 
       <TabsContent value="schedule" forceMount className="mt-4">
@@ -1428,6 +1432,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           initialCms={initialWebsiteCms}
           currentEditionId={selectedEditionId || initialEditions[0]?.id}
         />
+      </TabsContent>
+
+      <TabsContent value="push-notifications" className="mt-4">
+        <PushNotificationTab />
       </TabsContent>
       </Tabs>
 

@@ -273,7 +273,7 @@ export function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   flex: { flex: 1 },
   content: { padding: 24, alignItems: 'center' },
   logo: { width: 100, height: 100, borderRadius: 16, marginBottom: 12 },

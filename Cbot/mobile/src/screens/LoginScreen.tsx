@@ -195,7 +195,7 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   flex: { flex: 1 },
   content: {
     flexGrow: 1,

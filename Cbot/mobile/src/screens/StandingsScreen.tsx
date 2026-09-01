@@ -92,7 +92,7 @@ export function StandingsScreen(_props: Props) {
   const days = open?.row?.days || [];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>STANDINGS</Text>
@@ -371,7 +371,7 @@ export function StandingsScreen(_props: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#1c0205' },
+  safe: { flex: 1, backgroundColor: '#020617' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   koMatch: { color: '#f8fafc', fontWeight: '800', marginTop: 4 },
   koScore: { color: '#f59e0b', fontWeight: '800', marginTop: 6, fontSize: 12 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  modalSafe: { flex: 1, backgroundColor: '#1c0205' },
+  modalSafe: { flex: 1, backgroundColor: '#020617' },
   modalHeader: {
     paddingHorizontal: 16,
     paddingVertical: 14,
