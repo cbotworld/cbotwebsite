@@ -276,7 +276,7 @@ export function VideosScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,

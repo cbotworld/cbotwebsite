@@ -578,7 +578,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 14,
   },
-  teamLogo: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#020617' },
+  teamLogo: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#1c0205' },
   teamBadge: {
     width: 48,
     height: 48,

@@ -232,8 +232,8 @@ export function RegisterScreen({ navigation }: Props) {
                 )}
               </Pressable>
 
-              <Pressable onPress={() => setStep(1)} style={styles.backWrap}>
-                <Text style={styles.backText}>← Edit Registration Details</Text>
+              <Pressable onPress={() => setStep(1)} style={styles.secondaryBtn}>
+                <Text style={styles.secondaryBtnText}>← Edit Registration Details</Text>
               </Pressable>
             </View>
           )}
@@ -259,10 +259,10 @@ export function RegisterScreen({ navigation }: Props) {
               </View>
 
               <Pressable
-                style={styles.btn}
+                style={styles.proceedBtn}
                 onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}
               >
-                <Text style={styles.btnText}>PROCEED TO LOGIN</Text>
+                <Text style={styles.proceedBtnText}>🚀  PROCEED TO LOGIN</Text>
               </Pressable>
             </View>
           )}
@@ -273,35 +273,70 @@ export function RegisterScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   flex: { flex: 1 },
   content: { padding: 24, alignItems: 'center' },
-  logo: { width: 80, height: 80, resizeMode: 'contain', marginBottom: 12 },
+  logo: { width: 100, height: 100, borderRadius: 16, marginBottom: 12 },
   title: { color: '#f8fafc', fontSize: 22, fontWeight: '900', marginBottom: 16 },
-  sub: { color: '#94a3b8', fontSize: 13, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
+  sub: { color: '#cbd5e1', fontSize: 13, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   white: { color: '#fff', fontWeight: '700' },
   errorText: { color: '#ef4444', fontSize: 12, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
   form: { width: '100%' },
-  label: { color: '#94a3b8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#1e293b', borderRadius: 10, color: '#f8fafc', fontSize: 14, paddingHorizontal: 14, paddingVertical: 12 },
+  label: { color: '#f59e0b', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: '#2a0408', borderWidth: 1, borderColor: '#4a0910', borderRadius: 10, color: '#f8fafc', fontSize: 14, paddingHorizontal: 14, paddingVertical: 12 },
   otpInput: { fontSize: 24, fontWeight: '900', letterSpacing: 8, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
   half: { flex: 1 },
   btn: { backgroundColor: '#f59e0b', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#0f172a', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
+  btnText: { color: '#1c0205', fontSize: 13, fontWeight: '900', letterSpacing: 0.8 },
   linkWrap: { alignItems: 'center', marginTop: 18 },
-  linkText: { color: '#64748b', fontSize: 12 },
+  linkText: { color: '#cbd5e1', fontSize: 12 },
   linkBold: { color: '#f59e0b', fontWeight: '700' },
   backWrap: { alignItems: 'center', marginTop: 16 },
-  backText: { color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' },
+  backText: { color: '#d4a5aa', fontSize: 12, textDecorationLine: 'underline' },
+  secondaryBtn: {
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: '#7a121c',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    backgroundColor: 'rgba(122,18,28,0.15)',
+  },
+  secondaryBtnText: {
+    color: '#d4a5aa',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  proceedBtn: {
+    width: '100%',
+    backgroundColor: '#f59e0b',
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 8,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  proceedBtnText: {
+    color: '#1c0205',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
   successBox: { width: '100%', alignItems: 'center', paddingVertical: 12 },
   successEmoji: { fontSize: 48, marginBottom: 12 },
   successTitle: { color: '#f8fafc', fontSize: 20, fontWeight: '900', marginBottom: 8 },
-  successSub: { color: '#94a3b8', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  credsBox: { backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 12, padding: 16, width: '100%', marginBottom: 24 },
+  successSub: { color: '#cbd5e1', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  credsBox: { backgroundColor: '#2a0408', borderWidth: 1, borderColor: '#4a0910', borderRadius: 12, padding: 16, width: '100%', marginBottom: 24 },
   credRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
-  credLabel: { color: '#94a3b8', fontSize: 13 },
+  credLabel: { color: '#d4a5aa', fontSize: 13 },
   credValueAmber: { color: '#f59e0b', fontSize: 15, fontWeight: '900' },
   credValueGreen: { color: '#22c55e', fontSize: 15, fontWeight: '900' },
 });

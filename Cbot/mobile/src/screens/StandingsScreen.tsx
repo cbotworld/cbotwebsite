@@ -371,7 +371,7 @@ export function StandingsScreen(_props: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
   koMatch: { color: '#f8fafc', fontWeight: '800', marginTop: 4 },
   koScore: { color: '#f59e0b', fontWeight: '800', marginTop: 6, fontSize: 12 },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  modalSafe: { flex: 1, backgroundColor: '#020617' },
+  modalSafe: { flex: 1, backgroundColor: '#1c0205' },
   modalHeader: {
     paddingHorizontal: 16,
     paddingVertical: 14,

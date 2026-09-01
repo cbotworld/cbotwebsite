@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View, Image } from "react-native";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -64,28 +64,44 @@ function TabLabel({ label, color }: { label: string; color: string }) {
   return <Text style={{ color, fontSize: 9, fontWeight: "800", letterSpacing: 0.4 }}>{label}</Text>;
 }
 
+const appLogo = require('./assets/logo.png');
+
+function CustomHeaderTitle({ title }: { title: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Image
+        source={appLogo}
+        style={{ width: 26, height: 26, borderRadius: 6 }}
+      />
+      <Text style={{ color: '#f59e0b', fontWeight: '900', fontSize: 16, letterSpacing: 1 }}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
 function MainTabs() {
-  const insets = useSafeAreaInsets();
-  const bottom = Math.max(insets.bottom, 8);
   const [reportVisible, setReportVisible] = useState(false);
+  const { bottom } = useSafeAreaInsets();
 
   const ReportButton = () => (
     <Pressable
-      onPress={() => setReportVisible(true)}
-      hitSlop={10}
       style={{
-        marginRight: 14,
-        backgroundColor: '#1e293b',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        gap: 6,
+        backgroundColor: 'rgba(239, 68, 68, 0.18)',
+        borderColor: '#ef4444',
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        marginRight: 12,
       }}
+      onPress={() => setReportVisible(true)}
     >
-      <Text style={{ fontSize: 13 }}>🚩</Text>
-      <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }}>REPORT</Text>
+      <Ionicons name="flag" size={14} color="#f87171" />
+      <Text style={{ color: '#f87171', fontWeight: '900', fontSize: 11, letterSpacing: 1 }}>REPORT</Text>
     </Pressable>
   );
 
@@ -95,17 +111,17 @@ function MainTabs() {
       <Tab.Navigator
         screenOptions={{
           headerShown: true,
-          headerStyle: { backgroundColor: '#0f172a' },
-          headerTitleStyle: { color: '#f59e0b', fontWeight: '900', fontSize: 15, letterSpacing: 1 },
+          headerStyle: { backgroundColor: '#1c0205' },
+          headerTitle: ({ children }) => <CustomHeaderTitle title={typeof children === 'string' ? children : 'CBOT'} />,
           headerTitleAlign: 'left',
           headerShadowVisible: false,
           headerRight: () => <ReportButton />,
           tabBarHideOnKeyboard: true,
           tabBarActiveTintColor: "#f59e0b",
-          tabBarInactiveTintColor: "#64748b",
+          tabBarInactiveTintColor: "#a37075",
           tabBarStyle: {
-            backgroundColor: "#020617",
-            borderTopColor: "#1e293b",
+            backgroundColor: "#1c0205",
+            borderTopColor: "#35080c",
             borderTopWidth: 1,
             height: 56 + bottom,
             paddingBottom: bottom,
@@ -225,7 +241,7 @@ export default function App() {
   }, [ready]);
 
   if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: "#020617" }} />;
+    return <View style={{ flex: 1, backgroundColor: "#1c0205" }} />;
   }
 
   return (
@@ -235,9 +251,9 @@ export default function App() {
         <Stack.Navigator
           initialRouteName="Main"
           screenOptions={{
-            headerStyle: { backgroundColor: "#0f172a" },
+            headerStyle: { backgroundColor: "#2b0408" },
             headerTintColor: "#f8fafc",
-            contentStyle: { backgroundColor: "#0f172a" },
+            contentStyle: { backgroundColor: "#1c0205" },
           }}
         >
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

@@ -195,7 +195,7 @@ export function LoginScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
@@ -204,14 +204,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   logoContainer: { alignItems: 'center', marginBottom: 28 },
-  logo: { width: 188, height: 188, marginBottom: 12 },
-  appSubtitle: { fontSize: 11, fontWeight: '800', color: '#94a3b8', letterSpacing: 4, marginTop: 2 },
-  hint: { color: '#94a3b8', textAlign: 'center', marginBottom: 20, fontSize: 13 },
-  label: { fontSize: 10, fontWeight: '800', color: '#64748b', letterSpacing: 2, marginBottom: 6, marginTop: 12 },
+  logo: { width: 188, height: 188, marginBottom: 12, borderRadius: 20 },
+  appSubtitle: { fontSize: 11, fontWeight: '800', color: '#d4a5aa', letterSpacing: 4, marginTop: 2 },
+  hint: { color: '#cbd5e1', textAlign: 'center', marginBottom: 20, fontSize: 13 },
+  label: { fontSize: 10, fontWeight: '800', color: '#f59e0b', letterSpacing: 2, marginBottom: 6, marginTop: 12 },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#2a0408',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#4a0910',
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -226,9 +226,9 @@ const styles = StyleSheet.create({
   pinBox: {
     flex: 1,
     height: 58,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#2a0408',
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: '#4a0910',
     borderRadius: 14,
     textAlign: 'center',
     fontSize: 24,
@@ -237,11 +237,11 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   pinBoxFilled: {
-    borderColor: '#64748b',
+    borderColor: '#7a121c',
   },
   pinBoxFocused: {
     borderColor: '#f59e0b',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#38050a',
   },
   button: {
     backgroundColor: '#f59e0b',
@@ -251,11 +251,11 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 14, fontWeight: '900', color: '#0f172a', letterSpacing: 2 },
+  buttonText: { fontSize: 14, fontWeight: '900', color: '#1c0205', letterSpacing: 2 },
   skip: { marginTop: 12, alignItems: 'center', paddingVertical: 10 },
-  skipText: { color: '#94a3b8', fontWeight: '800', fontSize: 12, letterSpacing: 1.2 },
+  skipText: { color: '#d4a5aa', fontWeight: '800', fontSize: 12, letterSpacing: 1.2 },
   registerLink: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
-  registerLinkText: { color: '#94a3b8', fontSize: 13 },
+  registerLinkText: { color: '#cbd5e1', fontSize: 13 },
   registerLinkBold: { color: '#f59e0b', fontWeight: '800' },
   error: { color: '#fca5a5', marginTop: 12, textAlign: 'center' },
 });

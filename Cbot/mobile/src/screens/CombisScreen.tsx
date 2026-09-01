@@ -920,7 +920,7 @@ export function CombisScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   header: {
     paddingHorizontal: 16,
     paddingTop: 10,
@@ -1009,14 +1009,14 @@ const styles = StyleSheet.create({
   dayChipMeta: { color: '#64748b', fontSize: 9, fontWeight: '800', marginTop: 2 },
   allTitle: { color: '#f8fafc', fontWeight: '900', fontSize: 16, marginBottom: 4 },
   matchCard: {
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#1e293b',
     padding: 10,
     marginTop: 12,
   },
-  modalSafe: { flex: 1, backgroundColor: '#020617' },
+  modalSafe: { flex: 1, backgroundColor: '#1c0205' },
   modalHeader: {
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
     borderColor: '#1e293b',
   },
   vsTeam: { flex: 1, alignItems: 'center' },
-  vsLogo: { width: 52, height: 52, borderRadius: 12, marginBottom: 6, backgroundColor: '#020617' },
+  vsLogo: { width: 52, height: 52, borderRadius: 12, marginBottom: 6, backgroundColor: '#1c0205' },
   vsLogoFallback: {
     width: 52,
     height: 52,
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderTopWidth: 1,
     borderTopColor: '#1e293b',
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     gap: 10,
   },
   backBtn: {
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderWidth: 1,
     borderColor: '#1e293b',
     borderRadius: 12,
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   pickerCloseText: { color: '#e2e8f0', fontSize: 16, fontWeight: '700' },
   pickerSearchWrap: {
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#334155',
@@ -1216,7 +1216,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 14,
     marginBottom: 6,
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderWidth: 1,
     borderColor: '#1e293b',
   },

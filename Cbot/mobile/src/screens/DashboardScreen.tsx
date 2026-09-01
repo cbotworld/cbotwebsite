@@ -493,21 +493,21 @@ export function DashboardScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#020617' },
+  safe: { flex: 1, backgroundColor: '#1c0205' },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#35080c',
     gap: 12,
   },
-  headerTitle: { fontSize: 11, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },
-  headerName: { fontSize: 20, fontWeight: '900', color: '#f8fafc', marginTop: 2 },
-  headerSub: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  list: { flex: 1, paddingHorizontal: 14, paddingTop: 10 },
+  headerTitle: { fontSize: 10, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },
+  headerName: { fontSize: 18, fontWeight: '900', color: '#f8fafc', marginTop: 0 },
+  headerSub: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
+  list: { flex: 1, paddingHorizontal: 14, paddingTop: 4 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   muted: { color: '#94a3b8' },
   warning: { color: '#fbbf24', textAlign: 'center', marginBottom: 12, fontWeight: '700' },
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
   teamCol: { flex: 1, alignItems: 'center' },
   vsCol: { alignItems: 'center', paddingHorizontal: 8 },
   vs: { color: '#64748b', fontWeight: '900', fontSize: 12 },
-  logo: { width: 48, height: 48, borderRadius: 10, marginBottom: 6, backgroundColor: '#020617' },
+  logo: { width: 48, height: 48, borderRadius: 10, marginBottom: 6, backgroundColor: '#1c0205' },
   avatar: {
     width: 48,
     height: 48,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   extraRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   eventBox: {
     marginTop: 10,
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderWidth: 1,
     borderColor: '#334155',
     borderRadius: 12,
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   watchBtnText: { color: '#f59e0b', fontWeight: '900', letterSpacing: 1 },
   scoreBox: {
     marginTop: 10,
-    backgroundColor: '#020617',
+    backgroundColor: '#1c0205',
     borderWidth: 1,
     borderColor: '#1e293b',
     borderRadius: 12,

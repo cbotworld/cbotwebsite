@@ -297,7 +297,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="text-muted-foreground hover:text-foreground underline"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400/80 hover:text-amber-400 hover:border-amber-500/60 hover:bg-amber-500/5 transition-all text-xs font-semibold"
                 >
                   ← Edit Registration Info
                 </button>
@@ -338,13 +338,13 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 pt-2">
-                <Button variant="carrom" onClick={copyCreds} className="w-full font-bold">
+              <div className="flex flex-col gap-3 pt-2">
+                <Button variant="carrom" onClick={copyCreds} className="w-full font-bold justify-center">
                   <Copy className="h-4 w-4 mr-1.5" /> {copied ? 'Copied Credentials!' : 'Copy Username & PIN'}
                 </Button>
                 <Link href="/login" className="block">
-                  <Button variant="outline" className="w-full font-bold">
-                    Proceed to Login <ArrowRight className="h-4 w-4 ml-1" />
+                  <Button variant="carrom" className="w-full font-black justify-center text-base py-5 shadow-lg shadow-amber-500/20">
+                    🚀&nbsp; Proceed to Login <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                 </Link>
               </div>
