@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { listCaptainDesks, listPlayerTeams } from '@/lib/mobile-team';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,14 +102,23 @@ export async function POST(request: NextRequest) {
     // Generate token
     const token = Buffer.from(`${foundUser.id}:${Date.now()}`).toString('base64');
 
-    const participation = await prisma.editionParticipant.findFirst({
-      where: { userId: foundUser.id },
+    const liveEdition = await resolveCurrentEdition();
+
+    let participation = await prisma.editionParticipant.findFirst({
+      where: liveEdition ? { userId: foundUser.id, editionId: liveEdition.id } : { userId: foundUser.id },
       include: { team: true },
       orderBy: { createdAt: 'desc' },
     });
+    if (!participation?.team) {
+      participation = await prisma.editionParticipant.findFirst({
+        where: { userId: foundUser.id, teamId: { not: null } },
+        include: { team: true },
+        orderBy: { edition: { number: 'desc' } },
+      });
+    }
     const [playerTeams, captainDesks] = await Promise.all([
-      listPlayerTeams(foundUser.id),
-      listCaptainDesks(foundUser.id),
+      listPlayerTeams(foundUser.id, liveEdition?.id || participation?.editionId),
+      listCaptainDesks(foundUser.id, liveEdition?.id || participation?.editionId),
     ]);
     const team = participation?.team || (playerTeams[0]
       ? { id: playerTeams[0].id, name: playerTeams[0].name, tag: playerTeams[0].tag, logo: playerTeams[0].logo }

@@ -512,7 +512,7 @@ export default function WebsiteCmsPanel({ initialCms, currentEditionId }: Props)
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                This is the gold pill on the top bar (currently shown as “200th Edition”). Change the label anytime without creating a new edition.
+                This is the gold pill on the top bar (currently shown as “201st Edition”). Change the label anytime without creating a new edition.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

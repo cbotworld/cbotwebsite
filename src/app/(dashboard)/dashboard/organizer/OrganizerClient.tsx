@@ -18,8 +18,33 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell, GraduationCap, Award } from 'lucide-react';
 import { PushNotificationTab } from '@/components/organizer/PushNotificationTab';
+import OrganizerGradingPanel from '@/components/organizer/OrganizerGradingPanel';
+import EnrolledPlayersPanel from '@/components/organizer/EnrolledPlayersPanel';
+import EditionParticipantsPanel from '@/components/organizer/EditionParticipantsPanel';
+import {
+  exportEditionArchive,
+  emptyEditionTournamentData,
+} from '@/lib/actions/editionArchiveActions';
+import {
+  ensureTournamentSlots,
+  openRegistration,
+  closeRegistration,
+  publishTournament,
+  getPublishStatus,
+  syncUnlockedGradeAverages,
+} from '@/lib/actions/tournamentSlotActions';
+import {
+  editionBySlot,
+  resolveOrganizerLiveEdition,
+  resolveOrganizerDraftEdition,
+  statusLabel,
+  canPublishDraft,
+  formatEnrollmentFee,
+  type TournamentSlot,
+} from '@/lib/tournament-slots';
+import { InlineStatCell, type InlineStatField } from '@/components/organizer/InlineStatCell';
 import AverageHistoryGraph from '@/components/player/AverageHistoryGraph';
 import TournamentStageDesigner from '@/components/organizer/TournamentStageDesigner';
 import OrganizerScoresPanel from '@/components/organizer/OrganizerScoresPanel';
@@ -28,16 +53,53 @@ import SpocExhibitionTeamsPanel from '@/components/organizer/SpocExhibitionTeams
 import WebsiteCmsPanel from '@/components/organizer/WebsiteCmsPanel';
 import { isCalendarDayCompleted } from '@/lib/tournament-stages';
 import {
-  OFFICIAL_DAY1_CALENDAR,
+  defaultDay1Calendar,
   buildDayDatesMap,
   normalizeDayDates,
   toCalendarDate,
 } from '@/lib/combi-cutoff';
 import { filterMainTeams, filterSpocTeams, isMainTournamentTeam } from '@/lib/spoc-teams';
 import type { WebsiteCmsContent } from '@/lib/website-cms';
+
+type PlayerStatSort = 'none' | 'asc' | 'desc';
+
+function isEnrolledParticipant(p: { status?: string; enrolledAt?: unknown }) {
+  const status = String(p.status || '').toUpperCase();
+  return status === 'ENROLLED' || status === 'QUALIFIED' || Boolean(p.enrolledAt);
+}
+
+function getPlayerStatValue(usr: any, field: InlineStatField): number | null {
+  const value = field === 'average' ? usr.average : usr.target;
+  if (value === undefined || value === null || Number(value) <= 0) return null;
+  return Number(value);
+}
+
+function sortPlayersByStat(users: any[], field: InlineStatField, direction: 'asc' | 'desc') {
+  return [...users].sort((a, b) => {
+    const aVal = getPlayerStatValue(a, field);
+    const bVal = getPlayerStatValue(b, field);
+    const aMissing = aVal === null;
+    const bMissing = bVal === null;
+    if (aMissing && bMissing) return (a.name || '').localeCompare(b.name || '');
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    if (aVal === bVal) return (a.name || '').localeCompare(b.name || '');
+    return direction === 'asc' ? aVal - bVal : bVal - aVal;
+  });
+}
+
 export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
   const router = useRouter();
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
+  const [tournamentSlot, setTournamentSlot] = React.useState<TournamentSlot>('A');
+  const [ensuringSlots, setEnsuringSlots] = React.useState(false);
+  const [slotActionBusy, setSlotActionBusy] = React.useState<string | null>(null);
+  const [publishGuard, setPublishGuard] = React.useState<{ canPublish: boolean; reason: string | null }>({
+    canPublish: false,
+    reason: null,
+  });
+  const [clearDialogOpen, setClearDialogOpen] = React.useState(false);
+  const [clearConfirmNumber, setClearConfirmNumber] = React.useState('');
   const [scoreReports, setScoreReports] = React.useState(initialScoreReports);
   const [usersList, setUsersList] = React.useState(initialUsersList);
   const [teamsList, setTeamsList] = React.useState<any[]>(initialTeams);
@@ -156,6 +218,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   // Credential Generator State
   // Credential Generator & Profile Edit State
   const [userSearchQuery, setUserSearchQuery] = React.useState('');
+  const [avgSort, setAvgSort] = React.useState<PlayerStatSort>('none');
+  const [tgtSort, setTgtSort] = React.useState<PlayerStatSort>('none');
+  const [inlineStatEdit, setInlineStatEdit] = React.useState<{
+    userId: string;
+    field: InlineStatField;
+    value: string;
+  } | null>(null);
+  const [inlineStatSaving, setInlineStatSaving] = React.useState<string | null>(null);
   const [rosterSearchQuery, setRosterSearchQuery] = React.useState('');
   const [genName, setGenName] = React.useState('');
   const [genUsername, setGenUsername] = React.useState('');
@@ -218,6 +288,30 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     rajesh_cbot: '1111',
   });
 
+  const filteredPlayers = React.useMemo(() => {
+    return usersList.filter((usr) => {
+      if (!userSearchQuery.trim()) return true;
+      const q = userSearchQuery.toLowerCase().trim();
+      const qClean = q.startsWith('@') ? q.substring(1) : q;
+      const displayPin =
+        activePinMap[usr.username?.toLowerCase() || ''] || (usr.pin && usr.pin.length === 4 ? usr.pin : '••••');
+      return (
+        (usr.name || '').toLowerCase().includes(q) ||
+        (usr.username || '').toLowerCase().includes(qClean) ||
+        displayPin.includes(q) ||
+        (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+        (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q)) ||
+        (usr.role || '').toLowerCase().includes(q)
+      );
+    });
+  }, [usersList, userSearchQuery, activePinMap]);
+
+  const displayedPlayers = React.useMemo(() => {
+    if (avgSort !== 'none') return sortPlayersByStat(filteredPlayers, 'average', avgSort);
+    if (tgtSort !== 'none') return sortPlayersByStat(filteredPlayers, 'target', tgtSort);
+    return filteredPlayers;
+  }, [filteredPlayers, avgSort, tgtSort]);
+
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
 
@@ -257,7 +351,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   };
 
   const [totalDays, setTotalDays] = React.useState<number>(15);
-  const [startDate, setStartDate] = React.useState<string>(OFFICIAL_DAY1_CALENDAR);
+  const [startDate, setStartDate] = React.useState<string>('');
   const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
   const startDateRef = React.useRef(startDate);
   const calendarSeedRef = React.useRef<{ editionId: string; start: string } | null>(null);
@@ -265,7 +359,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   /** Consecutive days from the chosen start, with any already-set days kept as they are. */
   const generateDefaultDayDates = (startStr: string, numDays: number, existingMap: Record<number, string> = {}) => {
-    const start = toCalendarDate(startStr) || OFFICIAL_DAY1_CALENDAR;
+    const start = toCalendarDate(startStr) || defaultDay1Calendar();
     const map = buildDayDatesMap(numDays, start);
     Object.entries(existingMap).forEach(([key, value]) => {
       const day = Number(key);
@@ -275,10 +369,255 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     return map;
   };
 
-  const selectedEdition =
-    editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0];
+  const slotAEdition = React.useMemo(() => {
+    const live = resolveOrganizerLiveEdition(editions);
+    if (!live) return null;
+    return editions.find((e) => e.id === live.id) || live;
+  }, [editions]);
+  const slotBEdition = React.useMemo(() => {
+    const draft = resolveOrganizerDraftEdition(editions);
+    if (!draft) return null;
+    return editions.find((e) => e.id === draft.id) || draft;
+  }, [editions]);
+  const liveTournament = slotAEdition;
+  const draftTournament = slotBEdition;
+
+  const selectedEdition = tournamentSlot === 'A' ? slotAEdition : slotBEdition;
   const selectedEditionId = selectedEdition?.id || '';
+  const liveEditionId = slotAEdition?.id || '';
+  const isLiveSlotA = tournamentSlot === 'A';
+  const viewingDraftSlot = tournamentSlot === 'B';
+  const selectedEditionParticipants = selectedEdition?.participants || [];
+  const enrolledParticipants = React.useMemo(
+    () => (viewingDraftSlot ? selectedEditionParticipants.filter(isEnrolledParticipant) : []),
+    [selectedEditionParticipants, viewingDraftSlot]
+  );
+  const enrolledCount = enrolledParticipants.length;
+  const assignedSelectedCount = React.useMemo(() => {
+    if (!selectedEdition) return 0;
+    return (selectedEdition.participants || []).filter(
+      (p: { teamId?: string | null; team?: unknown }) => p.teamId || p.team
+    ).length;
+  }, [selectedEdition]);
   const tournamentInProgress = String(selectedEdition?.status || '').toUpperCase() === 'IN_PROGRESS';
+
+  const hasTournamentPayload = React.useMemo(() => {
+    if (!selectedEditionId) return false;
+    const teamCount = teamsList.filter((t) => t.editionId === selectedEditionId).length;
+    const participantCount = selectedEdition?.participants?.length || 0;
+    return teamCount > 0 || participantCount > 0;
+  }, [selectedEditionId, teamsList, selectedEdition]);
+
+  const canClearEdition = React.useMemo(() => {
+    if (!selectedEdition || !hasTournamentPayload) return false;
+    const isLiveCup =
+      selectedEdition.slot === 'A' &&
+      String(selectedEdition.status || '').toUpperCase() === 'IN_PROGRESS';
+    return !isLiveCup;
+  }, [selectedEdition, hasTournamentPayload]);
+
+  const mergeSlotEditions = React.useCallback((slotA: any, slotB: any) => {
+    setEditions((prev) => {
+      const next = [...prev];
+      [slotA, slotB].forEach((edition) => {
+        if (!edition) return;
+        const idx = next.findIndex((e) => e.id === edition.id);
+        if (idx >= 0) next[idx] = edition;
+        else next.unshift(edition);
+      });
+      return next;
+    });
+  }, []);
+
+  const refreshSlots = React.useCallback(async () => {
+    setEnsuringSlots(true);
+    const res = await ensureTournamentSlots();
+    if (res.success) {
+      mergeSlotEditions(res.slotA, res.slotB);
+    }
+    setEnsuringSlots(false);
+    return res;
+  }, [mergeSlotEditions]);
+
+  // Slots are read from the server-loaded editions list. We do NOT auto-write on page load
+  // so the live IN_PROGRESS cup is never touched until the organizer explicitly prepares the draft slot.
+
+  React.useEffect(() => {
+    if (!selectedEditionId || !viewingDraftSlot) return;
+    let cancelled = false;
+    void getPublishStatus(selectedEditionId).then((res) => {
+      if (cancelled || !res.success) return;
+      setPublishGuard({ canPublish: res.canPublish, reason: res.reason });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEditionId, viewingDraftSlot, selectedEdition?.status]);
+
+  const handleTournamentSlotChange = async (slot: TournamentSlot) => {
+    setTournamentSlot(slot);
+    const targetEdition = slot === 'A' ? slotAEdition : slotBEdition;
+    if (!targetEdition && slot === 'B') {
+      await refreshSlots();
+    }
+  };
+
+  const handleOpenRegistration = async () => {
+    if (!selectedEditionId) return;
+    setSlotActionBusy('open');
+    const res = await openRegistration(selectedEditionId);
+    if (res.success && res.edition) {
+      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? res.edition : e)));
+    } else {
+      alert(res.error || 'Failed to open registration.');
+    }
+    setSlotActionBusy(null);
+  };
+
+  const handleCloseRegistration = async () => {
+    if (!selectedEditionId) return;
+    setSlotActionBusy('close');
+    const res = await closeRegistration(selectedEditionId);
+    if (res.success && res.edition) {
+      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? res.edition : e)));
+    } else {
+      alert(res.error || 'Failed to close registration.');
+    }
+    setSlotActionBusy(null);
+  };
+
+  const handlePublishTournament = async () => {
+    if (!selectedEditionId) return;
+    const guard = canPublishDraft(liveTournament, selectedEdition);
+    if (!guard.ok) {
+      alert(guard.reason);
+      return;
+    }
+    if (!window.confirm('Publish this tournament? It will go live and the current live slot will move to draft.')) return;
+    setSlotActionBusy('publish');
+    const res = await publishTournament(selectedEditionId);
+    if (res.success) {
+      mergeSlotEditions(res.published, res.resetLive);
+      setTournamentSlot('A');
+      router.refresh();
+    } else {
+      alert(res.error || 'Failed to publish tournament.');
+    }
+    setSlotActionBusy(null);
+  };
+
+  const handleStartClearTournament = async () => {
+    if (!selectedEditionId || !selectedEdition) return;
+    if (
+      !window.confirm(
+        `Download a full Excel archive for Edition ${selectedEdition.number}, then confirm to clear all tournament data from this slot? Player profiles and website CMS are kept.`,
+      )
+    ) {
+      return;
+    }
+    setSlotActionBusy('clear-export');
+    try {
+      const res = await exportEditionArchive(selectedEditionId);
+      if (!res.success || !res.fileBase64) {
+        alert(res.error || 'Could not build archive. Tournament was not cleared.');
+        return;
+      }
+      const binary = atob(res.fileBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: res.mimeType });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = res.fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setClearConfirmNumber('');
+      setClearDialogOpen(true);
+    } finally {
+      setSlotActionBusy(null);
+    }
+  };
+
+  const handleConfirmClearTournament = async () => {
+    if (!selectedEditionId || !selectedEdition) return;
+    setSlotActionBusy('clear');
+    const res = await emptyEditionTournamentData(selectedEditionId, clearConfirmNumber);
+    if (res.success) {
+      setClearDialogOpen(false);
+      setClearConfirmNumber('');
+      setTeamsList((prev) => prev.filter((t) => t.editionId !== selectedEditionId));
+      setEditions((prev) =>
+        prev.map((edition) =>
+          edition.id === selectedEditionId
+            ? {
+                ...edition,
+                participants: [],
+                status: 'DRAFT',
+                dayDates: null,
+                tournamentStartDate: null,
+                tournamentEndDate: null,
+              }
+            : edition,
+        ),
+      );
+      router.refresh();
+      alert(res.message);
+    } else {
+      alert(res.error || 'Failed to clear tournament data.');
+    }
+    setSlotActionBusy(null);
+  };
+
+  const handleParticipantsChange = React.useCallback((participants: any[]) => {
+    if (!selectedEditionId) return;
+    setEditions((prev) =>
+      prev.map((edition) =>
+        edition.id === selectedEditionId ? { ...edition, participants } : edition
+      )
+    );
+  }, [selectedEditionId]);
+
+  const handleEnrolledParticipantsChange = React.useCallback((participants: any[]) => {
+    if (!slotBEdition?.id) return;
+    setEditions((prev) =>
+      prev.map((edition) => {
+        if (edition.id !== slotBEdition.id) return edition;
+        const enrolledIds = new Set(participants.map((p: { userId: string }) => p.userId));
+        const others = (edition.participants || []).filter(
+          (p: { userId: string }) => !enrolledIds.has(p.userId)
+        );
+        return { ...edition, participants: [...others, ...participants] };
+      })
+    );
+  }, [slotBEdition?.id]);
+
+  const handleUserStatUpdate = React.useCallback((userId: string, updates: { average?: number; target?: number }) => {
+    setUsersList((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updates } : u)));
+    setEditions((prev) =>
+      prev.map((edition) => ({
+        ...edition,
+        participants: (edition.participants || []).map((p: any) =>
+          p.userId === userId && p.user ? { ...p, user: { ...p.user, ...updates } } : p
+        ),
+      }))
+    );
+    if (slotBEdition?.id && updates.average !== undefined) {
+      void syncUnlockedGradeAverages(slotBEdition.id).then(() => {
+        setEditions((prev) =>
+          prev.map((edition) => {
+            if (edition.id !== slotBEdition.id) return edition;
+            const synced = (edition.participants || []).map((p: any) => {
+              if (p.userId !== userId || p.gradeAverageLocked) return p;
+              const gradeAverage = updates.average && updates.average > 0 ? updates.average : null;
+              return { ...p, gradeAverage };
+            });
+            return { ...edition, participants: synced };
+          })
+        );
+      });
+    }
+  }, [slotBEdition?.id]);
 
   const handleDaysNeeded = React.useCallback((days: number) => {
     if (days < 1) return;
@@ -342,7 +681,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         startDateRef.current !== calendarSeedRef.current!.start;
       if (dirty) return;
 
-      const nextStart = firstDate || startDateRef.current || OFFICIAL_DAY1_CALENDAR;
+      const nextStart = firstDate || startDateRef.current || defaultDay1Calendar();
       setStartDate(nextStart);
       setDayDatesMap(generateDefaultDayDates(nextStart, numDays, loadedMap));
       calendarSeedRef.current = { editionId: selectedEditionId, start: nextStart };
@@ -375,12 +714,28 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setIsSubmitting(false);
   };
 
-  const selectedEditionTeams = filterMainTeams(
-    teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id))
+  const teamsForEdition = React.useCallback(
+    (editionId: string, liveOnlyLegacy = false) =>
+      teamsList.filter((t) => {
+        if (!editionId) return false;
+        if (t.editionId === editionId) return true;
+        if (!t.editionId && liveOnlyLegacy && editionId === liveEditionId) return true;
+        return false;
+      }),
+    [teamsList, liveEditionId]
   );
-  const selectedEditionSpocTeams = filterSpocTeams(
-    teamsList.filter((t) => t.editionId === selectedEditionId || (!t.editionId && selectedEditionId === editions[0]?.id))
-  );
+
+  const selectedEditionTeams = filterMainTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
+  const selectedEditionSpocTeams = filterSpocTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
+
+  const editionCaptainUserIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    selectedEditionTeams.forEach((team: any) => {
+      if (team.captainId) ids.add(team.captainId);
+      if (team.captain?.id) ids.add(team.captain.id);
+    });
+    return ids;
+  }, [selectedEditionTeams]);
 
   const activeEditions = editions.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REGISTRATION_OPEN');
   const pendingReports = scoreReports.filter((r) => r.status === 'PENDING');
@@ -396,7 +751,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     const updatedCaptain = usersList.find((u) => u.id === newTeamCaptainId);
 
     const res = await addOrUpdateEditionTeam({
-      editionId: selectedEditionId || editions[0]?.id,
+      editionId: selectedEditionId || '',
       name: newTeamName.trim(),
       tag: newTeamTag.trim() || newTeamName.substring(0, 3).toUpperCase(),
       captainId: newTeamCaptainId,
@@ -425,7 +780,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [teamsNotice, setTeamsNotice] = React.useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const handleAutoAssignPlayers = async () => {
-    const editionId = selectedEditionId || editions[0]?.id;
+    const editionId = selectedEditionId || slotAEdition?.id || '';
     if (!editionId || autoAssigning) return;
     setAutoAssigning(true);
     setTeamsNotice(null);
@@ -755,6 +1110,55 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setIsSubmitting(false);
   };
 
+  const startInlineStatEdit = (usr: any, field: InlineStatField) => {
+    const value =
+      field === 'average'
+        ? usr.average !== undefined && usr.average !== null && usr.average > 0
+          ? String(usr.average)
+          : ''
+        : usr.target !== undefined && usr.target !== null && usr.target > 0
+          ? String(usr.target)
+          : '';
+    setInlineStatEdit({ userId: usr.id, field, value });
+  };
+
+  const cancelInlineStatEdit = () => {
+    setInlineStatEdit(null);
+  };
+
+  const saveInlineStatEdit = async (usr: any) => {
+    if (!inlineStatEdit || inlineStatEdit.userId !== usr.id) return;
+    const { field, value } = inlineStatEdit;
+    const saveKey = `${usr.id}-${field}`;
+    setInlineStatSaving(saveKey);
+
+    const payload =
+      field === 'average'
+        ? { average: parseFloat(value) || 0 }
+        : { target: parseInt(value, 10) || 0 };
+
+    setUsersList((prev) => prev.map((u) => (u.id === usr.id ? { ...u, ...payload } : u)));
+    setInlineStatEdit(null);
+
+    const res = await updatePlayerProfileDetails(usr.id, payload);
+    if (res.success && res.user) {
+      setUsersList((prev) => prev.map((u) => (u.id === usr.id ? { ...u, ...res.user } : u)));
+    } else if (!res.success) {
+      setUsersList((prev) =>
+        prev.map((u) =>
+          u.id === usr.id
+            ? {
+                ...u,
+                average: usr.average,
+                target: usr.target,
+              }
+            : u
+        )
+      );
+    }
+    setInlineStatSaving(null);
+  };
+
   const handleOpenResetPin = (usr: any) => {
     setTargetUser(usr);
     setTargetUsername(usr.username || '');
@@ -902,18 +1306,70 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </div>
       </div>
 
-      {/* Edition-Wise Control Selector Banner */}
-      <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Badge variant="carrom" className="text-xs font-black uppercase tracking-wider">
-              <Trophy className="h-3.5 w-3.5 mr-1" /> Edition Control Scope
-            </Badge>
-            <Badge variant={selectedEdition?.status === 'IN_PROGRESS' ? 'warning' : 'success'}>
-              {selectedEdition?.status || 'ACTIVE'}
-            </Badge>
+      {/* Tournament A / B slot selector */}
+      <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div
+            className="inline-flex items-center rounded-full border border-amber-500/30 bg-black/30 p-1 shadow-inner"
+            role="tablist"
+            aria-label="Tournament slot"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tournamentSlot === 'A'}
+              onClick={() => void handleTournamentSlotChange('A')}
+              disabled={ensuringSlots}
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 ${
+                tournamentSlot === 'A'
+                  ? 'bg-amber-500 text-black shadow-md'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              }`}
+            >
+              <Trophy className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+              Tournament A
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tournamentSlot === 'B'}
+              onClick={() => void handleTournamentSlotChange('B')}
+              disabled={ensuringSlots}
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 ${
+                tournamentSlot === 'B'
+                  ? 'bg-violet-500 text-white shadow-md'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              }`}
+            >
+              {ensuringSlots ? (
+                <Loader2 className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5 animate-spin" />
+              ) : (
+                <Award className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+              )}
+              Tournament B
+            </button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="text-[11px] font-semibold text-muted-foreground max-w-2xl">
+            <strong className="text-amber-400">Tournament A</strong> is always the live cup players see.
+            <strong className="text-violet-300"> Tournament B</strong> is the draft twin — same tools (teams, scores, stage, schedule).
+            When you publish B, it becomes live (A) and the former live edition moves to B so you can design the next cup without interruption.
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="carrom" className="text-xs font-black uppercase tracking-wider">
+              <Trophy className="h-3.5 w-3.5 mr-1" /> Tournament {tournamentSlot}
+            </Badge>
+            <Badge variant={selectedEdition?.status === 'IN_PROGRESS' ? 'warning' : 'outline'}>
+              {statusLabel(selectedEdition?.status)}
+            </Badge>
+            {isLiveSlotA && selectedEdition?.id === slotAEdition?.id && (
+              <Badge variant="success" className="text-[10px] font-black">LIVE</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-2xl font-black text-amber-500">
               {selectedEdition?.title || `Edition #${selectedEdition?.number}`}
             </h2>
@@ -928,35 +1384,168 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </div>
           <p className="text-xs text-muted-foreground font-medium">
             <strong className="text-foreground">Theme:</strong> {selectedEdition?.theme || selectedEdition?.themeDescription || 'Standard Carrom Theme'}
+            {' · '}
+            <strong className="text-foreground">Enrollment fee:</strong>{' '}
+            {formatEnrollmentFee(selectedEdition?.enrollmentFee)}
           </p>
+          {viewingDraftSlot && selectedEdition?.tournamentStartDate && (
+            <p className="text-xs text-violet-300 font-medium">
+              <strong className="text-foreground">Expected start:</strong>{' '}
+              {toCalendarDate(selectedEdition.tournamentStartDate) || 'Not set'}
+            </p>
+          )}
           <p className="text-[11px] text-muted-foreground">
-            Cups run one after another on this same edition. Use Edit Edition to update the next tournament instead of creating a new record.
+            {isLiveSlotA
+              ? 'Live cup — scores, teams, schedule, and selected players for the edition players see now.'
+              : 'Draft twin — same organizer tools as A. Open registration, build teams & stage, then publish when the live cup ends.'}
           </p>
+        </div>
+
+        {viewingDraftSlot && !slotBEdition && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="carrom"
+              disabled={ensuringSlots}
+              onClick={() => void refreshSlots()}
+              className="text-xs font-black"
+            >
+              {ensuringSlots ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Prepare Tournament B Draft
+            </Button>
+            <p className="text-[10px] text-muted-foreground max-w-sm">
+              Creates a separate draft edition for the next cup. Your live Tournament A data stays untouched.
+            </p>
+          </div>
+        )}
+
+        {viewingDraftSlot && slotBEdition && selectedEditionId && (
+          <div className="flex flex-wrap items-center gap-2">
+            {String(selectedEdition?.status).toUpperCase() === 'DRAFT' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={slotActionBusy !== null}
+                onClick={() => void handleOpenRegistration()}
+                className="text-xs font-bold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+              >
+                {slotActionBusy === 'open' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Open Registration
+              </Button>
+            )}
+            {String(selectedEdition?.status).toUpperCase() === 'REGISTRATION_OPEN' && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={slotActionBusy !== null}
+                onClick={() => void handleCloseRegistration()}
+                className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+              >
+                {slotActionBusy === 'close' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Close Registration
+              </Button>
+            )}
+            {['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(
+              String(selectedEdition?.status).toUpperCase()
+            ) && (
+              <Button
+                type="button"
+                size="sm"
+                variant="carrom"
+                disabled={slotActionBusy !== null || !publishGuard.canPublish}
+                onClick={() => void handlePublishTournament()}
+                title={publishGuard.reason || 'Publish this tournament to go live'}
+                className="text-xs font-black"
+              >
+                {slotActionBusy === 'publish' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trophy className="h-3.5 w-3.5" />}
+                Publish Tournament
+              </Button>
+            )}
+            {!publishGuard.canPublish && publishGuard.reason && (
+              <p className="text-[10px] text-muted-foreground max-w-xs">{publishGuard.reason}</p>
+            )}
+          </div>
+        )}
+
+        {canClearEdition && selectedEditionId && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-amber-500/20 pt-3 w-full">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={slotActionBusy !== null}
+              onClick={() => void handleStartClearTournament()}
+              className="text-xs font-bold border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
+            >
+              {slotActionBusy === 'clear-export' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              Clear tournament data
+            </Button>
+            <p className="text-[10px] text-muted-foreground max-w-md">
+              Downloads Excel first (players, grading, standings, scores, combis), then confirm to wipe teams, matches, and scores. CMS and player profiles stay.
+            </p>
+          </div>
+        )}
         </div>
       </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <Card className="p-5 border-amber-500/30 bg-amber-500/5">
-          <div className="text-xs font-bold text-amber-500 uppercase">Active Edition</div>
+          <div className="text-xs font-bold text-amber-500 uppercase">Edition</div>
           <div className="text-xl font-black text-foreground mt-1 truncate">{selectedEdition?.title || 'Edition'}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            #{selectedEdition?.number || '—'} · Slot {tournamentSlot}
+            {slotAEdition?.number && slotBEdition?.number ? (
+              <span className="ml-1 text-muted-foreground/80">
+                (A = #{slotAEdition.number}, B = #{slotBEdition.number})
+              </span>
+            ) : null}
+          </div>
         </Card>
 
         <Card className="p-5 border-violet-500/30 bg-violet-500/5">
           <div className="text-xs font-bold text-violet-400 uppercase">Teams</div>
-          <div className="text-3xl font-black text-foreground mt-1">{selectedEditionTeams.length}</div>
+          <div className="text-3xl font-black text-foreground mt-1">
+            {selectedEditionTeams.length}
+          </div>
+          {viewingDraftSlot && enrolledCount > 0 ? (
+            <div className="text-[10px] text-muted-foreground mt-0.5">{enrolledCount} enrolled</div>
+          ) : null}
         </Card>
 
         <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-xs font-bold text-emerald-500 uppercase">Registered Players</div>
-          <div className="text-3xl font-black text-foreground mt-1">{usersList.length}</div>
+          <div className="text-xs font-bold text-emerald-500 uppercase">Selected Players</div>
+          <div className="text-3xl font-black text-foreground mt-1">
+            {assignedSelectedCount}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {usersList.length} total accounts
+          </div>
         </Card>
       </div>
 
-      <Tabs defaultValue="players" className="space-y-4">
+      <Tabs key={tournamentSlot} defaultValue="players" className="space-y-4">
         <TabsList className="flex flex-wrap h-auto w-full gap-1 p-1.5 bg-card border border-border rounded-2xl">
           <TabsTrigger value="players" className="text-xs font-bold gap-1.5 px-3 py-2">
             <KeyRound className="h-3.5 w-3.5" /> Players
+          </TabsTrigger>
+          <TabsTrigger value="selected-players" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <UserCheck className="h-3.5 w-3.5 text-sky-400" /> Selected
+          </TabsTrigger>
+          {viewingDraftSlot && (
+            <TabsTrigger value="enrolled-players" className="text-xs font-bold gap-1.5 px-3 py-2">
+              <UserCheck className="h-3.5 w-3.5 text-violet-400" /> Enrolled
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="grading" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <GraduationCap className="h-3.5 w-3.5" /> Grading
           </TabsTrigger>
           <TabsTrigger value="scores" className="text-xs font-bold gap-1.5 px-3 py-2">
             <Trophy className="h-3.5 w-3.5" /> Scores
@@ -988,7 +1577,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 <Layers className="h-5 w-5 text-amber-500 animate-pulse" /> Tournament Days, Schedule &amp; Match Formats
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Assign calendar dates for each event day and configure per-round match formats for <strong className="text-amber-500">{selectedEdition?.title || 'Active Edition'}</strong>. Start date and length come from the Stage Designer.
+                Assign calendar dates for each event day and configure per-round match formats for <strong className="text-amber-500">{selectedEdition?.title || 'This Edition'}</strong>. Start date and length come from the Stage Designer.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1126,7 +1715,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       <TabsContent value="stages" forceMount className="mt-4">
       <TournamentStageDesigner
         editionId={selectedEditionId}
-        editionTitle={selectedEdition?.title || selectedEdition?.name || 'Active Edition'}
+        editionTitle={selectedEdition?.title || selectedEdition?.name || 'Edition'}
         spocTeams={selectedEditionSpocTeams.map((t: any) => ({
           id: t.id,
           name: t.name,
@@ -1295,7 +1884,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       </TabsContent>
 
       <TabsContent value="scores" className="mt-4">
-        <OrganizerScoresPanel users={usersList} />
+        <OrganizerScoresPanel
+          users={usersList}
+          editionTitle={selectedEdition?.title}
+          editionId={selectedEditionId}
+        />
       </TabsContent>
 
       <TabsContent value="players" forceMount className="mt-4">
@@ -1341,30 +1934,49 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               <TableRow>
                 <TableHead>Competitor Name</TableHead>
                 <TableHead>Username</TableHead>
-                <TableHead>Average (Avg)</TableHead>
-                <TableHead>Target (Tgt)</TableHead>
+                <TableHead>
+                  <div className="flex flex-col gap-1">
+                    <span>Average (Avg)</span>
+                    <Select
+                      value={avgSort}
+                      onChange={(e) => {
+                        const next = e.target.value as PlayerStatSort;
+                        setAvgSort(next);
+                        if (next !== 'none') setTgtSort('none');
+                      }}
+                      className="h-7 w-[7.5rem] text-[10px] font-bold border-amber-500/30 bg-background px-1.5 py-0"
+                    >
+                      <option value="none">Sort</option>
+                      <option value="asc">Low to High</option>
+                      <option value="desc">High to Low</option>
+                    </Select>
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <div className="flex flex-col gap-1">
+                    <span>Target (Tgt)</span>
+                    <Select
+                      value={tgtSort}
+                      onChange={(e) => {
+                        const next = e.target.value as PlayerStatSort;
+                        setTgtSort(next);
+                        if (next !== 'none') setAvgSort('none');
+                      }}
+                      className="h-7 w-[7.5rem] text-[10px] font-bold border-amber-500/30 bg-background px-1.5 py-0"
+                    >
+                      <option value="none">Sort</option>
+                      <option value="asc">Low to High</option>
+                      <option value="desc">High to Low</option>
+                    </Select>
+                  </div>
+                </TableHead>
                 <TableHead>4-Digit PIN</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {usersList
-                .filter((usr) => {
-                  if (!userSearchQuery.trim()) return true;
-                  const q = userSearchQuery.toLowerCase().trim();
-                  const qClean = q.startsWith('@') ? q.substring(1) : q;
-                  const displayPin = activePinMap[usr.username?.toLowerCase() || ''] || (usr.pin && usr.pin.length === 4 ? usr.pin : '••••');
-                  return (
-                    (usr.name || '').toLowerCase().includes(q) ||
-                    (usr.username || '').toLowerCase().includes(qClean) ||
-                    displayPin.includes(q) ||
-                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
-                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q)) ||
-                    (usr.role || '').toLowerCase().includes(q)
-                  );
-                })
-                .map((usr) => {
+              {displayedPlayers.map((usr) => {
                 const avgVal = usr.average !== undefined && usr.average !== null && usr.average > 0 ? Number(usr.average).toFixed(2) : '-';
                 const tgtVal = usr.target !== undefined && usr.target !== null && usr.target > 0 ? usr.target : '-';
                 const displayPin = activePinMap[usr.username.toLowerCase()] || (usr.pin && usr.pin.length === 4 ? usr.pin : '••••');
@@ -1373,11 +1985,34 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   <TableRow key={usr.id}>
                     <TableCell className="font-bold text-xs">{usr.name}</TableCell>
                     <TableCell className="font-mono text-xs text-amber-500 font-bold">@{usr.username}</TableCell>
-                    <TableCell className="font-mono text-xs font-black text-emerald-400">
-                      {avgVal}
+                    <TableCell>
+                      <InlineStatCell
+                        usr={usr}
+                        field="average"
+                        displayText={avgVal}
+                        valueClassName="text-emerald-400"
+                        editState={inlineStatEdit}
+                        savingKey={inlineStatSaving}
+                        onStart={startInlineStatEdit}
+                        onChange={(v) => setInlineStatEdit((prev) => (prev ? { ...prev, value: v } : null))}
+                        onCancel={cancelInlineStatEdit}
+                        onSave={saveInlineStatEdit}
+                      />
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-black text-amber-400">
-                      {tgtVal !== '-' ? `${tgtVal} pts` : '-'}
+                    <TableCell>
+                      <InlineStatCell
+                        usr={usr}
+                        field="target"
+                        displayText={tgtVal !== '-' ? `${tgtVal} pts` : '-'}
+                        valueClassName="text-amber-400"
+                        suffix="pts"
+                        editState={inlineStatEdit}
+                        savingKey={inlineStatSaving}
+                        onStart={startInlineStatEdit}
+                        onChange={(v) => setInlineStatEdit((prev) => (prev ? { ...prev, value: v } : null))}
+                        onCancel={cancelInlineStatEdit}
+                        onSave={saveInlineStatEdit}
+                      />
                     </TableCell>
                     <TableCell className="font-mono text-xs font-bold">
                       <span className="bg-black/40 px-2 py-1 rounded border border-amber-500/30 text-amber-300">
@@ -1425,6 +2060,38 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </Table>
         </CardContent>
       </Card>
+      </TabsContent>
+
+      <TabsContent value="selected-players" className="mt-4">
+        <EditionParticipantsPanel
+          editionId={selectedEditionId || null}
+          editionTitle={selectedEdition?.title || selectedEdition?.name}
+          participants={selectedEditionParticipants}
+          allUsers={usersList}
+          captainUserIds={editionCaptainUserIds}
+          onParticipantsChange={handleParticipantsChange}
+          onUserStatUpdate={handleUserStatUpdate}
+        />
+      </TabsContent>
+
+      <TabsContent value="enrolled-players" className="mt-4">
+        <EnrolledPlayersPanel
+          editionId={selectedEditionId || null}
+          editionTitle={selectedEdition?.title || selectedEdition?.name}
+          participants={enrolledParticipants}
+          allUsers={usersList}
+          enrollmentFee={slotBEdition?.enrollmentFee}
+          onParticipantsChange={handleEnrolledParticipantsChange}
+        />
+      </TabsContent>
+
+      <TabsContent value="grading" className="mt-4">
+        <OrganizerGradingPanel
+          editionId={selectedEditionId || null}
+          editionTitle={selectedEdition?.title || selectedEdition?.name}
+          users={usersList}
+          enrolledUserIds={viewingDraftSlot ? enrolledParticipants.map((p: { userId: string }) => p.userId) : undefined}
+        />
       </TabsContent>
 
       <TabsContent value="website-cms" className="mt-4">
@@ -2002,7 +2669,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Edit3 className="h-5 w-5 text-amber-500" /> Edit Edition: {selectedEdition?.title || selectedEdition?.name || 'Selected Edition'}
           </DialogTitle>
           <DialogDescription>
-            Update this edition for the next cup — title, theme, prize pool, dates, and rounds. Teams stay on this record.
+            {viewingDraftSlot
+              ? 'Configure the draft slot — title, edition number, enrollment fee, expected start, theme, prize pool, and rounds.'
+              : 'Update this edition — title, theme, prize pool, dates, and rounds.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -2010,6 +2679,51 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <div>
             <label className="text-xs font-bold block mb-1">Edition Title</label>
             <Input name="title" defaultValue={selectedEdition?.title || selectedEdition?.name || ''} required placeholder="e.g. CBOT Edition #205" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold block mb-1">Edition Number</label>
+              <Input
+                name="editionNumber"
+                type="number"
+                min="1"
+                defaultValue={selectedEdition?.number || ''}
+                placeholder="e.g. 202"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1">
+                {viewingDraftSlot ? 'Expected Start Date' : 'Start Date'}
+              </label>
+              <Input
+                name="expectedStartDate"
+                type="date"
+                defaultValue={toCalendarDate(selectedEdition?.tournamentStartDate) || ''}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold block mb-1">Enrollment Fee (₹)</label>
+              <Input
+                name="enrollmentFee"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={selectedEdition?.enrollmentFee ?? 0}
+                placeholder="0 for free"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold block mb-1">Registration Cutoff</label>
+              <Input
+                name="registrationEndDate"
+                type="date"
+                defaultValue={toCalendarDate(selectedEdition?.registrationEndDate) || ''}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -2581,6 +3295,56 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               className="font-bold text-xs bg-rose-600 hover:bg-rose-700"
             >
               {isSubmitting ? 'Deleting...' : 'Confirm & Delete Team'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-rose-400">
+            <Trash2 className="h-5 w-5" /> Confirm clear tournament data
+          </DialogTitle>
+          <DialogDescription>
+            The Excel archive was downloaded. This permanently removes teams, matches, scores, combis, grading grid, and stage data for Edition {selectedEdition?.number}. Player profiles, career averages, and website CMS are kept.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-muted-foreground">
+            Archive saved. Check your downloads folder for <strong className="text-foreground">CBOT-Edition-{selectedEdition?.number}-*.xlsx</strong>
+          </div>
+          <div>
+            <label className="text-xs font-bold block mb-1">
+              Type <strong className="text-rose-400">{selectedEdition?.number}</strong> to confirm:
+            </label>
+            <Input
+              value={clearConfirmNumber}
+              onChange={(e) => setClearConfirmNumber(e.target.value)}
+              placeholder={`Edition number ${selectedEdition?.number || ''}`}
+              className="text-xs font-bold border-rose-500/40 focus:border-rose-500"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={() => setClearDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                slotActionBusy === 'clear' ||
+                clearConfirmNumber.trim() !== String(selectedEdition?.number || '')
+              }
+              onClick={() => void handleConfirmClearTournament()}
+              className="font-bold text-xs bg-rose-600 hover:bg-rose-700"
+            >
+              {slotActionBusy === 'clear' ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Clearing…
+                </>
+              ) : (
+                'Clear all tournament data'
+              )}
             </Button>
           </div>
         </div>

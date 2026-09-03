@@ -1,5 +1,10 @@
-/** Fallback calendar: the 200th edition ran Day 1 = 10 Aug 2026 … Day 15 = 24 Aug 2026. */
-export const OFFICIAL_DAY1_CALENDAR = '2026-08-10';
+/** Fallback calendar when an edition has no Day 1 stored yet (uses today in IST). */
+export function defaultDay1Calendar(): string {
+  return istCalendarDateFromMs(Date.now());
+}
+
+/** @deprecated Use defaultDay1Calendar() or the live edition's stored Day 1. */
+export const OFFICIAL_DAY1_CALENDAR = defaultDay1Calendar();
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,12 +78,12 @@ export function normalizeDayDates(raw: DayDatesInput): Record<number, string> | 
 
 /**
  * Calendar date for Day N: the organizer's stored dates win, missing days are
- * extrapolated from Day 1, and the 200th edition calendar is the last resort.
+ * extrapolated from Day 1, then today's calendar date as a last resort.
  */
 export function combiCalendarDate(dayNumber: number | string, dayDates?: DayDatesInput): string {
   const day = coerceDayNumber(dayNumber);
   const map = normalizeDayDates(dayDates);
-  const day1 = map?.[1] ?? OFFICIAL_DAY1_CALENDAR;
+  const day1 = map?.[1] ?? defaultDay1Calendar();
   if (day < 1) return day1;
   return map?.[day] ?? addDaysIsoDate(day1, day - 1);
 }
@@ -98,9 +103,9 @@ export function isCombiSubmissionLocked(
   return now.getTime() >= cutoff;
 }
 
-/** Consecutive Day 1…N map starting at `day1` (defaults to the 200th edition calendar). */
-export function buildDayDatesMap(totalDays = 15, day1: string = OFFICIAL_DAY1_CALENDAR): Record<number, string> {
-  const start = toCalendarDate(day1) || OFFICIAL_DAY1_CALENDAR;
+/** Consecutive Day 1…N map starting at `day1` (defaults to today IST when omitted). */
+export function buildDayDatesMap(totalDays = 15, day1?: string): Record<number, string> {
+  const start = toCalendarDate(day1) || defaultDay1Calendar();
   const out: Record<number, string> = {};
   const n = Math.max(1, totalDays || 15);
   for (let day = 1; day <= n; day += 1) {
@@ -109,14 +114,14 @@ export function buildDayDatesMap(totalDays = 15, day1: string = OFFICIAL_DAY1_CA
   return out;
 }
 
-/** Back-compat alias for the 200th edition calendar. */
-export function officialDayDatesMap(totalDays = 15): Record<number, string> {
-  return buildDayDatesMap(totalDays, OFFICIAL_DAY1_CALENDAR);
+/** Build a Day 1…N map; pass the live edition's Day 1 when available. */
+export function officialDayDatesMap(totalDays = 15, day1?: string): Record<number, string> {
+  return buildDayDatesMap(totalDays, day1);
 }
 
 /**
  * True only when stored dates are absent or unusable. Dates the organizer chose
- * are never "wrong" just because they differ from the 200th edition calendar.
+ * are never "wrong" just because they differ from another edition's calendar.
  */
 export function dayDatesNeedRepair(raw: DayDatesInput, totalDays = 15): boolean {
   const map = normalizeDayDates(raw);

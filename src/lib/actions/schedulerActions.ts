@@ -42,7 +42,7 @@ async function requireOrganizer() {
 
 function revalidateSchedulePaths() {
   revalidateTag('organizer-schedule');
-  revalidateTag('edition-200-combis-data');
+  revalidateTag('edition-combis-data');
   [
     '/admin',
     '/dashboard/organizer',

@@ -14,6 +14,7 @@ import {
 } from '@/lib/spoc-teams';
 import { listCaptainDesks } from '@/lib/mobile-team';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 
 export const revalidate = 0;
 
@@ -47,13 +48,10 @@ export default async function CaptainPage() {
         ]
       }
     }),
-    prisma.edition.findFirst({
-      orderBy: { number: 'desc' },
-      include: {
-        patterns: {
-          orderBy: { sequence: 'asc' },
-          include: { pattern: true },
-        },
+    resolveCurrentEditionRecord({
+      patterns: {
+        orderBy: { sequence: 'asc' },
+        include: { pattern: true },
       },
     }),
     prisma.user.findMany({ 

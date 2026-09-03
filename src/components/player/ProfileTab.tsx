@@ -19,6 +19,7 @@ import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 interface ProfileTabProps {
   currentPlayer: any;
   currentTeam: any;
+  editionGrade?: string | null;
   shortName?: string;
   editionLabel?: string;
 }
@@ -57,6 +58,7 @@ function LockedRow({ icon, label, value }: { icon: React.ReactNode; label: strin
 export function ProfileTab({
   currentPlayer: p,
   currentTeam: team,
+  editionGrade = null,
   shortName = DEFAULT_WEBSITE_CMS.site.shortName,
   editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: ProfileTabProps) {
@@ -180,6 +182,11 @@ export function ProfileTab({
                 <p className="text-sm text-muted-foreground font-mono">@{p.username}</p>
                 <div className="flex flex-wrap gap-2 mt-2">
                   <Badge variant="secondary" className="text-[10px]"><UserCheck className="h-3 w-3 mr-1" />{p.role || 'PLAYER'}</Badge>
+                  {editionGrade ? (
+                    <Badge variant="outline" className="text-[10px] text-violet-300 border-violet-500/40 font-black">
+                      Grade {editionGrade}
+                    </Badge>
+                  ) : null}
                   {p.isActivated && <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30"><CheckCircle2 className="h-3 w-3 mr-1" />Activated</Badge>}
                 </div>
               </div>
@@ -259,7 +266,7 @@ export function ProfileTab({
             <form onSubmit={handleSave} className="space-y-5">
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-400 font-semibold flex items-center gap-2">
                 <Lock className="h-3.5 w-3.5 flex-shrink-0" />
-                Name, username, average &amp; target are set by the organiser and cannot be changed here.
+                Name, username, average, target &amp; grade are set by the organiser and cannot be changed here.
               </div>
 
               {/* Locked fields shown as read-only */}
@@ -268,6 +275,7 @@ export function ProfileTab({
                 <LockedRow icon={<UserCheck className="h-4 w-4" />} label="Username (Organiser-set)" value={`@${p.username}`} />
                 <LockedRow icon={<Shield className="h-4 w-4" />} label="Average (Organiser-set)" value={`${p.average || 0}`} />
                 <LockedRow icon={<Shield className="h-4 w-4" />} label="Target (Organiser-set)" value={`${p.target || 0}`} />
+                <LockedRow icon={<Shield className="h-4 w-4" />} label="Grade (Organiser-set)" value={editionGrade || '—'} />
               </div>
 
               <div className="border-t border-border/40 pt-4">
@@ -383,7 +391,11 @@ export function ProfileTab({
             /* ── READ VIEW ─────────────────────────────────────── */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
               <div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-3">Personal Details</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-3">Tournament Details</h3>
+                <InfoRow icon={<Shield className="h-4 w-4" />} label="Grade" value={editionGrade} placeholder="Not assigned yet" />
+                <InfoRow icon={<Shield className="h-4 w-4" />} label="Target" value={p.target ? String(p.target) : null} placeholder="Not set" />
+                <InfoRow icon={<Shield className="h-4 w-4" />} label="Average" value={p.average ? String(p.average) : null} placeholder="Not set" />
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-3 mt-5">Personal Details</h3>
                 {(form.bio || p.bio) && (
                   <div className="mb-3 py-2.5 border-b border-border/40">
                     <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Bio</div>

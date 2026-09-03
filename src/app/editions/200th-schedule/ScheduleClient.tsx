@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
-import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import { getCurrentEditionCombisData } from '@/lib/actions/combisActions';
 import {
   buildOrganizerScheduleDays,
   formatCalendarDate,
@@ -99,7 +99,7 @@ export function ScheduleClient({
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await get200thEditionCombisData();
+        const res = await getCurrentEditionCombisData();
         if (!res.success || cancelled) return;
         const nextStages = (res as any).stageConfig?.stages || [];
         const pairings = resolveOrganizerPairings(nextStages, res.teams || []);

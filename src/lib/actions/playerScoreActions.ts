@@ -33,7 +33,7 @@ import {
 } from '@/lib/board-scores';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
-import { combiCalendarDate, normalizeDayDates, OFFICIAL_DAY1_CALENDAR } from '@/lib/combi-cutoff';
+import { combiCalendarDate, normalizeDayDates, toCalendarDate } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
 import { countEventWinsForPlayer, editionProfileStats, rankPlayers } from '@/lib/player-ranking';
 import { resolveCurrentEdition } from '@/lib/current-edition';
@@ -56,8 +56,13 @@ async function requireSession() {
 export async function loadLatestEdition() {
   const current = await resolveCurrentEdition();
   if (!current) return null;
+  return loadEditionById(current.id);
+}
+
+export async function loadEditionById(editionId?: string | null) {
+  if (!editionId) return null;
   const edition = await prisma.edition.findUnique({
-    where: { id: current.id },
+    where: { id: editionId },
     select: { id: true, title: true, number: true, dayDates: true, totalDays: true, status: true, tournamentStartDate: true },
   });
   return ensureOfficialDayDates(edition);
@@ -368,13 +373,14 @@ export async function organiserUpsertPlayerDayScore(
   score: unknown,
   slams: unknown,
   boards?: unknown,
+  editionId?: string,
 ) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error };
   if (!isOrganiser(session)) return { success: false as const, error: 'Organiser access required.' };
   const parsed = resolveScoreInput(score, slams, boards);
   if (!parsed.ok) return { success: false as const, error: parsed.error };
-  const edition = await loadLatestEdition();
+  const edition = editionId ? await loadEditionById(editionId) : await loadLatestEdition();
   if (!edition) return { success: false as const, error: 'No edition found.' };
   const player = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!player) return { success: false as const, error: 'Player not found.' };
@@ -397,11 +403,11 @@ export async function organiserUpsertPlayerDayScore(
   return { success: true };
 }
 
-export async function getOrganiserScoreDesk() {
+export async function getOrganiserScoreDesk(editionId?: string) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error, maxDay: 1, days: [] as any[], scores: [] as any[] };
   if (!isOrganiser(session)) return { success: false as const, error: 'Organiser access required.', maxDay: 1, days: [] as any[], scores: [] as any[] };
-  const edition = await loadLatestEdition();
+  const edition = editionId ? await loadEditionById(editionId) : await loadLatestEdition();
   if (!edition) return { success: false as const, error: 'No edition found.', maxDay: 1, days: [] as any[], scores: [] as any[] };
   const stages = (await loadStageConfig(edition.id)).stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
@@ -882,8 +888,8 @@ async function loadPublicStandings() {
   };
 }
 
-export async function getAverageReviewPrompt() {
-  const edition = await loadLatestEdition();
+export async function getAverageReviewPrompt(editionId?: string) {
+  const edition = editionId ? await loadEditionById(editionId) : await loadLatestEdition();
   if (!edition) return null;
   const config = await loadStageConfig(edition.id);
   return stageJustFinishedForAverageReview(config.stages, lastCompletedDay(edition.dayDates || {}));
@@ -935,7 +941,7 @@ export async function getEditionProfileStatsForUser(userId: string) {
     if (entry) {
       dayNumber = Number(entry[0]);
     } else {
-      const day1 = map?.[1] ?? OFFICIAL_DAY1_CALENDAR;
+      const day1 = map?.[1] ?? toCalendarDate(edition.tournamentStartDate) ?? '';
       const d1 = new Date(day1).getTime();
       const dTarget = new Date(log.effectiveFrom).getTime();
       if (Number.isFinite(d1) && Number.isFinite(dTarget)) {
@@ -953,13 +959,13 @@ export async function getEditionProfileStatsForUser(userId: string) {
   if (targetHistory.length === 0 && user?.target) {
     targetHistory.push({
       dayNumber: 1,
-      effectiveFrom: map?.[1] ?? OFFICIAL_DAY1_CALENDAR,
+      effectiveFrom: map?.[1] ?? toCalendarDate(edition.tournamentStartDate) ?? '',
       target: user.target,
       changedAt: new Date(edition.tournamentStartDate || Date.now()).toISOString(),
     });
   }
 
-  const standings = await loadPublicStandings();
+  const standings = await getPublicStandings();
   const playerRank = standings.players.find((p) => p.userId === userId);
   const calculatedAverage = playerRank && playerRank.boardAverage != null ? Number(playerRank.boardAverage) : (user?.average || 0);
 

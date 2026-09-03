@@ -648,7 +648,7 @@ export function isCalendarDayCompleted(
   dayDates: Record<number, string> | Record<string, string>,
   today = new Date()
 ): boolean {
-  // This edition's own calendar decides. Falling back to the 200th edition's
+  // This edition's own calendar decides. Falling back to another edition's
   // windows first would mark a future tournament's days as already played.
   const dates = normalizeDayDates(dayDates);
   const calendarEnd = dates[dayNumber] ? calendarDateEndMs(dates[dayNumber]) : NaN;

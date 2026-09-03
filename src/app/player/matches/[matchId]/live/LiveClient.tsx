@@ -769,7 +769,7 @@ export default function PlayerMatchLiveClient({ matchDetails }: { matchDetails: 
                   }}
                 >
                   <div className="flex items-center gap-2 pointer-events-auto">
-                    <Link href="/edition-200-videos">
+                    <Link href="/live">
                       <Button size="sm" variant="ghost" className="h-8 px-2.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-xl text-white font-bold text-xs gap-1 border border-white/15">
                         <ArrowLeft className="h-3.5 w-3.5" /> Back
                       </Button>

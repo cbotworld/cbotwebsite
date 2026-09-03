@@ -26,7 +26,7 @@ export function canRepairDayDates(edition: RepairableEdition | null | undefined)
 /**
  * Fills in a missing or incomplete day-date calendar so every screen agrees on Day N.
  * Dates the organizer already chose are kept as-is; Day 1 falls back to the stored
- * start date, then to the 200th edition calendar. Finished editions are never touched.
+ * start date, then to today's calendar in IST. Finished editions are never touched.
  */
 export async function ensureOfficialDayDates<T extends RepairableEdition>(
   edition: T | null | undefined,

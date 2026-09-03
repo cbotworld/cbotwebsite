@@ -5,6 +5,7 @@ import { MatchLineupSlot } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { isCombiSubmissionLocked, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 export async function submitMatchLineup(data: {
   matchId: string;
@@ -254,10 +255,13 @@ export async function sendLineupEmailAction(data: {
 
 export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rounds: any[], submittedAt: string) {
   try {
-    const activeEdition = await prisma.edition.findFirst({
-      orderBy: { number: 'desc' },
-      select: { id: true, status: true, dayDates: true, totalDays: true }
-    });
+    const editionRef = await resolveCurrentEdition();
+    const activeEdition = editionRef
+      ? await prisma.edition.findUnique({
+          where: { id: editionRef.id },
+          select: { id: true, status: true, dayDates: true, totalDays: true },
+        })
+      : null;
 
     const scheduledEdition = await ensureOfficialDayDates(activeEdition);
     const editionDayDates = scheduledEdition?.dayDates ?? null;

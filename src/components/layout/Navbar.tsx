@@ -22,10 +22,11 @@ import {
   isPublicTeamsPlayersPath,
   isPublicPlayerScoresPath,
   isPublicStandingsPath,
+  DEFAULT_WEBSITE_CMS,
 } from '@/lib/website-cms';
 
 export function Navbar({
-  editionButtonLabel = '200th Edition',
+  editionButtonLabel = DEFAULT_WEBSITE_CMS.nav.editionButtonLabel,
   editionButtonHref = PUBLIC_COMBIS_PATH,
   combisLabel = 'Daily Team Combis',
   combisHref = PUBLIC_COMBIS_PATH,
@@ -123,7 +124,8 @@ export function Navbar({
     pathname === combisHref ||
     pathname === scheduleHref ||
     pathname === editionButtonHref ||
-    pathname.includes('200') ||
+    pathname.includes('combis') ||
+    pathname.includes('schedule') ||
     pathname.includes('combis') ||
     pathname.includes('schedule') ||
     pathname.includes('videos') ||

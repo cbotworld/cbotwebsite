@@ -3,6 +3,7 @@ import { monumentStatus } from '@/lib/bicentennial-monuments';
 import { prisma } from '@/lib/prisma';
 import { buildOrganizerScheduleDays, resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { stageConfigKey } from '@/lib/tournament-stages';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 export const revalidate = 60;
 
@@ -17,10 +18,10 @@ export async function OPTIONS() {
 }
 
 async function activeEditionSchedule() {
-  const edition = await prisma.edition.findFirst({
-    where: { OR: [{ status: 'IN_PROGRESS' }, { number: 200 }] },
-    orderBy: { number: 'desc' },
-  });
+  const editionRef = await resolveCurrentEdition();
+  const edition = editionRef
+    ? await prisma.edition.findUnique({ where: { id: editionRef.id } })
+    : null;
 
   let stageConfig: { stages?: any[] } | null = null;
   if (edition?.id) {

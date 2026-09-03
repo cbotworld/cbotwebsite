@@ -7,7 +7,7 @@ export interface BicentennialMonument {
   matches: Array<{ team1: string; team2: string }>;
 }
 
-/** Stage 1 Round Robin for the 200th Edition: 7 days, 4 matches/day, each team plays once per day. */
+/** Stage 1 Round Robin template: 7 days, 4 matches/day, each team plays once per day. */
 export const BICENTENNIAL_MONUMENTS: BicentennialMonument[] = [
   {
     monumentNumber: 1,

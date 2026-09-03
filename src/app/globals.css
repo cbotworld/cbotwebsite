@@ -144,6 +144,23 @@
   background: rgba(156, 163, 175, 0.5);
 }
 
+.grading-player-list {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(251, 191, 36, 0.55) rgba(255, 255, 255, 0.08);
+}
+.grading-player-list::-webkit-scrollbar {
+  width: 10px;
+}
+.grading-player-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+}
+.grading-player-list::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.5);
+  border-radius: 9999px;
+  border: 2px solid rgba(15, 23, 42, 0.9);
+}
+
 /* Team poster marquee animation */
 @keyframes marquee {
   0%   { transform: translateX(0); }

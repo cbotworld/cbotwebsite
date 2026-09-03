@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { sendPushNotifications, PushNotificationPayload } from '@/lib/push-notifications';
 import { currentCombiDayNumber } from '@/lib/combi-cutoff';
 import { rankStandingRows } from '@/lib/team-standings';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 function ordinalRank(rank: number): string {
   if (rank <= 0) return `${rank}`;
@@ -23,23 +24,26 @@ export async function dispatchNotifications(
   notificationsCount: number;
   results: { sent: number; failed: number; invalidTokensRemoved: number };
 }> {
-  // 1. Get active edition
-  const activeEdition = await prisma.edition.findFirst({
-    orderBy: { number: 'desc' },
-    include: {
-      teams: {
+  // 1. Get live Tournament A edition
+  const editionRef = await resolveCurrentEdition();
+  const activeEdition = editionRef
+    ? await prisma.edition.findUnique({
+        where: { id: editionRef.id },
         include: {
-          members: {
+          teams: {
             include: {
-              user: true,
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+              captain: true,
             },
           },
-          captain: true,
+          matches: true,
         },
-      },
-      matches: true,
-    },
-  });
+      })
+    : null;
 
   if (!activeEdition) {
     return {

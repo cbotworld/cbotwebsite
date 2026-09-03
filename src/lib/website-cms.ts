@@ -160,12 +160,14 @@ export const PUBLIC_STANDINGS_PATH = '/standings';
 const COMBIS_PATH_ALIASES = new Set([
   PUBLIC_COMBIS_PATH,
   '/edition-200-combis',
+  '/edition-201-combis',
   '/editions/200th-combis',
   '/edition-test-combis',
 ]);
 const SCHEDULE_PATH_ALIASES = new Set([
   PUBLIC_SCHEDULE_PATH,
   '/edition-200-schedule',
+  '/edition-201-schedule',
   '/editions/200th-schedule',
   '/edition-test-schedule',
 ]);
@@ -253,7 +255,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     brandTagline: 'Connect Carrom Enthusiasts Worldwide',
     organizationName: 'Carrom Balu Online Tournament',
     founderName: 'Carrom Balu',
-    editionLabel: '200th Edition',
+    editionLabel: '201st Edition',
     editionSeriesName: 'Cornerstones of Carrom',
     metaTitle: 'CBOT World - Carrom Balu Online Tournament',
     metaDescription:
@@ -267,7 +269,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   },
   pages: {
     schedule: {
-      badge: '✨ 200th Edition',
+      badge: '✨ 201st Edition',
       title: 'Official Match Fixtures',
       subtitle: 'Carrom Balu Online Tournament',
     },
@@ -277,14 +279,14 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       subtitle: 'Submitted by Captains • Auto-Published Every Day at 9:30 PM IST',
     },
     videos: {
-      badge: '🏆 Bicentennial 200th Edition Video Center',
-      title: 'Live & Recorded Match Videos | CBOT 200th Bicentennial Edition',
+      badge: '🏆 201st Edition Video Center',
+      title: 'Live & Recorded Match Videos | CBOT 201st Edition',
       subtitle:
-        'Watch all official live streams and recorded match videos day-wise across all 20 tournament days of the CBOT 200th Edition.',
+        'Watch all official live streams and recorded match videos day-wise across all tournament days of the CBOT 201st Edition.',
     },
     fixtures: {
       badge: 'Official Fixtures & Public Schedule',
-      title: 'Cornerstones of Carrom (Edition #200) Schedule',
+      title: 'Cornerstones of Carrom (Edition #201) Schedule',
       subtitle:
         'Inspect upcoming round-robin, league group, qualifier, and finals fixtures, plus table numbers and time slots.',
     },
@@ -326,7 +328,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     },
   },
   nav: {
-    editionButtonLabel: '200th Edition',
+    editionButtonLabel: '201st Edition',
     editionButtonHref: PUBLIC_COMBIS_PATH,
     combisLabel: 'Daily Team Combis',
     combisHref: PUBLIC_COMBIS_PATH,
@@ -334,14 +336,14 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     scheduleHref: PUBLIC_SCHEDULE_PATH,
   },
   hero: {
-    badgeText: 'Celebrating 200th Edition',
+    badgeText: 'Celebrating 201st Edition',
     headlineLine1: "World's Premier Online",
     headlineLine2: 'Carrom Arena.',
-    headlineAccent: '200th Edition.',
+    headlineAccent: '201st Edition.',
     description:
-      'Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.',
+      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 201 — the live cup where players compete today.',
     stats: [
-      { value: '200th', label: 'Edition Milestone', color: 'amber' },
+      { value: '201st', label: 'Live Edition', color: 'amber' },
       { value: '12,000+', label: 'Matches Played', color: 'foreground' },
       { value: '2,000+', label: 'Slams', color: 'pink' },
       { value: '100+', label: 'Active Participants', color: 'emerald' },
@@ -349,12 +351,12 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     bannerImage: '',
     posterUrl: '',
     currentEditionBadge: 'Current Edition',
-    ctaButtonText: 'View Bicentennial Monuments Schedule (200th Edition)',
+    ctaButtonText: 'View Live Edition Schedule (201st Edition)',
     ctaButtonLink: PUBLIC_SCHEDULE_PATH,
   },
   sponsors: {
     sectionBadge: '💎 Official Elite Sponsors',
-    sectionTitle: 'Powering CBOT 200th Edition',
+    sectionTitle: 'Powering CBOT 201st Edition',
     sectionDescription:
       'Our elite sponsors make this milestone tournament possible — supporting communities, sports talent, & cultural empowerment.',
     eliteSponsors: [
@@ -415,7 +417,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   goldSponsors: {
     sectionBadge: '🥇 Gold Sponsors',
     sectionTitle: 'Our Gold Sponsors',
-    sectionDescription: 'Proud supporters powering CBOT 200th Edition. Thank you for your generous contributions!',
+    sectionDescription: 'Proud supporters powering CBOT 201st Edition. Thank you for your generous contributions!',
     sponsors: DEFAULT_GOLD_SPONSORS,
   },
   legacy: {
@@ -433,7 +435,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   },
   footer: {
     brandDescription:
-      'Founded by Carrom Balu in August 2020, CBOT World reaches its monumental 200th edition connecting players worldwide.',
+      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 201 — connecting players worldwide in the live cup.',
     exploreHeading: 'Explore',
     exploreSoonLabel: 'Soon',
     governanceHeading: 'Tournament Governance',

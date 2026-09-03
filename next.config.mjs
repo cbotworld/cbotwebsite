@@ -8,6 +8,7 @@ const nextConfig = {
       { source: '/edition-test-combis', destination: '/combis', permanent: true },
       { source: '/edition-200-schedule', destination: '/schedule', permanent: true },
       { source: '/editions/200th-schedule', destination: '/schedule', permanent: true },
+      { source: '/edition-200-videos', destination: '/live', permanent: true },
       { source: '/edition-test-schedule', destination: '/schedule', permanent: true },
     ];
   },

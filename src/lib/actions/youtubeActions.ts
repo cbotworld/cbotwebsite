@@ -33,10 +33,10 @@ async function getYouTubeOAuthCredentials() {
  */
 export async function createLiveStreamAction(_matchId: string, _replayComment?: string, _deviceSessionId?: string) {
   noStore();
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user || !(session.user as any).id) {
-    return { success: false, error: 'Unauthorized: Please log in to stream.' };
-  }
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !(session.user as any).id) {
+      return { success: false, error: 'Unauthorized: Please log in to stream.' };
+    }
   return { success: false, error: 'Go live is only available in the CBOT mobile app.' };
 }
 
@@ -45,10 +45,10 @@ export async function createLiveStreamAction(_matchId: string, _replayComment?: 
  */
 export async function startLiveStreamAction(_streamId: string, _deviceSessionId?: string) {
   noStore();
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user) {
-    return { success: false, error: 'Unauthorized' };
-  }
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return { success: false, error: 'Unauthorized' };
+    }
   return { success: false, error: 'Go live is only available in the CBOT mobile app.' };
 }
 

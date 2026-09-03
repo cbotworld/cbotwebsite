@@ -14,7 +14,7 @@ export type TeamCatalogEntry = {
   logo?: string | null;
 };
 
-/** Official 200th Edition faces. Name, tag, and poster always belong together. */
+/** Official live-edition team faces. Name, tag, and poster always belong together. */
 export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'PLYWOOD PIONEERS': {
     name: 'PLYWOOD PIONEERS',

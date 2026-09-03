@@ -27,8 +27,12 @@ type DeskScore = {
 
 export default function OrganizerScoresPanel({
   users,
+  editionTitle,
+  editionId,
 }: {
   users: Array<{ id: string; name?: string; username?: string; target?: number | null }>;
+  editionTitle?: string;
+  editionId?: string;
 }) {
   const [userId, setUserId] = React.useState(users[0]?.id || '');
   const [day, setDay] = React.useState(1);
@@ -56,13 +60,13 @@ export default function OrganizerScoresPanel({
   }, [users, playerQuery, userId]);
 
   const loadDesk = React.useCallback(async () => {
-    const desk = await getOrganiserScoreDesk();
+    const desk = await getOrganiserScoreDesk(editionId);
     if (desk.success) {
       setDays(desk.days || []);
       setScores(desk.scores || []);
     }
     return desk;
-  }, []);
+  }, [editionId]);
 
   React.useEffect(() => {
     loadDesk()
@@ -72,8 +76,8 @@ export default function OrganizerScoresPanel({
         }
       })
       .catch(() => {});
-    getAverageReviewPrompt().then(setReview).catch(() => {});
-  }, [loadDesk]);
+    getAverageReviewPrompt(editionId).then(setReview).catch(() => {});
+  }, [loadDesk, editionId]);
 
   React.useEffect(() => {
     if (!userId && users[0]?.id) setUserId(users[0].id);
@@ -92,6 +96,12 @@ export default function OrganizerScoresPanel({
       <CardHeader>
         <CardTitle className="text-xl font-black">Edit player scores</CardTitle>
         <CardDescription>
+          {editionTitle ? (
+            <>
+              <strong className="text-amber-400">{editionTitle}</strong>
+              {' · '}
+            </>
+          ) : null}
           Pick a player and day. If they or their captain already entered boards, those load here so you can fix them. If the day is empty, add the boards yourself.
         </CardDescription>
       </CardHeader>
@@ -173,7 +183,7 @@ export default function OrganizerScoresPanel({
             setBusy(true);
             setMsg(null);
             const payload = draftToPayload(boards);
-            const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload);
+            const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload, editionId);
             setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
             if (res.success) await loadDesk();
             setBusy(false);

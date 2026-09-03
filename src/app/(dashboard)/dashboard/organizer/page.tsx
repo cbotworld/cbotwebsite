@@ -6,6 +6,7 @@ import OrganizerClient from './OrganizerClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@/lib/mock-data';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 export const revalidate = 0;
 
@@ -34,6 +35,29 @@ export default async function OrganizerPage() {
       prisma.edition.findMany({
         orderBy: { number: 'desc' },
         include: {
+          participants: {
+            orderBy: [{ gradeAverage: 'asc' }, { user: { name: 'asc' } }],
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  average: true,
+                  target: true,
+                  role: true,
+                  isActivated: true,
+                },
+              },
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  tag: true,
+                },
+              },
+            },
+          },
           patterns: {
             orderBy: { sequence: 'asc' },
             include: { pattern: true },
@@ -60,8 +84,9 @@ export default async function OrganizerPage() {
     ]);
 
     // Only the edition the dashboard opens on; archived ones keep their own dates.
+    const liveEditionRef = await resolveCurrentEdition();
     await ensureOfficialDayDates(
-      editions.find((e) => e.status === 'IN_PROGRESS' || e.status === 'REGISTRATION_OPEN') || editions[0],
+      (liveEditionRef && editions.find((e) => e.id === liveEditionRef.id)) || editions[0],
     );
   } catch (e) {
     console.error('Database connection error in OrganizerPage fallback to mocks', e);

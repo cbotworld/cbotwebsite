@@ -119,6 +119,10 @@ model Edition {
   
   format                String    @default("SINGLE_ELIMINATION")
   status                String    @default("DRAFT")
+  slot                  String?   @unique
+  
+  enrollmentFee         Float?    @default(0)
+  publishedAt           DateTime?
   
   prizePool             String    @default("₹0 INR")
   maxTeams              Int       @default(16)
@@ -159,6 +163,11 @@ model EditionParticipant {
   startingRank  Int?
   status        String    @default("REGISTERED")
   result        String?   
+  gradeAverage       Float?
+  gradeAverageLocked Boolean   @default(false)
+  enrolledAt         DateTime?
+  paymentStatus      String?
+  paymentAmount      Float?
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

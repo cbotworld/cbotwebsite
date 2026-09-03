@@ -1,7 +1,7 @@
 export type UserRole = 'ORGANIZER' | 'CAPTAIN' | 'PLAYER';
 
 export type TournamentFormat = 'SINGLE_ELIMINATION' | 'DOUBLE_ELIMINATION' | 'ROUND_ROBIN' | 'SWISS' | 'CBOT_HYBRID_PLAYOFFS' | 'MULTI_STAGE';
-export type TournamentStatus = 'DRAFT' | 'REGISTRATION_OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TournamentStatus = 'DRAFT' | 'UPCOMING' | 'REGISTRATION_OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type MatchStatus = 'SCHEDULED' | 'LIVE' | 'COMPLETED' | 'DISPUTED';
 export type RegistrationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type PlayerCategory = 'CATEGORY_A' | 'CATEGORY_B' | 'CATEGORY_C' | 'CATEGORY_D';

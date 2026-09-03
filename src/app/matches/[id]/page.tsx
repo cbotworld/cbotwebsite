@@ -56,7 +56,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
 
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
-          <Link href="/edition-200-videos">
+          <Link href="/live">
             <Button variant="outline" size="sm" className="gap-1.5 text-xs font-bold rounded-xl border-white/15 hover:bg-white/5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
@@ -230,7 +230,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
                     <span>🔄 Refresh Video Player</span>
                   </a>
                   <Link
-                    href="/edition-200-videos"
+                    href="/live"
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-white/10"
                   >
                     <span>🎬 All Match Videos</span>

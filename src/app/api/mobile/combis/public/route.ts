@@ -6,6 +6,7 @@ import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { combiCutoffIso, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 import { combiRoundLabel } from '@/lib/combi-round-label';
 
 export const dynamic = 'force-dynamic';
@@ -118,13 +119,15 @@ function teamPayload(
 
 export async function GET() {
   try {
-    const rawEdition = await prisma.edition.findFirst({
-      where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
-      orderBy: { number: 'desc' },
-      include: {
-        patterns: { orderBy: { sequence: 'asc' } },
-      },
-    });
+    const editionRef = await resolveCurrentEdition();
+    const rawEdition = editionRef
+      ? await prisma.edition.findUnique({
+          where: { id: editionRef.id },
+          include: {
+            patterns: { orderBy: { sequence: 'asc' } },
+          },
+        })
+      : null;
     const edition = await ensureOfficialDayDates(rawEdition);
 
     const teams = edition?.id

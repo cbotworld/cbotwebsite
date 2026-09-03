@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import PlayerClient from './PlayerClient';
 import { TEAM_TYPE_SPOC, spocTeamMembersFromTeam } from '@/lib/spoc-teams';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
+import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 
 export const revalidate = 0;
 
@@ -36,27 +37,43 @@ export default async function PlayerPage() {
     }
   });
 
-  // Find the team this player belongs to in the current edition
-  const activeEdition = await prisma.edition.findFirst({ orderBy: { number: 'desc' } });
+  // Live Tournament A — same edition used for scores, standings, and mobile.
+  let activeEdition = await resolveCurrentEditionRecord();
 
-  const editionParticipant = player ? await prisma.editionParticipant.findFirst({
-    where: {
-      userId: player.id,
-      editionId: activeEdition?.id,
+  const participantInclude = {
+    team: {
+      include: {
+        captain: true,
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
     },
-    include: {
-      team: {
-        include: {
-          captain: true,
-          members: {
-            include: {
-              user: true
-            }
-          }
-        }
-      }
+  } as const;
+
+  let editionParticipant = player
+    ? await prisma.editionParticipant.findFirst({
+        where: {
+          userId: player.id,
+          editionId: activeEdition?.id,
+        },
+        include: participantInclude,
+      })
+    : null;
+
+  // Fallback: player team may be on the live cup even when slot tags are stale in DB.
+  if (player && !editionParticipant?.team) {
+    editionParticipant = await prisma.editionParticipant.findFirst({
+      where: { userId: player.id, teamId: { not: null } },
+      include: participantInclude,
+      orderBy: { edition: { number: 'desc' } },
+    });
+    if (editionParticipant?.editionId && editionParticipant.editionId !== activeEdition?.id) {
+      activeEdition = await prisma.edition.findUnique({ where: { id: editionParticipant.editionId } });
     }
-  }) : null;
+  }
 
   const team = editionParticipant?.team || null;
   const teammates = team?.members?.map((m: any) => m.user) || [];
@@ -145,6 +162,7 @@ export default async function PlayerPage() {
       initialSpocTeam={spocTeam}
       initialSpocMembers={spocMembers}
       hasSpocCaptainDesk={hasSpocCaptainDesk}
+      initialEditionGrade={editionParticipant?.category || null}
       shortName={websiteCms.site.shortName}
       editionLabel={websiteCms.site.editionLabel}
     />

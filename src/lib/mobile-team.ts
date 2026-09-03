@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
+import { resolveLiveEditionForPlayers } from '@/lib/current-edition';
 
 export type CaptainDeskKind = 'MAIN' | 'SPOC';
 
@@ -95,19 +96,31 @@ export async function resolveEditionAndTeam(
   userId: string,
   opts?: { preferSpoc?: boolean; teamId?: string },
 ) {
-  const edition = await prisma.edition.findFirst({
-    where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
-    orderBy: { number: 'desc' },
-    include: {
-      patterns: { orderBy: { sequence: 'asc' } },
-    },
-  });
+  const edition = await resolveLiveEditionForPlayers();
 
   const participation = await prisma.editionParticipant.findFirst({
     where: edition?.id ? { userId, editionId: edition.id } : { userId },
     include: { team: true },
     orderBy: { createdAt: 'desc' },
   });
+
+  if (!participation?.team && edition?.id) {
+    const fallback = await prisma.editionParticipant.findFirst({
+      where: { userId, teamId: { not: null } },
+      include: { team: true },
+      orderBy: { edition: { number: 'desc' } },
+    });
+    if (fallback?.team) {
+      const matchedEdition =
+        edition?.id === fallback.editionId
+          ? edition
+          : await prisma.edition.findUnique({
+              where: { id: fallback.editionId },
+              include: { patterns: { orderBy: { sequence: 'asc' } } },
+            });
+      return { edition: matchedEdition, team: fallback.team, participation: fallback };
+    }
+  }
 
   if (opts?.teamId && edition?.id) {
     const requested = await prisma.team.findFirst({

@@ -355,7 +355,7 @@ export function buildOrganizerScheduleDays(opts?: {
     });
   };
 
-  // Seeded 200th-edition fixtures are only a fallback when this edition has no
+  // Seeded legacy fixtures are only a fallback when this edition has no
   // stage path of its own. Otherwise Day 8–10 would keep showing Royal Carroms
   // pairings after the organizer designed a 7-day round robin.
   if (!stages.length) {

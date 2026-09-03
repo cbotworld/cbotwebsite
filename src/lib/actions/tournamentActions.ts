@@ -16,6 +16,7 @@ import { isCalendarDayCompleted } from '@/lib/tournament-stages';
 import { syncCaptainRole } from '@/lib/captain-role';
 import { filterMainTeams } from '@/lib/spoc-teams';
 import { getWebsiteCmsSite } from '@/lib/website-cms-site';
+import { getNextEditionNumber } from '@/lib/current-edition';
 
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
@@ -129,6 +130,10 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const prizePool = (formData.get('prizePool') as string) || '₹1,00,000 INR';
     const maxTeams = parseInt((formData.get('maxTeams') as string) || '16', 10);
     const rules = formData.get('rules') as string;
+    const editionNumberRaw = formData.get('editionNumber') as string | null;
+    const expectedStartDateRaw = formData.get('expectedStartDate') as string | null;
+    const enrollmentFeeRaw = formData.get('enrollmentFee') as string | null;
+    const registrationEndDateRaw = formData.get('registrationEndDate') as string | null;
 
     const roundFormatsRaw = formData.get('roundFormats') as string;
     let roundFormats: string[] = ['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES'];
@@ -166,7 +171,44 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const scheduleDays = totalDays ?? existing?.totalDays ?? 15;
     const submittedDates = formData.get('dayDates') as string | null;
 
-    // The organizer's calendar is the source of truth. The 200th edition dates are
+    let editionNumberUpdate: { number?: number } = {};
+    if (editionNumberRaw && editionNumberRaw.trim()) {
+      const editionNumber = parseInt(editionNumberRaw, 10);
+      if (Number.isFinite(editionNumber) && editionNumber > 0) {
+        const conflict = await prisma.edition.findFirst({
+          where: { number: editionNumber, NOT: { id: editionId } },
+          select: { id: true },
+        });
+        if (conflict) {
+          return { success: false, error: `Edition number ${editionNumber} is already in use.` };
+        }
+        editionNumberUpdate = { number: editionNumber };
+      }
+    }
+
+    let expectedStartUpdate: { tournamentStartDate?: Date } = {};
+    if (expectedStartDateRaw && toCalendarDate(expectedStartDateRaw)) {
+      const parsed = calendarDateToUtcDate(expectedStartDateRaw);
+      if (parsed) expectedStartUpdate = { tournamentStartDate: parsed };
+    }
+
+    let enrollmentFeeUpdate: { enrollmentFee?: number } = {};
+    if (enrollmentFeeRaw !== null && enrollmentFeeRaw !== undefined && enrollmentFeeRaw.trim() !== '') {
+      const fee = parseFloat(enrollmentFeeRaw);
+      if (Number.isFinite(fee) && fee >= 0) enrollmentFeeUpdate = { enrollmentFee: fee };
+    }
+
+    let registrationEndUpdate: { registrationEndDate?: Date | null } = {};
+    if (registrationEndDateRaw !== null && registrationEndDateRaw !== undefined) {
+      if (registrationEndDateRaw.trim() === '') {
+        registrationEndUpdate = { registrationEndDate: null };
+      } else if (toCalendarDate(registrationEndDateRaw)) {
+        const parsed = calendarDateToUtcDate(registrationEndDateRaw);
+        if (parsed) registrationEndUpdate = { registrationEndDate: parsed };
+      }
+    }
+
+    // The organizer's calendar is the source of truth. Stored edition dates win;
     // only a fallback for an edition that has never had any dates set.
     const chosen = normalizeDayDates(submittedDates) ?? normalizeDayDates(existing?.dayDates);
     const dayDatesMap = buildDayDatesMap(scheduleDays, chosen?.[1]);
@@ -178,6 +220,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
     // Stored at UTC midnight so a later date-only read can never slide back a day.
     const startDate = calendarDateToUtcDate(dayDatesMap[1]);
     const endDate = calendarDateToUtcDate(dayDatesMap[scheduleDays] || dayDatesMap[1]);
+    const resolvedStartDate = expectedStartUpdate.tournamentStartDate || startDate || undefined;
 
     let updatedEdition;
     if (existing) {
@@ -186,6 +229,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
         data: {
           ...(title ? { title } : {}),
           ...slugData,
+          ...editionNumberUpdate,
           theme,
           themeDescription: description,
           prizePool,
@@ -193,8 +237,10 @@ export async function updateEdition(editionId: string, formData: FormData) {
           rules: rulesVal,
           ...(totalDays !== undefined ? { totalDays } : {}),
           dayDates,
-          ...(startDate ? { tournamentStartDate: startDate } : {}),
+          ...(resolvedStartDate ? { tournamentStartDate: resolvedStartDate } : {}),
           ...(endDate ? { tournamentEndDate: endDate } : {}),
+          ...enrollmentFeeUpdate,
+          ...registrationEndUpdate,
         }
       });
     } else {
@@ -202,10 +248,12 @@ export async function updateEdition(editionId: string, formData: FormData) {
       const organizerUser = await prisma.user.findFirst({ where: { role: 'ORGANIZER' } });
       if (organizerUser) organizerId = organizerUser.id;
 
+      const nextNumber = await getNextEditionNumber();
+
       updatedEdition = await prisma.edition.create({
         data: {
           id: editionId,
-          number: 200,
+          number: nextNumber,
           title: title || (await getWebsiteCmsSite()).editionSeriesName,
           slug: slugData.slug || `edition-${Date.now()}`,
           theme,

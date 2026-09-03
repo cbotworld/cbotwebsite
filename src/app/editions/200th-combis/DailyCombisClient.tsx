@@ -6,7 +6,7 @@ import { Calendar, Clock, Lock, Unlock, Shield, Trophy, Eye, Search, Sparkles, C
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import { getCurrentEditionCombisData } from '@/lib/actions/combisActions';
 import { officialMatchDays, monumentStatus } from '@/lib/bicentennial-monuments';
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { resolveTeamFace } from '@/lib/team-identity';
@@ -691,7 +691,7 @@ export default function DailyCombisClient({
 
     async function fetchSupabaseData() {
       try {
-        const res = await get200thEditionCombisData();
+        const res = await getCurrentEditionCombisData();
         if (res.success) {
           if (res.teams && res.teams.length > 0) {
             setDbTeams(res.teams);

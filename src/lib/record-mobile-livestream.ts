@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 
 type RecordArgs = {
   userId: string;
@@ -52,10 +53,7 @@ async function ensureDayMatch(opts: {
 export async function recordMobileLiveStream(args: RecordArgs) {
   if (!args.userId || !args.youtubeBroadcastId || args.dayNumber < 1) return null;
 
-  const edition = await prisma.edition.findFirst({
-    where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
-    orderBy: { number: 'desc' },
-  });
+  const edition = await resolveCurrentEditionRecord();
   if (!edition) return null;
 
   let teamId = args.teamId || null;

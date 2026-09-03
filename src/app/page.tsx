@@ -3,6 +3,7 @@ import HomeClient from './HomeClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 import { sanitizeCmsImages, safePublicImageUrl, withSafeTeamLogo } from '@/lib/safe-image-url';
+import { resolveCurrentEdition, resolveRegistrationEdition } from '@/lib/current-edition';
 
 export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
@@ -10,29 +11,9 @@ export default async function HomePage() {
   try {
     // Only query what is actually rendered on the UI to minimize data transfer size.
     // HomeClient only needs edition metadata for basic display, and teams/allTeams for the marquee image strip (using id, name, tag, logo).
-    const [currentEdition, allTeams, websiteCms] = await Promise.all([
-      prisma.edition.findFirst({
-        orderBy: { number: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          number: true,
-          theme: true,
-          bannerImage: true,
-          posterUrl: true,
-          tournamentStartDate: true,
-          dayDates: true,
-          totalDays: true,
-          teams: {
-            select: {
-              id: true,
-              name: true,
-              tag: true,
-              logo: true,
-            },
-          },
-        },
-      }),
+    const [currentEditionRef, registrationEdition, allTeams, websiteCms] = await Promise.all([
+      resolveCurrentEdition(),
+      resolveRegistrationEdition(),
       prisma.team.findMany({
         select: {
           id: true,
@@ -43,6 +24,31 @@ export default async function HomePage() {
       }),
       getWebsiteCmsContent(),
     ]);
+
+    const currentEdition = currentEditionRef
+      ? await prisma.edition.findUnique({
+          where: { id: currentEditionRef.id },
+          select: {
+            id: true,
+            title: true,
+            number: true,
+            theme: true,
+            bannerImage: true,
+            posterUrl: true,
+            tournamentStartDate: true,
+            dayDates: true,
+            totalDays: true,
+            teams: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+                logo: true,
+              },
+            },
+          },
+        })
+      : null;
 
     // Drop base64 / oversized logos so ISR HTML stays under Vercel's ~19MB limit.
     const currentEditionTeams = (currentEdition?.teams ?? []).map(withSafeTeamLogo);
@@ -72,6 +78,16 @@ export default async function HomePage() {
           totalDays: currentEdition.totalDays ?? 15,
         } : null}
         websiteCms={safeCms}
+        registrationEdition={registrationEdition ? {
+          id: registrationEdition.id,
+          title: registrationEdition.title,
+          number: registrationEdition.number,
+          theme: registrationEdition.theme ?? null,
+          enrollmentFee: registrationEdition.enrollmentFee ?? 0,
+          registrationEndDate: registrationEdition.registrationEndDate
+            ? registrationEdition.registrationEndDate.toISOString()
+            : null,
+        } : null}
       />
     );
   } catch (error) {
@@ -87,6 +103,7 @@ export default async function HomePage() {
         editionPosterUrl={null}
         currentEdition={null}
         websiteCms={DEFAULT_WEBSITE_CMS}
+        registrationEdition={null}
       />
     );
   }

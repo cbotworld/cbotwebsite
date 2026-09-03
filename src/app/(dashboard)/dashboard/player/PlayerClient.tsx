@@ -26,7 +26,7 @@ import {
   tournamentPlayWindow,
   unlockPrerequisiteDay,
 } from '@/lib/match-play-window';
-import { get200thEditionCombisData } from '@/lib/actions/combisActions';
+import { getCurrentEditionCombisData } from '@/lib/actions/combisActions';
 import { coherentMatchSides } from '@/lib/team-identity';
 import {
   buildOrganizerScheduleDays,
@@ -47,6 +47,7 @@ export default function PlayerClient({
   initialSpocTeam,
   initialSpocMembers = [],
   hasSpocCaptainDesk = false,
+  initialEditionGrade = null,
   shortName = DEFAULT_WEBSITE_CMS.site.shortName,
   editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: {
@@ -59,6 +60,7 @@ export default function PlayerClient({
   initialSpocTeam?: any;
   initialSpocMembers?: any[];
   hasSpocCaptainDesk?: boolean;
+  initialEditionGrade?: string | null;
   shortName?: string;
   editionLabel?: string;
 }) {
@@ -139,7 +141,7 @@ export default function PlayerClient({
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await get200thEditionCombisData();
+        const res = await getCurrentEditionCombisData();
         if (!res.success || cancelled) return;
         const pairings = resolveOrganizerPairings((res as any).stageConfig?.stages || [], res.teams || []);
         let dayDates: Record<number, string> = {};
@@ -370,6 +372,14 @@ export default function PlayerClient({
     },
     [scheduledDayNumbers, daysWithYoutube, currentPlayDay, nowMs]
   );
+
+  if (!currentPlayer) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading your player profile…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -679,6 +689,7 @@ export default function PlayerClient({
           <ProfileTab
             currentPlayer={currentPlayer}
             currentTeam={currentTeam}
+            editionGrade={initialEditionGrade}
             shortName={shortName}
             editionLabel={editionLabel}
           />

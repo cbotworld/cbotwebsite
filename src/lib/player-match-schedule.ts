@@ -15,6 +15,7 @@ import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 import { isCombiSubmissionLocked } from '@/lib/combi-cutoff';
 import { isDayScorePublished } from '@/lib/day-scoring';
 import { isSpocExhibitionTeam } from '@/lib/spoc-teams';
+import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 import {
   parseSavedLineups,
   playerMatchEvent,
@@ -28,10 +29,7 @@ export async function getPlayerMatchSchedule(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
-  const edition = await prisma.edition.findFirst({
-    where: { OR: [{ number: 200 }, { status: 'IN_PROGRESS' }] },
-    orderBy: { number: 'desc' },
-  });
+  const edition = await resolveCurrentEditionRecord();
 
   const cmsSite = await getWebsiteCmsSite();
   const fallbackEditionTitle = `${cmsSite.shortName} ${cmsSite.editionLabel}`;
@@ -329,7 +327,7 @@ export async function getPlayerMatchSchedule(
         opponentLogo: oppFace.logo,
         tableNumber: 1,
         editionTitle: edition?.title || fallbackEditionTitle,
-        editionNumber: edition?.number || 200,
+        editionNumber: edition?.number ?? 0,
         myEvent,
       };
     });

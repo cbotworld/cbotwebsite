@@ -228,7 +228,7 @@ export const MOCK_USERS: User[] = OFFICIAL_PLAYERS_RAW.map((p, idx) => {
 
 export const MOCK_TEAMS: Team[] = [
   {
-    id: 'team_200_1',
+    id: 'team_201_1',
     name: 'Vintage Strikers',
     tag: 'VS',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
@@ -239,7 +239,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_2',
+    id: 'team_201_2',
     name: 'Boric Speedsters',
     tag: 'BS',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
@@ -250,7 +250,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_3',
+    id: 'team_201_3',
     name: 'Plywood Pioneers',
     tag: 'PP',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
@@ -261,7 +261,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_4',
+    id: 'team_201_4',
     name: 'Pocket Dynamos',
     tag: 'PD',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
@@ -272,7 +272,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_5',
+    id: 'team_201_5',
     name: 'Vanilla Falcons',
     tag: 'VF',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
@@ -283,7 +283,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_6',
+    id: 'team_201_6',
     name: 'Ebony Overlords',
     tag: 'EO',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
@@ -294,7 +294,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_7',
+    id: 'team_201_7',
     name: 'Supernova Queen',
     tag: 'SQ',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
@@ -305,7 +305,7 @@ export const MOCK_TEAMS: Team[] = [
     members: [],
   },
   {
-    id: 'team_200_8',
+    id: 'team_201_8',
     name: 'Lumen Pillar',
     tag: 'LP',
     logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
@@ -319,8 +319,8 @@ export const MOCK_TEAMS: Team[] = [
 
 export const MOCK_EDITIONS: Edition[] = [
   {
-    id: 'ed_200',
-    number: 200,
+    id: 'ed_201',
+    number: 201,
     title: 'Cornerstones of Carrom',
     theme: 'Cornerstones of Carrom',
     posterUrl: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
@@ -355,13 +355,13 @@ export const MOCK_HALL_OF_FAME: HallOfFameMember[] = [
 export const MOCK_NEWS: NewsArticle[] = [
   {
     id: 'news_1',
-    title: 'Cornerstones of Carrom (Edition #200) Announced with Record ₹2,00,000 Prize Pool',
+    title: 'Cornerstones of Carrom (Edition #201) Announced with Record ₹2,00,000 Prize Pool',
     slug: 'cornerstones-of-carrom-announced',
     category: 'ANNOUNCEMENT',
     date: '2026-08-05',
     author: 'CBOT Editorial Team',
-    excerpt: 'The 200th official edition of Carrom Balu Online Tournament is set to begin next week featuring 8 top teams.',
-    content: 'Carrom Balu Online Tournament (CBOT) officially announces its 200th landmark edition: Cornerstones of Carrom. Featuring a prize pool of ₹2,00,000 INR, Edition #200 will test the finest strikers in a multi-format round robin playoffs format.',
+    excerpt: 'The 201st official edition of Carrom Balu Online Tournament is set to begin next week featuring 8 top teams.',
+    content: 'Carrom Balu Online Tournament (CBOT) officially announces its 201st landmark edition: Cornerstones of Carrom. Featuring a prize pool of ₹2,00,000 INR, Edition #201 will test the finest strikers in a multi-format round robin playoffs format.',
     image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=800',
   },
 ];
@@ -369,20 +369,20 @@ export const MOCK_NEWS: NewsArticle[] = [
 export const MOCK_GALLERY: GalleryItem[] = [
   {
     id: 'gal_1',
-    title: 'Bicentennial Edition #200 Trophy Presentation',
+    title: 'Edition #201 Trophy Presentation',
     category: 'CEREMONY',
     date: 'August 2026',
     imageUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&q=80&w=600',
-    caption: 'Balu Master presenting the Edition #200 Championship Trophy.',
+    caption: 'Balu Master presenting the Edition #201 Championship Trophy.',
   },
 ];
 
 export const MOCK_TOURNAMENTS: Tournament[] = [
   {
     id: 'tour_1',
-    title: 'Cornerstones of Carrom (Edition #200)',
+    title: 'Cornerstones of Carrom (Edition #201)',
     slug: 'cornerstones-of-carrom',
-    description: 'The landmark 200th online carrom championship featuring 8 elite teams competing for the coveted Balu Cup trophy.',
+    description: 'The landmark 201st online carrom championship featuring 8 elite teams competing for the coveted Balu Cup trophy.',
     format: 'SINGLE_ELIMINATION',
     status: 'IN_PROGRESS',
     startDate: '2026-08-10T10:00:00Z',
