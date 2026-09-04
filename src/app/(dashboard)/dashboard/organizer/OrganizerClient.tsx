@@ -2052,6 +2052,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           editionTitle={selectedEdition?.title || selectedEdition?.name}
           users={usersList}
           enrolledUserIds={enrolledParticipants.map((p: { userId: string }) => p.userId)}
+          participants={enrolledParticipants}
         />
       </TabsContent>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Crown, Search, Users } from 'lucide-react';
+import { Crown, Search, Users, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
@@ -13,6 +13,8 @@ export type RosterMember = {
   username: string;
   image?: string;
   isCaptain: boolean;
+  grade?: string | null;
+  target?: number | null;
 };
 
 export type RosterTeam = {
@@ -155,24 +157,46 @@ function TeamSection({
                   {team.members.map((member) => (
                     <li
                       key={member.id}
-                      className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-1.5"
+                      className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-1.5 min-w-0"
                     >
-                      <Avatar fallback={member.name} size="sm" className="h-7 w-7" />
+                      <Avatar fallback={member.name} size="sm" className="h-7 w-7 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold truncate">{member.name}</div>
                         {member.username ? (
                           <div className="text-[10px] text-muted-foreground truncate">@{member.username}</div>
                         ) : null}
                       </div>
-                      {member.isCaptain ? (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider text-amber-400">
-                          <Crown className="h-3 w-3" /> Captain
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
-                          Player
-                        </span>
-                      )}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className="flex items-center gap-1">
+                          {member.grade ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 border border-violet-500/35">
+                              {member.grade}
+                            </span>
+                          ) : null}
+                          {member.target !== null && member.target !== undefined && Number(member.target) >= 0 ? (
+                            Number(member.target) > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/35">
+                                <Target className="h-2.5 w-2.5" />
+                                Target {member.target}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted/40 text-muted-foreground border border-border/50">
+                                <Target className="h-2.5 w-2.5 opacity-60" />
+                                No target
+                              </span>
+                            )
+                          ) : null}
+                        </div>
+                        {member.isCaptain ? (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider text-amber-400">
+                            <Crown className="h-3 w-3" /> Captain
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Player
+                          </span>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

@@ -273,8 +273,8 @@ export function ProfileTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                 <LockedRow icon={<User className="h-4 w-4" />} label="Full Name (Organiser-set)" value={p.name} />
                 <LockedRow icon={<UserCheck className="h-4 w-4" />} label="Username (Organiser-set)" value={`@${p.username}`} />
-                <LockedRow icon={<Shield className="h-4 w-4" />} label="Average (Organiser-set)" value={`${p.average || 0}`} />
-                <LockedRow icon={<Shield className="h-4 w-4" />} label="Target (Organiser-set)" value={`${p.target || 0}`} />
+                <LockedRow icon={<Shield className="h-4 w-4" />} label="Average (Organiser-set)" value={`${p.average ?? 0}`} />
+                <LockedRow icon={<Shield className="h-4 w-4" />} label="Target (Organiser-set)" value={p.target !== null && p.target !== undefined ? (Number(p.target) > 0 ? String(p.target) : 'No target') : 'Not set'} />
                 <LockedRow icon={<Shield className="h-4 w-4" />} label="Grade (Organiser-set)" value={editionGrade || '—'} />
               </div>
 
@@ -393,8 +393,19 @@ export function ProfileTab({
               <div>
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-3">Tournament Details</h3>
                 <InfoRow icon={<Shield className="h-4 w-4" />} label="Grade" value={editionGrade} placeholder="Not assigned yet" />
-                <InfoRow icon={<Shield className="h-4 w-4" />} label="Target" value={p.target ? String(p.target) : null} placeholder="Not set" />
-                <InfoRow icon={<Shield className="h-4 w-4" />} label="Average" value={p.average ? String(p.average) : null} placeholder="Not set" />
+                <InfoRow
+                  icon={<Shield className="h-4 w-4" />}
+                  label="Target"
+                  value={
+                    p.target !== null && p.target !== undefined
+                      ? Number(p.target) > 0
+                        ? String(p.target)
+                        : 'No target'
+                      : null
+                  }
+                  placeholder="Not set"
+                />
+                <InfoRow icon={<Shield className="h-4 w-4" />} label="Average" value={p.average !== null && p.average !== undefined ? String(p.average) : null} placeholder="Not set" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 mb-3 mt-5">Personal Details</h3>
                 {(form.bio || p.bio) && (
                   <div className="mb-3 py-2.5 border-b border-border/40">

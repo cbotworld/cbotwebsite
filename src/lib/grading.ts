@@ -50,7 +50,7 @@ export function normalizeSequentialTiers(
       toRow: Math.max(1, Math.round(Number(t.toRow))),
       target: Math.round(Number(t.target)),
     }))
-    .filter((t) => Number.isFinite(t.target) && t.target > 0 && t.fromRow <= rowCount)
+    .filter((t) => Number.isFinite(t.target) && t.target >= 0 && t.fromRow <= rowCount)
     .map((t) => ({ ...t, toRow: Math.min(t.toRow, rowCount) }))
     .filter((t) => t.fromRow <= t.toRow)
     .sort((a, b) => a.fromRow - b.fromRow || a.toRow - b.toRow);
@@ -128,7 +128,7 @@ export function computePlayerTargetUpdates(grid: GradingGrid): Array<{ userId: s
       const userId = grid.cells[cellKey(col.id, rowIndex)];
       if (!userId || seen.has(userId)) continue;
       const target = resolveTargetForCell(col, rowIndex);
-      if (target === null || target <= 0) continue;
+      if (target === null || target < 0) continue;
       seen.add(userId);
       out.push({ userId, target });
     }
@@ -347,7 +347,7 @@ export function splitDraftsToTiers(
   const tiers: GradingTargetTier[] = [];
   for (const split of splits) {
     const target = Math.round(Number(split.target));
-    if (!Number.isFinite(target) || target <= 0) {
+    if (!Number.isFinite(target) || target < 0) {
       return { ok: false, error: 'Enter target for each split' };
     }
     tiers.push({ fromRow: split.fromRow, toRow: split.toRow, target });
@@ -393,8 +393,8 @@ export function parseTargetRangeString(input: string, rowCount: number): ParseTa
     if (fromRow < 1 || toRow > rowCount || fromRow > toRow) {
       return { ok: false, error: `Rows must be between 1 and ${rowCount}` };
     }
-    if (target <= 0) {
-      return { ok: false, error: `Target must be positive in "${part}"` };
+    if (target < 0) {
+      return { ok: false, error: `Target cannot be negative in "${part}"` };
     }
 
     for (let r = fromRow; r <= toRow; r += 1) {
@@ -428,7 +428,7 @@ export function tiersFromCountSplits(splits: CountSplit[], rowCount: number): Gr
   splits.forEach((split) => {
     const count = Math.max(0, Math.round(Number(split.count)));
     const target = Math.round(Number(split.target));
-    if (count <= 0 || target <= 0 || row > rowCount) return;
+    if (count <= 0 || target < 0 || row > rowCount) return;
     const toRow = Math.min(rowCount, row + count - 1);
     tiers.push({ fromRow: row, toRow, target });
     row = toRow + 1;

@@ -5,11 +5,33 @@ import * as XLSX from 'xlsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Trophy, Activity, Users, Flame, Download } from 'lucide-react';
+import { Trophy, Activity, Users, Flame, Download, Info, ChevronDown, ChevronUp, AlertCircle, ShieldAlert } from 'lucide-react';
 
 type ScoreDay = { dayNumber: number; published: boolean; calendarDate: string };
 type ScoreTeam = { id: string; name: string; tag: string; players: Array<{ id: string; name: string }> };
-type ScoreRow = { userId: string; dayNumber: number; score: number; slams: number };
+
+export type WalkoverBreakdown = {
+  eventLossScore: number;
+  opponentsTotal: number;
+  teammatesTotal: number;
+  gradeWorstScore: number;
+  gradeMaxDayScore: number | null;
+  targetLossScore: number;
+  finalScore: number;
+  appliedConstraint: 'EVENT_LOSS' | 'GRADE_WORST' | 'TARGET_LOSS' | 'FALLBACK';
+};
+
+export type ScoreRow = {
+  userId: string;
+  dayNumber: number;
+  score: number;
+  slams: number;
+  isWalkover?: boolean;
+  eventName?: string;
+  playerGrade?: string | null;
+  playerTarget?: number | null;
+  breakdown?: WalkoverBreakdown;
+};
 
 const PLAYER_COLS = [
   { wch: 8 },
@@ -19,7 +41,8 @@ const PLAYER_COLS = [
   { wch: 24 },
   { wch: 10 },
   { wch: 8 },
-  { wch: 12 },
+  { wch: 16 },
+  { wch: 36 },
 ];
 const TEAM_COLS = [
   { wch: 8 },
@@ -57,6 +80,20 @@ function buildExcelRows(
         teamTotalSlams += row.slams || 0;
         submittedCount++;
       }
+      let statusStr = 'Pending';
+      let woDetail = '';
+      if (row) {
+        if (row.isWalkover) {
+          statusStr = 'Walkover (WO)';
+          const b = row.breakdown;
+          if (b) {
+            woDetail = `EventLoss: ${b.eventLossScore} (Opp:${b.opponentsTotal}+1 - Tm:${b.teammatesTotal}), GradeWorst: ${b.gradeWorstScore}, TargetLoss: ${b.targetLossScore} => Final: ${b.finalScore}`;
+          }
+        } else {
+          statusStr = 'Submitted';
+        }
+      }
+
       playerRows.push({
         Day: dayMeta.dayNumber,
         Date: dayMeta.calendarDate || '',
@@ -65,7 +102,8 @@ function buildExcelRows(
         Player: player.name,
         Points: row ? row.score : '',
         Slams: row ? row.slams : '',
-        Status: row ? 'Submitted' : 'Pending',
+        Status: statusStr,
+        'Walkover Calculation': woDetail,
       });
     });
 
@@ -101,6 +139,19 @@ function writeScoreWorkbook(
   XLSX.writeFile(workbook, fileName);
 }
 
+function constraintBadgeLabel(appliedConstraint?: string) {
+  switch (appliedConstraint) {
+    case 'EVENT_LOSS':
+      return 'Event Loss (Opponents + 1)';
+    case 'GRADE_WORST':
+      return 'Grade Worst (Day Max + 1)';
+    case 'TARGET_LOSS':
+      return 'Target Loss (Target + 1)';
+    default:
+      return 'Calculated Penalty';
+  }
+}
+
 export default function PlayerScoresClient({
   editionTitle,
   days,
@@ -110,17 +161,22 @@ export default function PlayerScoresClient({
   editionTitle: string;
   days?: Array<{ dayNumber: number; published: boolean; calendarDate: string }>;
   teams?: Array<{ id: string; name: string; tag: string; players: Array<{ id: string; name: string }> }>;
-  scores?: Array<{ userId: string; dayNumber: number; score: number; slams: number }>;
+  scores?: Array<ScoreRow>;
 }) {
   const dayList = Array.isArray(days) ? days : [];
   const teamList = Array.isArray(teams) ? teams : [];
   const scoreList = Array.isArray(scores) ? scores : [];
 
   const [day, setDay] = React.useState(1);
+  const [expandedWoUsers, setExpandedWoUsers] = React.useState<Record<string, boolean>>({});
 
   const selected = dayList.find((d) => d.dayNumber === day) || dayList[0];
   const selectedDay = selected?.dayNumber ?? day;
   const byUser = scoresByUserForDay(scoreList, selectedDay);
+
+  const toggleWoExpand = (userId: string) => {
+    setExpandedWoUsers((prev) => ({ ...prev, [userId]: !prev[userId] }));
+  };
 
   const downloadDayExcel = () => {
     if (!selected) return;
@@ -165,7 +221,7 @@ export default function PlayerScoresClient({
           <Trophy className="h-7 w-7 text-amber-500" /> Player Scores
         </h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          {editionTitle} — Day-wise and team-wise real-time score updates.
+          {editionTitle} — Day-wise and team-wise real-time score updates with official walkover calculations.
         </p>
       </div>
 
@@ -254,37 +310,152 @@ export default function PlayerScoresClient({
                   </div>
                 </CardHeader>
 
-                <CardContent className="pt-3 space-y-2">
+                <CardContent className="pt-3 space-y-2.5">
                   {(team.players || []).length === 0 ? (
                     <div className="text-xs text-muted-foreground italic py-2">No players assigned to this team.</div>
                   ) : (
                     (team.players || []).map((player) => {
                       const row = byUser.get(player.id);
+                      const isExpanded = Boolean(expandedWoUsers[player.id]);
+                      const isWo = Boolean(row?.isWalkover);
+                      const b = row?.breakdown;
+
                       return (
                         <div
                           key={player.id}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-background/60 border border-border/40 hover:border-border transition-colors"
+                          className={`rounded-xl border transition-all ${
+                            isWo
+                              ? 'bg-rose-950/20 border-rose-500/40'
+                              : 'bg-background/60 border-border/40 hover:border-border'
+                          }`}
                         >
-                          <span className="font-bold text-sm text-foreground flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-amber-500/70 shrink-0" />
-                            {player.name}
-                          </span>
-
-                          {row ? (
+                          <div className="flex items-center justify-between p-2.5">
                             <div className="flex items-center gap-2">
-                              <Badge variant="carrom" className="font-mono text-xs font-black px-2.5 py-0.5">
-                                {row.score} pts
-                              </Badge>
-                              {row.slams > 0 && (
-                                <span className="text-xs font-extrabold text-amber-400 flex items-center gap-0.5">
-                                  <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> {row.slams}
-                                </span>
-                              )}
+                              <span
+                                className={`h-2 w-2 rounded-full shrink-0 ${
+                                  isWo ? 'bg-rose-500' : 'bg-amber-500/70'
+                                }`}
+                              />
+                              <div>
+                                <span className="font-bold text-sm text-foreground">{player.name}</span>
+                                {row?.playerGrade && (
+                                  <span className="ml-2 text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                    {row.playerGrade}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-xs font-semibold text-muted-foreground/60 italic">
-                              — Pending
-                            </span>
+
+                            {row ? (
+                              <div className="flex items-center gap-2">
+                                {isWo ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge
+                                      variant="destructive"
+                                      className="font-mono text-xs font-black px-2.5 py-0.5 bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30"
+                                    >
+                                      WO: {row.score} pts
+                                    </Badge>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleWoExpand(player.id)}
+                                      className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20 transition-colors"
+                                      title="Toggle walkover calculation breakdown"
+                                    >
+                                      <Info className="h-3 w-3" />
+                                      {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <Badge variant="carrom" className="font-mono text-xs font-black px-2.5 py-0.5">
+                                    {row.score} pts
+                                  </Badge>
+                                )}
+
+                                {row.slams > 0 && (
+                                  <span className="text-xs font-extrabold text-amber-400 flex items-center gap-0.5">
+                                    <Flame className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> {row.slams}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs font-semibold text-muted-foreground/60 italic">
+                                — Pending
+                              </span>
+                            )}
+                          </div>
+
+                          {/* ── Walkover Breakdown Details Panel ───────────────── */}
+                          {isWo && b && isExpanded && (
+                            <div className="mx-2.5 mb-2.5 p-3 rounded-lg bg-slate-950/80 border border-rose-500/30 text-xs space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                              <div className="flex items-center justify-between border-b border-rose-500/20 pb-1.5">
+                                <div className="font-black text-rose-300 flex items-center gap-1.5">
+                                  <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+                                  Walkover Score Calculation Breakdown
+                                </div>
+                                <span className="text-[10px] font-bold text-rose-400/80">
+                                  {row.eventName || `Event Match`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                                {/* 1. Event Loss */}
+                                <div
+                                  className={`p-2 rounded border ${
+                                    b.appliedConstraint === 'EVENT_LOSS'
+                                      ? 'bg-rose-500/20 border-rose-400 text-foreground font-semibold shadow-sm'
+                                      : 'bg-card/40 border-border/40 text-muted-foreground'
+                                  }`}
+                                >
+                                  <div className="text-[10px] font-bold uppercase text-amber-400">1. Event Loss Rule</div>
+                                  <div className="text-xs font-black text-foreground mt-0.5">{b.eventLossScore} pts</div>
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                                    Opponents ({b.opponentsTotal}) + 1 - Teammates ({b.teammatesTotal})
+                                  </div>
+                                </div>
+
+                                {/* 2. Grade Worst */}
+                                <div
+                                  className={`p-2 rounded border ${
+                                    b.appliedConstraint === 'GRADE_WORST'
+                                      ? 'bg-rose-500/20 border-rose-400 text-foreground font-semibold shadow-sm'
+                                      : 'bg-card/40 border-border/40 text-muted-foreground'
+                                  }`}
+                                >
+                                  <div className="text-[10px] font-bold uppercase text-amber-400">2. Grade Worst Rule</div>
+                                  <div className="text-xs font-black text-foreground mt-0.5">{b.gradeWorstScore} pts</div>
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                                    {row.playerGrade || 'Grade'} Max ({b.gradeMaxDayScore ?? 'N/A'}) + 1
+                                  </div>
+                                </div>
+
+                                {/* 3. Target Loss */}
+                                <div
+                                  className={`p-2 rounded border ${
+                                    b.appliedConstraint === 'TARGET_LOSS'
+                                      ? 'bg-rose-500/20 border-rose-400 text-foreground font-semibold shadow-sm'
+                                      : 'bg-card/40 border-border/40 text-muted-foreground'
+                                  }`}
+                                >
+                                  <div className="text-[10px] font-bold uppercase text-amber-400">3. Target Rule</div>
+                                  <div className="text-xs font-black text-foreground mt-0.5">
+                                    {b.targetLossScore > 0 ? `${b.targetLossScore} pts` : 'No Target'}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                                    {row.playerTarget ? `Target (${row.playerTarget}) + 1` : 'No target set'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1.5 border-t border-rose-500/20 gap-1.5 text-[11px]">
+                                <div className="text-muted-foreground">
+                                  Final Score: <span className="font-mono font-black text-rose-300">max({b.eventLossScore}, {b.gradeWorstScore}, {b.targetLossScore || 0})</span>
+                                </div>
+                                <div className="text-rose-300 font-extrabold flex items-center gap-1">
+                                  Applied Constraint: <span className="text-amber-400">{constraintBadgeLabel(b.appliedConstraint)}</span>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
                       );
