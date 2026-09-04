@@ -8,6 +8,8 @@ import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export default async function OrganizerPage() {

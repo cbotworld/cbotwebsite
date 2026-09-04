@@ -62,9 +62,11 @@ import type { WebsiteCmsContent } from '@/lib/website-cms';
 
 type PlayerStatSort = 'none' | 'asc' | 'desc';
 
-function isEnrolledParticipant(p: { status?: string; enrolledAt?: unknown }) {
+function isEnrolledParticipant(p: { status?: string; enrolledAt?: unknown; paymentStatus?: unknown }) {
+  if (!p) return false;
   const status = String(p.status || '').toUpperCase();
-  return status === 'ENROLLED' || status === 'QUALIFIED' || Boolean(p.enrolledAt);
+  if (status === 'CANCELLED' || status === 'DROPPED' || status === 'REJECTED') return false;
+  return true;
 }
 
 function getPlayerStatValue(usr: any, field: InlineStatField): number | null {
@@ -399,6 +401,16 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         isEnrolledParticipant(p) || Boolean(p.teamId || p.team)
     );
   }, [selectedEditionParticipants, viewingDraftSlot]);
+  const slotAEnrolledCount = React.useMemo(() => {
+    const parts = slotAEdition?.participants || [];
+    return parts.filter((p: any) => isEnrolledParticipant(p) || Boolean(p.teamId || p.team)).length;
+  }, [slotAEdition]);
+
+  const slotBEnrolledCount = React.useMemo(() => {
+    const parts = slotBEdition?.participants || [];
+    return parts.filter(isEnrolledParticipant).length;
+  }, [slotBEdition]);
+
   const enrolledCount = enrolledParticipants.length;
   const tournamentInProgress = String(selectedEdition?.status || '').toUpperCase() === 'IN_PROGRESS';
 
@@ -1289,14 +1301,17 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               aria-selected={tournamentSlot === 'A'}
               onClick={() => void handleTournamentSlotChange('A')}
               disabled={ensuringSlots}
-              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 ${
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 ${
                 tournamentSlot === 'A'
                   ? 'bg-amber-500 text-black shadow-md'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               }`}
             >
-              <Trophy className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-              Tournament A
+              <Trophy className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5" />
+              <span>Tournament A</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${tournamentSlot === 'A' ? 'bg-black/20 text-black' : 'bg-amber-500/20 text-amber-300'}`}>
+                {slotAEnrolledCount}
+              </span>
             </button>
             <button
               type="button"
@@ -1304,18 +1319,21 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               aria-selected={tournamentSlot === 'B'}
               onClick={() => void handleTournamentSlotChange('B')}
               disabled={ensuringSlots}
-              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 ${
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 ${
                 tournamentSlot === 'B'
                   ? 'bg-violet-500 text-white shadow-md'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               }`}
             >
               {ensuringSlots ? (
-                <Loader2 className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5 animate-spin" />
               ) : (
-                <Award className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+                <Award className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5" />
               )}
-              Tournament B
+              <span>Tournament B</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${tournamentSlot === 'B' ? 'bg-black/20 text-white' : 'bg-violet-500/20 text-violet-300'}`}>
+                {slotBEnrolledCount}
+              </span>
             </button>
           </div>
           <div className="text-[11px] font-semibold text-muted-foreground max-w-2xl">
@@ -1515,7 +1533,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <KeyRound className="h-3.5 w-3.5" /> Players
           </TabsTrigger>
           <TabsTrigger value="enrolled-players" className="text-xs font-bold gap-1.5 px-3 py-2">
-            <UserCheck className="h-3.5 w-3.5 text-violet-400" /> Enrolled
+            <UserCheck className="h-3.5 w-3.5 text-violet-400" /> Enrolled ({enrolledCount})
           </TabsTrigger>
           <TabsTrigger value="grading" className="text-xs font-bold gap-1.5 px-3 py-2">
             <GraduationCap className="h-3.5 w-3.5" /> Grading

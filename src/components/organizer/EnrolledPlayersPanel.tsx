@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -96,12 +97,26 @@ export default function EnrolledPlayersPanel({
   enrollmentFee?: number | null;
   onParticipantsChange: (participants: EnrolledRow[]) => void;
 }) {
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [listSearch, setListSearch] = React.useState('');
   const [addSearch, setAddSearch] = React.useState('');
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState('');
   const [inlineStatEdit, setInlineStatEdit] = React.useState<InlineStatEditState>(null);
   const [inlineStatSaving, setInlineStatSaving] = React.useState<string | null>(null);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      router.refresh();
+      if (editionId) {
+        await syncUnlockedGradeAverages(editionId);
+      }
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 800);
+    }
+  };
 
   const fee = Number(enrollmentFee) || 0;
   const showPaymentColumns = fee > 0;
@@ -289,14 +304,28 @@ export default function EnrolledPlayersPanel({
             Grade average syncs from current average until you edit it manually.
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
-          <Input
-            value={listSearch}
-            onChange={(e) => setListSearch(e.target.value)}
-            placeholder="Search enrolled players..."
-            className="h-9 text-xs font-semibold bg-background border-sky-500/40 focus:border-sky-500 pr-7"
-          />
-          <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void handleManualRefresh()}
+            disabled={isRefreshing}
+            className="h-9 text-xs font-bold border-border hover:border-sky-500/50 hover:bg-sky-500/10 text-muted-foreground hover:text-foreground shrink-0"
+            title="Refresh enrolled players"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin text-sky-400' : 'text-muted-foreground'}`} />
+            Refresh
+          </Button>
+          <div className="relative w-full sm:w-64">
+            <Input
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+              placeholder="Search enrolled players..."
+              className="h-9 text-xs font-semibold bg-background border-sky-500/40 focus:border-sky-500 pr-7"
+            />
+            <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
       </CardHeader>
 
