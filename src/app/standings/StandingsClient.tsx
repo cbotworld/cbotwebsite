@@ -177,7 +177,18 @@ export default function StandingsClient({ payload }: { payload: any }) {
                         {(g.rows || []).map((row: any) => (
                           <TableRow key={row.teamId}>
                             <TableCell className="font-black">{row.rank}</TableCell>
-                            <TableCell className="font-semibold">{row.teamName}</TableCell>
+                            <TableCell className="font-semibold">
+                              <div className="flex items-center gap-2">
+                                {row.teamLogo ? (
+                                  <img src={row.teamLogo} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-border flex items-center justify-center text-[10px] text-slate-400 font-bold">
+                                    {row.teamName?.[0]}
+                                  </div>
+                                )}
+                                <span>{row.teamName}</span>
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <StatButton value={row.eventPts} onClick={() => setOpen({ row, focus: 'event' })} />
                             </TableCell>

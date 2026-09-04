@@ -337,6 +337,7 @@ export interface StandingDayBreakdown {
 export interface StageStandingRow {
   teamId: string;
   teamName: string;
+  teamLogo?: string | null;
   teamTag?: string;
   eventPts: number;
   slamBonus: number;

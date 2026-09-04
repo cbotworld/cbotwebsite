@@ -9,6 +9,7 @@ import { filterMainTeams, filterSpocTeams } from '@/lib/spoc-teams';
 export type StandingTeam = {
   id: string;
   name: string;
+  logo?: string | null;
   tag?: string | null;
   teamType?: string | null;
   savedLineups?: string | null;
@@ -82,6 +83,7 @@ function emptyRow(team: StandingTeam): StageStandingRow {
   return {
     teamId: team.id,
     teamName: team.name,
+    teamLogo: team.logo,
     teamTag: team.tag || undefined,
     eventPts: 0,
     slamBonus: 0,

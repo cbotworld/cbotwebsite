@@ -833,6 +833,7 @@ async function loadPublicStandings() {
     return {
       id: t.id,
       name: t.name,
+      logo: t.logo,
       tag: t.tag,
       teamType: t.teamType,
       savedLineups: t.savedLineups,
