@@ -288,6 +288,11 @@ export interface PlayerDayScoreRow {
   score: number;
   slams: number;
   boards?: unknown;
+  isWalkover?: boolean;
+  eventName?: string;
+  playerGrade?: string | null;
+  playerTarget?: number | null;
+  breakdown?: any;
 }
 
 export interface PlayerAverageLogRow {

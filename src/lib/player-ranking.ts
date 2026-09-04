@@ -75,6 +75,9 @@ export function rankPlayers(opts: {
     for (const day of days) {
       const row = byKey.get(scoreKey(player.userId, day));
       if (row) {
+        if (row.isWalkover) {
+          walkovers += 1;
+        }
         const boards = normalizeBoards(row.boards, row.score, row.slams);
         const agg = aggregateBoards(boards);
         totalScore += agg.score;
@@ -178,10 +181,10 @@ export function countEventWinsForPlayer(
   dayDates?: DayDatesInput,
   now = new Date(),
 ): number {
-  const scoreMapByDay = new Map<number, Record<string, { score: number; slams: number }>>();
+  const scoreMapByDay = new Map<number, Record<string, { score: number; slams: number; isWalkover?: boolean }>>();
   for (const row of scores) {
     const map = scoreMapByDay.get(row.dayNumber) || {};
-    map[row.userId] = { score: row.score, slams: row.slams };
+    map[row.userId] = { score: row.score, slams: row.slams, isWalkover: row.isWalkover };
     scoreMapByDay.set(row.dayNumber, map);
   }
   const byId = new Map(teams.map((t) => [t.id, t]));

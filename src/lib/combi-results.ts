@@ -6,7 +6,7 @@ export type LineupRound = {
 
 export type RosterPlayer = { id: string; name?: string | null };
 
-export type DayScoreMap = Record<string, { score: number; slams: number }>;
+export type DayScoreMap = Record<string, { score: number; slams: number; isWalkover?: boolean }>;
 
 export type EventResult = {
   name: string;
@@ -80,8 +80,8 @@ export function scoreOneEvent(
   if (empty2) {
     return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 2, team2Pts: 0, reason: 'walkover', winnerTeam: 1 };
   }
-  const wo1 = side1.some((id) => !scores[id]);
-  const wo2 = side2.some((id) => !scores[id]);
+  const wo1 = side1.some((id) => !scores[id] || Boolean(scores[id]?.isWalkover));
+  const wo2 = side2.some((id) => !scores[id] || Boolean(scores[id]?.isWalkover));
   if (wo1 && wo2) {
     return { name, format, team1PlayerIds: side1, team2PlayerIds: side2, team1Pts: 0, team2Pts: 0, reason: 'double-walkover', winnerTeam: 0 };
   }

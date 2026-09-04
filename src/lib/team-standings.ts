@@ -47,9 +47,9 @@ export type StageStandingBlock = {
 };
 
 function scoreMapForDay(scores: PlayerDayScoreRow[], day: number) {
-  const map: Record<string, { score: number; slams: number }> = {};
+  const map: Record<string, { score: number; slams: number; isWalkover?: boolean }> = {};
   for (const row of scores) {
-    if (row.dayNumber === day) map[row.userId] = { score: row.score, slams: row.slams };
+    if (row.dayNumber === day) map[row.userId] = { score: row.score, slams: row.slams, isWalkover: row.isWalkover };
   }
   return map;
 }

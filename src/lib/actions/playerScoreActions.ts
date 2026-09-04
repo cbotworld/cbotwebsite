@@ -994,6 +994,11 @@ async function loadPublicStandings() {
     score: s.score,
     slams: s.slams,
     boards: s.boards,
+    isWalkover: s.isWalkover,
+    eventName: s.eventName,
+    playerGrade: s.playerGrade,
+    playerTarget: s.playerTarget,
+    breakdown: s.breakdown,
   }));
 
   await recalculateAndPopulateAveragesForEndedDays(edition.id, scoreRows);
