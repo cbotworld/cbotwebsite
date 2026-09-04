@@ -100,6 +100,8 @@ export function resolveYoutubeWatchUrl(stream: {
 
 export type PlayerDayStreamSummary = {
   daysWithYoutube: number[];
+  /** Official (non-practice / non-tie-break) streams, even before a YouTube URL is saved. */
+  daysWithOfficialPlay: number[];
   latestByDay: Record<
     number,
     {
@@ -129,6 +131,7 @@ export function summarizePlayerDayStreams(
   const latestByDay: PlayerDayStreamSummary['latestByDay'] = {};
   const streamCountByDay: Record<number, number> = {};
   const daysWithYoutubeSet = new Set<number>();
+  const daysWithOfficialPlaySet = new Set<number>();
 
   const sorted = [...streams].sort((a, b) => {
     const ta = new Date(a.recordedAt || a.createdAt || 0).getTime();
@@ -145,19 +148,17 @@ export function summarizePlayerDayStreams(
     });
     if (day < 1) continue;
     streamCountByDay[day] = (streamCountByDay[day] || 0) + 1;
-    const url = resolveYoutubeWatchUrl(s);
-    if (!url) continue;
     const bonusLabel =
       typeof (s as { title?: string }).title === 'string' ? (s as { title?: string }).title : null;
-    if (
-      !isBonusPlayRef({
-        matchId: s.matchId,
-        label: bonusLabel,
-        extra: `${s.youtubeUrl || ''} ${s.youtubeEmbedUrl || ''}`,
-      })
-    ) {
-      daysWithYoutubeSet.add(day);
-    }
+    const bonus = isBonusPlayRef({
+      matchId: s.matchId,
+      label: bonusLabel,
+      extra: `${s.youtubeUrl || ''} ${s.youtubeEmbedUrl || ''}`,
+    });
+    if (!bonus) daysWithOfficialPlaySet.add(day);
+    const url = resolveYoutubeWatchUrl(s);
+    if (!url) continue;
+    if (!bonus) daysWithYoutubeSet.add(day);
     if (!latestByDay[day]) {
       latestByDay[day] = {
         youtubeUrl: url,
@@ -175,17 +176,32 @@ export function summarizePlayerDayStreams(
 
   return {
     daysWithYoutube: [...daysWithYoutubeSet].sort((a, b) => a - b),
+    daysWithOfficialPlay: [...daysWithOfficialPlaySet].sort((a, b) => a - b),
     latestByDay,
     streamCountByDay,
   };
 }
 
 /**
- * Sequential YouTube lock applies to FUTURE days only.
+ * Sequential lock applies to FUTURE days only. Opponent TBD does not block go-live.
  * - Past (day < currentDay): not playable.
  * - Current day: always playable — past days never block it.
- * - Future (day > currentDay): needs a YouTube save on the previous remaining day.
+ * - Future (day > currentDay): previous remaining day must be played
+ *   (official stream, YouTube save, or submitted day score).
  */
+
+export function playedDaysForUnlock(
+  summary: PlayerDayStreamSummary,
+  extraDays?: Iterable<number>,
+): Set<number> {
+  const days = new Set<number>([...summary.daysWithYoutube, ...(summary.daysWithOfficialPlay || [])]);
+  if (extraDays) {
+    for (const d of extraDays) {
+      if (Number(d) > 0) days.add(Number(d));
+    }
+  }
+  return days;
+}
 export function isDayUnlockedByYoutubeSequence(
   dayNumber: number,
   scheduledDays: number[],

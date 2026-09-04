@@ -122,6 +122,8 @@ model Edition {
   slot                  String?   @unique
   
   enrollmentFee         Float?    @default(0)
+  paymentQrUrl          String?
+  paymentUpiLink        String?
   publishedAt           DateTime?
   
   prizePool             String    @default("₹0 INR")
@@ -165,9 +167,11 @@ model EditionParticipant {
   result        String?   
   gradeAverage       Float?
   gradeAverageLocked Boolean   @default(false)
+  isSpoc             Boolean   @default(false)
   enrolledAt         DateTime?
   paymentStatus      String?
   paymentAmount      Float?
+  paymentTransactionId String?
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

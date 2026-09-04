@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 import { filterMainTeams, filterSpocTeams, isSpocExhibitionTeam } from '@/lib/spoc-teams';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { safePublicImageUrl } from '@/lib/safe-image-url';
 import { DELETED_USERNAMES } from '@/lib/mock-data';
 import TeamsAndPlayersClient, { type RosterTeam } from './TeamsAndPlayersClient';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 const DUMMY_USERNAMES = new Set(['rajesh_cbot', 'queen_ananya', 'striker_vikram']);
 
@@ -35,11 +36,7 @@ function toMember(
 export default async function TeamsAndPlayersPage() {
   const cms = await getWebsiteCmsContent();
 
-  const edition = await prisma.edition.findFirst({
-    where: { OR: [{ status: 'IN_PROGRESS' }, { status: 'REGISTRATION_OPEN' }] },
-    orderBy: { number: 'desc' },
-    select: { id: true, title: true, number: true },
-  });
+  const edition = await resolveCurrentEdition();
 
   const teams = edition
     ? await prisma.team.findMany({

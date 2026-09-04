@@ -332,7 +332,7 @@ export function DashboardScreen({ navigation }: Props) {
                     <Text style={styles.title}>{match.title || match.label}</Text>
                     <Text style={styles.time}>{match.timeRange}</Text>
                     {!canPlay && !isPast && match.prerequisiteDay ? (
-                      <Text style={styles.lockHint}>Need a Day {match.prerequisiteDay} YouTube save first</Text>
+                      <Text style={styles.lockHint}>Play Day {match.prerequisiteDay} first, then Day {match.dayNumber} unlocks</Text>
                     ) : null}
                   </View>
                   <View
@@ -457,7 +457,7 @@ export function DashboardScreen({ navigation }: Props) {
                             ? 'GO LIVE AGAIN'
                             : 'GO LIVE'
                           : match.prerequisiteDay
-                            ? `NEED DAY ${match.prerequisiteDay} VIDEO`
+                            ? `NEED DAY ${match.prerequisiteDay} PLAY`
                             : 'LOCKED'}
                       </Text>
                     </Pressable>

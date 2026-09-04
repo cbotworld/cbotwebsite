@@ -142,6 +142,7 @@ export async function buildEditionArchiveWorkbook(editionId: string) {
     enrolled_at: p.enrolledAt?.toISOString() || '',
     payment_status: p.paymentStatus || '',
     payment_amount: p.paymentAmount ?? '',
+    payment_transaction_id: p.paymentTransactionId || '',
     career_average: p.user?.average ?? '',
     career_target: p.user?.target ?? '',
   }));

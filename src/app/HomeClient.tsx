@@ -17,7 +17,6 @@ import {
 import { SponsorAvatar } from '@/components/layout/SponsorAvatar';
 import { withImageCacheBust } from '@/lib/safe-image-url';
 import { currentCombiDayNumber } from '@/lib/combi-cutoff';
-import EnrollmentFloatingBar from '@/components/home/EnrollmentFloatingBar';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -51,7 +50,6 @@ export default function HomeClient({
   editionPosterUrl,
   currentEdition,
   websiteCms,
-  registrationEdition,
 }: {
   teams: any[];
   allTeams: any[];
@@ -71,14 +69,6 @@ export default function HomeClient({
     totalDays?: number;
   } | null;
   websiteCms: WebsiteCmsContent;
-  registrationEdition?: {
-    id: string;
-    title: string;
-    number: number;
-    theme?: string | null;
-    enrollmentFee?: number | null;
-    registrationEndDate?: string | null;
-  } | null;
 }) {
   const hero = websiteCms.hero;
   const sponsorsCms = websiteCms.sponsors;
@@ -593,8 +583,6 @@ export default function HomeClient({
           </div>
         </div>
       </Dialog>
-
-      {registrationEdition ? <EnrollmentFloatingBar edition={registrationEdition} /> : null}
 
     </div>
   );

@@ -3,7 +3,7 @@ import HomeClient from './HomeClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 import { sanitizeCmsImages, safePublicImageUrl, withSafeTeamLogo } from '@/lib/safe-image-url';
-import { resolveCurrentEdition, resolveRegistrationEdition } from '@/lib/current-edition';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 
 export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
@@ -11,9 +11,8 @@ export default async function HomePage() {
   try {
     // Only query what is actually rendered on the UI to minimize data transfer size.
     // HomeClient only needs edition metadata for basic display, and teams/allTeams for the marquee image strip (using id, name, tag, logo).
-    const [currentEditionRef, registrationEdition, allTeams, websiteCms] = await Promise.all([
+    const [currentEditionRef, allTeams, websiteCms] = await Promise.all([
       resolveCurrentEdition(),
-      resolveRegistrationEdition(),
       prisma.team.findMany({
         select: {
           id: true,
@@ -78,16 +77,6 @@ export default async function HomePage() {
           totalDays: currentEdition.totalDays ?? 15,
         } : null}
         websiteCms={safeCms}
-        registrationEdition={registrationEdition ? {
-          id: registrationEdition.id,
-          title: registrationEdition.title,
-          number: registrationEdition.number,
-          theme: registrationEdition.theme ?? null,
-          enrollmentFee: registrationEdition.enrollmentFee ?? 0,
-          registrationEndDate: registrationEdition.registrationEndDate
-            ? registrationEdition.registrationEndDate.toISOString()
-            : null,
-        } : null}
       />
     );
   } catch (error) {
@@ -103,7 +92,6 @@ export default async function HomePage() {
         editionPosterUrl={null}
         currentEdition={null}
         websiteCms={DEFAULT_WEBSITE_CMS}
-        registrationEdition={null}
       />
     );
   }

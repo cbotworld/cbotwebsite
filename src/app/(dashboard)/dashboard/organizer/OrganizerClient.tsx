@@ -22,7 +22,6 @@ import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, 
 import { PushNotificationTab } from '@/components/organizer/PushNotificationTab';
 import OrganizerGradingPanel from '@/components/organizer/OrganizerGradingPanel';
 import EnrolledPlayersPanel from '@/components/organizer/EnrolledPlayersPanel';
-import EditionParticipantsPanel from '@/components/organizer/EditionParticipantsPanel';
 import {
   exportEditionArchive,
   emptyEditionTournamentData,
@@ -123,6 +122,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   // Modals
   const [editModalOpen, setEditModalOpen] = React.useState(false);
+  const [editPaymentQrUrl, setEditPaymentQrUrl] = React.useState('');
+  const [editEnrollmentFee, setEditEnrollmentFee] = React.useState(0);
   const [genCredentialsModalOpen, setGenCredentialsModalOpen] = React.useState(false);
   const [addTeamModalOpen, setAddTeamModalOpen] = React.useState(false);
   const [editTeamModalOpen, setEditTeamModalOpen] = React.useState(false);
@@ -388,17 +389,17 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const isLiveSlotA = tournamentSlot === 'A';
   const viewingDraftSlot = tournamentSlot === 'B';
   const selectedEditionParticipants = selectedEdition?.participants || [];
-  const enrolledParticipants = React.useMemo(
-    () => (viewingDraftSlot ? selectedEditionParticipants.filter(isEnrolledParticipant) : []),
-    [selectedEditionParticipants, viewingDraftSlot]
-  );
+  const enrolledParticipants = React.useMemo(() => {
+    if (viewingDraftSlot) {
+      return selectedEditionParticipants.filter(isEnrolledParticipant);
+    }
+    // Tournament A is free — roster / edition participants are the enrolled pool (no UPI).
+    return selectedEditionParticipants.filter(
+      (p: { status?: string; enrolledAt?: unknown; teamId?: string | null; team?: unknown }) =>
+        isEnrolledParticipant(p) || Boolean(p.teamId || p.team)
+    );
+  }, [selectedEditionParticipants, viewingDraftSlot]);
   const enrolledCount = enrolledParticipants.length;
-  const assignedSelectedCount = React.useMemo(() => {
-    if (!selectedEdition) return 0;
-    return (selectedEdition.participants || []).filter(
-      (p: { teamId?: string | null; team?: unknown }) => p.teamId || p.team
-    ).length;
-  }, [selectedEdition]);
   const tournamentInProgress = String(selectedEdition?.status || '').toUpperCase() === 'IN_PROGRESS';
 
   const hasTournamentPayload = React.useMemo(() => {
@@ -569,20 +570,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setSlotActionBusy(null);
   };
 
-  const handleParticipantsChange = React.useCallback((participants: any[]) => {
+  const handleEnrolledParticipantsChange = React.useCallback((participants: any[]) => {
     if (!selectedEditionId) return;
     setEditions((prev) =>
-      prev.map((edition) =>
-        edition.id === selectedEditionId ? { ...edition, participants } : edition
-      )
-    );
-  }, [selectedEditionId]);
-
-  const handleEnrolledParticipantsChange = React.useCallback((participants: any[]) => {
-    if (!slotBEdition?.id) return;
-    setEditions((prev) =>
       prev.map((edition) => {
-        if (edition.id !== slotBEdition.id) return edition;
+        if (edition.id !== selectedEditionId) return edition;
         const enrolledIds = new Set(participants.map((p: { userId: string }) => p.userId));
         const others = (edition.participants || []).filter(
           (p: { userId: string }) => !enrolledIds.has(p.userId)
@@ -590,34 +582,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         return { ...edition, participants: [...others, ...participants] };
       })
     );
-  }, [slotBEdition?.id]);
-
-  const handleUserStatUpdate = React.useCallback((userId: string, updates: { average?: number; target?: number }) => {
-    setUsersList((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updates } : u)));
-    setEditions((prev) =>
-      prev.map((edition) => ({
-        ...edition,
-        participants: (edition.participants || []).map((p: any) =>
-          p.userId === userId && p.user ? { ...p, user: { ...p.user, ...updates } } : p
-        ),
-      }))
-    );
-    if (slotBEdition?.id && updates.average !== undefined) {
-      void syncUnlockedGradeAverages(slotBEdition.id).then(() => {
-        setEditions((prev) =>
-          prev.map((edition) => {
-            if (edition.id !== slotBEdition.id) return edition;
-            const synced = (edition.participants || []).map((p: any) => {
-              if (p.userId !== userId || p.gradeAverageLocked) return p;
-              const gradeAverage = updates.average && updates.average > 0 ? updates.average : null;
-              return { ...p, gradeAverage };
-            });
-            return { ...edition, participants: synced };
-          })
-        );
-      });
-    }
-  }, [slotBEdition?.id]);
+  }, [selectedEditionId]);
 
   const handleDaysNeeded = React.useCallback((days: number) => {
     if (days < 1) return;
@@ -727,15 +692,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   const selectedEditionTeams = filterMainTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
   const selectedEditionSpocTeams = filterSpocTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
-
-  const editionCaptainUserIds = React.useMemo(() => {
-    const ids = new Set<string>();
-    selectedEditionTeams.forEach((team: any) => {
-      if (team.captainId) ids.add(team.captainId);
-      if (team.captain?.id) ids.add(team.captain.id);
-    });
-    return ids;
-  }, [selectedEditionTeams]);
 
   const activeEditions = editions.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REGISTRATION_OPEN');
   const pendingReports = scoreReports.filter((r) => r.status === 'PENDING');
@@ -931,9 +887,22 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     const optimisticDescription = (formData.get('description') as string) || selectedEdition?.themeDescription;
     const optimisticPrizePool = (formData.get('prizePool') as string) || selectedEdition?.prizePool;
     const optimisticMaxTeams = parseInt((formData.get('maxTeams') as string) || '16', 10);
+    const optimisticFee = parseFloat((formData.get('enrollmentFee') as string) || '0');
+    const optimisticQr = (formData.get('paymentQrUrl') as string) || '';
+    const optimisticUpi = (formData.get('paymentUpiLink') as string) || '';
     setEditions(editions.map((ed) =>
       ed.id === selectedEditionId
-        ? { ...ed, title: optimisticTitle, theme: optimisticTheme, themeDescription: optimisticDescription, prizePool: optimisticPrizePool, maxTeams: optimisticMaxTeams }
+        ? {
+            ...ed,
+            title: optimisticTitle,
+            theme: optimisticTheme,
+            themeDescription: optimisticDescription,
+            prizePool: optimisticPrizePool,
+            maxTeams: optimisticMaxTeams,
+            enrollmentFee: Number.isFinite(optimisticFee) ? optimisticFee : ed.enrollmentFee,
+            paymentQrUrl: optimisticFee > 0 ? optimisticQr || null : null,
+            paymentUpiLink: optimisticFee > 0 ? optimisticUpi || null : null,
+          }
         : ed
     ));
     setEditModalOpen(false);
@@ -1376,7 +1345,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setEditModalOpen(true)}
+              onClick={() => {
+                setEditPaymentQrUrl(selectedEdition?.paymentQrUrl || '');
+                setEditEnrollmentFee(Number(selectedEdition?.enrollmentFee) || 0);
+                setEditModalOpen(true);
+              }}
               className="h-7 text-xs font-extrabold border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
             >
               <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Edition
@@ -1422,7 +1395,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
         {viewingDraftSlot && slotBEdition && selectedEditionId && (
           <div className="flex flex-wrap items-center gap-2">
-            {String(selectedEdition?.status).toUpperCase() === 'DRAFT' && (
+            {['DRAFT', 'REGISTRATION_CLOSED'].includes(
+              String(selectedEdition?.status).toUpperCase()
+            ) && (
               <Button
                 type="button"
                 size="sm"
@@ -1467,6 +1442,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             {!publishGuard.canPublish && publishGuard.reason && (
               <p className="text-[10px] text-muted-foreground max-w-xs">{publishGuard.reason}</p>
             )}
+            <p className="text-[10px] text-muted-foreground max-w-xs w-full sm:w-auto">
+              Registration can be opened or closed anytime by the organizer.
+            </p>
           </div>
         )}
 
@@ -1515,15 +1493,15 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <div className="text-3xl font-black text-foreground mt-1">
             {selectedEditionTeams.length}
           </div>
-          {viewingDraftSlot && enrolledCount > 0 ? (
+          {enrolledCount > 0 ? (
             <div className="text-[10px] text-muted-foreground mt-0.5">{enrolledCount} enrolled</div>
           ) : null}
         </Card>
 
         <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-xs font-bold text-emerald-500 uppercase">Selected Players</div>
+          <div className="text-xs font-bold text-emerald-500 uppercase">Enrolled Players</div>
           <div className="text-3xl font-black text-foreground mt-1">
-            {assignedSelectedCount}
+            {enrolledCount}
           </div>
           <div className="text-[10px] text-muted-foreground mt-0.5">
             {usersList.length} total accounts
@@ -1536,14 +1514,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           <TabsTrigger value="players" className="text-xs font-bold gap-1.5 px-3 py-2">
             <KeyRound className="h-3.5 w-3.5" /> Players
           </TabsTrigger>
-          <TabsTrigger value="selected-players" className="text-xs font-bold gap-1.5 px-3 py-2">
-            <UserCheck className="h-3.5 w-3.5 text-sky-400" /> Selected
+          <TabsTrigger value="enrolled-players" className="text-xs font-bold gap-1.5 px-3 py-2">
+            <UserCheck className="h-3.5 w-3.5 text-violet-400" /> Enrolled
           </TabsTrigger>
-          {viewingDraftSlot && (
-            <TabsTrigger value="enrolled-players" className="text-xs font-bold gap-1.5 px-3 py-2">
-              <UserCheck className="h-3.5 w-3.5 text-violet-400" /> Enrolled
-            </TabsTrigger>
-          )}
           <TabsTrigger value="grading" className="text-xs font-bold gap-1.5 px-3 py-2">
             <GraduationCap className="h-3.5 w-3.5" /> Grading
           </TabsTrigger>
@@ -2062,25 +2035,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       </Card>
       </TabsContent>
 
-      <TabsContent value="selected-players" className="mt-4">
-        <EditionParticipantsPanel
-          editionId={selectedEditionId || null}
-          editionTitle={selectedEdition?.title || selectedEdition?.name}
-          participants={selectedEditionParticipants}
-          allUsers={usersList}
-          captainUserIds={editionCaptainUserIds}
-          onParticipantsChange={handleParticipantsChange}
-          onUserStatUpdate={handleUserStatUpdate}
-        />
-      </TabsContent>
-
       <TabsContent value="enrolled-players" className="mt-4">
         <EnrolledPlayersPanel
           editionId={selectedEditionId || null}
           editionTitle={selectedEdition?.title || selectedEdition?.name}
           participants={enrolledParticipants}
           allUsers={usersList}
-          enrollmentFee={slotBEdition?.enrollmentFee}
+          enrollmentFee={selectedEdition?.enrollmentFee}
           onParticipantsChange={handleEnrolledParticipantsChange}
         />
       </TabsContent>
@@ -2090,7 +2051,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           editionId={selectedEditionId || null}
           editionTitle={selectedEdition?.title || selectedEdition?.name}
           users={usersList}
-          enrolledUserIds={viewingDraftSlot ? enrolledParticipants.map((p: { userId: string }) => p.userId) : undefined}
+          enrolledUserIds={enrolledParticipants.map((p: { userId: string }) => p.userId)}
         />
       </TabsContent>
 
@@ -2714,10 +2675,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 step="1"
                 defaultValue={selectedEdition?.enrollmentFee ?? 0}
                 placeholder="0 for free"
+                onChange={(e) => setEditEnrollmentFee(Number(e.target.value) || 0)}
               />
             </div>
             <div>
-              <label className="text-xs font-bold block mb-1">Registration Cutoff</label>
+              <label className="text-xs font-bold block mb-1">Registration Cutoff (optional)</label>
               <Input
                 name="registrationEndDate"
                 type="date"
@@ -2725,6 +2687,38 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               />
             </div>
           </div>
+
+          {editEnrollmentFee > 0 ? (
+            <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="text-xs font-black uppercase tracking-wide text-amber-400">
+                Player payment details
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Upload a UPI QR image and/or paste a UPI/payment link. Players see these in the enroll popup. Hidden for free editions.
+              </p>
+              <input type="hidden" name="paymentQrUrl" value={editPaymentQrUrl} />
+              <ImageUploader
+                label="Payment QR code"
+                value={editPaymentQrUrl}
+                onChange={setEditPaymentQrUrl}
+                bucket="teams"
+                placeholder="Upload QR image or paste image URL"
+              />
+              <div>
+                <label className="text-xs font-bold block mb-1">UPI / Payment link</label>
+                <Input
+                  name="paymentUpiLink"
+                  defaultValue={selectedEdition?.paymentUpiLink || ''}
+                  placeholder="upi://pay?... or https://pay.example.com/..."
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <input type="hidden" name="paymentQrUrl" value="" />
+              <input type="hidden" name="paymentUpiLink" value="" />
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

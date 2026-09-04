@@ -6,12 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   addEnrolledPlayer,
   pullCurrentAverageAsGrade,
   removeEnrolledPlayer,
   syncUnlockedGradeAverages,
+  updateEnrolledPlayerSpoc,
   updateGradeAverage,
 } from '@/lib/actions/tournamentSlotActions';
 import { InlineStatCell, type InlineStatEditState } from '@/components/organizer/InlineStatCell';
@@ -23,9 +25,11 @@ type EnrolledRow = {
   userId: string;
   gradeAverage?: number | null;
   gradeAverageLocked?: boolean;
+  isSpoc?: boolean;
   status?: string;
   paymentStatus?: string | null;
   paymentAmount?: number | null;
+  paymentTransactionId?: string | null;
   enrolledAt?: string | Date | null;
   user?: {
     id: string;
@@ -72,6 +76,11 @@ function paymentLabel(row: EnrolledRow) {
   return status || '—';
 }
 
+function transactionLabel(row: EnrolledRow) {
+  const txn = String(row.paymentTransactionId || '').trim();
+  return txn || '—';
+}
+
 export default function EnrolledPlayersPanel({
   editionId,
   editionTitle,
@@ -93,6 +102,10 @@ export default function EnrolledPlayersPanel({
   const [error, setError] = React.useState('');
   const [inlineStatEdit, setInlineStatEdit] = React.useState<InlineStatEditState>(null);
   const [inlineStatSaving, setInlineStatSaving] = React.useState<string | null>(null);
+
+  const fee = Number(enrollmentFee) || 0;
+  const showPaymentColumns = fee > 0;
+  const tableColSpan = showPaymentColumns ? 8 : 6;
 
   const enrolledUserIds = React.useMemo(() => new Set(participants.map((p) => p.userId)), [participants]);
 
@@ -126,7 +139,8 @@ export default function EnrolledPlayersPanel({
     return sorted.filter((row) => {
       const name = (row.user?.name || '').toLowerCase();
       const username = (row.user?.username || '').toLowerCase();
-      return name.includes(q) || username.includes(q);
+      const txn = (row.paymentTransactionId || '').toLowerCase();
+      return name.includes(q) || username.includes(q) || txn.includes(q);
     });
   }, [participants, listSearch]);
 
@@ -195,6 +209,25 @@ export default function EnrolledPlayersPanel({
     setBusyId(null);
   };
 
+  const handleSpocChange = async (row: EnrolledRow, isSpoc: boolean) => {
+    if (!editionId || !row.userId || Boolean(row.isSpoc) === isSpoc) return;
+    setError('');
+    const busyKey = `spoc-${row.userId}`;
+    setBusyId(busyKey);
+    const previous = participants;
+    onParticipantsChange(participants.map((p) => (p.userId === row.userId ? { ...p, isSpoc } : p)));
+    const res = await updateEnrolledPlayerSpoc(editionId, row.userId, isSpoc);
+    if (res.success && res.participant) {
+      onParticipantsChange(
+        previous.map((p) => (p.userId === row.userId ? (res.participant as EnrolledRow) : p))
+      );
+    } else {
+      onParticipantsChange(previous);
+      setError(res.error || 'Failed to update SPoC.');
+    }
+    setBusyId(null);
+  };
+
   const startGradeEdit = (usr: { id: string }) => {
     const row = participants.find((p) => p.userId === usr.id);
     const value =
@@ -243,12 +276,15 @@ export default function EnrolledPlayersPanel({
             <UserCheck className="h-5 w-5 text-sky-400" /> Enrolled Players
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Edition enrollment for{' '}
+            Enrollment for{' '}
             <strong className="text-amber-400">{editionTitle || 'selected tournament'}</strong>.
             {' '}
             <strong className="text-sky-400">({participants.length} enrolled)</strong>
             {' · '}
             Fee: <strong className="text-emerald-400">{formatEnrollmentFee(enrollmentFee)}</strong>
+            {showPaymentColumns
+              ? ' · UPI transaction IDs appear for paid enrollments.'
+              : ' · Free edition — grade average only (no UPI).'}
             {' · '}
             Grade average syncs from current average until you edit it manually.
           </p>
@@ -324,14 +360,16 @@ export default function EnrolledPlayersPanel({
                 <TableHead>Username</TableHead>
                 <TableHead>Current Avg</TableHead>
                 <TableHead>Grade Avg</TableHead>
-                <TableHead>Payment</TableHead>
+                <TableHead>SPoC (yes/no)</TableHead>
+                {showPaymentColumns ? <TableHead>Payment</TableHead> : null}
+                {showPaymentColumns ? <TableHead>UPI Txn ID</TableHead> : null}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredParticipants.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-xs text-muted-foreground">
+                  <TableCell colSpan={tableColSpan} className="text-center py-10 text-xs text-muted-foreground">
                     {listSearch.trim()
                       ? 'No enrolled players match your search.'
                       : 'No players enrolled yet. Open registration or add players above.'}
@@ -382,7 +420,30 @@ export default function EnrolledPlayersPanel({
                           onSave={saveGradeEdit}
                         />
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{paymentLabel(row)}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.isSpoc ? 'yes' : 'no'}
+                          disabled={busyId === `spoc-${row.userId}` || !editionId}
+                          onChange={(e) => handleSpocChange(row, e.target.value === 'yes')}
+                          aria-label={`SPoC for ${row.user?.name || row.user?.username || 'player'}`}
+                          className={`h-7 w-[4.75rem] text-[10px] font-bold px-1.5 py-0 ${
+                            row.isSpoc
+                              ? 'text-emerald-300 border-emerald-500/50 bg-emerald-500/10'
+                              : 'text-muted-foreground border-border'
+                          }`}
+                        >
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </Select>
+                      </TableCell>
+                      {showPaymentColumns ? (
+                        <TableCell className="text-xs text-muted-foreground">{paymentLabel(row)}</TableCell>
+                      ) : null}
+                      {showPaymentColumns ? (
+                        <TableCell className="font-mono text-[11px] font-semibold text-sky-300 max-w-[10rem] truncate" title={transactionLabel(row)}>
+                          {transactionLabel(row)}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button

@@ -23,6 +23,7 @@ import {
   type RosterPlayer,
 } from '@/lib/combi-results';
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
+import { combiRoundLabel } from '@/lib/combi-round-label';
 import * as XLSX from 'xlsx';
 interface TeamInfo {
   name: string;
@@ -303,7 +304,7 @@ function withMatchResults(
   scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>,
   revealed: boolean,
 ): MatchCombiData {
-  const events = buildMatchEvents(t1Key, t2Key, dayNum, teamsList);
+  const events = buildMatchEvents(t1Key, t2Key, dayNum, teamsList, []);
   const scored = scoreFixtureMatch(t1Key, t2Key, dayNum, teamsList, scores, revealed);
   if (!scored) {
     return { team1Key: t1Key, team2Key: t2Key, events, scored: false };
@@ -353,84 +354,64 @@ function eventScoreLabel(score: number | null | undefined, result: string | null
   return String(score);
 }
 
-function getTeamCombiForDay(
+function playersFromRound(round: any): string {
+  if (!round) return '';
+  if (Array.isArray(round.players)) {
+    return round.players.map((p: any) => String(p || '').trim()).filter(Boolean).join(', ');
+  }
+  return '';
+}
+
+type FormatSlot = { key: string; label: string; format: string };
+
+function eventSlotsFromFormats(formats: string[]): FormatSlot[] {
+  const clean = (formats || []).map((f) => String(f || 'SINGLES').toUpperCase()).filter(Boolean);
+  if (!clean.length) return [];
+  return clean.map((format, index) => {
+    const label = combiRoundLabel(clean, index);
+    return {
+      key: label.toLowerCase().replace(/\s+/g, ''),
+      label,
+      format,
+    };
+  });
+}
+
+function lineupRoundsForDay(teamKey: string, dayNum: number, teamsList: any[]): any[] {
+  const team = findTeamByKey(teamKey, teamsList);
+  if (!team?.savedLineups) return [];
+  try {
+    const parsed = typeof team.savedLineups === 'string' ? JSON.parse(team.savedLineups) : team.savedLineups;
+    const dayData = parsed?.[dayNum] || parsed?.[String(dayNum)];
+    return Array.isArray(dayData?.rounds) ? dayData.rounds : [];
+  } catch {
+    return [];
+  }
+}
+
+function playerStringForSlot(
   teamKey: string,
   dayNum: number,
-  teamsList: any[]
-): Record<string, string> {
+  teamsList: any[],
+  slot: FormatSlot,
+  slotIndex: number
+): string {
   const isDay1 = Number(dayNum) === 1;
   const keyUpper = teamKey.trim().toUpperCase();
-  const defaultCombi: any = isDay1 ? (OFFICIAL_TEAM_COMBIS[keyUpper] || {}) : {};
+  const defaultCombi: Record<string, string> = isDay1 ? (OFFICIAL_TEAM_COMBIS[keyUpper] || {}) : {};
+  const rounds = lineupRoundsForDay(teamKey, dayNum, teamsList);
 
-  if (!teamsList || teamsList.length === 0) {
-    return {
-      singles1: defaultCombi.singles1 || 'NA',
-      singles2: defaultCombi.singles2 || 'NA',
-      singles3: defaultCombi.singles3 || 'NA',
-      singles4: defaultCombi.singles4 || 'NA',
-      doubles1: defaultCombi.doubles1 || 'NA',
-      doubles2: defaultCombi.doubles2 || 'NA',
-      doubles3: defaultCombi.doubles3 || 'NA',
-      triples1: defaultCombi.triples1 || 'NA',
-      triples2: defaultCombi.triples2 || 'NA',
-    };
+  if (rounds.length) {
+    const byName = rounds.find((r: any) => {
+      const rName = r?.name ? String(r.name).toLowerCase().replace(/\s+/g, '') : '';
+      return rName && rName === slot.key;
+    });
+    if (byName) return playersFromRound(byName);
+    if (rounds[slotIndex]) return playersFromRound(rounds[slotIndex]);
   }
 
-  const team = findTeamByKey(teamKey, teamsList);
-
-  if (team?.savedLineups) {
-    try {
-      const parsed = typeof team.savedLineups === 'string' ? JSON.parse(team.savedLineups) : team.savedLineups;
-      const dayData = parsed[dayNum] || parsed[dayNum.toString()];
-      if (dayData && dayData.rounds && Array.isArray(dayData.rounds) && dayData.rounds.length > 0) {
-        const result: Record<string, string> = {};
-        const slots = [
-          'singles1', 'singles2', 'singles3', 'singles4',
-          'doubles1', 'doubles2', 'doubles3',
-          'triples1', 'triples2'
-        ];
-
-        dayData.rounds.forEach((r: any, idx: number) => {
-          if (!r) return;
-          const rName = r.name ? r.name.toLowerCase().replace(/\s+/g, '') : '';
-          let playersStr = '';
-          if (Array.isArray(r.players) && r.players.length > 0) {
-            playersStr = r.players.filter((p: any) => p && String(p).trim() !== '').join(', ');
-          }
-
-          if (rName && slots.includes(rName)) {
-            result[rName] = playersStr || 'NA';
-          } else if (slots[idx]) {
-            if (!result[slots[idx]]) {
-              result[slots[idx]] = playersStr || 'NA';
-            }
-          }
-        });
-
-        slots.forEach((s) => {
-          if (!result[s]) {
-            result[s] = (defaultCombi as any)[s] || 'NA';
-          }
-        });
-
-        return result;
-      }
-    } catch (e) {
-      console.error(`Error parsing savedLineups for team ${teamKey} on day ${dayNum}:`, e);
-    }
-  }
-
-  return {
-    singles1: defaultCombi.singles1 || 'NA',
-    singles2: defaultCombi.singles2 || 'NA',
-    singles3: defaultCombi.singles3 || 'NA',
-    singles4: defaultCombi.singles4 || 'NA',
-    doubles1: defaultCombi.doubles1 || 'NA',
-    doubles2: defaultCombi.doubles2 || 'NA',
-    doubles3: defaultCombi.doubles3 || 'NA',
-    triples1: defaultCombi.triples1 || 'NA',
-    triples2: defaultCombi.triples2 || 'NA',
-  };
+  const fallback = String(defaultCombi[slot.key] || '').trim();
+  return fallback === 'NA' ? '' : fallback;
 }
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -609,28 +590,40 @@ function buildCombiSchedule(opts?: {
   return days;
 }
 
-function buildMatchEvents(t1Key: string, t2Key: string, dayNum: number = 1, teamsList: any[] = []): EventSlot[] {
-  const c1 = getTeamCombiForDay(t1Key, dayNum, teamsList);
-  const c2 = getTeamCombiForDay(t2Key, dayNum, teamsList);
+function buildMatchEvents(
+  t1Key: string,
+  t2Key: string,
+  dayNum: number = 1,
+  teamsList: any[] = [],
+  formats: string[] = []
+): EventSlot[] {
+  let slots = eventSlotsFromFormats(formats);
 
-  return [
-    { label: 'Singles 1', leftPlayers: c1?.singles1 || 'NA', rightPlayers: c2?.singles1 || 'NA' },
-    { label: 'Singles 2', leftPlayers: c1?.singles2 || 'NA', rightPlayers: c2?.singles2 || 'NA' },
-    { label: 'Singles 3', leftPlayers: c1?.singles3 || 'NA', rightPlayers: c2?.singles3 || 'NA' },
-    { label: 'Singles 4', leftPlayers: c1?.singles4 || 'NA', rightPlayers: c2?.singles4 || 'NA' },
-    { label: 'Doubles 1', leftPlayers: c1?.doubles1 || 'NA', rightPlayers: c2?.doubles1 || 'NA' },
-    { label: 'Doubles 2', leftPlayers: c1?.doubles2 || 'NA', rightPlayers: c2?.doubles2 || 'NA' },
-    { label: 'Doubles 3', leftPlayers: c1?.doubles3 || 'NA', rightPlayers: c2?.doubles3 || 'NA' },
-    { label: 'Triples 1', leftPlayers: c1?.triples1 || 'NA', rightPlayers: c2?.triples1 || 'NA' },
-    { label: 'Triples 2', leftPlayers: c1?.triples2 || 'NA', rightPlayers: c2?.triples2 || 'NA' },
-  ];
-}
+  if (!slots.length) {
+    const leftRounds = lineupRoundsForDay(t1Key, dayNum, teamsList);
+    const rightRounds = lineupRoundsForDay(t2Key, dayNum, teamsList);
+    const count = Math.max(leftRounds.length, rightRounds.length);
+    if (count > 0) {
+      const inferred = Array.from({ length: count }, (_, i) =>
+        String(leftRounds[i]?.format || rightRounds[i]?.format || 'SINGLES').toUpperCase()
+      );
+      slots = eventSlotsFromFormats(inferred).map((slot, i) => {
+        const name = leftRounds[i]?.name || rightRounds[i]?.name;
+        if (!name) return slot;
+        return {
+          ...slot,
+          label: String(name),
+          key: String(name).toLowerCase().replace(/\s+/g, ''),
+        };
+      });
+    }
+  }
 
-function filenameToken(value: string) {
-  return value
-    .trim()
-    .replace(/[^A-Za-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  return slots.map((slot, idx) => ({
+    label: slot.label,
+    leftPlayers: playerStringForSlot(t1Key, dayNum, teamsList, slot, idx),
+    rightPlayers: playerStringForSlot(t2Key, dayNum, teamsList, slot, idx),
+  }));
 }
 
 export default function DailyCombisClient({
@@ -652,8 +645,10 @@ export default function DailyCombisClient({
     dayDates?: Record<number, string>;
     pairings?: Array<{ dayNumber?: number; team1Name?: string; team2Name?: string }>;
     stages?: Array<{ startDay?: number; durationDays?: number; kind?: string; name?: string }>;
+    roundFormats?: string[];
   }>({});
   const nowMs = new Date().getTime();
+  const roundFormats = scheduleMeta.roundFormats || [];
 
   const scheduleDays = React.useMemo(
     () =>
@@ -721,6 +716,9 @@ export default function DailyCombisClient({
             dayDates,
             pairings,
             stages: (res as any).stageConfig?.stages || [],
+            roundFormats:
+              (res.edition as any)?.patterns?.map((p: any) => p.matchFormat || 'SINGLES').filter(Boolean) ||
+              [],
           });
         }
       } catch (e) {
@@ -738,7 +736,7 @@ export default function DailyCombisClient({
 
   const filteredMatches = activeDayFixture.matches.map((m) => ({
     ...m,
-    events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams),
+    events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats),
   })).filter((m) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
@@ -755,7 +753,7 @@ export default function DailyCombisClient({
   const handleDownloadExcel = () => {
     const activeMatches = activeDayFixture.matches.map((m) => ({
       ...m,
-      events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams),
+      events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats),
     }));
 
     const rows: any[] = [];
@@ -798,8 +796,7 @@ export default function DailyCombisClient({
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `Day ${selectedDayNum} Combis`);
-    const filePrefix = filenameToken(`${shortName} ${editionLabel}`) || 'Combis';
-    XLSX.writeFile(workbook, `${filePrefix}_Day_${selectedDayNum}_Combis.xlsx`);
+    XLSX.writeFile(workbook, `Official Day ${selectedDayNum} Combinations Spreadsheet.xlsx`);
   };
 
   return (
@@ -917,9 +914,6 @@ export default function DailyCombisClient({
                 <h3 className="text-xs sm:text-sm font-black text-foreground truncate">
                   Official Day {selectedDayNum} Combinations Spreadsheet
                 </h3>
-                <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">
-                  {activeDayFixture.title} · {activeDayFixture.calendarDate}
-                </p>
               </div>
             </div>
             <Button

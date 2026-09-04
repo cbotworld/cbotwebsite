@@ -6,6 +6,7 @@ import PlayerClient from './PlayerClient';
 import { TEAM_TYPE_SPOC, spocTeamMembersFromTeam } from '@/lib/spoc-teams';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
+import { getMyRegistrationEnrollment } from '@/lib/actions/tournamentSlotActions';
 
 export const revalidate = 0;
 
@@ -128,6 +129,15 @@ export default async function PlayerPage() {
   const patterns = await prisma.boardPattern.findMany({ take: 5 });
 
   const websiteCms = await getWebsiteCmsContent();
+  const enrollmentRes = await getMyRegistrationEnrollment();
+  const registrationEnrollment = enrollmentRes.enrollment
+    ? {
+        ...enrollmentRes.enrollment,
+        enrolledAt: enrollmentRes.enrollment.enrolledAt
+          ? enrollmentRes.enrollment.enrolledAt.toISOString()
+          : null,
+      }
+    : null;
 
   // All of this player's streams for the edition (includes day-N / schedule_* match ids)
   const liveStreams = player
@@ -163,6 +173,7 @@ export default async function PlayerPage() {
       initialSpocMembers={spocMembers}
       hasSpocCaptainDesk={hasSpocCaptainDesk}
       initialEditionGrade={editionParticipant?.category || null}
+      registrationEnrollment={registrationEnrollment}
       shortName={websiteCms.site.shortName}
       editionLabel={websiteCms.site.editionLabel}
     />

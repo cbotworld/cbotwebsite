@@ -134,6 +134,8 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const expectedStartDateRaw = formData.get('expectedStartDate') as string | null;
     const enrollmentFeeRaw = formData.get('enrollmentFee') as string | null;
     const registrationEndDateRaw = formData.get('registrationEndDate') as string | null;
+    const paymentQrUrlRaw = formData.get('paymentQrUrl') as string | null;
+    const paymentUpiLinkRaw = formData.get('paymentUpiLink') as string | null;
 
     const roundFormatsRaw = formData.get('roundFormats') as string;
     let roundFormats: string[] = ['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES'];
@@ -208,6 +210,23 @@ export async function updateEdition(editionId: string, formData: FormData) {
       }
     }
 
+    const resolvedFee =
+      enrollmentFeeUpdate.enrollmentFee !== undefined
+        ? enrollmentFeeUpdate.enrollmentFee
+        : Number(existing?.enrollmentFee) || 0;
+
+    let paymentUpdate: { paymentQrUrl?: string | null; paymentUpiLink?: string | null } = {};
+    if (resolvedFee <= 0) {
+      paymentUpdate = { paymentQrUrl: null, paymentUpiLink: null };
+    } else {
+      if (paymentQrUrlRaw !== null && paymentQrUrlRaw !== undefined) {
+        paymentUpdate.paymentQrUrl = paymentQrUrlRaw.trim() || null;
+      }
+      if (paymentUpiLinkRaw !== null && paymentUpiLinkRaw !== undefined) {
+        paymentUpdate.paymentUpiLink = paymentUpiLinkRaw.trim() || null;
+      }
+    }
+
     // The organizer's calendar is the source of truth. Stored edition dates win;
     // only a fallback for an edition that has never had any dates set.
     const chosen = normalizeDayDates(submittedDates) ?? normalizeDayDates(existing?.dayDates);
@@ -241,6 +260,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
           ...(endDate ? { tournamentEndDate: endDate } : {}),
           ...enrollmentFeeUpdate,
           ...registrationEndUpdate,
+          ...paymentUpdate,
         }
       });
     } else {

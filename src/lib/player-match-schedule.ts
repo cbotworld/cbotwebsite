@@ -3,6 +3,7 @@ import { monumentStatus } from '@/lib/bicentennial-monuments';
 import {
   currentPlayDayNumber,
   isDayUnlockedByYoutubeSequence,
+  playedDaysForUnlock,
   summarizePlayerDayStreams,
   tournamentPlayWindow,
   unlockPrerequisiteDay,
@@ -161,13 +162,16 @@ export async function getPlayerMatchSchedule(
     },
   });
   const streamSummary = summarizePlayerDayStreams(playerStreams);
-  const daysWithYoutube = new Set(streamSummary.daysWithYoutube);
   const dayScores = edition?.id
     ? await prisma.playerDayScore.findMany({
         where: { editionId: edition.id },
         select: { userId: true, dayNumber: true, score: true, slams: true },
       })
     : [];
+  const daysPlayed = playedDaysForUnlock(
+    streamSummary,
+    dayScores.filter((s) => s.userId === userId).map((s) => s.dayNumber),
+  );
 
   const rosterOf = (full: (typeof teams)[number] | undefined): RosterPlayer[] => {
     if (!full) return [];
@@ -260,13 +264,11 @@ export async function getPlayerMatchSchedule(
       const isCurrent = isLiveDay || dayNumber === currentDayForView;
       const isPast = !isCurrent && dayNumber < currentDayForView;
       const isFuture = dayNumber > currentDayForView && !isLiveDay;
-      const canGoLive = oppMissing
+      const canGoLive = isPast
         ? false
-        : isPast
-          ? false
-          : isCurrent
-            ? true
-            : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysWithYoutube, currentDayForView);
+        : isCurrent
+          ? true
+          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysPlayed, currentDayForView);
       const latest = streamSummary.latestByDay[dayNumber] || null;
       const prerequisiteDay = isFuture
         ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
@@ -305,12 +307,10 @@ export async function getPlayerMatchSchedule(
         canTieBreakGoLive: true,
         lockedReason: canGoLive
           ? null
-          : oppMissing
-            ? 'Opponent is TBD until this stage is assigned.'
-            : isPast
+          : isPast
             ? 'Go Live is closed for this match day (closed at 8:00pm IST). Existing live sessions started before 8:00pm IST can continue recording.'
             : prerequisiteDay
-              ? `Go live on Day ${prerequisiteDay} and save at least one YouTube video before Day ${dayNumber} unlocks.`
+              ? `Play Day ${prerequisiteDay} (go live or save a score) before Day ${dayNumber} unlocks.`
               : 'This day is not unlocked yet.',
         prerequisiteDay,
         hasYoutube: Boolean(latest),
@@ -356,7 +356,7 @@ export async function getPlayerMatchSchedule(
     currentDay: currentDayForView,
     playableFromDay: isSpocView ? (fixtureDays[0] || 1) : 1,
     playableUntilDay: isSpocView ? (fixtureDays[fixtureDays.length - 1] || currentDayForView) : totalDays,
-    daysWithYoutube: streamSummary.daysWithYoutube,
+    daysWithYoutube: [...daysPlayed].sort((a, b) => a - b),
     warning,
     days,
   };

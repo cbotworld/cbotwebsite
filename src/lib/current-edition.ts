@@ -112,7 +112,15 @@ export async function resolveRegistrationEdition() {
       theme: true,
       enrollmentFee: true,
       registrationEndDate: true,
+      paymentQrUrl: true,
+      paymentUpiLink: true,
       slot: true,
+      organizer: {
+        select: {
+          name: true,
+          username: true,
+        },
+      },
     },
   });
 }

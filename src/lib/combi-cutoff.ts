@@ -1,3 +1,6 @@
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
 /** Fallback calendar when an edition has no Day 1 stored yet (uses today in IST). */
 export function defaultDay1Calendar(): string {
   return istCalendarDateFromMs(Date.now());
@@ -5,8 +8,6 @@ export function defaultDay1Calendar(): string {
 
 /** @deprecated Use defaultDay1Calendar() or the live edition's stored Day 1. */
 export const OFFICIAL_DAY1_CALENDAR = defaultDay1Calendar();
-const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function addDaysIsoDate(dateStr: string, days: number) {
   const [y, m, d] = String(dateStr).slice(0, 10).split('-').map(Number);

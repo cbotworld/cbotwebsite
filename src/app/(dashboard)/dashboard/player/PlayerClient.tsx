@@ -22,6 +22,7 @@ import { monumentStatus } from '@/lib/bicentennial-monuments';
 import {
   currentPlayDayNumber,
   isDayUnlockedByYoutubeSequence,
+  playedDaysForUnlock,
   summarizePlayerDayStreams,
   tournamentPlayWindow,
   unlockPrerequisiteDay,
@@ -34,6 +35,7 @@ import {
   type OrganizerScheduleDay,
 } from '@/lib/organizer-schedule';
 import { ProfileTab } from '@/components/player/ProfileTab';
+import { PlayerEnrollmentCard, type PlayerEnrollmentInfo } from '@/components/player/PlayerEnrollmentCard';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 
 
@@ -48,6 +50,7 @@ export default function PlayerClient({
   initialSpocMembers = [],
   hasSpocCaptainDesk = false,
   initialEditionGrade = null,
+  registrationEnrollment = null,
   shortName = DEFAULT_WEBSITE_CMS.site.shortName,
   editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: {
@@ -61,6 +64,7 @@ export default function PlayerClient({
   initialSpocMembers?: any[];
   hasSpocCaptainDesk?: boolean;
   initialEditionGrade?: string | null;
+  registrationEnrollment?: PlayerEnrollmentInfo | null;
   shortName?: string;
   editionLabel?: string;
 }) {
@@ -317,10 +321,10 @@ export default function PlayerClient({
     const streams = initialStreams || [];
     return new Set<string>(streams.map((s: any) => s.matchId));
   }, [initialStreams]);
-  const daysWithYoutube = React.useMemo(
-    () => new Set(streamSummary.daysWithYoutube),
-    [streamSummary],
-  );
+  const daysPlayed = React.useMemo(() => {
+    const scoreDays = (myDayInfo?.scores || []).map((s: { dayNumber?: number }) => Number(s.dayNumber) || 0);
+    return playedDaysForUnlock(streamSummary, scoreDays);
+  }, [streamSummary, myDayInfo]);
 
   /** Sorted schedule (ascending by matchNumber / scheduledTime) */
   const sortedSchedule = React.useMemo(
@@ -335,8 +339,8 @@ export default function PlayerClient({
 
   /**
    * Current calendar day is always open. Past days are ignored — skipping Day 8
-   * does not block Day 9. Future days unlock only after the previous remaining
-   * day has a YouTube save (Day 9 video unlocks Day 10, Day 10 unlocks Day 11).
+   * does not block Day 9. Future days unlock after the previous remaining day
+   * was played (go live or save a score). Opponent TBD does not block go-live.
    */
   const currentPlayDay = React.useMemo(() => {
     const fromSchedule = currentPlayDayNumber(
@@ -351,9 +355,6 @@ export default function PlayerClient({
 
   const canGoLive = React.useCallback(
     (match: any): { allowed: boolean; prerequisiteDay: number | null } => {
-      if (match?.isTbd || /^tbd$/i.test(match?.team1?.name || '') || /^tbd$/i.test(match?.team2?.name || '')) {
-        return { allowed: false, prerequisiteDay: null };
-      }
       const dayNum = match?.matchNumber || 0;
       const windowStatus = monumentStatus(
         { startIso: match?.scheduledTime, endIso: match?.endIso },
@@ -366,11 +367,11 @@ export default function PlayerClient({
         return { allowed: false, prerequisiteDay: null };
       }
       return {
-        allowed: isDayUnlockedByYoutubeSequence(dayNum, scheduledDayNumbers, daysWithYoutube, currentPlayDay),
+        allowed: isDayUnlockedByYoutubeSequence(dayNum, scheduledDayNumbers, daysPlayed, currentPlayDay),
         prerequisiteDay: unlockPrerequisiteDay(dayNum, scheduledDayNumbers, currentPlayDay),
       };
     },
-    [scheduledDayNumbers, daysWithYoutube, currentPlayDay, nowMs]
+    [scheduledDayNumbers, daysPlayed, currentPlayDay, nowMs]
   );
 
   if (!currentPlayer) {
@@ -451,6 +452,10 @@ export default function PlayerClient({
       </div>
 
 
+
+      {registrationEnrollment ? (
+        <PlayerEnrollmentCard enrollment={registrationEnrollment} />
+      ) : null}
 
       {/* ── ALL MATCHES & GO LIVE LIST ────────────────────────────────────────── */}
       {currentTeam?.id && (

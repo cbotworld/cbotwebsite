@@ -200,13 +200,22 @@ export async function openRegistration(editionId: string) {
       };
     }
 
+    const status = String(existing.status || '').toUpperCase();
+    if (!['DRAFT', 'REGISTRATION_CLOSED', 'REGISTRATION_OPEN', 'UPCOMING'].includes(status)) {
+      return {
+        success: false as const,
+        error: 'Registration can only be opened on the draft tournament (Tournament B).',
+      };
+    }
+
+    // Organizer control is the source of truth — clear any auto-cutoff so reopen works anytime.
     const edition = await prisma.edition.update({
       where: { id: editionId },
-      data: { status: 'REGISTRATION_OPEN' },
+      data: { status: 'REGISTRATION_OPEN', registrationEndDate: null },
       include: editionInclude,
     });
     revalidatePath('/dashboard/organizer');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true as const, edition };
   } catch (error) {
     console.error('[openRegistration]', error);
@@ -235,7 +244,7 @@ export async function closeRegistration(editionId: string) {
       include: editionInclude,
     });
     revalidatePath('/dashboard/organizer');
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true as const, edition };
   } catch (error) {
     console.error('[closeRegistration]', error);
@@ -343,13 +352,23 @@ export async function addEnrolledPlayer(editionId: string, userId: string) {
   if (!auth.ok) return { success: false as const, error: auth.error };
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const [user, edition] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.edition.findUnique({ where: { id: editionId }, select: { enrollmentFee: true } }),
+    ]);
     if (!user) return { success: false as const, error: 'Player not found.' };
 
+    const fee = Number(edition?.enrollmentFee) || 0;
     const gradeAverage = Number(user.average) > 0 ? Number(user.average) : null;
     const participant = await prisma.editionParticipant.upsert({
       where: { editionId_userId: { editionId, userId } },
-      update: { status: 'ENROLLED' },
+      update: {
+        status: 'ENROLLED',
+        enrolledAt: new Date(),
+        ...(fee <= 0
+          ? { paymentStatus: 'FREE', paymentAmount: 0, paymentTransactionId: null }
+          : { paymentStatus: 'WAIVED', paymentAmount: 0 }),
+      },
       create: {
         editionId,
         userId,
@@ -357,7 +376,7 @@ export async function addEnrolledPlayer(editionId: string, userId: string) {
         gradeAverage,
         gradeAverageLocked: false,
         enrolledAt: new Date(),
-        paymentStatus: 'WAIVED',
+        paymentStatus: fee > 0 ? 'WAIVED' : 'FREE',
         paymentAmount: 0,
       },
       include: participantUserSelect,
@@ -406,6 +425,24 @@ export async function updateGradeAverage(editionId: string, userId: string, grad
   }
 }
 
+export async function updateEnrolledPlayerSpoc(editionId: string, userId: string, isSpoc: boolean) {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return { success: false as const, error: auth.error };
+
+  try {
+    const participant = await prisma.editionParticipant.update({
+      where: { editionId_userId: { editionId, userId } },
+      data: { isSpoc: Boolean(isSpoc) },
+      include: participantUserSelect,
+    });
+    revalidatePath('/dashboard/organizer');
+    return { success: true as const, participant };
+  } catch (error) {
+    console.error('[updateEnrolledPlayerSpoc]', error);
+    return { success: false as const, error: 'Failed to update SPoC selection.' };
+  }
+}
+
 export async function pullCurrentAverageAsGrade(editionId: string, userId: string) {
   const auth = await requireOrganizer();
   if (!auth.ok) return { success: false as const, error: auth.error };
@@ -439,7 +476,12 @@ export async function getOpenRegistrationEdition() {
         theme: true,
         enrollmentFee: true,
         registrationEndDate: true,
+        paymentQrUrl: true,
+        paymentUpiLink: true,
         slot: true,
+        organizer: {
+          select: { name: true, username: true },
+        },
       },
     });
     return edition;
@@ -448,7 +490,7 @@ export async function getOpenRegistrationEdition() {
   }
 }
 
-export async function enrollCurrentUser(editionId: string) {
+export async function enrollCurrentUser(editionId: string, paymentTransactionId?: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user || !(session.user as { id?: string }).id) {
     return { success: false as const, error: 'Please log in to enroll.' };
@@ -460,9 +502,7 @@ export async function enrollCurrentUser(editionId: string) {
     if (!edition || edition.status !== 'REGISTRATION_OPEN') {
       return { success: false as const, error: 'Registration is not open for this tournament.' };
     }
-    if (edition.registrationEndDate && new Date() > edition.registrationEndDate) {
-      return { success: false as const, error: 'Registration cutoff has passed.' };
-    }
+    // Status is controlled by the organizer; optional registrationEndDate is display-only.
 
     const existing = await prisma.editionParticipant.findUnique({
       where: { editionId_userId: { editionId, userId } },
@@ -473,6 +513,11 @@ export async function enrollCurrentUser(editionId: string) {
     if (!user) return { success: false as const, error: 'Account not found.' };
 
     const fee = Number(edition.enrollmentFee) || 0;
+    const txnId = String(paymentTransactionId || '').trim();
+    if (fee > 0 && !txnId) {
+      return { success: false as const, error: 'UPI transaction ID is required to enroll.' };
+    }
+
     const gradeAverage = Number(user.average) > 0 ? Number(user.average) : null;
 
     const participant = await prisma.editionParticipant.create({
@@ -485,11 +530,13 @@ export async function enrollCurrentUser(editionId: string) {
         enrolledAt: new Date(),
         paymentStatus: fee > 0 ? 'PAID' : 'FREE',
         paymentAmount: fee > 0 ? fee : 0,
+        paymentTransactionId: fee > 0 ? txnId : null,
       },
     });
 
     revalidatePath('/');
     revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/player');
     return {
       success: true as const,
       participant,
@@ -498,6 +545,163 @@ export async function enrollCurrentUser(editionId: string) {
   } catch (error) {
     console.error('[enrollCurrentUser]', error);
     return { success: false as const, error: 'Enrollment failed. Please try again.' };
+  }
+}
+
+export async function getMyEnrollmentForEdition(editionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !(session.user as { id?: string }).id) {
+    return { success: false as const, enrolled: false as const };
+  }
+  const userId = (session.user as { id: string }).id;
+
+  try {
+    const participant = await prisma.editionParticipant.findUnique({
+      where: { editionId_userId: { editionId, userId } },
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        paymentAmount: true,
+        paymentTransactionId: true,
+        enrolledAt: true,
+      },
+    });
+    if (!participant) return { success: true as const, enrolled: false as const };
+
+    const status = String(participant.status || '').toUpperCase();
+    const enrolled =
+      status === 'ENROLLED' ||
+      status === 'QUALIFIED' ||
+      Boolean(participant.enrolledAt) ||
+      String(participant.paymentStatus || '').toUpperCase() === 'PAID';
+
+    return {
+      success: true as const,
+      enrolled,
+      participant: enrolled ? participant : null,
+    };
+  } catch (error) {
+    console.error('[getMyEnrollmentForEdition]', error);
+    return { success: false as const, enrolled: false as const };
+  }
+}
+
+/** Latest enrollment on Tournament B (draft / registration cup) for the logged-in player. */
+export async function getMyRegistrationEnrollment() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !(session.user as { id?: string }).id) {
+    return { success: false as const, enrollment: null };
+  }
+  const userId = (session.user as { id: string }).id;
+
+  try {
+    const participant = await prisma.editionParticipant.findFirst({
+      where: {
+        userId,
+        OR: [
+          { status: { in: ['ENROLLED', 'QUALIFIED'] } },
+          { enrolledAt: { not: null } },
+          { paymentStatus: { in: ['PAID', 'FREE'] } },
+        ],
+        edition: { slot: 'B' },
+      },
+      orderBy: { enrolledAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        paymentStatus: true,
+        paymentAmount: true,
+        paymentTransactionId: true,
+        enrolledAt: true,
+        edition: {
+          select: {
+            id: true,
+            title: true,
+            number: true,
+            theme: true,
+            enrollmentFee: true,
+            status: true,
+            slot: true,
+            organizer: { select: { name: true, username: true } },
+          },
+        },
+      },
+    });
+
+    if (!participant?.edition) return { success: true as const, enrollment: null };
+
+    return {
+      success: true as const,
+      enrollment: {
+        participantId: participant.id,
+        status: participant.status,
+        paymentStatus: participant.paymentStatus,
+        paymentAmount: participant.paymentAmount,
+        paymentTransactionId: participant.paymentTransactionId,
+        enrolledAt: participant.enrolledAt,
+        edition: {
+          id: participant.edition.id,
+          title: participant.edition.title,
+          number: participant.edition.number,
+          theme: participant.edition.theme,
+          enrollmentFee: participant.edition.enrollmentFee,
+          status: participant.edition.status,
+          organizerName:
+            participant.edition.organizer?.name?.trim() ||
+            participant.edition.organizer?.username?.trim() ||
+            'Organizer',
+        },
+      },
+    };
+  } catch (error) {
+    console.error('[getMyRegistrationEnrollment]', error);
+    return { success: false as const, enrollment: null };
+  }
+}
+
+export async function updateMyPaymentTransactionId(editionId: string, paymentTransactionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !(session.user as { id?: string }).id) {
+    return { success: false as const, error: 'Please log in.' };
+  }
+  const userId = (session.user as { id: string }).id;
+  const txnId = String(paymentTransactionId || '').trim();
+  if (!txnId) {
+    return { success: false as const, error: 'UPI transaction ID is required.' };
+  }
+
+  try {
+    const participant = await prisma.editionParticipant.findUnique({
+      where: { editionId_userId: { editionId, userId } },
+      include: { edition: { select: { enrollmentFee: true } } },
+    });
+    if (!participant) {
+      return { success: false as const, error: 'You are not enrolled in this edition.' };
+    }
+
+    const fee = Number(participant.edition?.enrollmentFee) || Number(participant.paymentAmount) || 0;
+    if (fee <= 0) {
+      return { success: false as const, error: 'This enrollment is free — no transaction ID needed.' };
+    }
+
+    const updated = await prisma.editionParticipant.update({
+      where: { id: participant.id },
+      data: { paymentTransactionId: txnId },
+      select: {
+        id: true,
+        paymentTransactionId: true,
+        paymentStatus: true,
+        paymentAmount: true,
+      },
+    });
+
+    revalidatePath('/dashboard/player');
+    revalidatePath('/dashboard/organizer');
+    return { success: true as const, participant: updated };
+  } catch (error) {
+    console.error('[updateMyPaymentTransactionId]', error);
+    return { success: false as const, error: 'Could not update transaction ID.' };
   }
 }
 
