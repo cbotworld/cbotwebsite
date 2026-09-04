@@ -358,6 +358,8 @@ export interface PlayerRankingRow {
   name: string;
   teamId: string;
   teamName: string;
+  grade?: string | null;
+  target?: number | null;
   daysCounted: number;
   walkovers: number;
   totalScore: number;
@@ -366,6 +368,14 @@ export interface PlayerRankingRow {
   matchesWon: number;
   slams: number;
   rank: number;
+  dayScores?: Array<{
+    dayNumber: number;
+    score: number;
+    slams: number;
+    isWalkover?: boolean;
+    eventName?: string;
+    breakdown?: any;
+  }>;
 }
 
 export interface EditionProfileStats {

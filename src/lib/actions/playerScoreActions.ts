@@ -980,7 +980,7 @@ async function loadPublicStandings() {
     };
   });
 
-  const { allEffectiveScores, pairings } = await resolveEditionWalkoverData(
+  const { allEffectiveScores, userGradeMap, userTargetMap, pairings } = await resolveEditionWalkoverData(
     edition.id,
     maxDay,
     standingTeams,
@@ -1026,6 +1026,8 @@ async function loadPublicStandings() {
       teamId: t.id,
       teamName: t.name,
       average: m.average,
+      grade: userGradeMap.get(m.id) || (m as any).grade || null,
+      target: userTargetMap.get(m.id) ?? m.target ?? null,
       matchesWon: countEventWinsForPlayer(m.id, standingTeams, pairings, scoreRows, edition.dayDates),
     })));
   const players = rankPlayers({

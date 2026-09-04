@@ -24,6 +24,8 @@ export type RankedPlayer = {
   teamId: string;
   teamName: string;
   average?: number | null;
+  grade?: string | null;
+  target?: number | null;
   matchesWon?: number;
 };
 
@@ -71,6 +73,14 @@ export function rankPlayers(opts: {
     let slams = 0;
     let walkovers = 0;
     let daysProcessed = 0;
+    const dayScores: Array<{
+      dayNumber: number;
+      score: number;
+      slams: number;
+      isWalkover?: boolean;
+      eventName?: string;
+      breakdown?: any;
+    }> = [];
 
     for (const day of days) {
       const row = byKey.get(scoreKey(player.userId, day));
@@ -78,6 +88,14 @@ export function rankPlayers(opts: {
         if (row.isWalkover) {
           walkovers += 1;
         }
+        dayScores.push({
+          dayNumber: day,
+          score: row.score,
+          slams: row.slams || 0,
+          isWalkover: row.isWalkover,
+          eventName: row.eventName,
+          breakdown: row.breakdown,
+        });
         const boards = normalizeBoards(row.boards, row.score, row.slams);
         const agg = aggregateBoards(boards);
         totalScore += agg.score;
@@ -94,6 +112,12 @@ export function rankPlayers(opts: {
         const playerBase = running > 0 ? running : seed > 0 ? seed : 0;
         const maxRef = Math.max(highestAverage, playerBase);
         const walkoverDayAvg = (maxRef > 0 ? maxRef : 25) + 1;
+        dayScores.push({
+          dayNumber: day,
+          score: walkoverDayAvg,
+          slams: 0,
+          isWalkover: true,
+        });
         running = running > 0 ? roundAverage((running + walkoverDayAvg) / 2) : roundAverage(walkoverDayAvg);
         daysProcessed += 1;
       }
@@ -111,6 +135,8 @@ export function rankPlayers(opts: {
       name: player.name,
       teamId: player.teamId,
       teamName: player.teamName,
+      grade: player.grade || null,
+      target: player.target ?? null,
       daysCounted: days.length - walkovers,
       walkovers,
       totalScore,
@@ -119,6 +145,7 @@ export function rankPlayers(opts: {
       matchesWon: player.matchesWon || 0,
       slams,
       rank: 0,
+      dayScores,
     };
   });
 
