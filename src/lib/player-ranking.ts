@@ -196,8 +196,7 @@ export function editionProfileStats(opts: {
   return { wins: opts.eventWins || 0, slams, averageBonuses };
 }
 
-export function countEventWinsForPlayer(
-  userId: string,
+export function computeEventWinsMap(
   teams: Array<{
     id: string;
     savedLineups?: string | null;
@@ -207,7 +206,8 @@ export function countEventWinsForPlayer(
   scores: PlayerDayScoreRow[],
   dayDates?: DayDatesInput,
   now = new Date(),
-): number {
+): Map<string, number> {
+  const winsMap = new Map<string, number>();
   const scoreMapByDay = new Map<number, Record<string, { score: number; slams: number; isWalkover?: boolean }>>();
   for (const row of scores) {
     const map = scoreMapByDay.get(row.dayNumber) || {};
@@ -215,7 +215,6 @@ export function countEventWinsForPlayer(
     scoreMapByDay.set(row.dayNumber, map);
   }
   const byId = new Map(teams.map((t) => [t.id, t]));
-  let wins = 0;
   for (const pair of pairings) {
     if (!isCombiSubmissionLocked(pair.dayNumber, dayDates, now)) continue;
     const t1 = byId.get(pair.team1Id);
@@ -231,11 +230,34 @@ export function countEventWinsForPlayer(
       scoreMapByDay.get(pair.dayNumber) || {},
     );
     for (const event of result.events) {
-      if (event.winnerTeam === 1 && event.team1PlayerIds.includes(userId)) wins += 1;
-      if (event.winnerTeam === 2 && event.team2PlayerIds.includes(userId)) wins += 1;
+      if (event.winnerTeam === 1) {
+        for (const pid of event.team1PlayerIds) {
+          winsMap.set(pid, (winsMap.get(pid) || 0) + 1);
+        }
+      } else if (event.winnerTeam === 2) {
+        for (const pid of event.team2PlayerIds) {
+          winsMap.set(pid, (winsMap.get(pid) || 0) + 1);
+        }
+      }
     }
   }
-  return wins;
+  return winsMap;
+}
+
+export function countEventWinsForPlayer(
+  userId: string,
+  teams: Array<{
+    id: string;
+    savedLineups?: string | null;
+    members: RosterPlayer[];
+  }>,
+  pairings: Array<{ dayNumber: number; team1Id: string; team2Id: string }>,
+  scores: PlayerDayScoreRow[],
+  dayDates?: DayDatesInput,
+  now = new Date(),
+): number {
+  const winsMap = computeEventWinsMap(teams, pairings, scores, dayDates, now);
+  return winsMap.get(userId) || 0;
 }
 
 export function daysForStage(stage: Pick<TournamentStage, 'startDay' | 'durationDays'>): number[] {
