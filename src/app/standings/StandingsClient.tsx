@@ -336,13 +336,89 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
                     Day {d.dayNumber} combis {d.opponentName ? `vs ${d.opponentName}` : ''}
                   </div>
-                  {d.events.map((ev: any, i: number) => (
-                    <div key={`${d.dayNumber}-${i}`} className="text-xs grid grid-cols-1 sm:grid-cols-3 gap-1 border-t border-border/60 pt-2">
-                      <div className="font-bold">{ev.name} · {ev.result} · {ev.myPts}–{ev.oppPts}</div>
-                      <div>YOU · {ev.myPlayers || '—'}{ev.myScore != null ? ` (${ev.myScore})` : ''}</div>
-                      <div>OPP · {ev.oppPlayers || '—'}{ev.oppScore != null ? ` (${ev.oppScore})` : ''}</div>
-                    </div>
-                  ))}
+                  {d.events.map((ev: any, i: number) => {
+                    const isWin = String(ev.result || '').includes('Win');
+                    const isLoss = String(ev.result || '').includes('Loss');
+                    const isWO = String(ev.result || '').includes('WO') || ev.reason === 'walkover' || ev.reason === 'double-walkover';
+                    return (
+                      <div key={`${d.dayNumber}-${i}`} className="text-xs grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/60 pt-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                            <span>{ev.name}</span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                isWin
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : isLoss
+                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  : isWO
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-muted text-muted-foreground border border-border'
+                              }`}
+                            >
+                              {ev.result} · {ev.myPts}–{ev.oppPts}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-sky-400">YOU</span>
+                          <span className="text-muted-foreground"> · </span>
+                          {ev.myPlayerList && ev.myPlayerList.length > 0 ? (
+                            ev.myPlayerList.map((p: any, idx: number) => (
+                              <span key={p.id || idx}>
+                                {idx > 0 && ', '}
+                                <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                  {p.name}
+                                  {p.score != null ? ` (${p.score})` : ''}
+                                  {p.isWalkover && (
+                                    <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                      Walkover
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                            ))
+                          ) : (
+                            <span>{ev.myPlayers || '—'}</span>
+                          )}
+                          {ev.myScore != null && (
+                            <span className="font-mono text-muted-foreground font-bold ml-1">
+                              = {ev.myScore}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-rose-400">OPP</span>
+                          <span className="text-muted-foreground"> · </span>
+                          {ev.oppPlayerList && ev.oppPlayerList.length > 0 ? (
+                            ev.oppPlayerList.map((p: any, idx: number) => (
+                              <span key={p.id || idx}>
+                                {idx > 0 && ', '}
+                                <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                  {p.name}
+                                  {p.score != null ? ` (${p.score})` : ''}
+                                  {p.isWalkover && (
+                                    <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                      Walkover
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                            ))
+                          ) : (
+                            <span>{ev.oppPlayers || '—'}</span>
+                          )}
+                          {ev.oppScore != null && (
+                            <span className="font-mono text-muted-foreground font-bold ml-1">
+                              = {ev.oppScore}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : null,
             )}

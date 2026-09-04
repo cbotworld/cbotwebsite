@@ -116,9 +116,42 @@ function dayBucket(row: StageStandingRow, day: number): StandingDayBreakdown {
   return d;
 }
 
-function namesFor(ids: string[], team: StandingTeam) {
+function playerDetailsFor(ids: string[], team: StandingTeam, map: Record<string, { score: number; slams: number; isWalkover?: boolean }>) {
   const byId = new Map(team.members.map((m) => [m.id, String(m.name || '').trim() || 'Player']));
-  return ids.map((id) => byId.get(id) || 'Player').join(', ');
+  return ids.map((id) => {
+    const name = byId.get(id) || 'Player';
+    const s = map[id];
+    return {
+      id,
+      name,
+      score: typeof s?.score === 'number' ? s.score : null,
+      isWalkover: Boolean(s?.isWalkover),
+    };
+  });
+}
+
+function namesFor(ids: string[], team: StandingTeam, map?: Record<string, { score: number; slams: number; isWalkover?: boolean }>) {
+  const byId = new Map(team.members.map((m) => [m.id, String(m.name || '').trim() || 'Player']));
+  return ids.map((id) => {
+    const name = byId.get(id) || 'Player';
+    const isWO = map?.[id]?.isWalkover;
+    return isWO ? `${name} [Walkover]` : name;
+  }).join(', ');
+}
+
+function formatEventResultLabel(ev: { winnerTeam: 0 | 1 | 2; reason?: string }, myTeamNum: 1 | 2) {
+  const oppTeamNum = myTeamNum === 1 ? 2 : 1;
+  if (ev.reason === 'double-walkover') {
+    return 'Double WO';
+  }
+  if (ev.reason === 'walkover') {
+    if (ev.winnerTeam === myTeamNum) return 'Win (WO)';
+    if (ev.winnerTeam === oppTeamNum) return 'Loss (WO)';
+    return 'Void (WO)';
+  }
+  if (ev.winnerTeam === myTeamNum) return 'Win';
+  if (ev.winnerTeam === oppTeamNum) return 'Loss';
+  return 'Tie';
 }
 
 function sideSum(ids: string[], map: Record<string, { score: number; slams: number }>): number | null {
@@ -207,24 +240,30 @@ function applyPairings(
     d1.events = result.events.map((ev) => ({
       name: ev.name,
       format: ev.format,
-      myPlayers: namesFor(ev.team1PlayerIds, t1),
-      oppPlayers: namesFor(ev.team2PlayerIds, t2),
+      myPlayers: namesFor(ev.team1PlayerIds, t1, map),
+      oppPlayers: namesFor(ev.team2PlayerIds, t2, map),
+      myPlayerList: playerDetailsFor(ev.team1PlayerIds, t1, map),
+      oppPlayerList: playerDetailsFor(ev.team2PlayerIds, t2, map),
       myPts: ev.team1Pts,
       oppPts: ev.team2Pts,
       myScore: sideSum(ev.team1PlayerIds, map),
       oppScore: sideSum(ev.team2PlayerIds, map),
-      result: ev.reason === 'walkover' ? (ev.winnerTeam === 1 ? 'Win (WO)' : ev.winnerTeam === 2 ? 'Loss (WO)' : 'Void') : ev.winnerTeam === 1 ? 'Win' : ev.winnerTeam === 2 ? 'Loss' : 'Tie',
+      result: formatEventResultLabel(ev, 1),
+      reason: ev.reason,
     }));
     d2.events = result.events.map((ev) => ({
       name: ev.name,
       format: ev.format,
-      myPlayers: namesFor(ev.team2PlayerIds, t2),
-      oppPlayers: namesFor(ev.team1PlayerIds, t1),
+      myPlayers: namesFor(ev.team2PlayerIds, t2, map),
+      oppPlayers: namesFor(ev.team1PlayerIds, t1, map),
+      myPlayerList: playerDetailsFor(ev.team2PlayerIds, t2, map),
+      oppPlayerList: playerDetailsFor(ev.team1PlayerIds, t1, map),
       myPts: ev.team2Pts,
       oppPts: ev.team1Pts,
       myScore: sideSum(ev.team2PlayerIds, map),
       oppScore: sideSum(ev.team1PlayerIds, map),
-      result: ev.reason === 'walkover' ? (ev.winnerTeam === 2 ? 'Win (WO)' : ev.winnerTeam === 1 ? 'Loss (WO)' : 'Void') : ev.winnerTeam === 2 ? 'Win' : ev.winnerTeam === 1 ? 'Loss' : 'Tie',
+      result: formatEventResultLabel(ev, 2),
+      reason: ev.reason,
     }));
   }
 }

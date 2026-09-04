@@ -223,9 +223,13 @@ export type PlayerMatchEvent = {
   scoresReady: boolean;
 };
 
-function namesForIds(ids: string[], roster: RosterPlayer[]) {
+function namesForIds(ids: string[], roster: RosterPlayer[], scores?: DayScoreMap) {
   const byId = new Map(roster.map((p) => [p.id, String(p.name || '').trim() || 'Player']));
-  return ids.map((id) => byId.get(id) || 'Player');
+  return ids.map((id) => {
+    const name = byId.get(id) || 'Player';
+    const isWO = scores?.[id]?.isWalkover;
+    return isWO ? `${name} [Walkover]` : name;
+  });
 }
 
 export function sideScoreSum(ids: string[], scores: DayScoreMap): number | null {
@@ -293,8 +297,8 @@ export function playerMatchEvent(opts: {
     selected: true,
     name: hit.name,
     format: hit.format,
-    myPlayers: namesForIds(myIds, opts.rosterMine),
-    oppPlayers: namesForIds(oppIds, opts.rosterOpp),
+    myPlayers: namesForIds(myIds, opts.rosterMine, opts.scores),
+    oppPlayers: namesForIds(oppIds, opts.rosterOpp, opts.scores),
     myScore: opts.scoresReady ? sideScoreSum(myIds, opts.scores) : null,
     oppScore: opts.scoresReady ? sideScoreSum(oppIds, opts.scores) : null,
     result,

@@ -301,16 +301,26 @@ export interface PlayerAverageLogRow {
   effectiveFrom: string;
 }
 
+export interface StandingEventPlayerDetail {
+  id: string;
+  name: string;
+  score: number | null;
+  isWalkover?: boolean;
+}
+
 export interface StandingDayEvent {
   name: string;
   format: string;
   myPlayers: string;
   oppPlayers: string;
+  myPlayerList?: StandingEventPlayerDetail[];
+  oppPlayerList?: StandingEventPlayerDetail[];
   myPts: number;
   oppPts: number;
   myScore: number | null;
   oppScore: number | null;
   result: string;
+  reason?: string;
 }
 
 export interface StandingDayPlayerBonus {
