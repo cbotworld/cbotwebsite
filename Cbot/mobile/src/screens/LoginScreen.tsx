@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { loginPlayer } from '../api/website';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { RootStackParamList } from '../navigation/types';
+import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
 
 const logo = require('../../assets/logo.png');
 const PIN_LENGTH = 4;
@@ -28,6 +29,7 @@ export function LoginScreen({ navigation }: Props) {
   const [pinFocus, setPinFocus] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const pinRefs = useRef<Array<TextInput | null>>([null, null, null, null]);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -188,8 +190,17 @@ export function LoginScreen({ navigation }: Props) {
           >
             <Text style={styles.skipText}>CONTINUE WITHOUT LOGIN</Text>
           </Pressable>
+
+          <Pressable style={styles.privacyLink} onPress={() => setPrivacyOpen(true)}>
+            <Text style={styles.privacyLinkText}>
+              By signing in, you agree to our{' '}
+              <Text style={styles.privacyLinkHighlight}>Privacy Policy</Text>
+            </Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PrivacyPolicyModal visible={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -257,5 +268,8 @@ const styles = StyleSheet.create({
   registerLink: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
   registerLinkText: { color: '#cbd5e1', fontSize: 13 },
   registerLinkBold: { color: '#f59e0b', fontWeight: '800' },
+  privacyLink: { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
+  privacyLinkText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
+  privacyLinkHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline' },
   error: { color: '#fca5a5', marginTop: 12, textAlign: 'center' },
 });

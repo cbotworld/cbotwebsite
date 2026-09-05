@@ -80,6 +80,7 @@ export default function LeaderboardClient({
               <option value="UK">UK</option>
               <option value="Italy">Italy</option>
               <option value="France">France</option>
+              <option value="Denmark">Denmark</option>
             </select>
           </div>
           <Button onClick={handleDownload} disabled={isDownloading} variant="outline" className="font-bold border-amber-500/30 text-amber-500 text-xs h-9 sm:h-10">

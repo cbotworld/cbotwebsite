@@ -29,6 +29,7 @@ import {
 } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 import { useAppDialog } from '../components/AppDialog';
+import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
 
 type Props = {
   navigation: CompositeNavigationProp<
@@ -43,6 +44,7 @@ export function ProfileScreen({ navigation }: Props) {
   const session = getSession();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -403,9 +405,13 @@ export function ProfileScreen({ navigation }: Props) {
               {saving ? <ActivityIndicator color="#0f172a" /> : <Text style={styles.buttonText}>SAVE PROFILE</Text>}
             </Pressable>
 
-            <Text style={styles.section}>SECURITY</Text>
+            <Text style={styles.section}>SECURITY & PRIVACY</Text>
             <Pressable style={styles.secondary} onPress={() => { setPinError(null); setPinOpen(true); }}>
               <Text style={styles.secondaryText}>UPDATE PIN</Text>
+            </Pressable>
+
+            <Pressable style={[styles.secondary, { marginTop: 8 }]} onPress={() => setPrivacyOpen(true)}>
+              <Text style={styles.secondaryText}>PRIVACY POLICY</Text>
             </Pressable>
 
             <Pressable style={styles.logout} onPress={logout}>
@@ -430,20 +436,36 @@ export function ProfileScreen({ navigation }: Props) {
           <Pressable style={styles.pinBackdrop} onPress={closeDeleteModal} />
           <View style={styles.pinCard}>
             {deleteStep === 'form' ? (
-              <>
+              <ScrollView style={{ maxHeight: 480 }} contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
                 <Text style={[styles.pinKicker, { color: '#ef4444' }]}>DANGER ZONE</Text>
                 <Text style={styles.pinTitle}>Delete Account</Text>
                 <Text style={styles.pinHint}>
-                  This will permanently delete your account and all your scores, stats, and data. This cannot be undone.
+                  Permanently remove your CBOT player account and all associated tournament data.
                 </Text>
+
+                {/* Detailed Deletion Scope */}
+                <View style={styles.deleteScopeBox}>
+                  <Text style={styles.deleteScopeHeader}>What will be deleted permanently:</Text>
+                  <Text style={styles.deleteScopeItem}>• <Text style={styles.boldText}>Profile & Login:</Text> Your name, username, PIN, email, WhatsApp number, bio, and address.</Text>
+                  <Text style={styles.deleteScopeItem}>• <Text style={styles.boldText}>Match & Score History:</Text> All match scores, day scores, target bonus achievements, and averages.</Text>
+                  <Text style={styles.deleteScopeItem}>• <Text style={styles.boldText}>Tournament Rosters:</Text> Edition participations, team lineups, and SPOC memberships.</Text>
+                  <Text style={styles.deleteScopeItem}>• <Text style={styles.boldText}>Media & Broadcasts:</Text> Live match stream recordings and score reports.</Text>
+                </View>
+
+                <View style={styles.deleteAlertBox}>
+                  <Text style={styles.deleteAlertText}>
+                    ⚠️ <Text style={styles.boldText}>Irreversible:</Text> Deletion is instantaneous and cannot be undone. There is no grace period.
+                  </Text>
+                </View>
+
                 <Field
-                  label="TYPE YOUR USERNAME"
+                  label="TYPE YOUR USERNAME TO CONFIRM"
                   value={deleteUsername}
                   onChange={(v) => setDeleteUsername(v.replace(/\s/g, ''))}
                   keyboard="default"
                 />
                 <Field
-                  label="TYPE YOUR PIN"
+                  label="TYPE YOUR 4-DIGIT PIN"
                   value={deletePin}
                   onChange={(v) => setDeletePin(v.replace(/[^\d]/g, '').slice(0, 4))}
                   keyboard="number-pad"
@@ -451,24 +473,30 @@ export function ProfileScreen({ navigation }: Props) {
                   maxLength={4}
                 />
                 {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+
+                <Text style={styles.deleteSupportNote}>
+                  Need help or want to update details instead? Email{' '}
+                  <Text style={{ color: '#f59e0b', fontWeight: '700' }}>cbotworld@gmail.com</Text>
+                </Text>
+
                 <Pressable
                   style={[styles.deleteConfirmBtn, deleteBusy && styles.disabled]}
                   onPress={onDeleteProceed}
                   disabled={deleteBusy}
                 >
-                  <Text style={styles.deleteConfirmBtnText}>CONTINUE →</Text>
+                  <Text style={styles.deleteConfirmBtnText}>CONTINUE TO CONFIRMATION →</Text>
                 </Pressable>
                 <Pressable style={styles.pinCancel} onPress={closeDeleteModal} disabled={deleteBusy}>
                   <Text style={styles.pinCancelText}>CANCEL</Text>
                 </Pressable>
-              </>
+              </ScrollView>
             ) : (
               <>
                 <Text style={[styles.pinKicker, { color: '#ef4444' }]}>FINAL CONFIRMATION</Text>
-                <Text style={styles.pinTitle}>Are you sure?</Text>
+                <Text style={styles.pinTitle}>Are you completely sure?</Text>
                 <Text style={styles.pinHint}>
-                  You are about to permanently delete{' '}
-                  <Text style={{ color: '#f87171', fontWeight: '900' }}>@{deleteUsername}</Text>. All scores, stats, and data will be erased forever.
+                  You are about to permanently delete account{' '}
+                  <Text style={{ color: '#f87171', fontWeight: '900' }}>@{deleteUsername}</Text>. All your tournament matches, scores, statistics, and credentials will be erased immediately.
                 </Text>
                 {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
                 <Pressable
@@ -478,7 +506,7 @@ export function ProfileScreen({ navigation }: Props) {
                 >
                   {deleteBusy
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.deleteConfirmBtnText}>YES, DELETE PERMANENTLY</Text>}
+                    : <Text style={styles.deleteConfirmBtnText}>YES, DELETE MY ACCOUNT NOW</Text>}
                 </Pressable>
                 <Pressable style={styles.pinCancel} onPress={() => setDeleteStep('form')} disabled={deleteBusy}>
                   <Text style={styles.pinCancelText}>GO BACK</Text>
@@ -537,6 +565,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <PrivacyPolicyModal visible={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       {dialog}
     </SafeAreaView>
   );
@@ -713,9 +742,55 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 10,
   },
   deleteConfirmBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 1.2, fontSize: 13 },
+  deleteScopeBox: {
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.25)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  deleteScopeHeader: {
+    color: '#fca5a5',
+    fontWeight: '800',
+    fontSize: 11.5,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  deleteScopeItem: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  deleteAlertBox: {
+    backgroundColor: 'rgba(245,158,11,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.25)',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  deleteAlertText: {
+    color: '#fef3c7',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  deleteSupportNote: {
+    color: '#94a3b8',
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  boldText: {
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
   pinOverlay: { flex: 1, justifyContent: 'center', padding: 20 },
   pinBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(2,6,23,0.82)' },
   pinCard: {

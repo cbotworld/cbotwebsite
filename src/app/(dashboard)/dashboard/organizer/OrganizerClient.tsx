@@ -125,6 +125,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   // Modals
   const [editModalOpen, setEditModalOpen] = React.useState(false);
   const [editPaymentQrUrl, setEditPaymentQrUrl] = React.useState('');
+  const [editIntlPaymentQrUrl, setEditIntlPaymentQrUrl] = React.useState('');
   const [editEnrollmentFee, setEditEnrollmentFee] = React.useState(0);
   const [genCredentialsModalOpen, setGenCredentialsModalOpen] = React.useState(false);
   const [addTeamModalOpen, setAddTeamModalOpen] = React.useState(false);
@@ -902,6 +903,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     const optimisticFee = parseFloat((formData.get('enrollmentFee') as string) || '0');
     const optimisticQr = (formData.get('paymentQrUrl') as string) || '';
     const optimisticUpi = (formData.get('paymentUpiLink') as string) || '';
+    const optimisticIntlQr = (formData.get('intlPaymentQrUrl') as string) || '';
+    const optimisticIntlUpi = (formData.get('intlPaymentUpiLink') as string) || '';
     setEditions(editions.map((ed) =>
       ed.id === selectedEditionId
         ? {
@@ -914,6 +917,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             enrollmentFee: Number.isFinite(optimisticFee) ? optimisticFee : ed.enrollmentFee,
             paymentQrUrl: optimisticFee > 0 ? optimisticQr || null : null,
             paymentUpiLink: optimisticFee > 0 ? optimisticUpi || null : null,
+            intlPaymentQrUrl: optimisticFee > 0 ? optimisticIntlQr || null : null,
+            intlPaymentUpiLink: optimisticFee > 0 ? optimisticIntlUpi || null : null,
           }
         : ed
     ));
@@ -1365,6 +1370,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               size="sm"
               onClick={() => {
                 setEditPaymentQrUrl(selectedEdition?.paymentQrUrl || '');
+                setEditIntlPaymentQrUrl(selectedEdition?.intlPaymentQrUrl || '');
                 setEditEnrollmentFee(Number(selectedEdition?.enrollmentFee) || 0);
                 setEditModalOpen(true);
               }}
@@ -2708,34 +2714,70 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           </div>
 
           {editEnrollmentFee > 0 ? (
-            <div className="space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-400">
-                Player payment details
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Upload a UPI QR image and/or paste a UPI/payment link. Players see these in the enroll popup. Hidden for free editions.
-              </p>
-              <input type="hidden" name="paymentQrUrl" value={editPaymentQrUrl} />
-              <ImageUploader
-                label="Payment QR code"
-                value={editPaymentQrUrl}
-                onChange={setEditPaymentQrUrl}
-                bucket="teams"
-                placeholder="Upload QR image or paste image URL"
-              />
+            <div className="space-y-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
               <div>
-                <label className="text-xs font-bold block mb-1">UPI / Payment link</label>
-                <Input
-                  name="paymentUpiLink"
-                  defaultValue={selectedEdition?.paymentUpiLink || ''}
-                  placeholder="upi://pay?... or https://pay.example.com/..."
+                <p className="text-xs font-black uppercase tracking-wide text-amber-400">
+                  Player Payment Details
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Configure Indian (default) and International payment details. Players can switch between both in the enrollment popup.
+                </p>
+              </div>
+
+              {/* Indian Payments */}
+              <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">🇮🇳</span>
+                  <span className="text-xs font-black text-foreground uppercase tracking-wider">Indian Payments</span>
+                </div>
+                <input type="hidden" name="paymentQrUrl" value={editPaymentQrUrl} />
+                <ImageUploader
+                  label="India Payment QR Code"
+                  value={editPaymentQrUrl}
+                  onChange={setEditPaymentQrUrl}
+                  bucket="teams"
+                  placeholder="Upload India UPI QR image or paste image URL"
                 />
+                <div>
+                  <label className="text-xs font-bold block mb-1">India UPI / Payment Link</label>
+                  <Input
+                    name="paymentUpiLink"
+                    defaultValue={selectedEdition?.paymentUpiLink || ''}
+                    placeholder="upi://pay?... or UPI ID / payment link"
+                  />
+                </div>
+              </div>
+
+              {/* International Payments */}
+              <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base">🌍</span>
+                  <span className="text-xs font-black text-foreground uppercase tracking-wider">International Payments</span>
+                </div>
+                <input type="hidden" name="intlPaymentQrUrl" value={editIntlPaymentQrUrl} />
+                <ImageUploader
+                  label="International Payment QR Code"
+                  value={editIntlPaymentQrUrl}
+                  onChange={setEditIntlPaymentQrUrl}
+                  bucket="teams"
+                  placeholder="Upload International QR / PayPal QR image or paste image URL"
+                />
+                <div>
+                  <label className="text-xs font-bold block mb-1">International UPI / Payment Link / ID</label>
+                  <Input
+                    name="intlPaymentUpiLink"
+                    defaultValue={selectedEdition?.intlPaymentUpiLink || ''}
+                    placeholder="PayPal link, Wise details, or international payment URL"
+                  />
+                </div>
               </div>
             </div>
           ) : (
             <>
               <input type="hidden" name="paymentQrUrl" value="" />
               <input type="hidden" name="paymentUpiLink" value="" />
+              <input type="hidden" name="intlPaymentQrUrl" value="" />
+              <input type="hidden" name="intlPaymentUpiLink" value="" />
             </>
           )}
 
@@ -2769,58 +2811,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               </Select>
             </div>
           </div>
-
-          {/* Per-Round Match Format — direct, no tabs */}
-          <div className="space-y-4 p-4 bg-muted/40 rounded-2xl border border-amber-500/25">
-              <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                    <Trophy className="h-4 w-4 text-amber-400" /> Per-Round Match Format
-                  </label>
-                  <p className="text-[11px] text-muted-foreground font-medium">Set the match format for each round.</p>
-                </div>
-                <Badge variant="carrom" className="text-[10px] font-extrabold px-2.5 py-0.5 uppercase tracking-wider">
-                  {roundCount} Rounds Configured
-                </Badge>
-              </div>
-
-              <div className="space-y-3 pt-1">
-                {roundFormats.map((format, idx) => (
-                  <div key={idx} className="bg-card p-4 rounded-xl border border-border/80 shadow-md space-y-3">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-border/40">
-                      <span className="text-xs font-black text-amber-500 flex items-center gap-1.5">
-                        👑 Round {idx + 1} Configuration
-                      </span>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        Stage {idx + 1}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <label className="text-[11px] font-bold text-muted-foreground block mb-1">
-                          Match Format
-                        </label>
-                        <Select
-                          value={format}
-                          onChange={(e: any) => {
-                            const copy = [...roundFormats];
-                            copy[idx] = e.target.value;
-                            setRoundFormats(copy);
-                          }}
-                          className="text-xs h-9 font-bold bg-background"
-                        >
-                          <option value="SINGLES">Singles (1v1)</option>
-                          <option value="DOUBLES">Doubles (2v2)</option>
-                          <option value="TRIPLES">Triples (3v3)</option>
-                          <option value="QUADRUPLES">Quadruples (4v4)</option>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
           <div>
             <label className="text-xs font-bold block mb-1">Description</label>

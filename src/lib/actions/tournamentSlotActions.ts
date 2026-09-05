@@ -478,6 +478,8 @@ export async function getOpenRegistrationEdition() {
         registrationEndDate: true,
         paymentQrUrl: true,
         paymentUpiLink: true,
+        intlPaymentQrUrl: true,
+        intlPaymentUpiLink: true,
         slot: true,
         organizer: {
           select: { name: true, username: true },

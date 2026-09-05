@@ -136,6 +136,8 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const registrationEndDateRaw = formData.get('registrationEndDate') as string | null;
     const paymentQrUrlRaw = formData.get('paymentQrUrl') as string | null;
     const paymentUpiLinkRaw = formData.get('paymentUpiLink') as string | null;
+    const intlPaymentQrUrlRaw = formData.get('intlPaymentQrUrl') as string | null;
+    const intlPaymentUpiLinkRaw = formData.get('intlPaymentUpiLink') as string | null;
 
     const roundFormatsRaw = formData.get('roundFormats') as string;
     let roundFormats: string[] = ['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES'];
@@ -215,15 +217,31 @@ export async function updateEdition(editionId: string, formData: FormData) {
         ? enrollmentFeeUpdate.enrollmentFee
         : Number(existing?.enrollmentFee) || 0;
 
-    let paymentUpdate: { paymentQrUrl?: string | null; paymentUpiLink?: string | null } = {};
+    let paymentUpdate: {
+      paymentQrUrl?: string | null;
+      paymentUpiLink?: string | null;
+      intlPaymentQrUrl?: string | null;
+      intlPaymentUpiLink?: string | null;
+    } = {};
     if (resolvedFee <= 0) {
-      paymentUpdate = { paymentQrUrl: null, paymentUpiLink: null };
+      paymentUpdate = {
+        paymentQrUrl: null,
+        paymentUpiLink: null,
+        intlPaymentQrUrl: null,
+        intlPaymentUpiLink: null,
+      };
     } else {
       if (paymentQrUrlRaw !== null && paymentQrUrlRaw !== undefined) {
         paymentUpdate.paymentQrUrl = paymentQrUrlRaw.trim() || null;
       }
       if (paymentUpiLinkRaw !== null && paymentUpiLinkRaw !== undefined) {
         paymentUpdate.paymentUpiLink = paymentUpiLinkRaw.trim() || null;
+      }
+      if (intlPaymentQrUrlRaw !== null && intlPaymentQrUrlRaw !== undefined) {
+        paymentUpdate.intlPaymentQrUrl = intlPaymentQrUrlRaw.trim() || null;
+      }
+      if (intlPaymentUpiLinkRaw !== null && intlPaymentUpiLinkRaw !== undefined) {
+        paymentUpdate.intlPaymentUpiLink = intlPaymentUpiLinkRaw.trim() || null;
       }
     }
 

@@ -13,6 +13,7 @@ const COUNTRIES = [
   { name: 'UK',        code: 'gb' },
   { name: 'Italy',     code: 'it' },
   { name: 'France',    code: 'fr' },
+  { name: 'Denmark',   code: 'dk' },
 ];
 
 // Triplicate for seamless infinite loop

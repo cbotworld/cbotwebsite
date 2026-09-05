@@ -18,6 +18,7 @@ import { config } from '../config';
 import { RootStackParamList } from '../navigation/types';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { sendEmailOtp, verifyEmailOtp } from '../api/website';
+import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
 
 const logo = require('../../assets/logo.png');
 
@@ -25,6 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export function RegisterScreen({ navigation }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Form, 2: OTP, 3: Success
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [name, setName] = useState('');
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
@@ -199,6 +201,13 @@ export function RegisterScreen({ navigation }: Props) {
                   Already have an account? <Text style={styles.linkBold}>Log In</Text>
                 </Text>
               </Pressable>
+
+              <Pressable style={styles.privacyWrap} onPress={() => setPrivacyOpen(true)}>
+                <Text style={styles.privacyText}>
+                  By creating an account, you agree to our{' '}
+                  <Text style={styles.privacyHighlight}>Privacy Policy</Text>
+                </Text>
+              </Pressable>
             </View>
           )}
 
@@ -268,6 +277,8 @@ export function RegisterScreen({ navigation }: Props) {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PrivacyPolicyModal visible={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -339,4 +350,7 @@ const styles = StyleSheet.create({
   credLabel: { color: '#d4a5aa', fontSize: 13 },
   credValueAmber: { color: '#f59e0b', fontSize: 15, fontWeight: '900' },
   credValueGreen: { color: '#22c55e', fontSize: 15, fontWeight: '900' },
+  privacyWrap: { marginTop: 14, alignItems: 'center', paddingVertical: 4 },
+  privacyText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
+  privacyHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline' },
 });

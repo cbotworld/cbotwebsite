@@ -16,6 +16,7 @@ import {
   PartyPopper,
   Sparkles,
   LayoutDashboard,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,8 @@ type RegistrationEdition = {
   registrationEndDate?: string | Date | null;
   paymentQrUrl?: string | null;
   paymentUpiLink?: string | null;
+  intlPaymentQrUrl?: string | null;
+  intlPaymentUpiLink?: string | null;
   organizerName?: string | null;
 };
 
@@ -52,6 +55,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   const [transactionId, setTransactionId] = React.useState('');
   const [alreadyEnrolled, setAlreadyEnrolled] = React.useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = React.useState(false);
+  const [paymentOption, setPaymentOption] = React.useState<'IN' | 'INTL'>('IN');
 
   const fee = Number(edition.enrollmentFee) || 0;
   const isPaid = fee > 0;
@@ -64,10 +68,34 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
     (session?.user as { username?: string } | undefined)?.username?.trim() ||
     'Player';
   const organizerName = edition.organizerName?.trim() || 'Organizer';
-  const paymentQrUrl = edition.paymentQrUrl?.trim() || '';
-  const paymentUpiLink = edition.paymentUpiLink?.trim() || '';
-  const hasPaymentDetails = Boolean(paymentQrUrl || paymentUpiLink);
-  const canSubmit = !isPaid || (hasPaymentDetails && txnReady);
+  
+  const inPaymentQrUrl = edition.paymentQrUrl?.trim() || '';
+  const inPaymentUpiLink = edition.paymentUpiLink?.trim() || '';
+  const intlPaymentQrUrl = edition.intlPaymentQrUrl?.trim() || '';
+  const intlPaymentUpiLink = edition.intlPaymentUpiLink?.trim() || '';
+
+  const currentQrUrl = paymentOption === 'IN' ? inPaymentQrUrl : intlPaymentQrUrl;
+  const currentUpiLink = paymentOption === 'IN' ? inPaymentUpiLink : intlPaymentUpiLink;
+  const hasAnyPaymentDetails = Boolean(inPaymentQrUrl || inPaymentUpiLink || intlPaymentQrUrl || intlPaymentUpiLink);
+  const hasCurrentPaymentDetails = Boolean(currentQrUrl || currentUpiLink);
+  const canSubmit = !isPaid || (hasAnyPaymentDetails && txnReady);
+
+  const getDirectPaymentUrl = () => {
+    if (!currentUpiLink) return '';
+    const trimmed = currentUpiLink.trim();
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('upi://')) {
+      return trimmed;
+    }
+    if (paymentOption === 'IN') {
+      const pa = encodeURIComponent(trimmed);
+      const pn = encodeURIComponent(organizerName || 'CBOT Organizer');
+      const am = fee > 0 ? `&am=${encodeURIComponent(fee.toString())}` : '';
+      return `upi://pay?pa=${pa}&pn=${pn}${am}&cu=INR`;
+    }
+    return '';
+  };
+
+  const directPaymentUrl = getDirectPaymentUrl();
 
   React.useEffect(() => {
     if (status !== 'authenticated') {
@@ -111,13 +139,13 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   };
 
   const handleCopyUpi = async () => {
-    if (!paymentUpiLink) return;
+    if (!currentUpiLink) return;
     try {
-      await navigator.clipboard.writeText(paymentUpiLink);
+      await navigator.clipboard.writeText(currentUpiLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError('Could not copy UPI link. Please copy it manually.');
+      setError('Could not copy payment link. Please copy it manually.');
     }
   };
 
@@ -241,54 +269,133 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
             </div>
 
             {isPaid && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-                <p className="text-xs font-black uppercase tracking-wide text-amber-400">
-                  Payment details
-                </p>
-                {hasPaymentDetails ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black uppercase tracking-wide text-amber-400">
+                    Payment details
+                  </p>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    Fee: <strong className="text-emerald-400">{formatEnrollmentFee(fee)}</strong>
+                  </span>
+                </div>
+
+                {/* Segmented Toggle: Indian vs International */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-background/80 rounded-lg border border-border/70 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentOption('IN');
+                      setCopied(false);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md transition-all ${
+                      paymentOption === 'IN'
+                        ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                    }`}
+                  >
+                    <span>🇮🇳</span>
+                    <span>Indian</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentOption('INTL');
+                      setCopied(false);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md transition-all ${
+                      paymentOption === 'INTL'
+                        ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                    }`}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>International</span>
+                  </button>
+                </div>
+
+                {hasCurrentPaymentDetails ? (
                   <>
-                    {paymentQrUrl ? (
-                      <div className="flex flex-col items-center gap-2">
+                    {currentQrUrl ? (
+                      <div className="flex flex-col items-center gap-2 pt-1">
                         <img
-                          src={paymentQrUrl}
-                          alt="Payment QR code"
-                          className="h-44 w-44 rounded-xl border border-border object-contain bg-white p-2"
+                          src={currentQrUrl}
+                          alt={paymentOption === 'IN' ? 'India Payment QR code' : 'International Payment QR code'}
+                          className="h-44 w-44 rounded-xl border border-border object-contain bg-white p-2 shadow-inner"
                         />
                         <p className="text-[11px] text-muted-foreground text-center">
-                          Scan this QR to pay {formatEnrollmentFee(fee)}
+                          Scan this {paymentOption === 'IN' ? 'UPI' : 'Payment'} QR to pay {formatEnrollmentFee(fee)}
                         </p>
                       </div>
                     ) : null}
-                    {paymentUpiLink ? (
+
+                    {currentUpiLink ? (
                       <div className="space-y-2">
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase">UPI / Payment link</p>
-                        <div className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs break-all font-medium">
-                          {paymentUpiLink}
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase">
+                            {paymentOption === 'IN' ? 'UPI ID / Payment link' : 'International Payment Link / ID'}
+                          </p>
+                          {directPaymentUrl && (
+                            <span className="text-[10px] text-amber-400 font-medium">
+                              {paymentOption === 'IN' ? 'Tap to open UPI app' : 'Tap to open link'}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => void handleCopyUpi()}>
-                            <Copy className="h-3.5 w-3.5 mr-1" />
-                            {copied ? 'Copied' : 'Copy link'}
-                          </Button>
-                          {/^https?:\/\//i.test(paymentUpiLink) || paymentUpiLink.startsWith('upi://') ? (
+
+                        {directPaymentUrl ? (
+                          <a
+                            href={directPaymentUrl}
+                            target={directPaymentUrl.startsWith('http') ? '_blank' : '_self'}
+                            rel="noopener noreferrer"
+                            className="group flex items-center justify-between gap-2.5 w-full rounded-lg border border-amber-500/40 bg-background/80 hover:bg-amber-500/10 hover:border-amber-500 px-3.5 py-2.5 text-xs font-semibold text-foreground transition-all shadow-sm cursor-pointer"
+                          >
+                            <span className="break-all font-mono text-amber-300 group-hover:text-amber-200">
+                              {currentUpiLink}
+                            </span>
+                            <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-black bg-amber-500 text-slate-950 px-2.5 py-1 rounded-md shadow-sm group-hover:bg-amber-400 transition-colors">
+                              <ExternalLink className="h-3 w-3" />
+                              {paymentOption === 'IN' ? 'Open UPI App' : 'Open Link'}
+                            </span>
+                          </a>
+                        ) : (
+                          <div className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs break-all font-medium">
+                            {currentUpiLink}
+                          </div>
+                        )}
+
+                        {directPaymentUrl && (
+                          <div className="flex items-center gap-2">
                             <a
-                              href={paymentUpiLink}
-                              target="_blank"
+                              href={directPaymentUrl}
+                              target={directPaymentUrl.startsWith('http') ? '_blank' : '_self'}
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-1 rounded-md border border-border h-8 px-3 text-xs font-bold hover:bg-white/5"
+                              className="inline-flex items-center justify-center gap-1.5 flex-1 rounded-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 font-black h-8 px-3 text-xs hover:from-amber-400 hover:to-amber-500 shadow-md shadow-amber-500/20"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" /> Open link
+                              <CreditCard className="h-3.5 w-3.5" />
+                              {paymentOption === 'IN' ? 'Pay via UPI App (GPay / PhonePe / Paytm)' : 'Open Payment Link'}
                             </a>
-                          ) : null}
-                        </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                              onClick={() => void handleCopyUpi()}
+                              title="Copy UPI ID"
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              {copied ? 'Copied' : 'Copy'}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ) : null}
+
                     <p className="text-[11px] text-muted-foreground">
-                      Pay the organizer using the details above, then enter your UPI transaction ID.
+                      Pay the organizer using the details above, then enter your payment reference / transaction ID below.
                     </p>
+
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
-                        UPI transaction ID <span className="text-rose-400">*</span>
+                        Transaction / Reference ID <span className="text-rose-400">*</span>
                       </label>
                       <Input
                         value={transactionId}
@@ -296,16 +403,37 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                           setTransactionId(e.target.value);
                           if (error) setError('');
                         }}
-                        placeholder="Enter UPI transaction / reference ID"
+                        placeholder={paymentOption === 'IN' ? 'Enter UPI transaction / UTR ID' : 'Enter payment reference / transaction ID'}
                         className="h-9 text-xs font-semibold bg-background border-amber-500/40 focus:border-amber-500"
                         autoComplete="off"
                       />
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-amber-200/90">
-                    Payment QR / UPI link has not been added by the organizer yet. Please contact the organizer before enrolling.
-                  </p>
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 space-y-2">
+                    <p className="text-xs text-amber-200/90 font-medium leading-relaxed">
+                      {paymentOption === 'INTL'
+                        ? '🌍 International payment details have not been added yet by the organizer. You can switch to the 🇮🇳 Indian payment option above or contact the organizer.'
+                        : '🇮🇳 Indian payment QR / UPI link has not been added yet by the organizer. Please contact the organizer before enrolling.'}
+                    </p>
+                    {hasAnyPaymentDetails && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
+                          Transaction / Reference ID <span className="text-rose-400">*</span>
+                        </label>
+                        <Input
+                          value={transactionId}
+                          onChange={(e) => {
+                            setTransactionId(e.target.value);
+                            if (error) setError('');
+                          }}
+                          placeholder="Enter payment reference / transaction ID"
+                          className="h-9 text-xs font-semibold bg-background border-amber-500/40 focus:border-amber-500"
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
