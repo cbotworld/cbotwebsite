@@ -14,6 +14,7 @@ export default async function CombisPage() {
         id: true,
         name: true,
         tag: true,
+        logo: true,
         savedLineups: true,
         captain: {
           select: { id: true, name: true, username: true },

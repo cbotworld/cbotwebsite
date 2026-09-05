@@ -240,13 +240,21 @@ const OFFICIAL_TEAM_COMBIS: Record<string, {
 };
 
 function findTeamByKey(teamKey: string, teamsList: any[]) {
+  if (!teamKey) return undefined;
   const keyUpper = teamKey.trim().toUpperCase();
   return (teamsList || []).find((t: any) => {
-    if (!t || !t.name) return false;
-    const nameUpper = t.name.trim().toUpperCase();
-    const tagUpper = t.tag?.trim().toUpperCase();
+    if (!t) return false;
+    if (t.id && (t.id === teamKey || String(t.id).toUpperCase() === keyUpper)) return true;
+    const nameUpper = (t.name || '').trim().toUpperCase();
+    const tagUpper = (t.tag || '').trim().toUpperCase();
     const teamInfoName = TEAMS_INFO[keyUpper]?.name?.trim().toUpperCase();
-    return nameUpper === keyUpper || tagUpper === keyUpper || (teamInfoName && nameUpper === teamInfoName);
+    return (
+      nameUpper === keyUpper ||
+      tagUpper === keyUpper ||
+      (teamInfoName && nameUpper === teamInfoName) ||
+      (keyUpper.length >= 3 && nameUpper.startsWith(keyUpper)) ||
+      (nameUpper.length >= 3 && keyUpper.startsWith(nameUpper))
+    );
   });
 }
 
@@ -933,25 +941,39 @@ export default function DailyCombisClient({
             </div>
           ) : null}
           {filteredMatches.map((match, mIdx) => {
-            const t1Face = resolveTeamFace({ name: match.team1Key });
-            const t2Face = resolveTeamFace({ name: match.team2Key });
-            const t1Info = TEAMS_INFO[t1Face.name];
-            const t2Info = TEAMS_INFO[t2Face.name];
             const dbTeam1 = findTeamByKey(match.team1Key, dbTeams);
             const dbTeam2 = findTeamByKey(match.team2Key, dbTeams);
+            const t1Face = resolveTeamFace({
+              id: dbTeam1?.id,
+              name: dbTeam1?.name || match.team1Key,
+              tag: dbTeam1?.tag,
+              logo: dbTeam1?.logo,
+              teams: dbTeams,
+            });
+            const t2Face = resolveTeamFace({
+              id: dbTeam2?.id,
+              name: dbTeam2?.name || match.team2Key,
+              tag: dbTeam2?.tag,
+              logo: dbTeam2?.logo,
+              teams: dbTeams,
+            });
+            const t1Info = TEAMS_INFO[t1Face.name];
+            const t2Info = TEAMS_INFO[t2Face.name];
+            const t1Logo = dbTeam1?.logo || (t1Face.logo !== '/logo.png' ? t1Face.logo : '');
+            const t2Logo = dbTeam2?.logo || (t2Face.logo !== '/logo.png' ? t2Face.logo : '');
             const t1 = {
-              name: t1Face.name,
-              tag: t1Face.tag,
+              name: dbTeam1?.name || t1Face.name,
+              tag: dbTeam1?.tag || t1Face.tag,
               captain: dbTeam1?.captain?.name || dbTeam1?.captain?.username || t1Info?.captain || 'Captain',
-              logo: t1Face.logo,
+              logo: t1Logo,
               color: t1Info?.color || t1Face.color || 'text-foreground',
               border: t1Info?.border || t1Face.border || 'border-border',
             };
             const t2 = {
-              name: t2Face.name,
-              tag: t2Face.tag,
+              name: dbTeam2?.name || t2Face.name,
+              tag: dbTeam2?.tag || t2Face.tag,
               captain: dbTeam2?.captain?.name || dbTeam2?.captain?.username || t2Info?.captain || 'Captain',
-              logo: t2Face.logo,
+              logo: t2Logo,
               color: t2Info?.color || t2Face.color || 'text-foreground',
               border: t2Info?.border || t2Face.border || 'border-border',
             };
@@ -966,11 +988,17 @@ export default function DailyCombisClient({
                   {/* Left Team */}
                   <div className="col-span-5 flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
-                      <img
-                        src={t1.logo}
-                        alt={t1.name}
-                        className="h-full w-full object-contain"
-                      />
+                      {t1.logo ? (
+                        <img
+                          src={t1.logo}
+                          alt={t1.name}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className={`h-full w-full flex items-center justify-center font-black text-xs sm:text-base ${t1.color} bg-amber-500/10 rounded-lg`}>
+                          {t1.tag || t1.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                     <div className="leading-tight min-w-0">
                       <div className="text-[11px] sm:text-sm font-black text-foreground truncate">
@@ -1000,11 +1028,17 @@ export default function DailyCombisClient({
                       </div>
                     </div>
                     <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
-                      <img
-                        src={t2.logo}
-                        alt={t2.name}
-                        className="h-full w-full object-contain"
-                      />
+                      {t2.logo ? (
+                        <img
+                          src={t2.logo}
+                          alt={t2.name}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className={`h-full w-full flex items-center justify-center font-black text-xs sm:text-base ${t2.color} bg-amber-500/10 rounded-lg`}>
+                          {t2.tag || t2.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
