@@ -129,15 +129,25 @@ export default async function PlayerPage() {
   const patterns = await prisma.boardPattern.findMany({ take: 5 });
 
   const websiteCms = await getWebsiteCmsContent();
-  const enrollmentRes = await getMyRegistrationEnrollment();
-  const registrationEnrollment = enrollmentRes.enrollment
-    ? {
+  let registrationEnrollment: any = null;
+  try {
+    const enrollmentRes = await getMyRegistrationEnrollment();
+    if (enrollmentRes?.success && enrollmentRes?.enrollment?.edition) {
+      registrationEnrollment = {
         ...enrollmentRes.enrollment,
         enrolledAt: enrollmentRes.enrollment.enrolledAt
-          ? enrollmentRes.enrollment.enrolledAt.toISOString()
+          ? (typeof enrollmentRes.enrollment.enrolledAt === 'string'
+              ? enrollmentRes.enrollment.enrolledAt
+              : enrollmentRes.enrollment.enrolledAt instanceof Date && !isNaN(enrollmentRes.enrollment.enrolledAt.getTime())
+                ? enrollmentRes.enrollment.enrolledAt.toISOString()
+                : String(enrollmentRes.enrollment.enrolledAt))
           : null,
-      }
-    : null;
+      };
+    }
+  } catch (err) {
+    console.error('[PlayerPage] enrollment fetch error:', err);
+    registrationEnrollment = null;
+  }
 
   // All of this player's streams for the edition (includes day-N / schedule_* match ids)
   const liveStreams = player

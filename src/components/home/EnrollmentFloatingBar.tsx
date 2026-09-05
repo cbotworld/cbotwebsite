@@ -478,23 +478,25 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
               <PartyPopper className="h-8 w-8 text-emerald-300" />
             </div>
             <div className="relative space-y-2">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400">Successfully enrolled</p>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400">Registration Details Received</p>
               <h3 className="text-2xl font-black text-foreground flex items-center justify-center gap-2">
                 Welcome, {playerName}! <Sparkles className="h-5 w-5 text-amber-400" />
               </h3>
-              <p className="text-sm text-emerald-200/90 font-semibold max-w-sm mx-auto">
-                {successMessage || `You're in for ${edition.title}.`}
+              <p className="text-sm text-emerald-200/90 font-medium max-w-md mx-auto leading-relaxed">
+                {isPaid
+                  ? 'Your enrollment details and payment reference have been submitted. The organizer will crosscheck and verify the payment. If there are any issues, the organizer will contact you. Thank you so much!'
+                  : `You are enrolled in ${edition.title}. Thank you so much!`}
               </p>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Need to fix your UPI transaction ID? Update it anytime from your player dashboard.
+                You can review your enrollment and update your payment reference ID anytime from your Player Dashboard.
               </p>
             </div>
             <div className="relative flex flex-wrap items-center justify-center gap-2 pt-2">
               <Link
                 href="/dashboard/player"
-                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950"
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20"
               >
-                <LayoutDashboard className="h-3.5 w-3.5" /> Go to Dashboard
+                <LayoutDashboard className="h-3.5 w-3.5" /> Go to Player Dashboard
               </Link>
               <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Close
@@ -510,22 +512,23 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
               <CheckCircle2 className="h-8 w-8 text-amber-300" />
             </div>
             <div className="relative space-y-2">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-400">Already enrolled</p>
-              <h3 className="text-xl font-black text-foreground">You are already enrolled</h3>
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                {playerName}, you&apos;re already registered for <strong className="text-foreground">{edition.title}</strong>
-                {' '}(Edition #{edition.number}).
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-400">Already Enrolled</p>
+              <h3 className="text-xl font-black text-foreground">You are registered for {edition.title}</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                {isPaid
+                  ? 'Your enrollment details are registered. The organizer will crosscheck and verify the payment details. If there are any issues, the organizer will contact you. Thank you so much!'
+                  : `You are registered for Edition #${edition.number}. Thank you so much!`}
               </p>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Entered the wrong UPI transaction ID? Edit it from your player dashboard.
+                Need to edit or check your payment reference ID? View it anytime on your Player Dashboard.
               </p>
             </div>
             <div className="relative flex flex-wrap items-center justify-center gap-2 pt-2">
               <Link
                 href="/dashboard/player"
-                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950"
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20"
               >
-                <LayoutDashboard className="h-3.5 w-3.5" /> Edit on Dashboard
+                <LayoutDashboard className="h-3.5 w-3.5" /> View on Dashboard
               </Link>
               <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Close

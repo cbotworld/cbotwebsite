@@ -542,7 +542,10 @@ export async function enrollCurrentUser(editionId: string, paymentTransactionId?
     return {
       success: true as const,
       participant,
-      message: fee > 0 ? `Payment of ₹${fee} received. You are enrolled!` : 'Enrollment successful!',
+      message:
+        fee > 0
+          ? `Your payment reference has been submitted. The organizer will crosscheck and verify the payment. If there are any issues, the organizer will contact you. Thank you so much!`
+          : 'Enrollment successful! Thank you so much!',
     };
   } catch (error) {
     console.error('[enrollCurrentUser]', error);
@@ -589,7 +592,7 @@ export async function getMyEnrollmentForEdition(editionId: string) {
   }
 }
 
-/** Latest enrollment on Tournament B (draft / registration cup) for the logged-in player. */
+/** Latest enrollment on registration cup / active cup for the logged-in player. */
 export async function getMyRegistrationEnrollment() {
   const session = await getServerSession(authOptions);
   if (!session?.user || !(session.user as { id?: string }).id) {
@@ -606,7 +609,6 @@ export async function getMyRegistrationEnrollment() {
           { enrolledAt: { not: null } },
           { paymentStatus: { in: ['PAID', 'FREE'] } },
         ],
-        edition: { slot: 'B' },
       },
       orderBy: { enrolledAt: 'desc' },
       select: {

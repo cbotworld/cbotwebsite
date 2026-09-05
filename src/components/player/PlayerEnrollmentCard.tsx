@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CheckCircle2, CreditCard, Loader2, PartyPopper, Pencil, Save, X } from 'lucide-react';
+import { CheckCircle2, CreditCard, Loader2, PartyPopper, Pencil, Save, X, Clock, Info, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,14 +32,16 @@ export function PlayerEnrollmentCard({
 }: {
   enrollment: PlayerEnrollmentInfo;
 }) {
-  const fee = Number(initial.edition.enrollmentFee ?? initial.paymentAmount) || 0;
+  const fee = Number(initial?.edition?.enrollmentFee ?? initial?.paymentAmount) || 0;
   const isPaid = fee > 0;
-  const [txnId, setTxnId] = React.useState(initial.paymentTransactionId || '');
+  const [txnId, setTxnId] = React.useState(initial?.paymentTransactionId || '');
   const [editing, setEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState(txnId);
+  const [draft, setDraft] = React.useState(initial?.paymentTransactionId || '');
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [error, setError] = React.useState('');
+
+  if (!initial || !initial.edition) return null;
 
   const startEdit = () => {
     setDraft(txnId);
@@ -57,7 +59,7 @@ export function PlayerEnrollmentCard({
   const saveTxn = async () => {
     const next = draft.trim();
     if (!next) {
-      setError('UPI transaction ID is required.');
+      setError('Payment reference / Transaction ID is required.');
       return;
     }
     setBusy(true);
@@ -67,7 +69,7 @@ export function PlayerEnrollmentCard({
     if (res.success) {
       setTxnId(res.participant?.paymentTransactionId || next);
       setEditing(false);
-      setMessage('UPI transaction ID updated.');
+      setMessage('Payment reference ID updated successfully.');
     } else {
       setError(res.error || 'Could not update transaction ID.');
     }
@@ -75,13 +77,13 @@ export function PlayerEnrollmentCard({
   };
 
   return (
-    <Card className="border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-amber-500/5 overflow-hidden">
+    <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-card to-emerald-500/5 overflow-hidden shadow-lg shadow-amber-500/5">
       <CardContent className="p-5 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black">
-                <PartyPopper className="h-3.5 w-3.5 mr-1" /> Successfully enrolled
+                <PartyPopper className="h-3.5 w-3.5 mr-1" /> Tournament Registration
               </Badge>
               <Badge variant="outline" className="text-[10px] font-bold">
                 Edition #{initial.edition.number}
@@ -102,72 +104,95 @@ export function PlayerEnrollmentCard({
         </div>
 
         {isPaid ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
-                <CreditCard className="h-3.5 w-3.5" /> UPI transaction ID
+          <>
+            {/* Organizer Crosscheck / Verification Notice */}
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/40">
+                  <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                  Payment Verification in Progress
+                </span>
+              </div>
+              <p className="text-xs text-amber-100/90 leading-relaxed font-medium">
+                Your enrollment details and payment reference have been received. The organizer will crosscheck and verify the payment. If there are any issues with your payment reference, the organizer will contact you directly. Thank you so much!
               </p>
-              {!editing ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[10px] font-bold border-amber-500/40 text-amber-300"
-                  onClick={startEdit}
-                >
-                  <Pencil className="h-3 w-3 mr-1" /> Edit
-                </Button>
-              ) : null}
             </div>
 
-            {!editing ? (
-              <p className="font-mono text-sm font-semibold text-sky-300 break-all">
-                {txnId || '— not set —'}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Enter correct UPI transaction / reference ID"
-                  className="h-9 text-xs font-semibold bg-background border-amber-500/40"
-                  autoComplete="off"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="carrom"
-                    className="h-8 text-xs font-black"
-                    disabled={busy}
-                    onClick={() => void saveTxn()}
-                  >
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-                    Save
-                  </Button>
+            {/* Payment Reference / Transaction ID card */}
+            <div className="rounded-xl border border-border/80 bg-background/60 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5" /> Payment Reference / Transaction ID
+                </p>
+                {!editing ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 text-xs"
-                    disabled={busy}
-                    onClick={cancelEdit}
+                    className="h-7 text-[10px] font-bold border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                    onClick={startEdit}
                   >
-                    <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                    <Pencil className="h-3 w-3 mr-1" /> Edit Reference ID
                   </Button>
-                </div>
+                ) : null}
               </div>
-            )}
-            {error ? <p className="text-xs font-semibold text-rose-400">{error}</p> : null}
-            {message ? <p className="text-xs font-semibold text-emerald-400">{message}</p> : null}
-            <p className="text-[11px] text-muted-foreground">
-              If you entered the wrong ID during enrollment, update it here. Organizers see this on Enrolled Players.
+
+              {!editing ? (
+                <div className="p-3 rounded-lg bg-background border border-border/60">
+                  <p className="font-mono text-sm font-bold text-sky-300 break-all">
+                    {txnId || '— not set —'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Enter correct payment reference / UPI transaction ID"
+                    className="h-9 text-xs font-semibold bg-background border-amber-500/40"
+                    autoComplete="off"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="carrom"
+                      className="h-8 text-xs font-black"
+                      disabled={busy}
+                      onClick={() => void saveTxn()}
+                    >
+                      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      disabled={busy}
+                      onClick={cancelEdit}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {error ? <p className="text-xs font-semibold text-rose-400">{error}</p> : null}
+              {message ? <p className="text-xs font-semibold text-emerald-400">{message}</p> : null}
+              <p className="text-[11px] text-muted-foreground">
+                If you made a typo or paid with a different reference ID, you can update it above. The organizer sees the updated reference immediately.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-400 uppercase">
+              <ShieldCheck className="h-4 w-4" /> Free Tournament Enrollment Confirmed
+            </div>
+            <p className="text-xs text-emerald-200/90 font-medium">
+              This edition is free to enter. Your registration is confirmed.
             </p>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            This is a free enrollment — no UPI transaction ID required.
-          </p>
         )}
       </CardContent>
     </Card>
