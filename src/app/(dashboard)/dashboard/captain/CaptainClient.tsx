@@ -178,6 +178,7 @@ export default function CaptainClient({
 
   // Roster view
   const [rosterViewMode, setRosterViewMode] = React.useState<'MY_TEAM' | 'ALL_TEAMS'>('MY_TEAM');
+  const [captainTab, setCaptainTab] = React.useState<'combis' | 'scores' | 'roster' | 'player'>('combis');
 
   // Day lineup state
   const [selectedDayNumber, setSelectedDayNumber] = React.useState<number>(() => {
@@ -469,135 +470,146 @@ export default function CaptainClient({
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card className="p-4 border-emerald-500/30 bg-emerald-500/5">
-          <div className="text-[10px] font-bold text-emerald-500 uppercase">Total Team Members</div>
-          <div className="text-3xl font-black text-foreground mt-1">{teamMembers.length}</div>
-        </Card>
-        <Card className="p-4 border-blue-500/30 bg-blue-500/5">
-          <div className="text-[10px] font-bold text-blue-400 uppercase">Combis Saved</div>
-          <div className="text-3xl font-black text-foreground mt-1">{Object.keys(savedDayLineups).length}</div>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setCaptainTab('combis')}
+          className={`text-left p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+            captainTab === 'combis'
+              ? 'border-amber-500/60 bg-amber-500/15 shadow-sm ring-1 ring-amber-500/40'
+              : 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50 hover:bg-amber-500/10'
+          }`}
+        >
+          <div className="text-[10px] font-bold text-amber-500 uppercase flex items-center justify-between">
+            <span>Combis Saved</span>
+            <Calendar className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-foreground mt-1">
+            {Object.keys(savedDayLineups).length} <span className="text-xs font-normal text-muted-foreground">/ {totalEventDays}</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCaptainTab('scores')}
+          className={`text-left p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+            captainTab === 'scores'
+              ? 'border-emerald-500/60 bg-emerald-500/15 shadow-sm ring-1 ring-emerald-500/40'
+              : 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50 hover:bg-emerald-500/10'
+          }`}
+        >
+          <div className="text-[10px] font-bold text-emerald-500 uppercase flex items-center justify-between">
+            <span>Score Entry</span>
+            <Trophy className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-foreground mt-1 truncate">
+            Day {selectedDayNumber} <span className="text-xs font-normal text-muted-foreground">{teamScoreOpen ? '· Open' : '· Closed'}</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCaptainTab('roster')}
+          className={`text-left p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+            captainTab === 'roster'
+              ? 'border-blue-500/60 bg-blue-500/15 shadow-sm ring-1 ring-blue-500/40'
+              : 'border-blue-500/30 bg-blue-500/5 hover:border-blue-500/50 hover:bg-blue-500/10'
+          }`}
+        >
+          <div className="text-[10px] font-bold text-blue-400 uppercase flex items-center justify-between">
+            <span>Team Roster</span>
+            <Crown className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-foreground mt-1">
+            {teamMembers.length} <span className="text-xs font-normal text-muted-foreground">Players</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCaptainTab('player')}
+          className={`text-left p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+            captainTab === 'player'
+              ? 'border-violet-500/60 bg-violet-500/15 shadow-sm ring-1 ring-violet-500/40'
+              : 'border-violet-500/30 bg-violet-500/5 hover:border-violet-500/50 hover:bg-violet-500/10'
+          }`}
+        >
+          <div className="text-[10px] font-bold text-violet-400 uppercase flex items-center justify-between">
+            <span>Player Portal</span>
+            <UserCheck className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-foreground mt-1">
+            Profile <span className="text-xs font-normal text-muted-foreground">· Active</span>
+          </div>
+        </button>
       </div>
 
-      {/* SECTION 1: PARTICIPANTS */}
-      <Card className="border-amber-500/30">
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle className="text-xl font-bold flex items-center gap-2">
-            <Crown className="h-5 w-5 text-amber-500" /> My Team
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">View your team members for this edition.</p>
-        </CardHeader>
+      {/* CAPTAIN TABS BAR */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-border/70 scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setCaptainTab('combis')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
+            captainTab === 'combis'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-amber-500/30'
+          }`}
+        >
+          <Calendar className="h-4 w-4" />
+          <span>Combi Lineups</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${captainTab === 'combis' ? 'bg-slate-950 text-amber-400' : 'bg-muted text-muted-foreground'}`}>
+            {Object.keys(savedDayLineups).length}/{totalEventDays}
+          </span>
+        </button>
 
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {teamMembers.map((member: any) => (
-              <div key={member.id} className="p-4 rounded-xl bg-card border border-amber-500/20 hover:border-amber-500/50 transition-all flex items-center gap-3 text-xs shadow-sm">
-                <Avatar src={member.image} fallback={member.name} size="sm" />
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-foreground">{member.name}</span>
-                    {member.id === currentTeam?.captainId && (
-                      <Badge variant="carrom" className="text-[9px]">CAPTAIN</Badge>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground font-mono">@{member.username}</span>
-                </div>
-              </div>
-            ))}
-            {teamMembers.length === 0 && (
-              <div className="col-span-3 text-center py-8 text-muted-foreground text-xs">
-                No team members found for this edition.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <button
+          type="button"
+          onClick={() => setCaptainTab('scores')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
+            captainTab === 'scores'
+              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+              : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-emerald-500/30'
+          }`}
+        >
+          <Trophy className="h-4 w-4" />
+          <span>Player Scores Entry</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${captainTab === 'scores' ? 'bg-slate-950 text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+            Day {selectedDayNumber}
+          </span>
+        </button>
 
-      <Card className="border-emerald-500/30">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <CardTitle className="text-lg font-black">Team day scores</CardTitle>
-            <CardDescription>Enter or fix teammate boards. Saved player scores load automatically.</CardDescription>
-          </div>
-          <select
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold min-w-[10rem]"
-            value={selectedDayNumber}
-            onChange={(e) => setSelectedDayNumber(parseInt(e.target.value, 10) || 1)}
-          >
-            {combiDayNumbers.map((d) => (
-              <option key={d} value={d}>
-                Day {d}
-                {dayDatesMap[d] ? ` · ${dayDatesMap[d]}` : ''}
-              </option>
-            ))}
-          </select>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <ScoreEditRules note={teamScoreOpen ? SCORE_EDIT_CAPTAIN_HELP : SCORE_EDIT_CAPTAIN_CLOSED} />
-          {teamScoreOpen && (
-            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Board score and slam per player. Total vs that player’s target decides bonus.
-            </p>
-          )}
-          {teamScoreOpen && teamScoreRows.map((row, idx) => (
-            <div key={row.userId} className="rounded-xl border border-border p-3 space-y-2">
-              <div className="min-w-0">
-                <div className="font-semibold truncate">{row.name}</div>
-                <div className="text-[10px] text-muted-foreground">
-                  {row.missingPrior ? 'Needs an earlier day (organiser only)' : row.score !== '' ? 'Submitted — captain can still edit until 9:30pm IST' : 'Empty — walkover if still blank at 9:00pm IST'}
-                </div>
-              </div>
-              <BoardScoreEditor
-                compact
-                boards={row.boards}
-                disabled={!teamScoreOpen || row.missingPrior}
-                target={row.target}
-                onChange={(next) => {
-                  const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
-                  const agg = aggregateBoards(filled);
-                  const updated = [...teamScoreRows];
-                  updated[idx] = {
-                    ...row,
-                    boards: next,
-                    score: filled.length ? String(agg.score) : '',
-                    slams: String(agg.slams),
-                  };
-                  setTeamScoreRows(updated);
-                }}
-              />
-            </div>
-          ))}
-          {teamScoreMsg && <p className="text-xs font-semibold">{teamScoreMsg}</p>}
-          {teamScoreOpen && currentTeam?.id && (
-            <Button onClick={() => void handleSaveTeamScores()}>
-              Save team scores
-            </Button>
-          )}
-          {publishedBoard?.days?.find((d: any) => d.dayNumber === selectedDayNumber)?.published && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-              {(publishedBoard.teams || []).map((t: any) => (
-                <div key={t.id} className="text-xs border border-border rounded-lg p-2">
-                  <div className="font-black mb-1">{t.name}</div>
-                  {t.players.map((p: any) => {
-                    const s = (publishedBoard.scores || []).find((x: any) => x.userId === p.id && x.dayNumber === selectedDayNumber);
-                    return (
-                      <div key={p.id} className="flex justify-between gap-2">
-                        <span className="truncate">{p.name}</span>
-                        <span className="font-semibold whitespace-nowrap">
-                          {s ? `${s.score} · ${s.slams} slam${s.slams === 1 ? '' : 's'}` : 'Walkover'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        <button
+          type="button"
+          onClick={() => setCaptainTab('roster')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
+            captainTab === 'roster'
+              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
+              : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-blue-500/30'
+          }`}
+        >
+          <Crown className="h-4 w-4" />
+          <span>Team Roster</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${captainTab === 'roster' ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'}`}>
+            {teamMembers.length}
+          </span>
+        </button>
 
-      {/* SECTION 2: DAY COMBI SUBMISSION */}
+        <button
+          type="button"
+          onClick={() => setCaptainTab('player')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
+            captainTab === 'player'
+              ? 'bg-violet-500 text-white shadow-md shadow-violet-500/20'
+              : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-violet-500/30'
+          }`}
+        >
+          <UserCheck className="h-4 w-4" />
+          <span>My Player Portal</span>
+        </button>
+      </div>
+
+      {/* TAB 1: COMBI LINEUPS */}
+      {captainTab === 'combis' && (
       <Card className={isSpocTeam ? 'border-violet-500/40' : 'border-amber-500/40'}>
         <CardHeader className="border-b border-border pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -806,6 +818,194 @@ export default function CaptainClient({
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* TAB 2: PLAYER SCORES ENTRY */}
+      {captainTab === 'scores' && (
+        <Card className="border-emerald-500/30">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-4">
+            <div>
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-emerald-500" /> Team Day Scores Entry
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Record and update player boards and match scores. Saved player scores sync automatically.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">Select Match Day:</span>
+              <select
+                className="h-9 rounded-xl border border-input bg-background px-3 text-xs font-bold min-w-[9rem] focus:ring-2 focus:ring-emerald-500/50"
+                value={selectedDayNumber}
+                onChange={(e) => setSelectedDayNumber(parseInt(e.target.value, 10) || 1)}
+              >
+                {combiDayNumbers.map((d) => (
+                  <option key={d} value={d}>
+                    Day {d}
+                    {dayDatesMap[d] ? ` · ${dayDatesMap[d]}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            <ScoreEditRules note={teamScoreOpen ? SCORE_EDIT_CAPTAIN_HELP : SCORE_EDIT_CAPTAIN_CLOSED} />
+            {teamScoreOpen && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                <p className="font-semibold text-emerald-400">
+                  ⚡ Board score and slams per player. Total score vs target decides match bonus.
+                </p>
+                <p className="text-[11px] font-bold text-muted-foreground">
+                  Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              {teamScoreRows.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground bg-muted/10 rounded-xl border border-dashed border-border">
+                  No players found for score submission.
+                </div>
+              ) : (
+                teamScoreRows.map((row, idx) => (
+                  <div key={row.userId} className="rounded-xl border border-border/80 bg-card/60 p-4 space-y-2.5 shadow-sm hover:border-emerald-500/30 transition-all">
+                    <div className="flex items-center justify-between min-w-0">
+                      <div className="font-bold text-sm text-foreground truncate">{row.name}</div>
+                      <div className="text-[11px] font-semibold">
+                        {row.missingPrior ? (
+                          <span className="text-amber-400">⚠️ Needs earlier day (organiser only)</span>
+                        ) : row.score !== '' ? (
+                          <span className="text-emerald-400">✓ Submitted ({row.score} pts · {row.slams} slams)</span>
+                        ) : (
+                          <span className="text-muted-foreground">Empty (Walkover if blank at 9:00 PM)</span>
+                        )}
+                      </div>
+                    </div>
+                    <BoardScoreEditor
+                      compact
+                      boards={row.boards}
+                      disabled={!teamScoreOpen || row.missingPrior}
+                      target={row.target}
+                      onChange={(next) => {
+                        const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+                        const agg = aggregateBoards(filled);
+                        const updated = [...teamScoreRows];
+                        updated[idx] = {
+                          ...row,
+                          boards: next,
+                          score: filled.length ? String(agg.score) : '',
+                          slams: String(agg.slams),
+                        };
+                        setTeamScoreRows(updated);
+                      }}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            {teamScoreMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400">
+                {teamScoreMsg}
+              </div>
+            )}
+
+            {teamScoreOpen && currentTeam?.id && teamScoreRows.length > 0 && (
+              <div className="pt-2">
+                <Button
+                  onClick={() => void handleSaveTeamScores()}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  <Save className="h-4 w-4 mr-1.5" />
+                  Save Team Scores for Day {selectedDayNumber}
+                </Button>
+              </div>
+            )}
+
+            {publishedBoard?.days?.find((d: any) => d.dayNumber === selectedDayNumber)?.published && (
+              <div className="border-t border-border pt-4 mt-6">
+                <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-3">
+                  Published Scoreboard · Day {selectedDayNumber}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(publishedBoard.teams || []).map((t: any) => (
+                    <div key={t.id} className="text-xs border border-border/80 bg-card rounded-xl p-3 shadow-sm">
+                      <div className="font-black text-amber-400 border-b border-border/40 pb-1.5 mb-2">{t.name}</div>
+                      <div className="space-y-1.5">
+                        {t.players.map((p: any) => {
+                          const s = (publishedBoard.scores || []).find((x: any) => x.userId === p.id && x.dayNumber === selectedDayNumber);
+                          return (
+                            <div key={p.id} className="flex justify-between items-center gap-2">
+                              <span className="truncate font-medium">{p.name}</span>
+                              <span className="font-bold text-[11px] whitespace-nowrap text-muted-foreground">
+                                {s ? `${s.score} pts · ${s.slams} slam${s.slams === 1 ? '' : 's'}` : 'Walkover'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB 3: TEAM ROSTER */}
+      {captainTab === 'roster' && (
+        <Card className="border-amber-500/30">
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-500" /> My Team Roster
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Team members assigned for this tournament edition.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teamMembers.map((member: any) => (
+                <div key={member.id} className="p-4 rounded-xl bg-card border border-amber-500/20 hover:border-amber-500/50 transition-all flex items-center gap-3 text-xs shadow-sm">
+                  <Avatar src={member.image} fallback={member.name} size="sm" />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-foreground">{member.name}</span>
+                      {member.id === currentTeam?.captainId && (
+                        <Badge variant="carrom" className="text-[9px]">CAPTAIN</Badge>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-mono">@{member.username}</span>
+                  </div>
+                </div>
+              ))}
+              {teamMembers.length === 0 && (
+                <div className="col-span-3 text-center py-8 text-muted-foreground text-xs">
+                  No team members found for this edition.
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB 4: MY PLAYER PORTAL */}
+      {captainTab === 'player' && (
+        <div className="pt-2">
+          <PlayerClient
+            initialPlayer={initialPlayer || currentTeam?.captain || { name: captainName, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
+            initialTeam={initialPlayerTeam || mainTeam || initialTeam}
+            initialTeammates={
+              (initialPlayerTeam || mainTeam)?.members?.map((m: any) => m.user).filter(Boolean)
+              || (initialMembers && initialMembers.length > 0 ? initialMembers : teamMembers)
+            }
+            initialMatches={initialPlayerMatches}
+            initialPatterns={initialPatterns}
+            initialStreams={initialPlayerStreams}
+          />
+        </div>
+      )}
 
       {/* COMBI MODAL */}
       <Dialog open={dayLineupModalOpen} onOpenChange={setDayLineupModalOpen}>
@@ -871,48 +1071,6 @@ export default function CaptainClient({
                   </div>
                 )}
 
-                {!isDayLocked(selectedDayNumber, dayDatesMap) && teamScoreRows.length > 0 && (
-                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
-                    <ScoreEditRules note={teamScoreOpen ? SCORE_EDIT_CAPTAIN_HELP : SCORE_EDIT_CAPTAIN_CLOSED} />
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <div className="text-xs font-black text-emerald-400">Team scores for this day</div>
-                        <div className="text-[10px] text-muted-foreground">{SCORE_EDIT_CAPTAIN_HELP}</div>
-                      </div>
-                      {teamScoreOpen ? (
-                        <Button type="button" size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={() => void handleSaveTeamScores()}>
-                          Save scores
-                        </Button>
-                      ) : null}
-                    </div>
-                    {teamScoreMsg ? <p className="text-[10px] font-semibold">{teamScoreMsg}</p> : null}
-                    <div className="space-y-2">
-                      {teamScoreRows.map((row, idx) => (
-                        <div key={row.userId} className="rounded-lg border border-border/70 p-2 space-y-1">
-                          <div className="min-w-0 text-xs font-semibold truncate">{row.name}</div>
-                          <BoardScoreEditor
-                            compact
-                            boards={row.boards}
-                            disabled={!teamScoreOpen || row.missingPrior}
-                            target={row.target}
-                            onChange={(next) => {
-                              const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
-                              const agg = aggregateBoards(filled);
-                              const updated = [...teamScoreRows];
-                              updated[idx] = {
-                                ...row,
-                                boards: next,
-                                score: filled.length ? String(agg.score) : '',
-                                slams: String(agg.slams),
-                              };
-                              setTeamScoreRows(updated);
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Duplicate player validation */}
                 {(() => {
@@ -1059,33 +1217,6 @@ export default function CaptainClient({
           )}
         </div>
       </Dialog>
-
-      {/* ── PLAYER DASHBOARD PANEL ───────────────────────────────── */}
-      <div className="pt-4">
-        {/* Divider */}
-        <div className="relative flex items-center gap-4 py-2 mb-6">
-          <div className="flex-1 border-t border-border/60" />
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 shadow-sm">
-            <UserCheck className="h-4 w-4 text-amber-400" />
-            <span className="text-xs font-black text-amber-400 uppercase tracking-widest">Also Playing As Player</span>
-          </div>
-          <div className="flex-1 border-t border-border/60" />
-        </div>
-
-        {/* Embedded PlayerClient — captain sees full player dashboard below */}
-        <PlayerClient
-          initialPlayer={initialPlayer || currentTeam?.captain || { name: captainName, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
-          initialTeam={initialPlayerTeam || mainTeam || initialTeam}
-          initialTeammates={
-            (initialPlayerTeam || mainTeam)?.members?.map((m: any) => m.user).filter(Boolean)
-            || (initialMembers && initialMembers.length > 0 ? initialMembers : teamMembers)
-          }
-          initialMatches={initialPlayerMatches}
-          initialPatterns={initialPatterns}
-          initialStreams={initialPlayerStreams}
-        />
-      </div>
-
     </div>
   );
 }

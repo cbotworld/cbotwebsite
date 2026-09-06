@@ -300,32 +300,40 @@ function standingRow(partial: Partial<StageStandingRow> & Pick<StageStandingRow,
     avgBonus: 0,
     total: 0,
     matchesWon: 0,
+    teamScore: 0,
     rank: 0,
     ...partial,
   };
 }
 
 const tiedOnPoints = rankStandingRows([
-  standingRow({ teamId: 'lowWins', teamName: 'Low Wins', total: 10, matchesWon: 1, slamBonus: 9 }),
-  standingRow({ teamId: 'highWins', teamName: 'High Wins', total: 10, matchesWon: 3, slamBonus: 1 }),
-  standingRow({ teamId: 'leader', teamName: 'Leader', total: 12, matchesWon: 0, slamBonus: 0 }),
+  standingRow({ teamId: 'lowWins', teamName: 'Low Wins', total: 10, matchesWon: 1, teamScore: 100, slamBonus: 9 }),
+  standingRow({ teamId: 'highWins', teamName: 'High Wins', total: 10, matchesWon: 3, teamScore: 120, slamBonus: 1 }),
+  standingRow({ teamId: 'leader', teamName: 'Leader', total: 12, matchesWon: 0, teamScore: 150, slamBonus: 0 }),
 ]);
 assert(tiedOnPoints[0].teamId === 'leader' && tiedOnPoints[0].rank === 1, 'highest total ranks first even with zero wins');
 assert(tiedOnPoints[1].teamId === 'highWins' && tiedOnPoints[1].rank === 2, 'same points: more matches won ranks higher');
 assert(tiedOnPoints[2].teamId === 'lowWins' && tiedOnPoints[2].rank === 3, 'same points: fewer matches won ranks lower');
 
-const tiedOnWins = rankStandingRows([
-  standingRow({ teamId: 'fewSlams', teamName: 'Few Slams', total: 8, matchesWon: 2, slamBonus: 1 }),
-  standingRow({ teamId: 'manySlams', teamName: 'Many Slams', total: 8, matchesWon: 2, slamBonus: 4 }),
+const tiedOnWinsAndPoints = rankStandingRows([
+  standingRow({ teamId: 'higherScore', teamName: 'Higher Score', total: 10, matchesWon: 2, teamScore: 150, slamBonus: 4 }),
+  standingRow({ teamId: 'lowerScore', teamName: 'Lower Score', total: 10, matchesWon: 2, teamScore: 120, slamBonus: 1 }),
 ]);
-assert(tiedOnWins[0].teamId === 'manySlams' && tiedOnWins[0].rank === 1, 'same points and wins: more slams ranks higher');
-assert(tiedOnWins[1].teamId === 'fewSlams' && tiedOnWins[1].rank === 2, 'same points and wins: fewer slams ranks lower');
+assert(tiedOnWinsAndPoints[0].teamId === 'lowerScore' && tiedOnWinsAndPoints[0].rank === 1, 'same points and wins: lower team total score ranks higher');
+assert(tiedOnWinsAndPoints[1].teamId === 'higherScore' && tiedOnWinsAndPoints[1].rank === 2, 'same points and wins: higher team total score ranks lower');
+
+const tiedOnScores = rankStandingRows([
+  standingRow({ teamId: 'fewSlams', teamName: 'Few Slams', total: 8, matchesWon: 2, teamScore: 100, slamBonus: 1 }),
+  standingRow({ teamId: 'manySlams', teamName: 'Many Slams', total: 8, matchesWon: 2, teamScore: 100, slamBonus: 4 }),
+]);
+assert(tiedOnScores[0].teamId === 'manySlams' && tiedOnScores[0].rank === 1, 'same points, wins and score: more slams ranks higher');
+assert(tiedOnScores[1].teamId === 'fewSlams' && tiedOnScores[1].rank === 2, 'same points, wins and score: fewer slams ranks lower');
 
 const fullTie = rankStandingRows([
-  standingRow({ teamId: 'b', teamName: 'Beta', total: 6, matchesWon: 1, slamBonus: 2 }),
-  standingRow({ teamId: 'a', teamName: 'Alpha', total: 6, matchesWon: 1, slamBonus: 2 }),
+  standingRow({ teamId: 'b', teamName: 'Beta', total: 6, matchesWon: 1, teamScore: 90, slamBonus: 2 }),
+  standingRow({ teamId: 'a', teamName: 'Alpha', total: 6, matchesWon: 1, teamScore: 90, slamBonus: 2 }),
 ]);
 assert(fullTie[0].teamId === 'a' && fullTie[1].teamId === 'b', 'name is display order only after a full tie');
-assert(fullTie[0].rank === 1 && fullTie[1].rank === 1, 'same points, wins, and slams share rank');
+assert(fullTie[0].rank === 1 && fullTie[1].rank === 1, 'same points, wins, teamScore, and slams share rank');
 
 console.log('verify-combi-results: all asserts passed');

@@ -54,14 +54,19 @@ function scoreMapForDay(scores: PlayerDayScoreRow[], day: number) {
   return map;
 }
 
-function standingRankKey(row: Pick<StageStandingRow, 'total' | 'matchesWon' | 'slamBonus'>) {
-  return `${row.total}:${row.matchesWon}:${row.slamBonus}`;
+function standingRankKey(row: Pick<StageStandingRow, 'total' | 'matchesWon' | 'teamScore' | 'slamBonus'>) {
+  return `${row.total}:${row.matchesWon}:${row.teamScore}:${row.slamBonus}`;
 }
 
 export function rankStandingRows(rows: StageStandingRow[]): StageStandingRow[] {
   const sorted = [...rows].sort((a, b) => {
+    // 1. Total Points (highest first)
     if (b.total !== a.total) return b.total - a.total;
+    // 2. Number of Match Wins (highest first)
     if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon;
+    // 3. Team Total Score (lowest first in Carrom / tiebreaker)
+    if (a.teamScore !== b.teamScore) return a.teamScore - b.teamScore;
+    // 4. Slam Bonus (highest first)
     if (b.slamBonus !== a.slamBonus) return b.slamBonus - a.slamBonus;
     return a.teamName.localeCompare(b.teamName);
   });
@@ -90,6 +95,7 @@ function emptyRow(team: StandingTeam): StageStandingRow {
     avgBonus: 0,
     total: 0,
     matchesWon: 0,
+    teamScore: 0,
     rank: 0,
     days: [],
   };
@@ -169,11 +175,16 @@ function applyBonuses(
   dayDates: DayDatesInput,
   now: Date,
 ) {
+  row.teamScore = 0;
   for (const day of days) {
     if (!isDayScorePublished(day, dayDates, now)) continue;
+    let dayTeamScore = 0;
     for (const member of team.members) {
       const score = scores.find((s) => s.userId === member.id && s.dayNumber === day);
       if (!score) continue;
+      const pts = Number(score.score) || 0;
+      row.teamScore += pts;
+      dayTeamScore += pts;
       const playerName = String(member.name || '').trim() || 'Player';
       row.slamBonus += score.slams || 0;
       const bucket = dayBucket(row, day);
@@ -194,6 +205,8 @@ function applyBonuses(
         });
       }
     }
+    const bucket = dayBucket(row, day);
+    bucket.teamScore = dayTeamScore;
   }
   row.total = row.eventPts + row.slamBonus + row.avgBonus;
 }

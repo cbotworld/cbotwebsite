@@ -72,7 +72,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
         <Badge variant="carrom" className="mb-2">Standings</Badge>
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          One table per organiser stage. Position is total points, then matches won if points are tied, then slams. Tap Event, Slams, Target+ or Total for the day-wise breakdown after each day completes.
+          One table per organiser stage. Position is determined by <strong>Total Points</strong>. If points are tied between teams, <strong>Number of Match Wins</strong> is considered. If wins are also tied, <strong>Team Total Score</strong> (including walkover scores) determines the rank. Tap Event, Slams, Target+ or Total for the day-wise breakdown.
         </p>
       </div>
       <div className="flex gap-2">
@@ -236,19 +236,20 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>#</TableHead>
+                          <TableHead className="w-10">#</TableHead>
                           <TableHead>Team</TableHead>
-                          <TableHead>Event</TableHead>
-                          <TableHead>Slams</TableHead>
-                          <TableHead>Target+</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Won</TableHead>
+                          <TableHead className="text-center">Total</TableHead>
+                          <TableHead className="text-center">Won</TableHead>
+                          <TableHead className="text-center font-bold text-foreground">Team Score</TableHead>
+                          <TableHead className="text-center">Event</TableHead>
+                          <TableHead className="text-center">Slams</TableHead>
+                          <TableHead className="text-center">Target+</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {(g.rows || []).map((row: any) => (
-                          <TableRow key={row.teamId}>
-                            <TableCell className="font-black">{row.rank}</TableCell>
+                          <TableRow key={row.teamId} className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-black text-amber-500">{row.rank}</TableCell>
                             <TableCell className="font-semibold">
                               <div className="flex items-center gap-2">
                                 {row.teamLogo ? (
@@ -258,22 +259,25 @@ export default function StandingsClient({ payload }: { payload: any }) {
                                     {row.teamName?.[0]}
                                   </div>
                                 )}
-                                <span>{row.teamName}</span>
+                                <span className="truncate">{row.teamName}</span>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center font-black">
+                              <StatButton value={row.total} onClick={() => setOpen({ row, focus: 'total' })} className="font-black text-amber-400" />
+                            </TableCell>
+                            <TableCell className="text-center font-bold">{row.matchesWon}</TableCell>
+                            <TableCell className="text-center font-mono font-bold text-foreground">
+                              {row.teamScore ?? 0}
+                            </TableCell>
+                            <TableCell className="text-center">
                               <StatButton value={row.eventPts} onClick={() => setOpen({ row, focus: 'event' })} />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <StatButton value={row.slamBonus} onClick={() => setOpen({ row, focus: 'slams' })} />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <StatButton value={row.avgBonus} onClick={() => setOpen({ row, focus: 'avg' })} />
                             </TableCell>
-                            <TableCell className="font-black">
-                              <StatButton value={row.total} onClick={() => setOpen({ row, focus: 'total' })} className="font-black" />
-                            </TableCell>
-                            <TableCell>{row.matchesWon}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -309,11 +313,12 @@ export default function StandingsClient({ payload }: { payload: any }) {
                 <TableRow>
                   <TableHead>Day</TableHead>
                   <TableHead>Vs</TableHead>
+                  <TableHead className={open?.focus === 'total' ? 'text-amber-400 font-black' : 'font-bold'}>Total Pts</TableHead>
+                  <TableHead>Match</TableHead>
+                  <TableHead className="font-bold text-foreground">Team Score</TableHead>
                   <TableHead className={open?.focus === 'event' ? 'text-amber-400' : ''}>Event</TableHead>
                   <TableHead className={open?.focus === 'slams' ? 'text-amber-400' : ''}>Slams</TableHead>
                   <TableHead className={open?.focus === 'avg' ? 'text-amber-400' : ''}>Target+</TableHead>
-                  <TableHead className={open?.focus === 'total' ? 'text-amber-400' : ''}>Total</TableHead>
-                  <TableHead>Match</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,11 +326,12 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   <TableRow key={d.dayNumber}>
                     <TableCell className="font-black">Day {d.dayNumber}</TableCell>
                     <TableCell>{d.opponentName || '—'}</TableCell>
+                    <TableCell className={open?.focus === 'total' ? 'font-black text-amber-400' : 'font-black'}>{d.total}</TableCell>
+                    <TableCell className="font-bold">{d.matchResult || '—'}</TableCell>
+                    <TableCell className="font-mono font-bold text-foreground">{d.teamScore ?? '—'}</TableCell>
                     <TableCell className={open?.focus === 'event' ? 'font-black text-amber-400' : ''}>{d.eventPts}</TableCell>
                     <TableCell className={open?.focus === 'slams' ? 'font-black text-amber-400' : ''}>{d.slamBonus}</TableCell>
                     <TableCell className={open?.focus === 'avg' ? 'font-black text-amber-400' : ''}>{d.avgBonus}</TableCell>
-                    <TableCell className={open?.focus === 'total' ? 'font-black text-amber-400' : 'font-black'}>{d.total}</TableCell>
-                    <TableCell>{d.matchResult || '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -343,6 +343,7 @@ export interface StandingDayBreakdown {
   slamBonus: number;
   avgBonus: number;
   total: number;
+  teamScore?: number;
   matchResult: 'W' | 'L' | 'T' | null;
   events: StandingDayEvent[];
   targetBonusPlayers?: StandingDayPlayerBonus[];
@@ -359,6 +360,7 @@ export interface StageStandingRow {
   avgBonus: number;
   total: number;
   matchesWon: number;
+  teamScore: number;
   rank: number;
   days?: StandingDayBreakdown[];
 }

@@ -210,8 +210,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   // Only show on Website Home page ('/') - do NOT show on dashboard pages (player/organizer/captain) or other routes
   if (pathname !== '/') return null;
 
-  // If dismissed or player is already enrolled - do NOT show this new edition enroll floating box at all
-  if (dismissed || alreadyEnrolled) return null;
+  // If dismissed - do NOT show this new edition enroll floating box
+  if (dismissed) return null;
 
   const openModal = async () => {
     setError('');
@@ -308,15 +308,26 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
             {/* Top row on mobile, Left on desktop */}
             <div className="flex items-center justify-between sm:justify-start gap-2.5 min-w-0 flex-1">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+                <div className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl border ${alreadyEnrolled ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'}`}>
+                  {alreadyEnrolled ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Trophy className="h-4 w-4 sm:h-5 sm:w-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="text-[10px] sm:text-xs font-black text-emerald-400 uppercase tracking-wide">
-                      {alreadyEnrolled ? 'You are enrolled' : 'Registration Open'}
+                    <p className="text-[10px] sm:text-xs font-black text-emerald-400 uppercase tracking-wide flex items-center gap-1">
+                      {alreadyEnrolled ? (
+                        <>
+                          <span>✓ You are Enrolled</span>
+                          {myParticipant?.enrollmentNumber ? (
+                            <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[9.5px]">
+                              #{myParticipant.enrollmentNumber}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : (
+                        'Registration Open'
+                      )}
                     </p>
-                    {cutoff ? (
+                    {cutoff && !alreadyEnrolled ? (
                       <span className="text-[10px] text-muted-foreground hidden xs:inline">
                         · Closes {cutoff}
                       </span>
@@ -326,8 +337,14 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     {edition.title} · Edition #{edition.number}
                   </p>
                   <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
-                    Fee: <strong className="text-emerald-400 font-bold">{formatEnrollmentFee(fee)}</strong>
-                    {cutoff ? <span className="xs:hidden"> · Closes {cutoff}</span> : ''}
+                    {alreadyEnrolled ? (
+                      <span className="text-emerald-300 font-semibold">Click to view registration receipt & status</span>
+                    ) : (
+                      <>
+                        Fee: <strong className="text-emerald-400 font-bold">{formatEnrollmentFee(fee)}</strong>
+                        {cutoff ? <span className="xs:hidden"> · Closes {cutoff}</span> : ''}
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -364,16 +381,23 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
 
               {status === 'authenticated' ? (
                 <Button
-                  variant="carrom"
+                  variant={alreadyEnrolled ? 'outline' : 'carrom'}
                   size="sm"
-                  className="flex-1 sm:flex-initial text-[11px] sm:text-xs font-black h-8 px-3"
+                  className={`flex-1 sm:flex-initial text-[11px] sm:text-xs font-black h-8 px-3 ${
+                    alreadyEnrolled
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200'
+                      : ''
+                  }`}
                   disabled={checkingEnrollment}
                   onClick={() => void openModal()}
                 >
                   {checkingEnrollment ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : alreadyEnrolled ? (
-                    'View Enrollment'
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-400 shrink-0" />
+                      <span>My Enrollment</span>
+                    </>
                   ) : (
                     <>
                       <Trophy className="h-3 w-3 mr-1 shrink-0" /> Enroll Now
