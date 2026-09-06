@@ -760,8 +760,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                       </Badge>
                     ) : null}
                     {p.user?.rating ? (
-                      <Badge className="text-[10px] font-extrabold bg-muted text-foreground border border-border">
-                        ★ {p.user.rating}
+                      <Badge variant="outline" className="text-[10px] font-black border-border bg-muted/50 text-foreground">
+                        Rating: {p.user.rating}
                       </Badge>
                     ) : null}
                   </div>
