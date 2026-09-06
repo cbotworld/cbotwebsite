@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canPublishDraft, isOrganizerLiveStatus } from '@/lib/tournament-slots';
-import { resolveCurrentEdition, archiveEditionsBefore, getNextEditionNumber } from '@/lib/current-edition';
+import { resolveCurrentEdition, resolveRegistrationEdition, archiveEditionsBefore, getNextEditionNumber } from '@/lib/current-edition';
 import { toCalendarDate } from '@/lib/combi-cutoff';
 import { stageConfigKey } from '@/lib/tournament-stages';
 
@@ -600,37 +600,72 @@ export async function getMyRegistrationEnrollment() {
   const userId = (session.user as { id: string }).id;
 
   try {
-    const participant = await prisma.editionParticipant.findFirst({
-      where: {
-        userId,
-        OR: [
-          { status: { in: ['ENROLLED', 'QUALIFIED'] } },
-          { enrolledAt: { not: null } },
-          { paymentStatus: { in: ['PAID', 'FREE'] } },
-        ],
-      },
-      orderBy: { enrolledAt: 'desc' },
-      select: {
-        id: true,
-        status: true,
-        paymentStatus: true,
-        paymentAmount: true,
-        paymentTransactionId: true,
-        enrolledAt: true,
-        edition: {
-          select: {
-            id: true,
-            title: true,
-            number: true,
-            theme: true,
-            enrollmentFee: true,
-            status: true,
-            slot: true,
-            organizer: { select: { name: true, username: true } },
+    const regEdition = await resolveRegistrationEdition();
+    let participant: any = null;
+
+    if (regEdition) {
+      participant = await prisma.editionParticipant.findUnique({
+        where: { editionId_userId: { editionId: regEdition.id, userId } },
+        select: {
+          id: true,
+          status: true,
+          paymentStatus: true,
+          paymentAmount: true,
+          paymentTransactionId: true,
+          enrolledAt: true,
+          edition: {
+            select: {
+              id: true,
+              title: true,
+              number: true,
+              theme: true,
+              enrollmentFee: true,
+              status: true,
+              slot: true,
+              organizer: { select: { name: true, username: true } },
+            },
           },
         },
-      },
-    });
+      });
+    }
+
+    if (!participant) {
+      participant = await prisma.editionParticipant.findFirst({
+        where: {
+          userId,
+          OR: [
+            { status: { in: ['ENROLLED', 'QUALIFIED', 'REGISTERED'] } },
+            { enrolledAt: { not: null } },
+            { paymentStatus: { in: ['PAID', 'FREE', 'PENDING'] } },
+            { paymentTransactionId: { not: null } },
+          ],
+        },
+        orderBy: [
+          { edition: { number: 'desc' } },
+          { enrolledAt: 'desc' },
+        ],
+        select: {
+          id: true,
+          status: true,
+          paymentStatus: true,
+          paymentAmount: true,
+          paymentTransactionId: true,
+          enrolledAt: true,
+          edition: {
+            select: {
+              id: true,
+              title: true,
+              number: true,
+              theme: true,
+              enrollmentFee: true,
+              status: true,
+              slot: true,
+              organizer: { select: { name: true, username: true } },
+            },
+          },
+        },
+      });
+    }
 
     if (!participant?.edition) return { success: true as const, enrollment: null };
 
