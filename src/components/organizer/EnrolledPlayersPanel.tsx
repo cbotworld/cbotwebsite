@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw, CheckCircle2, Check } from 'lucide-react';
+import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw, CheckCircle2, Check, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,20 @@ import {
 } from '@/lib/actions/tournamentSlotActions';
 import { InlineStatCell, type InlineStatEditState } from '@/components/organizer/InlineStatCell';
 import { formatEnrollmentFee } from '@/lib/tournament-slots';
+
+function formatEnrolledTimestamp(dateStr?: string | Date | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
 
 type EnrolledRow = {
   id: string;
@@ -469,8 +483,14 @@ export default function EnrolledPlayersPanel({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-amber-500 font-bold">
-                        @{row.user?.username || '—'}
+                      <TableCell className="font-mono text-xs">
+                        <span className="text-amber-500 font-bold">@{row.user?.username || '—'}</span>
+                        {row.enrolledAt ? (
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-sans mt-0.5" title="Enrolled timestamp">
+                            <Clock className="h-2.5 w-2.5 text-sky-400 shrink-0" />
+                            <span>{formatEnrolledTimestamp(row.enrolledAt)}</span>
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-xs font-black text-emerald-400">{currentAvg}</TableCell>
                       <TableCell>

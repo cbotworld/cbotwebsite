@@ -4,7 +4,6 @@ import './globals.css';
 import { Providers } from './providers';
 import { NavbarWithCms } from '@/components/layout/NavbarWithCms';
 import { FooterWithCms } from '@/components/layout/FooterWithCms';
-import { EnrollmentBarWithRegistration } from '@/components/layout/EnrollmentBarWithRegistration';
 import { WhatsAppButtonWithCms } from '@/components/ui/WhatsAppButtonWithCms';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
@@ -58,7 +57,6 @@ export default function RootLayout({
           <NavbarWithCms />
           <main className="flex-1">{children}</main>
           <FooterWithCms />
-          <EnrollmentBarWithRegistration />
           <WhatsAppButtonWithCms />
         </Providers>
       </body>

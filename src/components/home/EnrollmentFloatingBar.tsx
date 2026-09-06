@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Trophy,
@@ -22,6 +22,7 @@ import {
   Users,
   Search,
   Calendar,
+  Clock,
   MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,20 @@ type RegistrationEdition = {
 
 type Step = 'confirm' | 'enrolling' | 'done' | 'already';
 
+function formatEnrolledTimestamp(dateStr?: string | Date | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 function getPlayerInitials(name?: string | null, username?: string | null): string {
   const raw = (name || username || '').trim();
   if (!raw) return 'PL';
@@ -72,6 +87,7 @@ function getPlayerInitials(name?: string | null, username?: string | null): stri
 
 export default function EnrollmentFloatingBar({ edition }: { edition: RegistrationEdition }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, status } = useSession();
   const [dismissed, setDismissed] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -191,7 +207,11 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
     };
   }, [status, edition.id, session?.user]);
 
-  if (dismissed) return null;
+  // Only show on Website Home page ('/') - do NOT show on dashboard pages (player/organizer/captain) or other routes
+  if (pathname !== '/') return null;
+
+  // If dismissed or player is already enrolled - do NOT show this new edition enroll floating box at all
+  if (dismissed || alreadyEnrolled) return null;
 
   const openModal = async () => {
     setError('');
@@ -787,12 +807,9 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                           </span>
                         ) : null}
                         {p.enrolledAt ? (
-                          <span className="flex items-center gap-0.5">
-                            <Calendar className="h-2.5 w-2.5 text-muted-foreground/70" />
-                            {new Date(p.enrolledAt).toLocaleDateString([], {
-                              month: 'short',
-                              day: 'numeric',
-                            })}
+                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                            <Clock className="h-2.5 w-2.5 text-emerald-400 shrink-0" />
+                            <span>{formatEnrolledTimestamp(p.enrolledAt)}</span>
                           </span>
                         ) : null}
                       </div>

@@ -4,6 +4,7 @@ import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 import { sanitizeCmsImages, safePublicImageUrl, withSafeTeamLogo } from '@/lib/safe-image-url';
 import { resolveCurrentEdition } from '@/lib/current-edition';
+import { EnrollmentBarWithRegistration } from '@/components/layout/EnrollmentBarWithRegistration';
 
 export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
@@ -58,41 +59,47 @@ export default async function HomePage() {
     const safeCms = sanitizeCmsImages(websiteCms);
 
     return (
-      <HomeClient
-        teams={currentEditionTeams}
-        allTeams={slimAllTeams}
-        players={[]}
-        matches={[]}
-        currentEditionName={currentEditionName}
-        editionPosterUrl={safePublicImageUrl(currentEdition?.posterUrl) ?? null}
-        currentEdition={currentEdition ? {
-          id: currentEdition.id,
-          title: currentEdition.title,
-          theme: currentEdition.theme ?? null,
-          bannerImage: safePublicImageUrl(currentEdition.bannerImage),
-          posterUrl: safePublicImageUrl(currentEdition.posterUrl),
-          number: currentEdition.number,
-          tournamentStartDate: currentEdition.tournamentStartDate ? currentEdition.tournamentStartDate.toISOString() : null,
-          dayDates: currentEdition.dayDates ?? null,
-          totalDays: currentEdition.totalDays ?? 15,
-        } : null}
-        websiteCms={safeCms}
-      />
+      <>
+        <HomeClient
+          teams={currentEditionTeams}
+          allTeams={slimAllTeams}
+          players={[]}
+          matches={[]}
+          currentEditionName={currentEditionName}
+          editionPosterUrl={safePublicImageUrl(currentEdition?.posterUrl) ?? null}
+          currentEdition={currentEdition ? {
+            id: currentEdition.id,
+            title: currentEdition.title,
+            theme: currentEdition.theme ?? null,
+            bannerImage: safePublicImageUrl(currentEdition.bannerImage),
+            posterUrl: safePublicImageUrl(currentEdition.posterUrl),
+            number: currentEdition.number,
+            tournamentStartDate: currentEdition.tournamentStartDate ? currentEdition.tournamentStartDate.toISOString() : null,
+            dayDates: currentEdition.dayDates ?? null,
+            totalDays: currentEdition.totalDays ?? 15,
+          } : null}
+          websiteCms={safeCms}
+        />
+        <EnrollmentBarWithRegistration />
+      </>
     );
   } catch (error) {
     console.error('Error loading HomePage from database:', error);
     // Graceful fallback if database connection is pending or configuring
     return (
-      <HomeClient
-        teams={[]}
-        allTeams={[]}
-        players={[]}
-        matches={[]}
-        currentEditionName={DEFAULT_WEBSITE_CMS.site.editionLabel}
-        editionPosterUrl={null}
-        currentEdition={null}
-        websiteCms={DEFAULT_WEBSITE_CMS}
-      />
+      <>
+        <HomeClient
+          teams={[]}
+          allTeams={[]}
+          players={[]}
+          matches={[]}
+          currentEditionName={DEFAULT_WEBSITE_CMS.site.editionLabel}
+          editionPosterUrl={null}
+          currentEdition={null}
+          websiteCms={DEFAULT_WEBSITE_CMS}
+        />
+        <EnrollmentBarWithRegistration />
+      </>
     );
   }
 }

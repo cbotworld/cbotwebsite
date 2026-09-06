@@ -28,6 +28,20 @@ export type PlayerEnrollmentInfo = {
   };
 };
 
+function formatEnrolledTimestamp(dateStr?: string | Date | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 export function PlayerEnrollmentCard({
   enrollment: initial,
 }: {
@@ -108,12 +122,18 @@ export function PlayerEnrollmentCard({
               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
               {initial.edition.title}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
               {initial.edition.theme ? `${initial.edition.theme} · ` : ''}
-              Fee: <strong className="text-emerald-400">{formatEnrollmentFee(fee)}</strong>
-              {initial.edition.organizerName
-                ? ` · Organizer: ${initial.edition.organizerName}`
-                : ''}
+              <span>Fee: <strong className="text-emerald-400">{formatEnrollmentFee(fee)}</strong></span>
+              {initial.edition.organizerName ? (
+                <span>· Organizer: <strong className="text-foreground">{initial.edition.organizerName}</strong></span>
+              ) : null}
+              {initial.enrolledAt ? (
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[11px]">
+                  <Clock className="h-3 w-3 text-emerald-400" />
+                  <span>Enrolled: {formatEnrolledTimestamp(initial.enrolledAt)}</span>
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
