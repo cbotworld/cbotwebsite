@@ -596,10 +596,22 @@ export async function getMyEnrollmentForEdition(editionId: string, overrideUserI
         enrolledAt: true,
       },
     });
+
+    let enrollmentNumber: number | null = null;
+    if (participant) {
+      const allForEdition = await prisma.editionParticipant.findMany({
+        where: { editionId },
+        orderBy: [{ enrolledAt: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true },
+      });
+      const idx = allForEdition.findIndex((p) => p.id === participant.id);
+      enrollmentNumber = idx >= 0 ? idx + 1 : 1;
+    }
+
     return {
       success: true as const,
       enrolled: Boolean(participant),
-      participant,
+      participant: participant ? { ...participant, enrollmentNumber } : null,
     };
   } catch (error) {
     console.error('[getMyEnrollmentForEdition]', error);
@@ -705,10 +717,22 @@ export async function getMyRegistrationEnrollment(overrideUserId?: string) {
 
     if (!participant?.edition) return { success: true as const, enrollment: null };
 
+    let enrollmentNumber: number | null = null;
+    if (participant?.edition?.id) {
+      const allForEdition = await prisma.editionParticipant.findMany({
+        where: { editionId: participant.edition.id },
+        orderBy: [{ enrolledAt: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true },
+      });
+      const idx = allForEdition.findIndex((p) => p.id === participant.id);
+      enrollmentNumber = idx >= 0 ? idx + 1 : 1;
+    }
+
     return {
       success: true as const,
       enrollment: {
         participantId: participant.id,
+        enrollmentNumber,
         status: participant.status,
         paymentStatus: participant.paymentStatus,
         paymentAmount: participant.paymentAmount,
@@ -812,10 +836,18 @@ export async function verifyParticipantPayment(editionId: string, userId: string
         const organizerName =
           edition.organizer?.name?.trim() || edition.organizer?.username?.trim() || 'Organizer';
 
+        const allForEdition = await prisma.editionParticipant.findMany({
+          where: { editionId },
+          orderBy: [{ enrolledAt: 'asc' }, { createdAt: 'asc' }],
+          select: { id: true, userId: true },
+        });
+        const enrollIndex = allForEdition.findIndex((p) => p.userId === userId);
+        const enrollmentNumber = enrollIndex >= 0 ? enrollIndex + 1 : 1;
+
         await transporter.sendMail({
           from: `"CBOT Tournament Director" <${smtpFrom}>`,
           to: emailRecipient,
-          subject: `✅ Payment Verified — Enrollment Confirmed for ${edition.title} (Edition #${edition.number})`,
+          subject: `✅ Payment Verified — Enrollment Confirmed (#${enrollmentNumber}) for ${edition.title} (Edition #${edition.number})`,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #334155; border-radius: 16px; overflow: hidden; background: #0f172a; color: #f8fafc;">
               <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 30px 20px; text-align: center; border-bottom: 1px solid #334155;">
@@ -835,6 +867,10 @@ export async function verifyParticipantPayment(editionId: string, userId: string
                 <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 18px; margin: 20px 0;">
                   <h3 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">Enrollment Receipt</h3>
                   <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Enrollment #:</td>
+                      <td style="padding: 5px 0; color: #fbbf24; font-weight: 900; font-size: 14px; text-align: right;">#${enrollmentNumber}</td>
+                    </tr>
                     <tr>
                       <td style="padding: 5px 0; color: #94a3b8;">Tournament:</td>
                       <td style="padding: 5px 0; color: #f8fafc; font-weight: 700; text-align: right;">${edition.title} (#${edition.number})</td>
@@ -860,6 +896,12 @@ export async function verifyParticipantPayment(editionId: string, userId: string
                       <td style="padding: 5px 0; color: #34d399; font-weight: 800; text-align: right;">✅ VERIFIED</td>
                     </tr>
                   </table>
+                </div>
+
+                <!-- First-Come First-Served & Multiple of 8 Policy Box -->
+                <div style="background-color: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; padding: 14px 16px; margin: 18px 0; font-size: 12px; color: #c7d2fe; line-height: 1.55;">
+                  <strong style="color: #a5b4fc; display: block; font-size: 12.5px; margin-bottom: 5px;">ℹ️ First-Come First-Served & Multiples of 8 Policy:</strong>
+                  Players are admitted strictly on a first-come, first-served basis in <strong>multiples of 8</strong> (e.g. 8, 16, 24, 32 players) based on enrollment time. If final registrations exceed a confirmed multiple of 8, players beyond the cutoff can be cancelled by the organizer and the entry fee collected will be <strong>100% refunded</strong>.
                 </div>
 
                 <div style="text-align: center; margin: 24px 0 16px 0;">
@@ -959,6 +1001,7 @@ export type PublicEnrolledPlayer = {
   id: string;
   category?: string | null;
   enrolledAt: string | null;
+  enrollmentNumber: number;
   user: {
     id: string;
     name: string;
@@ -996,15 +1039,16 @@ export async function getPublicEditionEnrolledPlayers(editionId: string): Promis
         },
       },
       orderBy: [
-        { enrolledAt: 'desc' },
-        { createdAt: 'desc' },
+        { enrolledAt: 'asc' },
+        { createdAt: 'asc' },
       ],
     });
 
-    const players: PublicEnrolledPlayer[] = participants.map((p) => ({
+    const players: PublicEnrolledPlayer[] = participants.map((p, idx) => ({
       id: p.id,
       category: p.category,
       enrolledAt: (p.enrolledAt || p.createdAt)?.toISOString?.() || null,
+      enrollmentNumber: idx + 1,
       user: {
         id: p.user.id,
         name: p.user.name || p.user.username,

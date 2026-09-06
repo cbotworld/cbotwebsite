@@ -809,27 +809,29 @@ export default function CaptainClient({
 
       {/* COMBI MODAL */}
       <Dialog open={dayLineupModalOpen} onOpenChange={setDayLineupModalOpen}>
-        <div className="flex flex-col max-h-[85vh] overflow-hidden -mx-6 -my-6 bg-card text-foreground rounded-2xl">
-          {/* STICKY HEADER */}
-          <div className="px-6 pt-6 pb-4 border-b border-border bg-card/95 backdrop-blur-md sticky top-0 z-20 flex items-start justify-between gap-4">
-            <div className="flex flex-col space-y-1.5 text-left pr-6">
-              <h2 className="text-xl font-bold leading-none tracking-tight flex items-center gap-2">
-                <Send className={`h-5 w-5 ${isSpocTeam ? 'text-violet-400' : 'text-amber-500'}`} />
-                {isSpocTeam ? 'Spoc Exhibition' : 'Day'} {selectedDayNumber} Combi
-                {dayDatesMap[selectedDayNumber]
-                  ? ` (${formatIsoDateLabel(dayDatesMap[selectedDayNumber], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})`
-                  : ''}{' '}
-                — {roundsPerDay} events
+        <div className="flex flex-col -m-6 max-h-[85vh] overflow-hidden bg-background">
+          {/* HEADER */}
+          <div className="p-4 sm:p-6 border-b border-border bg-muted/20 flex justify-between items-start gap-2">
+            <div className="flex flex-col space-y-1 text-left pr-2 sm:pr-6 min-w-0 flex-1">
+              <h2 className="text-base sm:text-xl font-bold leading-tight tracking-tight flex items-center gap-2 truncate">
+                <Send className={`h-4 w-4 sm:h-5 sm:w-5 shrink-0 ${isSpocTeam ? 'text-violet-400' : 'text-amber-500'}`} />
+                <span>
+                  {isSpocTeam ? 'Spoc Exhibition' : 'Day'} {selectedDayNumber} Combi
+                  {dayDatesMap[selectedDayNumber]
+                    ? ` (${formatIsoDateLabel(dayDatesMap[selectedDayNumber], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })})`
+                    : ''}{' '}
+                  — {roundsPerDay} events
+                </span>
               </h2>
               {isSpocTeam && spocDayMeta.get(selectedDayNumber)?.opponentName ? (
-                <p className="text-sm font-bold text-violet-300 mt-1">
+                <p className="text-xs sm:text-sm font-bold text-violet-300 mt-0.5 truncate">
                   vs {spocDayMeta.get(selectedDayNumber)?.opponentName}
                   {spocDayMeta.get(selectedDayNumber)?.opponentTag
                     ? ` (${spocDayMeta.get(selectedDayNumber)?.opponentTag})`
                     : ''}
                 </p>
               ) : null}
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 Deadline: <strong className="text-rose-400">9:30 PM IST</strong>
               </p>
             </div>
@@ -839,11 +841,12 @@ export default function CaptainClient({
                 variant="outline"
                 size="sm"
                 onClick={() => setRoundLineups(initRoundLineups(selectedDayNumber))}
-                className="h-8 px-3 text-xs gap-1.5 border-rose-500/30 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 font-bold shrink-0 transition-colors"
+                className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs gap-1.5 border-rose-500/30 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 font-bold shrink-0 transition-colors"
                 title="Clear all player selections"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset All
+                <RotateCcw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden xs:inline">Reset All</span>
+                <span className="xs:hidden">Reset</span>
               </Button>
             )}
           </div>
@@ -860,7 +863,7 @@ export default function CaptainClient({
           ) : (
             <form onSubmit={handleSaveDayLineup} className="flex-1 flex flex-col overflow-hidden min-h-0">
               {/* SCROLLABLE INNER SECTION */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-amber-500/20 hover:scrollbar-thumb-amber-500/40 scrollbar-track-transparent">
+              <div className="flex-1 overflow-y-auto px-3.5 py-3 sm:px-6 sm:py-4 space-y-3.5 sm:space-y-4 min-h-0 scrollbar-thin scrollbar-thumb-amber-500/20 hover:scrollbar-thumb-amber-500/40 scrollbar-track-transparent">
                 {isDayLocked(selectedDayNumber, dayDatesMap) && (
                   <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-500/10 text-xs font-bold text-rose-400 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 shrink-0" />
@@ -954,12 +957,12 @@ export default function CaptainClient({
                     }
                   });
                   return (
-                    <div key={ri} className="p-4 rounded-xl border border-border bg-muted/20 space-y-3 hover:border-amber-500/20 transition-all">
+                    <div key={ri} className="p-3 sm:p-4 rounded-xl border border-border bg-muted/20 space-y-2.5 sm:space-y-3 hover:border-amber-500/20 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-black text-amber-400">{getRoundLabel(ri)}</span>
                       </div>
 
-                      <div className={`grid gap-2 ${roundPlayersNeeded === 1 ? 'grid-cols-1' : roundPlayersNeeded === 2 ? 'grid-cols-2' : roundPlayersNeeded >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+                      <div className={`grid gap-2 ${roundPlayersNeeded === 1 ? 'grid-cols-1' : roundPlayersNeeded === 2 ? 'grid-cols-1 sm:grid-cols-2' : roundPlayersNeeded >= 4 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
                         {Array.from({ length: roundPlayersNeeded }, (_, si) => {
                           const selectedId = round.playerIds[si] || '';
                           

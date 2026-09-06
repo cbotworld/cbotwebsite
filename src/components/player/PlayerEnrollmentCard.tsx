@@ -11,6 +11,7 @@ import { formatEnrollmentFee } from '@/lib/tournament-slots';
 
 export type PlayerEnrollmentInfo = {
   participantId: string;
+  enrollmentNumber?: number | null;
   status?: string | null;
   paymentStatus?: string | null;
   paymentAmount?: number | null;
@@ -103,6 +104,11 @@ export function PlayerEnrollmentCard({
               <Badge variant="outline" className="text-[10px] font-bold">
                 Edition #{initial.edition.number}
               </Badge>
+              {initial.enrollmentNumber ? (
+                <Badge className="bg-amber-500/25 text-amber-300 border border-amber-500/40 text-[10px] font-black">
+                  Enrollment #{initial.enrollmentNumber}
+                </Badge>
+              ) : null}
               {initial.paymentStatus === 'VERIFIED' ? (
                 <Badge className="bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
                   <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-400" /> Payment Verified
@@ -136,6 +142,19 @@ export function PlayerEnrollmentCard({
               ) : null}
             </p>
           </div>
+        </div>
+
+        {/* First-Come First-Served & Multiple of 8 Policy Box */}
+        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">
+              <ShieldCheck className="h-3.5 w-3.5 text-indigo-400" />
+              First-Come First-Served & Multiples of 8 Policy
+            </span>
+          </div>
+          <p className="text-xs text-indigo-200/90 leading-relaxed">
+            Tournament brackets are assembled strictly in <strong>multiples of 8</strong> (e.g. 8, 16, 24, 32 players) based on enrollment time. If final registrations exceed a complete multiple of 8, players beyond the cutoff can be cancelled by the organizer and the entry fee collected will be <strong>100% refunded</strong>.
+          </p>
         </div>
 
         {isPaid ? (

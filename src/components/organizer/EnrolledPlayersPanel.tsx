@@ -71,16 +71,33 @@ function getGradeAverage(row: EnrolledRow): number | null {
   return Number(value);
 }
 
+function sortByEnrollmentTimeAsc(rows: EnrolledRow[]) {
+  return [...rows].sort((a, b) => {
+    const timeA = new Date(a.enrolledAt || (a as any).createdAt || 0).getTime();
+    const timeB = new Date(b.enrolledAt || (b as any).createdAt || 0).getTime();
+    if (timeA !== timeB) return timeA - timeB;
+    return (a.user?.name || '').localeCompare(b.user?.name || '');
+  });
+}
+
 function sortByGradeAverageAsc(rows: EnrolledRow[]) {
   return [...rows].sort((a, b) => {
     const aVal = getGradeAverage(a);
     const bVal = getGradeAverage(b);
     const aMissing = aVal === null;
     const bMissing = bVal === null;
-    if (aMissing && bMissing) return (a.user?.name || '').localeCompare(b.user?.name || '');
+    if (aMissing && bMissing) {
+      const timeA = new Date(a.enrolledAt || (a as any).createdAt || 0).getTime();
+      const timeB = new Date(b.enrolledAt || (b as any).createdAt || 0).getTime();
+      return timeA - timeB;
+    }
     if (aMissing) return 1;
     if (bMissing) return -1;
-    if (aVal === bVal) return (a.user?.name || '').localeCompare(b.user?.name || '');
+    if (aVal === bVal) {
+      const timeA = new Date(a.enrolledAt || (a as any).createdAt || 0).getTime();
+      const timeB = new Date(b.enrolledAt || (b as any).createdAt || 0).getTime();
+      return timeA - timeB;
+    }
     return aVal - bVal;
   });
 }
@@ -123,6 +140,16 @@ export default function EnrolledPlayersPanel({
   const [successNotice, setSuccessNotice] = React.useState('');
   const [inlineStatEdit, setInlineStatEdit] = React.useState<InlineStatEditState>(null);
   const [inlineStatSaving, setInlineStatSaving] = React.useState<string | null>(null);
+  const [sortField, setSortField] = React.useState<'time' | 'grade'>('grade');
+
+  const enrollmentNumberMap = React.useMemo(() => {
+    const sortedChronologically = sortByEnrollmentTimeAsc(participants);
+    const map = new Map<string, number>();
+    sortedChronologically.forEach((p, idx) => {
+      map.set(p.userId, idx + 1);
+    });
+    return map;
+  }, [participants]);
 
   const handleVerifyPayment = async (row: EnrolledRow) => {
     if (!editionId || !row.userId) return;
@@ -165,7 +192,7 @@ export default function EnrolledPlayersPanel({
 
   const fee = Number(enrollmentFee) || 0;
   const showPaymentColumns = fee > 0;
-  const tableColSpan = showPaymentColumns ? 8 : 6;
+  const tableColSpan = showPaymentColumns ? 9 : 7;
 
   const enrolledUserIds = React.useMemo(() => new Set(participants.map((p) => p.userId)), [participants]);
 
@@ -194,7 +221,10 @@ export default function EnrolledPlayersPanel({
 
   const filteredParticipants = React.useMemo(() => {
     const q = listSearch.trim().toLowerCase();
-    const sorted = sortByGradeAverageAsc(participants);
+    const sorted =
+      sortField === 'grade'
+        ? sortByGradeAverageAsc(participants)
+        : sortByEnrollmentTimeAsc(participants);
     if (!q) return sorted;
     return sorted.filter((row) => {
       const name = (row.user?.name || '').toLowerCase();
@@ -202,7 +232,7 @@ export default function EnrolledPlayersPanel({
       const txn = (row.paymentTransactionId || '').toLowerCase();
       return name.includes(q) || username.includes(q) || txn.includes(q);
     });
-  }, [participants, listSearch]);
+  }, [participants, listSearch, sortField]);
 
   const addCandidates = React.useMemo(() => {
     const q = addSearch.trim().toLowerCase();
@@ -433,14 +463,44 @@ export default function EnrolledPlayersPanel({
           </div>
         )}
 
+        {/* FCFS Multiples of 8 Rule Status Indicator */}
+        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-xs text-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="font-black text-indigo-300">FCFS Multiples of 8 Rule:</span>
+            <span>Brackets are formed in multiples of 8 (8, 16, 24, 32...). Excess players beyond cutoff can be refunded.</span>
+          </div>
+          <span className="font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded text-[11px] shrink-0">
+            {participants.length % 8 === 0
+              ? `✅ ${participants.length} Enrolled (Exact ${participants.length / 8}x8 Bracket)`
+              : `⚠️ ${participants.length} Enrolled (${participants.length % 8} over ${Math.floor(participants.length / 8) * 8} / need ${8 - (participants.length % 8)} more for ${Math.ceil(participants.length / 8) * 8})`}
+          </span>
+        </div>
+
         <div className="rounded-xl border border-border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead
+                  className="w-16 text-center cursor-pointer select-none hover:text-amber-300 transition-colors"
+                  onClick={() => setSortField('time')}
+                  title="Click to sort by enrollment order (FCFS #)"
+                >
+                  <span className={`inline-flex items-center gap-1 text-xs ${sortField === 'time' ? 'text-amber-400 font-black' : 'font-bold'}`}>
+                    # {sortField === 'time' ? '↓' : ''}
+                  </span>
+                </TableHead>
                 <TableHead>Player</TableHead>
                 <TableHead>Username</TableHead>
                 <TableHead>Current Avg</TableHead>
-                <TableHead>Grade Avg</TableHead>
+                <TableHead
+                  className="cursor-pointer select-none hover:text-amber-300 transition-colors"
+                  onClick={() => setSortField('grade')}
+                  title="Click to sort by Grade Average"
+                >
+                  <span className={`inline-flex items-center gap-1 text-xs ${sortField === 'grade' ? 'text-amber-400 font-black' : 'font-bold'}`}>
+                    Grade Avg {sortField === 'grade' ? '↓' : ''}
+                  </span>
+                </TableHead>
                 <TableHead>SPoC (yes/no)</TableHead>
                 {showPaymentColumns ? <TableHead>Payment</TableHead> : null}
                 {showPaymentColumns ? <TableHead>Comments / Paid By</TableHead> : null}
@@ -470,9 +530,18 @@ export default function EnrolledPlayersPanel({
                     row.gradeAverage > 0
                       ? Number(row.gradeAverage).toFixed(2)
                       : '-';
+                  const enrollmentNum = enrollmentNumberMap.get(row.userId) ?? '—';
 
                   return (
                     <TableRow key={row.id}>
+                      <TableCell className="text-center font-mono text-xs font-black">
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px]"
+                          title={`Enrollment #${enrollmentNum} (enrolled on ${formatEnrolledTimestamp(row.enrolledAt)})`}
+                        >
+                          #{enrollmentNum}
+                        </span>
+                      </TableCell>
                       <TableCell className="font-bold text-xs">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span>{row.user?.name || '—'}</span>

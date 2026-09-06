@@ -301,73 +301,105 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
 
   return (
     <>
-      <div className="fixed bottom-0 inset-x-0 z-50 p-3 sm:p-4 pointer-events-none">
+      <div className="fixed bottom-0 inset-x-0 z-50 p-2 sm:p-4 pointer-events-none">
         <div className="max-w-4xl mx-auto pointer-events-auto">
-          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/40 bg-slate-950/95 backdrop-blur-md shadow-2xl shadow-emerald-500/20 px-4 py-3 sm:px-5 sm:py-4">
-            <div className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-              <Trophy className="h-5 w-5 text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-black text-emerald-400 uppercase tracking-wide">
-                {alreadyEnrolled ? 'You are enrolled' : 'Registration Open'}
-              </p>
-              <p className="text-sm font-bold text-foreground truncate">
-                {edition.title} · Edition #{edition.number}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Fee: {formatEnrollmentFee(fee)}
-                {cutoff ? ` · Closes ${cutoff}` : ''}
-              </p>
-            </div>
-            {/* Secondary Action: View Enrolled Players */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs font-black shrink-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 gap-1.5 h-8 px-3 rounded-lg"
-              onClick={() => void handleOpenRosterModal()}
-            >
-              <Users className="h-3.5 w-3.5 text-amber-400" />
-              <span>Enrolled Players</span>
-              {rosterCount > 0 ? (
-                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30">
-                  {rosterCount}
-                </span>
-              ) : null}
-            </Button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 rounded-2xl border border-emerald-500/40 bg-slate-950/95 backdrop-blur-md shadow-2xl shadow-emerald-500/20 p-3 sm:px-5 sm:py-4">
+            
+            {/* Top row on mobile, Left on desktop */}
+            <div className="flex items-center justify-between sm:justify-start gap-2.5 min-w-0 flex-1">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                  <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-[10px] sm:text-xs font-black text-emerald-400 uppercase tracking-wide">
+                      {alreadyEnrolled ? 'You are enrolled' : 'Registration Open'}
+                    </p>
+                    {cutoff ? (
+                      <span className="text-[10px] text-muted-foreground hidden xs:inline">
+                        · Closes {cutoff}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-foreground truncate">
+                    {edition.title} · Edition #{edition.number}
+                  </p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
+                    Fee: <strong className="text-emerald-400 font-bold">{formatEnrollmentFee(fee)}</strong>
+                    {cutoff ? <span className="xs:hidden"> · Closes {cutoff}</span> : ''}
+                  </p>
+                </div>
+              </div>
 
-            {status === 'authenticated' ? (
+              {/* Close Button on mobile */}
+              <button
+                type="button"
+                onClick={() => setDismissed(true)}
+                className="sm:hidden p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Action Buttons: 2-column full width on mobile, inline on desktop */}
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              {/* Secondary Action: View Enrolled Players */}
               <Button
-                variant="carrom"
+                type="button"
+                variant="outline"
                 size="sm"
-                className="text-xs font-black shrink-0"
-                disabled={checkingEnrollment}
-                onClick={() => void openModal()}
+                className="flex-1 sm:flex-initial text-[11px] sm:text-xs font-black border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg"
+                onClick={() => void handleOpenRosterModal()}
               >
-                {checkingEnrollment ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : alreadyEnrolled ? (
-                  'View Enrollment'
-                ) : (
-                  'Enroll Now'
-                )}
+                <Users className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span className="truncate">Players</span>
+                {rosterCount > 0 ? (
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30 shrink-0">
+                    {rosterCount}
+                  </span>
+                ) : null}
               </Button>
-            ) : (
-              <Link
-                href={`/login?callbackUrl=${encodeURIComponent('/')}`}
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md h-8 px-3 text-xs font-black shrink-0 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 hover:from-amber-400 hover:to-amber-600 shadow-lg shadow-amber-500/30 border border-amber-300/30"
+
+              {status === 'authenticated' ? (
+                <Button
+                  variant="carrom"
+                  size="sm"
+                  className="flex-1 sm:flex-initial text-[11px] sm:text-xs font-black h-8 px-3"
+                  disabled={checkingEnrollment}
+                  onClick={() => void openModal()}
+                >
+                  {checkingEnrollment ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : alreadyEnrolled ? (
+                    'View Enrollment'
+                  ) : (
+                    <>
+                      <Trophy className="h-3 w-3 mr-1 shrink-0" /> Enroll Now
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Link
+                  href={`/login?callbackUrl=${encodeURIComponent('/')}`}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md h-8 px-3 text-[11px] sm:text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 hover:from-amber-400 hover:to-amber-600 shadow-lg shadow-amber-500/30 border border-amber-300/30"
+                >
+                  Login to Enroll
+                </Link>
+              )}
+
+              {/* Close button on desktop */}
+              <button
+                type="button"
+                onClick={() => setDismissed(true)}
+                className="hidden sm:inline-flex p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 shrink-0"
+                aria-label="Dismiss"
               >
-                Login to Enroll
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => setDismissed(true)}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 shrink-0"
-              aria-label="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </button>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
@@ -402,12 +434,27 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                 <span className="text-muted-foreground">Enrollment fee</span>
                 <span className="font-black text-emerald-400">{formatEnrollmentFee(fee)}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Queue Position</span>
+                <span className="font-black text-amber-400">Enrollment #{rosterCount + 1}</span>
+              </div>
               {cutoff && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Registration closes</span>
                   <span className="font-bold">{cutoff}</span>
                 </div>
               )}
+            </div>
+
+            {/* First-Come First-Served & Multiple of 8 Rule Notice */}
+            <div className="rounded-xl border border-indigo-500/35 bg-indigo-500/10 p-3 text-xs text-indigo-200 leading-relaxed space-y-1">
+              <div className="flex items-center gap-1.5 font-black text-indigo-300 text-[11px] uppercase tracking-wider">
+                <Shield className="h-3.5 w-3.5 text-indigo-400" />
+                <span>First-Come, First-Served & Multiples of 8 Rule</span>
+              </div>
+              <p className="text-[11px] text-indigo-200/90 leading-normal">
+                Players are admitted strictly on a first-come, first-served basis in <strong>multiples of 8</strong> (e.g. 8, 16, 24, 32). If you enroll late and registrations exceed a full multiple of 8, your enrollment can be cancelled by the organizer and your entry fee will be <strong>100% refunded</strong>.
+              </p>
             </div>
 
             {isPaid && (
@@ -699,6 +746,11 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     ✅ Verified by Organizer
                   </Badge>
                 ) : null}
+                {myParticipant?.enrollmentNumber ? (
+                  <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black">
+                    Enrollment #{myParticipant.enrollmentNumber}
+                  </Badge>
+                ) : null}
               </div>
               <h3 className="text-xl font-black text-foreground">You are registered for {edition.title}</h3>
               <p className="text-sm text-emerald-200/90 max-w-md mx-auto leading-relaxed">
@@ -710,7 +762,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
               </p>
               {myParticipant?.paymentTransactionId ? (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background/80 border border-border text-xs font-mono">
-                  <span className="text-muted-foreground font-sans text-[11px] font-bold">Txn ID:</span>
+                  <span className="text-muted-foreground font-sans text-[11px] font-bold">Comments / Paid:</span>
                   <span className="text-sky-300 font-bold">{myParticipant.paymentTransactionId}</span>
                 </div>
               ) : null}
@@ -750,6 +802,26 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
         </DialogHeader>
 
         <div className="space-y-4 py-3">
+          {/* FCFS Multiples of 8 Rule & Bracket Indicator */}
+          <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3 text-xs text-indigo-200 space-y-1.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="font-black text-indigo-300 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                <Shield className="h-3.5 w-3.5 text-indigo-400" />
+                <span>First-Come, First-Served (Multiples of 8)</span>
+              </span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                {rosterCount > 0 ? (
+                  rosterCount % 8 === 0
+                    ? `Full ${rosterCount / 8}x8 Bracket (${rosterCount} slots filled)`
+                    : `Next 8-bracket: ${Math.ceil(rosterCount / 8) * 8} slots (${(Math.ceil(rosterCount / 8) * 8) - rosterCount} needed)`
+                ) : '8 slots per bracket'}
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-200/85 leading-relaxed">
+              Numbered in chronological order of enrollment. Registrations beyond the final confirmed multiple of 8 are subject to organizer cancellation with a <strong>100% refund</strong>.
+            </p>
+          </div>
+
           {/* Search Filter */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -787,8 +859,11 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                   className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border/70 bg-card/60 hover:bg-accent/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/25 via-amber-600/20 to-amber-700/25 border border-amber-500/40 text-amber-300 font-black text-xs uppercase tracking-wider select-none shadow-sm">
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/25 via-amber-600/20 to-amber-700/25 border border-amber-500/40 text-amber-300 font-black text-xs uppercase tracking-wider select-none shadow-sm">
                       {getPlayerInitials(p.user?.name, p.user?.username)}
+                      <span className="absolute -top-1.5 -left-1.5 px-1 py-0.2 rounded-md bg-amber-500 text-slate-950 text-[9px] font-black shadow-sm leading-tight border border-amber-300">
+                        #{p.enrollmentNumber || (idx + 1)}
+                      </span>
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
