@@ -429,7 +429,7 @@ export default function EnrolledPlayersPanel({
                 <TableHead>Grade Avg</TableHead>
                 <TableHead>SPoC (yes/no)</TableHead>
                 {showPaymentColumns ? <TableHead>Payment</TableHead> : null}
-                {showPaymentColumns ? <TableHead>UPI Txn ID</TableHead> : null}
+                {showPaymentColumns ? <TableHead>Comments / Paid By</TableHead> : null}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -540,7 +540,7 @@ export default function EnrolledPlayersPanel({
                         <TableCell className="text-xs">
                           <div className="flex flex-col gap-1 items-start">
                             <span
-                              className="font-mono text-[11px] font-bold text-sky-300 max-w-[12rem] truncate"
+                              className="text-[11px] font-bold text-sky-300 max-w-[14rem] truncate"
                               title={transactionLabel(row)}
                             >
                               {transactionLabel(row)}

@@ -547,12 +547,12 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     ) : null}
 
                     <p className="text-[11px] text-muted-foreground">
-                      Pay the organizer using the details above, then enter your payment reference / transaction ID below.
+                      Pay the organizer using the details above, then enter the payment phone number and payer name (or UPI Ref) below.
                     </p>
 
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
-                        Transaction / Reference ID <span className="text-rose-400">*</span>
+                        Comments (Phone Number & Payer Name) <span className="text-rose-400">*</span>
                       </label>
                       <Input
                         value={transactionId}
@@ -560,7 +560,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                           setTransactionId(e.target.value);
                           if (error) setError('');
                         }}
-                        placeholder={paymentOption === 'IN' ? 'Enter UPI transaction / UTR ID' : 'Enter payment reference / transaction ID'}
+                        placeholder="Enter phone number paid & name of person who paid (e.g. 9876543210 - Rahul)"
                         className="h-9 text-xs font-semibold bg-background border-amber-500/40 focus:border-amber-500"
                         autoComplete="off"
                       />
@@ -576,7 +576,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     {hasAnyPaymentDetails && (
                       <div className="space-y-1.5 pt-1">
                         <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
-                          Transaction / Reference ID <span className="text-rose-400">*</span>
+                          Comments (Phone Number & Payer Name) <span className="text-rose-400">*</span>
                         </label>
                         <Input
                           value={transactionId}
@@ -584,7 +584,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                             setTransactionId(e.target.value);
                             if (error) setError('');
                           }}
-                          placeholder="Enter payment reference / transaction ID"
+                          placeholder="Enter phone number paid & name of person who paid (e.g. 9876543210 - Rahul)"
                           className="h-9 text-xs font-semibold bg-background border-amber-500/40 focus:border-amber-500"
                           autoComplete="off"
                         />

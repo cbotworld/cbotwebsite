@@ -147,12 +147,12 @@ export function PlayerEnrollmentCard({
               </div>
             )}
 
-            {/* Payment Reference / Transaction ID card */}
+            {/* Payment Comments / Reference card */}
             <div className="rounded-xl border border-border/80 bg-background/60 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5" /> UPI Transaction ID / Payment Reference
+                    <CreditCard className="h-3.5 w-3.5" /> Comments / Payment Details
                   </p>
                   {initial.paymentMethod === 'ALTERNATE_UPI' ? (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -172,7 +172,7 @@ export function PlayerEnrollmentCard({
                     className="h-7 text-[10px] font-bold border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
                     onClick={startEdit}
                   >
-                    <Pencil className="h-3 w-3 mr-1" /> Edit UPI Transaction ID (if entered wrong)
+                    <Pencil className="h-3 w-3 mr-1" /> Edit Comments (phone number / payer name)
                   </Button>
                 ) : null}
               </div>
@@ -188,7 +188,7 @@ export function PlayerEnrollmentCard({
                   <Input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Enter correct payment reference / UPI transaction ID"
+                    placeholder="Enter phone number paid & name of person who paid (e.g. 9876543210 - Rahul)"
                     className="h-9 text-xs font-semibold bg-background border-amber-500/40"
                     autoComplete="off"
                   />
@@ -220,7 +220,7 @@ export function PlayerEnrollmentCard({
               {error ? <p className="text-xs font-semibold text-rose-400">{error}</p> : null}
               {message ? <p className="text-xs font-semibold text-emerald-400">{message}</p> : null}
               <p className="text-[11px] text-muted-foreground">
-                If you entered the wrong UPI transaction ID or made a typo, you can edit it above anytime. The organizer sees the updated reference immediately.
+                If you entered the wrong payment phone number or made a typo in the payer name, you can edit your comments above anytime. The organizer sees the updated comments immediately.
               </p>
             </div>
           </>

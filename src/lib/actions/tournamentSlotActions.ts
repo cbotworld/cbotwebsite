@@ -521,7 +521,7 @@ export async function enrollCurrentUser(
     const fee = Number(edition.enrollmentFee) || 0;
     const txnId = String(paymentTransactionId || '').trim();
     if (fee > 0 && !txnId) {
-      return { success: false as const, error: 'UPI transaction ID is required to enroll.' };
+      return { success: false as const, error: 'Payment phone number / comments are required to enroll.' };
     }
 
     const gradeAverage = Number(user.average) > 0 ? Number(user.average) : null;
@@ -852,7 +852,7 @@ export async function verifyParticipantPayment(editionId: string, userId: string
                       <td style="padding: 5px 0; color: #f8fafc; font-weight: 600; text-align: right;">${methodLabel}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 5px 0; color: #94a3b8;">Txn / Reference ID:</td>
+                      <td style="padding: 5px 0; color: #94a3b8;">Payment Comments / Ref:</td>
                       <td style="padding: 5px 0; font-family: monospace; color: #38bdf8; font-weight: 700; text-align: right;">${txnId}</td>
                     </tr>
                     <tr>
