@@ -119,6 +119,11 @@ export async function resolveRegistrationEdition() {
       intlPaymentUpiLink: true,
       intlPaymentPhone: true,
       slot: true,
+      _count: {
+        select: {
+          participants: true,
+        },
+      },
       organizer: {
         select: {
           name: true,

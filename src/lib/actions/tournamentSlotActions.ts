@@ -757,3 +757,77 @@ export async function getPublishStatus(draftEditionId: string) {
     liveEndDate: live?.tournamentEndDate ? toCalendarDate(live.tournamentEndDate) : null,
   };
 }
+
+export type PublicEnrolledPlayer = {
+  id: string;
+  category?: string | null;
+  enrolledAt: string | null;
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    rating: number;
+    image?: string | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+  };
+};
+
+export async function getPublicEditionEnrolledPlayers(editionId: string): Promise<{
+  success: boolean;
+  totalCount?: number;
+  players?: PublicEnrolledPlayer[];
+  error?: string;
+}> {
+  if (!editionId) return { success: false, error: 'Edition ID is required.' };
+  try {
+    const participants = await prisma.editionParticipant.findMany({
+      where: { editionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            rating: true,
+            image: true,
+            city: true,
+            state: true,
+            country: true,
+          },
+        },
+      },
+      orderBy: [
+        { enrolledAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
+    });
+
+    const players: PublicEnrolledPlayer[] = participants.map((p) => ({
+      id: p.id,
+      category: p.category,
+      enrolledAt: (p.enrolledAt || p.createdAt)?.toISOString?.() || null,
+      user: {
+        id: p.user.id,
+        name: p.user.name || p.user.username,
+        username: p.user.username,
+        rating: p.user.rating || 1200,
+        image: p.user.image,
+        city: p.user.city,
+        state: p.user.state,
+        country: p.user.country,
+      },
+    }));
+
+    return {
+      success: true,
+      totalCount: participants.length,
+      players,
+    };
+  } catch (error) {
+    console.error('[getPublicEditionEnrolledPlayers]', error);
+    return { success: false, error: 'Failed to load enrolled players list.' };
+  }
+}
+

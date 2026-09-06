@@ -19,13 +19,19 @@ import {
   LayoutDashboard,
   ArrowRightLeft,
   Phone,
+  Users,
+  Search,
+  Calendar,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   enrollCurrentUser,
   getMyEnrollmentForEdition,
+  getPublicEditionEnrolledPlayers,
 } from '@/lib/actions/tournamentSlotActions';
 import { formatEnrollmentFee } from '@/lib/tournament-slots';
 import { toCalendarDate } from '@/lib/combi-cutoff';
@@ -43,6 +49,7 @@ type RegistrationEdition = {
   intlPaymentQrUrl?: string | null;
   intlPaymentUpiLink?: string | null;
   intlPaymentPhone?: string | null;
+  enrolledCount?: number;
   organizerName?: string | null;
 };
 
@@ -62,6 +69,36 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   const [alreadyEnrolled, setAlreadyEnrolled] = React.useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = React.useState(false);
   const [paymentOption, setPaymentOption] = React.useState<'IN' | 'INTL'>('IN');
+
+  // Enrolled players roster state
+  const [rosterOpen, setRosterOpen] = React.useState(false);
+  const [rosterLoading, setRosterLoading] = React.useState(false);
+  const [enrolledPlayers, setEnrolledPlayers] = React.useState<any[]>([]);
+  const [rosterCount, setRosterCount] = React.useState(edition.enrolledCount ?? 0);
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const handleOpenRosterModal = async () => {
+    setRosterOpen(true);
+    setSearchQuery('');
+    setRosterLoading(true);
+    const res = await getPublicEditionEnrolledPlayers(edition.id);
+    if (res.success && res.players) {
+      setEnrolledPlayers(res.players);
+      setRosterCount(res.totalCount ?? res.players.length);
+    }
+    setRosterLoading(false);
+  };
+
+  const filteredPlayers = React.useMemo(() => {
+    if (!searchQuery.trim()) return enrolledPlayers;
+    const q = searchQuery.toLowerCase().trim();
+    return enrolledPlayers.filter((p) => {
+      const name = String(p.user?.name || '').toLowerCase();
+      const username = String(p.user?.username || '').toLowerCase();
+      const city = String(p.user?.city || '').toLowerCase();
+      return name.includes(q) || username.includes(q) || city.includes(q);
+    });
+  }, [enrolledPlayers, searchQuery]);
 
   const handleGoToDashboard = () => {
     setModalOpen(false);
@@ -222,6 +259,23 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                 {cutoff ? ` · Closes ${cutoff}` : ''}
               </p>
             </div>
+            {/* Secondary Action: View Enrolled Players */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs font-black shrink-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200 gap-1.5 h-8 px-3 rounded-lg"
+              onClick={() => void handleOpenRosterModal()}
+            >
+              <Users className="h-3.5 w-3.5 text-amber-400" />
+              <span>Enrolled Players</span>
+              {rosterCount > 0 ? (
+                <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30">
+                  {rosterCount}
+                </span>
+              ) : null}
+            </Button>
+
             {status === 'authenticated' ? (
               <Button
                 variant="carrom"
@@ -601,6 +655,153 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* ── ENROLLED PLAYERS ROSTER MODAL ────────────────────────────────────── */}
+      <Dialog open={rosterOpen} onOpenChange={setRosterOpen}>
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-inner">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg font-black text-foreground">
+                Enrolled Players · Edition #{edition.number}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {edition.title} {rosterCount > 0 ? `· ${rosterCount} player${rosterCount === 1 ? '' : 's'} registered so far` : ''}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-4 py-3">
+          {/* Search Filter */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search enrolled players by name, username, or city..."
+              className="pl-9 h-9 text-xs bg-background/60 border-border"
+            />
+          </div>
+
+          {/* Player list */}
+          {rosterLoading ? (
+            <div className="py-12 text-center space-y-2">
+              <Loader2 className="h-8 w-8 animate-spin text-amber-400 mx-auto" />
+              <p className="text-xs text-muted-foreground font-bold">Loading enrolled players list…</p>
+            </div>
+          ) : filteredPlayers.length === 0 ? (
+            <div className="py-12 text-center rounded-2xl border border-dashed border-border p-6 space-y-2">
+              <Users className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+              <p className="text-sm font-black text-foreground">
+                {searchQuery ? 'No matching players found.' : 'No players enrolled yet.'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {searchQuery
+                  ? 'Try searching with a different name or keyword.'
+                  : 'Be the first striker to register for this edition!'}
+              </p>
+            </div>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {filteredPlayers.map((p, idx) => (
+                <div
+                  key={p.id || idx}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border/70 bg-card/60 hover:bg-accent/40 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-xs">
+                      {p.user?.image ? (
+                        <img
+                          src={p.user.image}
+                          alt={p.user.name || p.user.username}
+                          className="h-full w-full rounded-xl object-cover"
+                        />
+                      ) : (
+                        (p.user?.name?.[0] || p.user?.username?.[0] || 'P').toUpperCase()
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-black text-foreground truncate">
+                          {p.user?.name || p.user?.username}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          @{p.user?.username}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5 flex-wrap">
+                        {p.user?.city || p.user?.country ? (
+                          <span className="flex items-center gap-0.5">
+                            <MapPin className="h-2.5 w-2.5 text-muted-foreground/70" />
+                            {[p.user.city, p.user.country].filter(Boolean).join(', ')}
+                          </span>
+                        ) : null}
+                        {p.enrolledAt ? (
+                          <span className="flex items-center gap-0.5">
+                            <Calendar className="h-2.5 w-2.5 text-muted-foreground/70" />
+                            {new Date(p.enrolledAt).toLocaleDateString([], {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {p.category ? (
+                      <Badge variant="outline" className="text-[9px] font-bold border-amber-500/30 text-amber-300">
+                        {p.category}
+                      </Badge>
+                    ) : null}
+                    {p.user?.rating ? (
+                      <Badge className="text-[10px] font-extrabold bg-muted text-foreground border border-border">
+                        ★ {p.user.rating}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Modal Footer */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+            <div className="text-xs text-muted-foreground font-semibold">
+              Total: <strong className="text-amber-400">{rosterCount}</strong> player{rosterCount === 1 ? '' : 's'} enrolled
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-bold"
+                onClick={() => setRosterOpen(false)}
+              >
+                Close
+              </Button>
+              {!alreadyEnrolled ? (
+                <Button
+                  type="button"
+                  variant="carrom"
+                  size="sm"
+                  className="h-8 text-xs font-black"
+                  onClick={() => {
+                    setRosterOpen(false);
+                    void openModal();
+                  }}
+                >
+                  <Trophy className="h-3.5 w-3.5 mr-1" /> Enroll Now
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
       </Dialog>
     </>
   );

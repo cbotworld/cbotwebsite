@@ -28,6 +28,7 @@ export async function EnrollmentBarWithRegistration() {
           intlPaymentQrUrl: edition.intlPaymentQrUrl ?? null,
           intlPaymentUpiLink: edition.intlPaymentUpiLink ?? null,
           intlPaymentPhone: edition.intlPaymentPhone ?? null,
+          enrolledCount: edition._count?.participants ?? 0,
           organizerName,
         }}
       />
