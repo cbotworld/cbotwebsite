@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw, CheckCircle2, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import {
   syncUnlockedGradeAverages,
   updateEnrolledPlayerSpoc,
   updateGradeAverage,
+  verifyParticipantPayment,
 } from '@/lib/actions/tournamentSlotActions';
 import { InlineStatCell, type InlineStatEditState } from '@/components/organizer/InlineStatCell';
 import { formatEnrollmentFee } from '@/lib/tournament-slots';
@@ -31,6 +32,7 @@ type EnrolledRow = {
   paymentStatus?: string | null;
   paymentAmount?: number | null;
   paymentTransactionId?: string | null;
+  paymentMethod?: string | null;
   enrolledAt?: string | Date | null;
   user?: {
     id: string;
@@ -71,6 +73,7 @@ function sortByGradeAverageAsc(rows: EnrolledRow[]) {
 
 function paymentLabel(row: EnrolledRow) {
   const status = (row.paymentStatus || '').toUpperCase();
+  if (status === 'VERIFIED') return `Verified (₹${Number(row.paymentAmount || 0).toLocaleString('en-IN')})`;
   if (status === 'PAID') return `Paid ₹${Number(row.paymentAmount || 0).toLocaleString('en-IN')}`;
   if (status === 'FREE') return 'Free';
   if (status === 'WAIVED') return 'Waived';
@@ -103,8 +106,36 @@ export default function EnrolledPlayersPanel({
   const [addSearch, setAddSearch] = React.useState('');
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState('');
+  const [successNotice, setSuccessNotice] = React.useState('');
   const [inlineStatEdit, setInlineStatEdit] = React.useState<InlineStatEditState>(null);
   const [inlineStatSaving, setInlineStatSaving] = React.useState<string | null>(null);
+
+  const handleVerifyPayment = async (row: EnrolledRow) => {
+    if (!editionId || !row.userId) return;
+    setError('');
+    setSuccessNotice('');
+    const busyKey = `verify-${row.userId}`;
+    setBusyId(busyKey);
+    const res = await verifyParticipantPayment(editionId, row.userId);
+    if (res.success && res.participant) {
+      onParticipantsChange(
+        participants.map((p) =>
+          p.userId === row.userId
+            ? { ...p, paymentStatus: 'VERIFIED', paymentTransactionId: res.participant.paymentTransactionId || p.paymentTransactionId }
+            : p
+        )
+      );
+      const name = row.user?.name || row.user?.username || 'Player';
+      if (res.emailSent && res.playerEmail) {
+        setSuccessNotice(`Payment verified for ${name}! Confirmation email sent to ${res.playerEmail}.`);
+      } else {
+        setSuccessNotice(`Payment verified successfully for ${name}!`);
+      }
+    } else {
+      setError(res.error || 'Failed to verify payment.');
+    }
+    setBusyId(null);
+  };
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -381,6 +412,13 @@ export default function EnrolledPlayersPanel({
           </div>
         )}
 
+        {successNotice && (
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+            {successNotice}
+          </div>
+        )}
+
         <div className="rounded-xl border border-border overflow-hidden">
           <Table>
             <TableHeader>
@@ -466,11 +504,60 @@ export default function EnrolledPlayersPanel({
                         </Select>
                       </TableCell>
                       {showPaymentColumns ? (
-                        <TableCell className="text-xs text-muted-foreground">{paymentLabel(row)}</TableCell>
+                        <TableCell className="text-xs">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {row.paymentStatus === 'VERIFIED' ? (
+                                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider gap-1">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Verified
+                                </Badge>
+                              ) : (
+                                <span className="font-bold text-foreground">{paymentLabel(row)}</span>
+                              )}
+                            </div>
+
+                            {row.paymentStatus !== 'VERIFIED' && (row.paymentStatus === 'PAID' || (fee > 0 && row.paymentTransactionId)) ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={busyId === `verify-${row.userId}`}
+                                onClick={() => void handleVerifyPayment(row)}
+                                className="h-6 px-2 text-[10px] font-black bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border-emerald-500/40 shadow-sm gap-1"
+                              >
+                                {busyId === `verify-${row.userId}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                )}
+                                Verify Payment
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
                       ) : null}
                       {showPaymentColumns ? (
-                        <TableCell className="font-mono text-[11px] font-semibold text-sky-300 max-w-[10rem] truncate" title={transactionLabel(row)}>
-                          {transactionLabel(row)}
+                        <TableCell className="text-xs">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span
+                              className="font-mono text-[11px] font-bold text-sky-300 max-w-[12rem] truncate"
+                              title={transactionLabel(row)}
+                            >
+                              {transactionLabel(row)}
+                            </span>
+                            {row.paymentTransactionId || row.paymentStatus === 'PAID' || row.paymentStatus === 'VERIFIED' ? (
+                              <Badge
+                                variant="outline"
+                                className={`text-[9px] px-1.5 py-0 font-extrabold ${
+                                  row.paymentMethod === 'ALTERNATE_UPI'
+                                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                }`}
+                              >
+                                {row.paymentMethod === 'ALTERNATE_UPI' ? 'Alternate UPI' : 'Primary UPI'}
+                              </Badge>
+                            ) : null}
+                          </div>
                         </TableCell>
                       ) : null}
                       <TableCell className="text-right">

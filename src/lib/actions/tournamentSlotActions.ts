@@ -2,6 +2,7 @@
 
 import { getServerSession } from 'next-auth';
 import { revalidatePath } from 'next/cache';
+import nodemailer from 'nodemailer';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canPublishDraft, isOrganizerLiveStatus } from '@/lib/tournament-slots';
@@ -491,7 +492,11 @@ export async function getOpenRegistrationEdition() {
   }
 }
 
-export async function enrollCurrentUser(editionId: string, paymentTransactionId?: string) {
+export async function enrollCurrentUser(
+  editionId: string,
+  paymentTransactionId?: string,
+  paymentMethod?: string
+) {
   const session = await getServerSession(authOptions);
   if (!session?.user || !(session.user as { id?: string }).id) {
     return { success: false as const, error: 'Please log in to enroll.' };
@@ -520,6 +525,12 @@ export async function enrollCurrentUser(editionId: string, paymentTransactionId?
     }
 
     const gradeAverage = Number(user.average) > 0 ? Number(user.average) : null;
+    const method =
+      paymentMethod === 'INTL' || paymentMethod === 'ALTERNATE' || paymentMethod === 'ALTERNATE_UPI'
+        ? 'ALTERNATE_UPI'
+        : fee > 0
+          ? 'PRIMARY_UPI'
+          : null;
 
     const participant = await prisma.editionParticipant.create({
       data: {
@@ -532,6 +543,7 @@ export async function enrollCurrentUser(editionId: string, paymentTransactionId?
         paymentStatus: fee > 0 ? 'PAID' : 'FREE',
         paymentAmount: fee > 0 ? fee : 0,
         paymentTransactionId: fee > 0 ? txnId : null,
+        paymentMethod: method,
       },
     });
 
@@ -552,38 +564,42 @@ export async function enrollCurrentUser(editionId: string, paymentTransactionId?
   }
 }
 
-export async function getMyEnrollmentForEdition(editionId: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !(session.user as { id?: string }).id) {
-    return { success: false as const, enrolled: false as const };
+export async function getMyEnrollmentForEdition(editionId: string, overrideUserId?: string) {
+  let userId = overrideUserId;
+  let username: string | undefined;
+
+  if (!userId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as { id?: string }).id) {
+      return { success: false as const, enrolled: false as const };
+    }
+    userId = (session.user as { id: string }).id;
+    username = (session.user as any)?.username;
   }
-  const userId = (session.user as { id: string }).id;
 
   try {
-    const participant = await prisma.editionParticipant.findUnique({
-      where: { editionId_userId: { editionId, userId } },
+    const participant = await prisma.editionParticipant.findFirst({
+      where: {
+        editionId,
+        OR: [
+          { userId },
+          ...(username ? [{ user: { username: { equals: username, mode: 'insensitive' as const } } }] : []),
+        ],
+      },
       select: {
         id: true,
         status: true,
         paymentStatus: true,
         paymentAmount: true,
         paymentTransactionId: true,
+        paymentMethod: true,
         enrolledAt: true,
       },
     });
-    if (!participant) return { success: true as const, enrolled: false as const };
-
-    const status = String(participant.status || '').toUpperCase();
-    const enrolled =
-      status === 'ENROLLED' ||
-      status === 'QUALIFIED' ||
-      Boolean(participant.enrolledAt) ||
-      String(participant.paymentStatus || '').toUpperCase() === 'PAID';
-
     return {
       success: true as const,
-      enrolled,
-      participant: enrolled ? participant : null,
+      enrolled: Boolean(participant),
+      participant,
     };
   } catch (error) {
     console.error('[getMyEnrollmentForEdition]', error);
@@ -592,26 +608,41 @@ export async function getMyEnrollmentForEdition(editionId: string) {
 }
 
 /** Latest enrollment on registration cup / active cup for the logged-in player. */
-export async function getMyRegistrationEnrollment() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !(session.user as { id?: string }).id) {
-    return { success: false as const, enrollment: null };
+export async function getMyRegistrationEnrollment(overrideUserId?: string) {
+  let userId = overrideUserId;
+  let username: string | undefined;
+
+  if (!userId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !(session.user as { id?: string }).id) {
+      return { success: false as const, enrollment: null };
+    }
+    userId = (session.user as { id: string }).id;
+    username = (session.user as any)?.username;
   }
-  const userId = (session.user as { id: string }).id;
 
   try {
     const regEdition = await resolveRegistrationEdition();
     let participant: any = null;
 
+    const userWhere = [
+      { userId },
+      ...(username ? [{ user: { username: { equals: username, mode: 'insensitive' as const } } }] : []),
+    ];
+
     if (regEdition) {
-      participant = await prisma.editionParticipant.findUnique({
-        where: { editionId_userId: { editionId: regEdition.id, userId } },
+      participant = await prisma.editionParticipant.findFirst({
+        where: {
+          editionId: regEdition.id,
+          OR: userWhere,
+        },
         select: {
           id: true,
           status: true,
           paymentStatus: true,
           paymentAmount: true,
           paymentTransactionId: true,
+          paymentMethod: true,
           enrolledAt: true,
           edition: {
             select: {
@@ -632,12 +663,16 @@ export async function getMyRegistrationEnrollment() {
     if (!participant) {
       participant = await prisma.editionParticipant.findFirst({
         where: {
-          userId,
-          OR: [
-            { status: { in: ['ENROLLED', 'QUALIFIED', 'REGISTERED'] } },
-            { enrolledAt: { not: null } },
-            { paymentStatus: { in: ['PAID', 'FREE', 'PENDING'] } },
-            { paymentTransactionId: { not: null } },
+          OR: userWhere,
+          AND: [
+            {
+              OR: [
+                { status: { in: ['ENROLLED', 'QUALIFIED', 'REGISTERED'] } },
+                { enrolledAt: { not: null } },
+                { paymentStatus: { in: ['PAID', 'VERIFIED', 'FREE', 'PENDING', 'WAIVED'] } },
+                { paymentTransactionId: { not: null } },
+              ],
+            },
           ],
         },
         orderBy: [
@@ -650,6 +685,7 @@ export async function getMyRegistrationEnrollment() {
           paymentStatus: true,
           paymentAmount: true,
           paymentTransactionId: true,
+          paymentMethod: true,
           enrolledAt: true,
           edition: {
             select: {
@@ -677,6 +713,7 @@ export async function getMyRegistrationEnrollment() {
         paymentStatus: participant.paymentStatus,
         paymentAmount: participant.paymentAmount,
         paymentTransactionId: participant.paymentTransactionId,
+        paymentMethod: participant.paymentMethod,
         enrolledAt: participant.enrolledAt,
         edition: {
           id: participant.edition.id,
@@ -695,6 +732,166 @@ export async function getMyRegistrationEnrollment() {
   } catch (error) {
     console.error('[getMyRegistrationEnrollment]', error);
     return { success: false as const, enrollment: null };
+  }
+}
+
+export async function verifyParticipantPayment(editionId: string, userId: string) {
+  const auth = await requireOrganizer();
+  if (!auth.ok) return { success: false as const, error: auth.error };
+
+  try {
+    const [edition, user, participant] = await Promise.all([
+      prisma.edition.findUnique({
+        where: { id: editionId },
+        select: {
+          id: true,
+          number: true,
+          title: true,
+          theme: true,
+          enrollmentFee: true,
+          organizer: { select: { name: true, username: true } },
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, username: true, email: true },
+      }),
+      prisma.editionParticipant.findUnique({
+        where: { editionId_userId: { editionId, userId } },
+      }),
+    ]);
+
+    if (!edition) return { success: false as const, error: 'Edition not found.' };
+    if (!user) return { success: false as const, error: 'Player not found.' };
+    if (!participant) return { success: false as const, error: 'Player is not enrolled in this edition.' };
+
+    const updated = await prisma.editionParticipant.update({
+      where: { editionId_userId: { editionId, userId } },
+      data: {
+        paymentStatus: 'VERIFIED',
+      },
+      include: participantUserSelect,
+    });
+
+    let emailSent = false;
+    let emailRecipient = user.email?.trim() || '';
+
+    // Send confirmation email if player has a valid email address
+    if (emailRecipient && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRecipient)) {
+      try {
+        const smtpHost = process.env.SMTP_HOST;
+        const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
+        const smtpFrom = process.env.SMTP_FROM || 'noreply@cbotworld.com';
+
+        let transporter;
+        if (smtpHost && smtpUser && smtpPass) {
+          transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+        } else {
+          const testAccount = await nodemailer.createTestAccount();
+          transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email',
+            port: 587,
+            secure: false,
+            auth: { user: testAccount.user, pass: testAccount.pass },
+          });
+        }
+
+        const feeAmount = Number(edition.enrollmentFee) || Number(participant.paymentAmount) || 200;
+        const txnId = participant.paymentTransactionId || '—';
+        const methodLabel =
+          participant.paymentMethod === 'ALTERNATE_UPI'
+            ? 'Alternate Payment UPI'
+            : 'Primary Payment UPI';
+        const organizerName =
+          edition.organizer?.name?.trim() || edition.organizer?.username?.trim() || 'Organizer';
+
+        await transporter.sendMail({
+          from: `"CBOT Tournament Director" <${smtpFrom}>`,
+          to: emailRecipient,
+          subject: `✅ Payment Verified — Enrollment Confirmed for ${edition.title} (Edition #${edition.number})`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; border: 1px solid #334155; border-radius: 16px; overflow: hidden; background: #0f172a; color: #f8fafc;">
+              <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 30px 20px; text-align: center; border-bottom: 1px solid #334155;">
+                <div style="display: inline-block; padding: 6px 14px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 9999px; margin-bottom: 12px;">
+                  <span style="color: #34d399; font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">🎯 Payment Verified & Confirmed</span>
+                </div>
+                <h1 style="margin: 0; color: #f59e0b; font-size: 22px; font-weight: 900; letter-spacing: -0.02em;">CBOT Tournament Arena</h1>
+                <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">${edition.title} · Edition #${edition.number}</p>
+              </div>
+
+              <div style="padding: 24px 20px;">
+                <p style="font-size: 15px; color: #e2e8f0; margin-top: 0;">Hello <strong style="color: #fbbf24;">${user.name || user.username}</strong>,</p>
+                <p style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+                  Great news! Tournament organizer <strong>${organizerName}</strong> has verified your payment reference for the upcoming edition. Your slot and enrollment are officially confirmed!
+                </p>
+
+                <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 18px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">Enrollment Receipt</h3>
+                  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Tournament:</td>
+                      <td style="padding: 5px 0; color: #f8fafc; font-weight: 700; text-align: right;">${edition.title} (#${edition.number})</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Player:</td>
+                      <td style="padding: 5px 0; color: #f8fafc; font-weight: 700; text-align: right;">${user.name} (@${user.username})</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Fee Paid:</td>
+                      <td style="padding: 5px 0; color: #34d399; font-weight: 800; text-align: right;">₹${feeAmount}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Payment Method:</td>
+                      <td style="padding: 5px 0; color: #f8fafc; font-weight: 600; text-align: right;">${methodLabel}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Txn / Reference ID:</td>
+                      <td style="padding: 5px 0; font-family: monospace; color: #38bdf8; font-weight: 700; text-align: right;">${txnId}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 5px 0; color: #94a3b8;">Status:</td>
+                      <td style="padding: 5px 0; color: #34d399; font-weight: 800; text-align: right;">✅ VERIFIED</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="text-align: center; margin: 24px 0 16px 0;">
+                  <a href="https://www.cbotworld.com/dashboard/player" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; font-weight: 900; font-size: 13px; padding: 11px 26px; border-radius: 8px; text-decoration: none;">
+                    Go to Player Dashboard →
+                  </a>
+                </div>
+
+                <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 20px; line-height: 1.5;">
+                  Keep your striker chalked! We look forward to seeing you at the tables.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+        emailSent = true;
+      } catch (mailErr) {
+        console.error('[verifyParticipantPayment] Email send error:', mailErr);
+      }
+    }
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/player');
+    return {
+      success: true as const,
+      participant: updated,
+      emailSent,
+      playerEmail: emailRecipient,
+    };
+  } catch (error) {
+    console.error('[verifyParticipantPayment]', error);
+    return { success: false as const, error: 'Failed to verify payment.' };
   }
 }
 

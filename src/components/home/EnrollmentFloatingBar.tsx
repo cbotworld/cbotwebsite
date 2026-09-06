@@ -67,6 +67,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   const [copiedPhone, setCopiedPhone] = React.useState(false);
   const [transactionId, setTransactionId] = React.useState('');
   const [alreadyEnrolled, setAlreadyEnrolled] = React.useState(false);
+  const [myParticipant, setMyParticipant] = React.useState<any>(null);
   const [checkingEnrollment, setCheckingEnrollment] = React.useState(false);
   const [paymentOption, setPaymentOption] = React.useState<'IN' | 'INTL'>('IN');
 
@@ -153,21 +154,27 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   React.useEffect(() => {
     if (status !== 'authenticated') {
       setAlreadyEnrolled(false);
+      setMyParticipant(null);
       return;
     }
     let cancelled = false;
+    const userId = (session?.user as any)?.id;
     (async () => {
       setCheckingEnrollment(true);
-      const res = await getMyEnrollmentForEdition(edition.id);
+      const res = await getMyEnrollmentForEdition(edition.id, userId);
       if (!cancelled && res.success) {
         setAlreadyEnrolled(Boolean(res.enrolled));
+        setMyParticipant(res.participant || null);
+        if (res.enrolled) {
+          setStep('already');
+        }
       }
       if (!cancelled) setCheckingEnrollment(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [status, edition.id]);
+  }, [status, edition.id, session?.user]);
 
   if (dismissed) return null;
 
@@ -176,20 +183,34 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
     setCopiedUpi(false);
     setCopiedPhone(false);
     setTransactionId('');
-    setModalOpen(true);
 
-    if (status !== 'authenticated') return;
+    if (alreadyEnrolled) {
+      setStep('already');
+      setModalOpen(true);
+      return;
+    }
+
+    if (status !== 'authenticated') {
+      setStep('confirm');
+      setModalOpen(true);
+      return;
+    }
 
     setCheckingEnrollment(true);
-    const res = await getMyEnrollmentForEdition(edition.id);
+    const userId = (session?.user as any)?.id;
+    const res = await getMyEnrollmentForEdition(edition.id, userId);
     setCheckingEnrollment(false);
     if (res.success && res.enrolled) {
       setAlreadyEnrolled(true);
+      setMyParticipant(res.participant || null);
       setStep('already');
+      setModalOpen(true);
       return;
     }
     setAlreadyEnrolled(false);
+    setMyParticipant(null);
     setStep('confirm');
+    setModalOpen(true);
   };
 
   const handleCopyUpi = async () => {
@@ -225,7 +246,11 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
     }
     setError('');
     setStep('enrolling');
-    const res = await enrollCurrentUser(edition.id, transactionId.trim());
+    const res = await enrollCurrentUser(
+      edition.id,
+      transactionId.trim(),
+      paymentOption === 'IN' ? 'PRIMARY_UPI' : 'ALTERNATE_UPI'
+    );
     if (res.success) {
       setAlreadyEnrolled(true);
       setStep('done');
@@ -625,21 +650,35 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
 
         {step === 'already' && (
           <div className="relative overflow-hidden py-8 text-center space-y-4">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.2),transparent_55%)]" />
-            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15 border border-amber-400/40">
-              <CheckCircle2 className="h-8 w-8 text-amber-300" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.2),transparent_55%)]" />
+            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/40 shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="h-8 w-8 text-emerald-300" />
             </div>
             <div className="relative space-y-2">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-400">Already Enrolled</p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-400">
+                  {myParticipant?.paymentStatus === 'VERIFIED' ? 'Payment Verified' : 'Already Enrolled'}
+                </span>
+                {myParticipant?.paymentStatus === 'VERIFIED' ? (
+                  <Badge className="bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase">
+                    ✅ Verified by Organizer
+                  </Badge>
+                ) : null}
+              </div>
               <h3 className="text-xl font-black text-foreground">You are registered for {edition.title}</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                {isPaid
-                  ? 'Your enrollment details are registered. The organizer will crosscheck and verify the payment details. If there are any issues, the organizer will contact you. Thank you so much!'
-                  : `You are registered for Edition #${edition.number}. Thank you so much!`}
+              <p className="text-sm text-emerald-200/90 max-w-md mx-auto leading-relaxed">
+                {myParticipant?.paymentStatus === 'VERIFIED'
+                  ? `Your payment has been verified by the organizer. You are officially confirmed for Edition #${edition.number}!`
+                  : isPaid
+                    ? 'Your enrollment details and payment reference have been received. The organizer will crosscheck and verify the payment.'
+                    : `You are registered for Edition #${edition.number}. Thank you so much!`}
               </p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Need to edit or check your payment reference ID? View it anytime on your Player Dashboard.
-              </p>
+              {myParticipant?.paymentTransactionId ? (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background/80 border border-border text-xs font-mono">
+                  <span className="text-muted-foreground font-sans text-[11px] font-bold">Txn ID:</span>
+                  <span className="text-sky-300 font-bold">{myParticipant.paymentTransactionId}</span>
+                </div>
+              ) : null}
             </div>
             <div className="relative flex flex-wrap items-center justify-center gap-2 pt-2">
               <Button
@@ -647,7 +686,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                 onClick={handleGoToDashboard}
                 className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-4 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-600"
               >
-                <LayoutDashboard className="h-3.5 w-3.5" /> View on Dashboard
+                <LayoutDashboard className="h-3.5 w-3.5" /> Go to Player Dashboard
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Close

@@ -131,7 +131,7 @@ export default async function PlayerPage() {
   const websiteCms = await getWebsiteCmsContent();
   let registrationEnrollment: any = null;
   try {
-    const enrollmentRes = await getMyRegistrationEnrollment();
+    const enrollmentRes = await getMyRegistrationEnrollment(player?.id || userId);
     if (enrollmentRes?.success && enrollmentRes?.enrollment?.edition) {
       registrationEnrollment = {
         ...enrollmentRes.enrollment,

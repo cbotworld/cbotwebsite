@@ -15,6 +15,7 @@ export type PlayerEnrollmentInfo = {
   paymentStatus?: string | null;
   paymentAmount?: number | null;
   paymentTransactionId?: string | null;
+  paymentMethod?: string | null;
   enrolledAt?: string | Date | null;
   edition: {
     id: string;
@@ -88,6 +89,20 @@ export function PlayerEnrollmentCard({
               <Badge variant="outline" className="text-[10px] font-bold">
                 Edition #{initial.edition.number}
               </Badge>
+              {initial.paymentStatus === 'VERIFIED' ? (
+                <Badge className="bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
+                  <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-400" /> Payment Verified
+                </Badge>
+              ) : null}
+              {initial.paymentMethod === 'ALTERNATE_UPI' ? (
+                <Badge className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-black uppercase tracking-wider">
+                  Paid to: Alternate Payment UPI
+                </Badge>
+              ) : initial.paymentMethod === 'PRIMARY_UPI' || isPaid ? (
+                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                  Paid to: Primary Payment UPI
+                </Badge>
+              ) : null}
             </div>
             <h2 className="text-xl font-black text-foreground flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
@@ -106,24 +121,49 @@ export function PlayerEnrollmentCard({
         {isPaid ? (
           <>
             {/* Organizer Crosscheck / Verification Notice */}
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/40">
-                  <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
-                  Payment Verification in Progress
-                </span>
+            {initial.paymentStatus === 'VERIFIED' ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/40">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    Payment Verified & Enrollment Confirmed
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-100/90 leading-relaxed font-medium">
+                  The organizer has crosschecked and verified your payment reference. Your official enrollment for <strong>{initial.edition.title}</strong> is confirmed. Keep your striker chalked!
+                </p>
               </div>
-              <p className="text-xs text-amber-100/90 leading-relaxed font-medium">
-                Your enrollment details and payment reference have been received. The organizer will crosscheck and verify the payment. If there are any issues with your payment reference, the organizer will contact you directly. Thank you so much!
-              </p>
-            </div>
+            ) : (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/40">
+                    <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                    Payment Verification in Progress
+                  </span>
+                </div>
+                <p className="text-xs text-amber-100/90 leading-relaxed font-medium">
+                  Your enrollment details and payment reference have been received. The organizer will crosscheck and verify the payment. If there are any issues with your payment reference, the organizer will contact you directly. Thank you so much!
+                </p>
+              </div>
+            )}
 
             {/* Payment Reference / Transaction ID card */}
             <div className="rounded-xl border border-border/80 bg-background/60 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
-                  <CreditCard className="h-3.5 w-3.5" /> UPI Transaction ID / Payment Reference
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5" /> UPI Transaction ID / Payment Reference
+                  </p>
+                  {initial.paymentMethod === 'ALTERNATE_UPI' ? (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      Alternate UPI
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      Primary UPI
+                    </span>
+                  )}
+                </div>
                 {!editing ? (
                   <Button
                     type="button"

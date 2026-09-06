@@ -176,6 +176,7 @@ model EditionParticipant {
   paymentStatus      String?
   paymentAmount      Float?
   paymentTransactionId String?
+  paymentMethod      String?   // PRIMARY_UPI | ALTERNATE_UPI
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

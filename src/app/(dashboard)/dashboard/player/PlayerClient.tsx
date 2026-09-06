@@ -465,17 +465,21 @@ export default function PlayerClient({
         <div className="rounded-3xl border border-border bg-card/60 p-6 sm:p-7 space-y-2 shadow-sm">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] font-bold text-amber-400 border-amber-500/30 bg-amber-500/10">
-              Current Edition {currentEditionInfo?.number ? `#${currentEditionInfo.number}` : ''}
+              Current Live Tournament {currentEditionInfo?.number ? `#${currentEditionInfo.number}` : ''}
             </Badge>
             <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-              Not Enrolled
+              {registrationEnrollment ? 'Enrolled for Next Edition' : 'Not Enrolled'}
             </span>
           </div>
           <h3 className="text-lg font-black text-foreground">
-            You are not enrolled in {currentEditionInfo?.title || 'Current Edition'}
+            {registrationEnrollment
+              ? `Live Cup (${currentEditionInfo?.title || 'Edition #201'}) In Progress`
+              : `You are not enrolled in ${currentEditionInfo?.title || 'Current Edition'}`}
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            You do not have an active team or match schedule in the current live tournament.
+            {registrationEnrollment
+              ? `Matches for ${currentEditionInfo?.title || 'Edition #201'} are currently underway. You are confirmed and enrolled for the upcoming ${registrationEnrollment.edition.title} (#${registrationEnrollment.edition.number})!`
+              : 'You do not have an active team or match schedule in the current live tournament.'}
           </p>
         </div>
       )}
@@ -733,62 +737,72 @@ export default function PlayerClient({
                     <CardDescription>Your team roster and current stats.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-4 border border-border rounded-xl bg-muted/10">
-                        {currentTeam.logo ? (
-                            <img src={currentTeam.logo} alt={currentTeam.name} className="w-20 h-20 rounded-full border border-border object-cover" />
-                        ) : (
-                            <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center font-bold text-xl">{currentTeam.tag}</div>
-                        )}
-                        <div className="text-center sm:text-left">
-                            <h2 className="text-xl font-black">{currentTeam.name}</h2>
-                            <p className="text-sm text-muted-foreground max-w-xl">{currentTeam.description}</p>
-                            {currentTeam.stats && (
-                                <div className="flex flex-wrap items-center gap-3 mt-3 justify-center sm:justify-start">
-                                    <Badge variant="secondary">Win Rate: {currentTeam.stats.winRate}%</Badge>
-                                    <Badge variant="outline">{currentTeam.stats.wins}W - {currentTeam.stats.losses}L</Badge>
-                                </div>
+                    {currentTeam ? (
+                      <>
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-4 border border-border rounded-xl bg-muted/10">
+                            {currentTeam.logo ? (
+                                <img src={currentTeam.logo} alt={currentTeam.name} className="w-20 h-20 rounded-full border border-border object-cover" />
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center font-bold text-xl">{currentTeam.tag || 'TEAM'}</div>
                             )}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h3 className="text-base font-bold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground"/> Teammates</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {teammates.map((mate: any) => {
-                              // First two letters of name for avatar
-                              const initials = (mate.name || '??')
-                                .split(' ')
-                                .map((w: string) => w[0])
-                                .join('')
-                                .slice(0, 2)
-                                .toUpperCase();
-                              // Average: boardsWon / total matches (wins+losses), fallback to mate.average
-                              const totalMatches = (mate.wins || 0) + (mate.losses || 0);
-                              const avg = mate.average
-                                ? Number(mate.average).toFixed(1)
-                                : totalMatches > 0
-                                  ? ((mate.boardsWon || 0) / totalMatches).toFixed(1)
-                                  : '—';
-                              return (
-                              <div key={mate.id} className="p-4 rounded-xl border border-border flex items-center gap-3 hover:bg-muted/20 transition-colors">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/30 to-orange-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm flex-shrink-0 shadow-inner">
-                                  {initials}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="font-bold text-sm">{mate.name}</span>
-                                        {mate.id === currentTeam.captainId && (
-                                        <Badge variant="carrom" className="text-[9px] px-1.5">CAPTAIN</Badge>
-                                        )}
+                            <div className="text-center sm:text-left">
+                                <h2 className="text-xl font-black">{currentTeam.name}</h2>
+                                <p className="text-sm text-muted-foreground max-w-xl">{currentTeam.description}</p>
+                                {currentTeam.stats && (
+                                    <div className="flex flex-wrap items-center gap-3 mt-3 justify-center sm:justify-start">
+                                        <Badge variant="secondary">Win Rate: {currentTeam.stats.winRate}%</Badge>
+                                        <Badge variant="outline">{currentTeam.stats.wins}W - {currentTeam.stats.losses}L</Badge>
                                     </div>
-                                    <span className="text-xs text-muted-foreground font-mono">@{mate.username}</span>
-                                    <div className="text-xs font-semibold text-emerald-400 mt-0.5">Avg {avg}</div>
-                                </div>
-                              </div>
-                              );
-                            })}
+                                )}
+                            </div>
                         </div>
-                    </div>
+                        
+                        <div>
+                            <h3 className="text-base font-bold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-muted-foreground"/> Teammates</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {teammates.map((mate: any) => {
+                                  // First two letters of name for avatar
+                                  const initials = (mate.name || '??')
+                                    .split(' ')
+                                    .map((w: string) => w[0])
+                                    .join('')
+                                    .slice(0, 2)
+                                    .toUpperCase();
+                                  // Average: boardsWon / total matches (wins+losses), fallback to mate.average
+                                  const totalMatches = (mate.wins || 0) + (mate.losses || 0);
+                                  const avg = mate.average
+                                    ? Number(mate.average).toFixed(1)
+                                    : totalMatches > 0
+                                      ? ((mate.boardsWon || 0) / totalMatches).toFixed(1)
+                                      : '—';
+                                  return (
+                                  <div key={mate.id} className="p-4 rounded-xl border border-border flex items-center gap-3 hover:bg-muted/20 transition-colors">
+                                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/30 to-orange-500/20 border border-amber-500/30 flex items-center justify-center font-black text-amber-400 text-sm flex-shrink-0 shadow-inner">
+                                      {initials}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="font-bold text-sm">{mate.name}</span>
+                                            {mate.id === currentTeam.captainId && (
+                                            <Badge variant="carrom" className="text-[9px] px-1.5">CAPTAIN</Badge>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-muted-foreground font-mono">@{mate.username}</span>
+                                        <div className="text-xs font-semibold text-emerald-400 mt-0.5">Avg {avg}</div>
+                                    </div>
+                                  </div>
+                                  );
+                                })}
+                            </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-10 space-y-2">
+                        <Users className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+                        <p className="text-sm font-bold text-foreground">No Team Assigned</p>
+                        <p className="text-xs text-muted-foreground">You are not currently assigned to a team in this edition.</p>
+                      </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
