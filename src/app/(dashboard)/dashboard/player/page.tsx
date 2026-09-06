@@ -184,6 +184,12 @@ export default async function PlayerPage() {
       hasSpocCaptainDesk={hasSpocCaptainDesk}
       initialEditionGrade={editionParticipant?.category || null}
       registrationEnrollment={registrationEnrollment}
+      currentEditionInfo={activeEdition ? {
+        id: activeEdition.id,
+        title: activeEdition.title,
+        number: activeEdition.number,
+        status: activeEdition.status,
+      } : null}
       shortName={websiteCms.site.shortName}
       editionLabel={websiteCms.site.editionLabel}
     />

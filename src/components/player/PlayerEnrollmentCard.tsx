@@ -83,7 +83,7 @@ export function PlayerEnrollmentCard({
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black">
-                <PartyPopper className="h-3.5 w-3.5 mr-1" /> Tournament Registration
+                <PartyPopper className="h-3.5 w-3.5 mr-1" /> Enrolled for Next Edition
               </Badge>
               <Badge variant="outline" className="text-[10px] font-bold">
                 Edition #{initial.edition.number}
@@ -122,7 +122,7 @@ export function PlayerEnrollmentCard({
             <div className="rounded-xl border border-border/80 bg-background/60 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <p className="text-xs font-black uppercase tracking-wide text-amber-400 flex items-center gap-1.5">
-                  <CreditCard className="h-3.5 w-3.5" /> Payment Reference / Transaction ID
+                  <CreditCard className="h-3.5 w-3.5" /> UPI Transaction ID / Payment Reference
                 </p>
                 {!editing ? (
                   <Button
@@ -132,7 +132,7 @@ export function PlayerEnrollmentCard({
                     className="h-7 text-[10px] font-bold border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
                     onClick={startEdit}
                   >
-                    <Pencil className="h-3 w-3 mr-1" /> Edit Reference ID
+                    <Pencil className="h-3 w-3 mr-1" /> Edit UPI Transaction ID (if entered wrong)
                   </Button>
                 ) : null}
               </div>
@@ -180,7 +180,7 @@ export function PlayerEnrollmentCard({
               {error ? <p className="text-xs font-semibold text-rose-400">{error}</p> : null}
               {message ? <p className="text-xs font-semibold text-emerald-400">{message}</p> : null}
               <p className="text-[11px] text-muted-foreground">
-                If you made a typo or paid with a different reference ID, you can update it above. The organizer sees the updated reference immediately.
+                If you entered the wrong UPI transaction ID or made a typo, you can edit it above anytime. The organizer sees the updated reference immediately.
               </p>
             </div>
           </>

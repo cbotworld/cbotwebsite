@@ -51,6 +51,7 @@ export default function PlayerClient({
   hasSpocCaptainDesk = false,
   initialEditionGrade = null,
   registrationEnrollment = null,
+  currentEditionInfo = null,
   shortName = DEFAULT_WEBSITE_CMS.site.shortName,
   editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: {
@@ -65,6 +66,7 @@ export default function PlayerClient({
   hasSpocCaptainDesk?: boolean;
   initialEditionGrade?: string | null;
   registrationEnrollment?: PlayerEnrollmentInfo | null;
+  currentEditionInfo?: { id: string; title: string; number: number; status: string } | null;
   shortName?: string;
   editionLabel?: string;
 }) {
@@ -453,9 +455,30 @@ export default function PlayerClient({
 
 
 
+      {/* Next Edition Registration Card with UPI Transaction ID editing */}
       {registrationEnrollment ? (
         <PlayerEnrollmentCard enrollment={registrationEnrollment} />
       ) : null}
+
+      {/* Current Edition Status: Not enrolled in live cup */}
+      {!currentTeam?.id && (
+        <div className="rounded-3xl border border-border bg-card/60 p-6 sm:p-7 space-y-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] font-bold text-amber-400 border-amber-500/30 bg-amber-500/10">
+              Current Edition {currentEditionInfo?.number ? `#${currentEditionInfo.number}` : ''}
+            </Badge>
+            <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+              Not Enrolled
+            </span>
+          </div>
+          <h3 className="text-lg font-black text-foreground">
+            You are not enrolled in {currentEditionInfo?.title || 'Current Edition'}
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            You do not have an active team or match schedule in the current live tournament.
+          </p>
+        </div>
+      )}
 
       {/* ── ALL MATCHES & GO LIVE LIST ────────────────────────────────────────── */}
       {currentTeam?.id && (
