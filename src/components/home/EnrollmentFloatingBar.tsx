@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Trophy,
@@ -48,6 +49,7 @@ type RegistrationEdition = {
 type Step = 'confirm' | 'enrolling' | 'done' | 'already';
 
 export default function EnrollmentFloatingBar({ edition }: { edition: RegistrationEdition }) {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const [dismissed, setDismissed] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -60,6 +62,11 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   const [alreadyEnrolled, setAlreadyEnrolled] = React.useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = React.useState(false);
   const [paymentOption, setPaymentOption] = React.useState<'IN' | 'INTL'>('IN');
+
+  const handleGoToDashboard = () => {
+    setModalOpen(false);
+    router.push('/dashboard/player');
+  };
 
   const fee = Number(edition.enrollmentFee) || 0;
   const isPaid = fee > 0;
@@ -548,12 +555,13 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
               </p>
             </div>
             <div className="relative flex flex-wrap items-center justify-center gap-2 pt-2">
-              <Link
-                href="/dashboard/player"
-                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20"
+              <Button
+                type="button"
+                onClick={handleGoToDashboard}
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-4 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-600"
               >
                 <LayoutDashboard className="h-3.5 w-3.5" /> Go to Player Dashboard
-              </Link>
+              </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Close
               </Button>
@@ -580,12 +588,13 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
               </p>
             </div>
             <div className="relative flex flex-wrap items-center justify-center gap-2 pt-2">
-              <Link
-                href="/dashboard/player"
-                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-3 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20"
+              <Button
+                type="button"
+                onClick={handleGoToDashboard}
+                className="inline-flex items-center justify-center gap-1.5 h-9 rounded-md px-4 text-xs font-black bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-600"
               >
                 <LayoutDashboard className="h-3.5 w-3.5" /> View on Dashboard
-              </Link>
+              </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(false)}>
                 Close
               </Button>
