@@ -753,18 +753,13 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {p.category ? (
+                  {p.category ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant="outline" className="text-[9px] font-bold border-amber-500/30 text-amber-300">
                         {p.category}
                       </Badge>
-                    ) : null}
-                    {p.user?.rating ? (
-                      <Badge variant="outline" className="text-[10px] font-black border-border bg-muted/50 text-foreground">
-                        Rating: {p.user.rating}
-                      </Badge>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
