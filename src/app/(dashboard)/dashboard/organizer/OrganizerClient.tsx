@@ -1294,13 +1294,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </div>
       </div>
 
-      {/* Tournament A / B slot selector */}
-      <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      {/* Current Edition / Next Edition Slot Selector Banner */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 via-background/80 to-violet-500/5 border border-amber-500/30 flex flex-col gap-4 shadow-lg shadow-amber-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div
-            className="inline-flex items-center rounded-full border border-amber-500/30 bg-black/30 p-1 shadow-inner"
+            className="inline-flex items-center rounded-full border border-amber-500/30 bg-black/40 p-1 shadow-inner"
             role="tablist"
-            aria-label="Tournament slot"
+            aria-label="Edition slot"
           >
             <button
               type="button"
@@ -1308,15 +1308,15 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               aria-selected={tournamentSlot === 'A'}
               onClick={() => void handleTournamentSlotChange('A')}
               disabled={ensuringSlots}
-              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 ${
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-2 ${
                 tournamentSlot === 'A'
-                  ? 'bg-amber-500 text-black shadow-md'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               }`}
             >
-              <Trophy className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5" />
-              <span>Tournament A</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${tournamentSlot === 'A' ? 'bg-black/20 text-black' : 'bg-amber-500/20 text-amber-300'}`}>
+              <Trophy className="h-3.5 w-3.5" />
+              <span>Current Edition</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${tournamentSlot === 'A' ? 'bg-black/20 text-slate-950' : 'bg-amber-500/20 text-amber-300'}`}>
                 {slotAEnrolledCount}
               </span>
             </button>
@@ -1326,176 +1326,158 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               aria-selected={tournamentSlot === 'B'}
               onClick={() => void handleTournamentSlotChange('B')}
               disabled={ensuringSlots}
-              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-1.5 ${
+              className={`rounded-full px-4 py-2 text-xs font-black transition-all duration-200 disabled:opacity-60 flex items-center gap-2 ${
                 tournamentSlot === 'B'
-                  ? 'bg-violet-500 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-violet-500 to-violet-600 text-white shadow-md'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               }`}
             >
               {ensuringSlots ? (
-                <Loader2 className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Award className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5" />
+                <Award className="h-3.5 w-3.5" />
               )}
-              <span>Tournament B</span>
+              <span>Next Edition</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${tournamentSlot === 'B' ? 'bg-black/20 text-white' : 'bg-violet-500/20 text-violet-300'}`}>
                 {slotBEnrolledCount}
               </span>
             </button>
           </div>
-          <div className="text-[11px] font-semibold text-muted-foreground max-w-2xl">
-            <strong className="text-amber-400">Tournament A</strong> is always the live cup players see.
-            <strong className="text-violet-300"> Tournament B</strong> is the draft twin — same tools (teams, scores, stage, schedule).
-            When you publish B, it becomes live (A) and the former live edition moves to B so you can design the next cup without interruption.
-          </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="carrom" className="text-xs font-black uppercase tracking-wider">
-              <Trophy className="h-3.5 w-3.5 mr-1" /> Tournament {tournamentSlot}
+          <div className="flex items-center gap-2">
+            <Badge variant={isLiveSlotA ? 'success' : 'outline'} className="text-[10px] font-black tracking-wider uppercase">
+              {isLiveSlotA ? 'Live Tournament' : 'Draft / Upcoming'}
             </Badge>
-            <Badge variant={selectedEdition?.status === 'IN_PROGRESS' ? 'warning' : 'outline'}>
+            <Badge variant={selectedEdition?.status === 'IN_PROGRESS' ? 'warning' : 'outline'} className="text-[10px] font-bold">
               {statusLabel(selectedEdition?.status)}
             </Badge>
-            {isLiveSlotA && selectedEdition?.id === slotAEdition?.id && (
-              <Badge variant="success" className="text-[10px] font-black">LIVE</Badge>
-            )}
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-2xl font-black text-amber-500">
-              {selectedEdition?.title || `Edition #${selectedEdition?.number}`}
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditPaymentQrUrl(selectedEdition?.paymentQrUrl || '');
-                setEditIntlPaymentQrUrl(selectedEdition?.intlPaymentQrUrl || '');
-                setEditEnrollmentFee(Number(selectedEdition?.enrollmentFee) || 0);
-                setEditModalOpen(true);
-              }}
-              className="h-7 text-xs font-extrabold border-amber-500/40 text-amber-500 hover:bg-amber-500/20"
-            >
-              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Edition
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground font-medium">
-            <strong className="text-foreground">Theme:</strong> {selectedEdition?.theme || selectedEdition?.themeDescription || 'Standard Carrom Theme'}
-            {' · '}
-            <strong className="text-foreground">Enrollment fee:</strong>{' '}
-            {formatEnrollmentFee(selectedEdition?.enrollmentFee)}
-          </p>
-          {viewingDraftSlot && selectedEdition?.tournamentStartDate && (
-            <p className="text-xs text-violet-300 font-medium">
-              <strong className="text-foreground">Expected start:</strong>{' '}
-              {toCalendarDate(selectedEdition.tournamentStartDate) || 'Not set'}
-            </p>
-          )}
-          <p className="text-[11px] text-muted-foreground">
-            {isLiveSlotA
-              ? 'Live cup — scores, teams, schedule, and selected players for the edition players see now.'
-              : 'Draft twin — same organizer tools as A. Open registration, build teams & stage, then publish when the live cup ends.'}
-          </p>
         </div>
 
-        {viewingDraftSlot && !slotBEdition && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="carrom"
-              disabled={ensuringSlots}
-              onClick={() => void refreshSlots()}
-              className="text-xs font-black"
-            >
-              {ensuringSlots ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Prepare Tournament B Draft
-            </Button>
-            <p className="text-[10px] text-muted-foreground max-w-sm">
-              Creates a separate draft edition for the next cup. Your live Tournament A data stays untouched.
-            </p>
-          </div>
-        )}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-2 border-t border-border/50">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-2xl font-black text-amber-500">
+                {selectedEdition?.title || `Edition #${selectedEdition?.number}`}
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditPaymentQrUrl(selectedEdition?.paymentQrUrl || '');
+                  setEditIntlPaymentQrUrl(selectedEdition?.intlPaymentQrUrl || '');
+                  setEditEnrollmentFee(Number(selectedEdition?.enrollmentFee) || 0);
+                  setEditModalOpen(true);
+                }}
+                className="h-7 text-xs font-extrabold border-amber-500/40 text-amber-400 hover:bg-amber-500/20"
+              >
+                <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Edition
+              </Button>
+            </div>
 
-        {viewingDraftSlot && slotBEdition && selectedEditionId && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
+              <span>
+                <strong className="text-foreground">Theme:</strong> {selectedEdition?.theme || selectedEdition?.themeDescription || 'Standard Carrom Theme'}
+              </span>
+              <span>·</span>
+              <span>
+                <strong className="text-foreground">Fee:</strong> {formatEnrollmentFee(selectedEdition?.enrollmentFee)}
+              </span>
+              {viewingDraftSlot && selectedEdition?.tournamentStartDate && (
+                <>
+                  <span>·</span>
+                  <span className="text-violet-300">
+                    <strong className="text-foreground">Expected start:</strong> {toCalendarDate(selectedEdition.tournamentStartDate)}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Action buttons on right */}
           <div className="flex flex-wrap items-center gap-2">
-            {['DRAFT', 'REGISTRATION_CLOSED'].includes(
-              String(selectedEdition?.status).toUpperCase()
-            ) && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={slotActionBusy !== null}
-                onClick={() => void handleOpenRegistration()}
-                className="text-xs font-bold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-              >
-                {slotActionBusy === 'open' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Open Registration
-              </Button>
-            )}
-            {String(selectedEdition?.status).toUpperCase() === 'REGISTRATION_OPEN' && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={slotActionBusy !== null}
-                onClick={() => void handleCloseRegistration()}
-                className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-              >
-                {slotActionBusy === 'close' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Close Registration
-              </Button>
-            )}
-            {['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(
-              String(selectedEdition?.status).toUpperCase()
-            ) && (
+            {viewingDraftSlot && !slotBEdition && (
               <Button
                 type="button"
                 size="sm"
                 variant="carrom"
-                disabled={slotActionBusy !== null || !publishGuard.canPublish}
-                onClick={() => void handlePublishTournament()}
-                title={publishGuard.reason || 'Publish this tournament to go live'}
-                className="text-xs font-black"
+                disabled={ensuringSlots}
+                onClick={() => void refreshSlots()}
+                className="text-xs font-black h-8"
               >
-                {slotActionBusy === 'publish' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trophy className="h-3.5 w-3.5" />}
-                Publish Tournament
+                {ensuringSlots ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                Prepare Next Edition
               </Button>
             )}
-            {!publishGuard.canPublish && publishGuard.reason && (
-              <p className="text-[10px] text-muted-foreground max-w-xs">{publishGuard.reason}</p>
-            )}
-            <p className="text-[10px] text-muted-foreground max-w-xs w-full sm:w-auto">
-              Registration can be opened or closed anytime by the organizer.
-            </p>
-          </div>
-        )}
 
-        {canClearEdition && selectedEditionId && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-amber-500/20 pt-3 w-full">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={slotActionBusy !== null}
-              onClick={() => void handleStartClearTournament()}
-              className="text-xs font-bold border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
-            >
-              {slotActionBusy === 'clear-export' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-              Clear tournament data
-            </Button>
-            <p className="text-[10px] text-muted-foreground max-w-md">
-              Downloads Excel first (players, grading, standings, scores, combis), then confirm to wipe teams, matches, and scores. CMS and player profiles stay.
-            </p>
+            {viewingDraftSlot && slotBEdition && selectedEditionId && (
+              <>
+                {['DRAFT', 'REGISTRATION_CLOSED'].includes(
+                  String(selectedEdition?.status).toUpperCase()
+                ) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={slotActionBusy !== null}
+                    onClick={() => void handleOpenRegistration()}
+                    className="text-xs font-bold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 h-8"
+                  >
+                    {slotActionBusy === 'open' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                    Open Registration
+                  </Button>
+                )}
+                {String(selectedEdition?.status).toUpperCase() === 'REGISTRATION_OPEN' && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={slotActionBusy !== null}
+                    onClick={() => void handleCloseRegistration()}
+                    className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10 h-8"
+                  >
+                    {slotActionBusy === 'close' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                    Close Registration
+                  </Button>
+                )}
+                {['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(
+                  String(selectedEdition?.status).toUpperCase()
+                ) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="carrom"
+                    disabled={slotActionBusy !== null || !publishGuard.canPublish}
+                    onClick={() => void handlePublishTournament()}
+                    title={publishGuard.reason || 'Publish this tournament to go live'}
+                    className="text-xs font-black h-8 shadow-md shadow-amber-500/20"
+                  >
+                    {slotActionBusy === 'publish' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Trophy className="h-3.5 w-3.5 mr-1" />}
+                    Publish Tournament
+                  </Button>
+                )}
+              </>
+            )}
+
+            {canClearEdition && selectedEditionId && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={slotActionBusy !== null}
+                onClick={() => void handleStartClearTournament()}
+                className="text-xs font-bold border-rose-500/30 text-rose-300 hover:bg-rose-500/10 h-8"
+                title="Download backup & clear tournament data"
+              >
+                {slotActionBusy === 'clear-export' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5 mr-1 text-rose-400" />
+                )}
+                Clear tournament data
+              </Button>
+            )}
           </div>
-        )}
         </div>
       </div>
 

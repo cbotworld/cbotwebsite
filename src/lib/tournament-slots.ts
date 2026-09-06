@@ -98,24 +98,9 @@ export function isDraftSlot(edition: EditionLike | null | undefined) {
 
 export function canPublishDraft(live: EditionLike | null, draft: EditionLike | null, now = new Date()) {
   if (!live || !draft) return { ok: false, reason: 'Tournament slots are not ready.' };
-  if (!isOrganizerLiveStatus(live.status)) {
-    return { ok: false, reason: 'The live tournament must be ongoing before publishing the draft slot.' };
-  }
-  const draftStatus = String(draft.status).toUpperCase();
-  if (!['DRAFT', 'REGISTRATION_CLOSED', 'REGISTRATION_OPEN'].includes(draftStatus)) {
-    return { ok: false, reason: 'Draft tournament is not in a publishable state.' };
-  }
-  if (!live.tournamentEndDate) {
-    return { ok: false, reason: 'Set an end date on the live tournament before publishing the draft.' };
-  }
-  const end = new Date(live.tournamentEndDate);
-  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (today < endDay) {
-    return {
-      ok: false,
-      reason: `Publish will be available after the live tournament end date (${endDay.toLocaleDateString()}).`,
-    };
+  const draftStatus = String(draft.status || '').toUpperCase();
+  if (!['DRAFT', 'REGISTRATION_CLOSED', 'REGISTRATION_OPEN', 'UPCOMING'].includes(draftStatus)) {
+    return { ok: false, reason: 'Next edition is not in a publishable state.' };
   }
   return { ok: true as const };
 }
