@@ -114,8 +114,10 @@ export async function resolveRegistrationEdition() {
       registrationEndDate: true,
       paymentQrUrl: true,
       paymentUpiLink: true,
+      paymentPhoneNumber: true,
       intlPaymentQrUrl: true,
       intlPaymentUpiLink: true,
+      intlPaymentPhone: true,
       slot: true,
       organizer: {
         select: {

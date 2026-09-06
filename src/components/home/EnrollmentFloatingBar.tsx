@@ -16,7 +16,8 @@ import {
   PartyPopper,
   Sparkles,
   LayoutDashboard,
-  Globe,
+  ArrowRightLeft,
+  Phone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,8 +38,10 @@ type RegistrationEdition = {
   registrationEndDate?: string | Date | null;
   paymentQrUrl?: string | null;
   paymentUpiLink?: string | null;
+  paymentPhoneNumber?: string | null;
   intlPaymentQrUrl?: string | null;
   intlPaymentUpiLink?: string | null;
+  intlPaymentPhone?: string | null;
   organizerName?: string | null;
 };
 
@@ -51,7 +54,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   const [step, setStep] = React.useState<Step>('confirm');
   const [error, setError] = React.useState('');
   const [successMessage, setSuccessMessage] = React.useState('');
-  const [copied, setCopied] = React.useState(false);
+  const [copiedUpi, setCopiedUpi] = React.useState(false);
+  const [copiedPhone, setCopiedPhone] = React.useState(false);
   const [transactionId, setTransactionId] = React.useState('');
   const [alreadyEnrolled, setAlreadyEnrolled] = React.useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = React.useState(false);
@@ -71,13 +75,18 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   
   const inPaymentQrUrl = edition.paymentQrUrl?.trim() || '';
   const inPaymentUpiLink = edition.paymentUpiLink?.trim() || '';
+  const inPaymentPhone = edition.paymentPhoneNumber?.trim() || '';
   const intlPaymentQrUrl = edition.intlPaymentQrUrl?.trim() || '';
   const intlPaymentUpiLink = edition.intlPaymentUpiLink?.trim() || '';
+  const intlPaymentPhone = edition.intlPaymentPhone?.trim() || '';
 
   const currentQrUrl = paymentOption === 'IN' ? inPaymentQrUrl : intlPaymentQrUrl;
   const currentUpiLink = paymentOption === 'IN' ? inPaymentUpiLink : intlPaymentUpiLink;
-  const hasAnyPaymentDetails = Boolean(inPaymentQrUrl || inPaymentUpiLink || intlPaymentQrUrl || intlPaymentUpiLink);
-  const hasCurrentPaymentDetails = Boolean(currentQrUrl || currentUpiLink);
+  const currentPhone = paymentOption === 'IN' ? inPaymentPhone : intlPaymentPhone;
+  const hasAnyPaymentDetails = Boolean(
+    inPaymentQrUrl || inPaymentUpiLink || inPaymentPhone || intlPaymentQrUrl || intlPaymentUpiLink || intlPaymentPhone
+  );
+  const hasCurrentPaymentDetails = Boolean(currentQrUrl || currentUpiLink || currentPhone);
   const canSubmit = !isPaid || (hasAnyPaymentDetails && txnReady);
 
   const getDirectPaymentUrl = () => {
@@ -120,7 +129,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
 
   const openModal = async () => {
     setError('');
-    setCopied(false);
+    setCopiedUpi(false);
+    setCopiedPhone(false);
     setTransactionId('');
     setModalOpen(true);
 
@@ -142,10 +152,21 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
     if (!currentUpiLink) return;
     try {
       await navigator.clipboard.writeText(currentUpiLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2000);
     } catch {
       setError('Could not copy payment link. Please copy it manually.');
+    }
+  };
+
+  const handleCopyPhone = async () => {
+    if (!currentPhone) return;
+    try {
+      await navigator.clipboard.writeText(currentPhone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+    } catch {
+      setError('Could not copy phone number. Please copy it manually.');
     }
   };
 
@@ -279,13 +300,14 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                   </span>
                 </div>
 
-                {/* Segmented Toggle: Indian vs International */}
+                {/* Segmented Toggle: Primary vs Alternate */}
                 <div className="grid grid-cols-2 gap-1.5 p-1 bg-background/80 rounded-lg border border-border/70 text-xs font-bold">
                   <button
                     type="button"
                     onClick={() => {
                       setPaymentOption('IN');
-                      setCopied(false);
+                      setCopiedUpi(false);
+                      setCopiedPhone(false);
                     }}
                     className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md transition-all ${
                       paymentOption === 'IN'
@@ -294,13 +316,14 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     }`}
                   >
                     <span>🇮🇳</span>
-                    <span>Indian</span>
+                    <span>Primary</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setPaymentOption('INTL');
-                      setCopied(false);
+                      setCopiedUpi(false);
+                      setCopiedPhone(false);
                     }}
                     className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md transition-all ${
                       paymentOption === 'INTL'
@@ -308,8 +331,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                         : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                     }`}
                   >
-                    <Globe className="h-3.5 w-3.5" />
-                    <span>International</span>
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <span>Alternate Option</span>
                   </button>
                 </div>
 
@@ -319,7 +342,7 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                       <div className="flex flex-col items-center gap-2 pt-1">
                         <img
                           src={currentQrUrl}
-                          alt={paymentOption === 'IN' ? 'India Payment QR code' : 'International Payment QR code'}
+                          alt={paymentOption === 'IN' ? 'Primary Payment QR code' : 'Alternate Payment QR code'}
                           className="h-44 w-44 rounded-xl border border-border object-contain bg-white p-2 shadow-inner"
                         />
                         <p className="text-[11px] text-muted-foreground text-center">
@@ -329,63 +352,96 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                     ) : null}
 
                     {currentUpiLink ? (
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <p className="text-[11px] font-bold text-muted-foreground uppercase">
-                            {paymentOption === 'IN' ? 'UPI ID / Payment link' : 'International Payment Link / ID'}
+                            {paymentOption === 'IN' ? 'UPI ID / Payment Link' : 'Alternate UPI ID / Link'}
                           </p>
                           {directPaymentUrl && (
                             <span className="text-[10px] text-amber-400 font-medium">
-                              {paymentOption === 'IN' ? 'Tap to open UPI app' : 'Tap to open link'}
+                              Tap to open UPI app
                             </span>
                           )}
                         </div>
 
-                        {directPaymentUrl ? (
-                          <a
-                            href={directPaymentUrl}
-                            target={directPaymentUrl.startsWith('http') ? '_blank' : '_self'}
-                            rel="noopener noreferrer"
-                            className="group flex items-center justify-between gap-2.5 w-full rounded-lg border border-amber-500/40 bg-background/80 hover:bg-amber-500/10 hover:border-amber-500 px-3.5 py-2.5 text-xs font-semibold text-foreground transition-all shadow-sm cursor-pointer"
-                          >
-                            <span className="break-all font-mono text-amber-300 group-hover:text-amber-200">
-                              {currentUpiLink}
-                            </span>
-                            <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-black bg-amber-500 text-slate-950 px-2.5 py-1 rounded-md shadow-sm group-hover:bg-amber-400 transition-colors">
-                              <ExternalLink className="h-3 w-3" />
-                              {paymentOption === 'IN' ? 'Open UPI App' : 'Open Link'}
-                            </span>
-                          </a>
-                        ) : (
-                          <div className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs break-all font-medium">
-                            {currentUpiLink}
-                          </div>
-                        )}
-
-                        {directPaymentUrl && (
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          {directPaymentUrl ? (
                             <a
                               href={directPaymentUrl}
                               target={directPaymentUrl.startsWith('http') ? '_blank' : '_self'}
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-1.5 flex-1 rounded-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-slate-950 font-black h-8 px-3 text-xs hover:from-amber-400 hover:to-amber-500 shadow-md shadow-amber-500/20"
+                              className="group flex-1 flex items-center justify-between gap-2.5 rounded-lg border border-amber-500/40 bg-background/80 hover:bg-amber-500/10 hover:border-amber-500 px-3 py-2 text-xs font-semibold text-foreground transition-all shadow-sm cursor-pointer"
                             >
-                              <CreditCard className="h-3.5 w-3.5" />
-                              {paymentOption === 'IN' ? 'Pay via UPI App (GPay / PhonePe / Paytm)' : 'Open Payment Link'}
+                              <span className="break-all font-mono text-amber-300 group-hover:text-amber-200">
+                                {currentUpiLink}
+                              </span>
+                              <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-black bg-amber-500 text-slate-950 px-2 py-0.5 rounded shadow-sm group-hover:bg-amber-400 transition-colors">
+                                <ExternalLink className="h-3 w-3" />
+                                Open UPI
+                              </span>
                             </a>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs text-muted-foreground hover:text-foreground shrink-0"
-                              onClick={() => void handleCopyUpi()}
-                              title="Copy UPI ID"
-                            >
-                              <Copy className="h-3.5 w-3.5 mr-1" />
-                              {copied ? 'Copied' : 'Copy'}
-                            </Button>
+                          ) : (
+                            <div className="flex-1 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs break-all font-mono text-amber-300">
+                              {currentUpiLink}
+                            </div>
+                          )}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 text-xs text-muted-foreground hover:text-foreground shrink-0 border-border hover:border-amber-500"
+                            onClick={() => void handleCopyUpi()}
+                            title="Copy UPI ID"
+                          >
+                            {copiedUpi ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-400" /> Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {currentPhone ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-bold text-muted-foreground uppercase">
+                          {paymentOption === 'IN' ? 'Payment Phone (GPay / PhonePe / Paytm)' : 'Alternate Phone (GPay / PhonePe / Paytm)'}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center justify-between gap-2 rounded-lg border border-border/80 bg-background/80 px-3 py-2 text-xs font-semibold text-foreground">
+                            <span className="font-mono text-amber-300 flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                              {currentPhone}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                              GPay · PhonePe · Paytm
+                            </span>
                           </div>
-                        )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 text-xs text-muted-foreground hover:text-foreground shrink-0 border-border hover:border-amber-500"
+                            onClick={() => void handleCopyPhone()}
+                            title="Copy Phone Number"
+                          >
+                            {copiedPhone ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-400" /> Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
 
@@ -413,8 +469,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                   <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 space-y-2">
                     <p className="text-xs text-amber-200/90 font-medium leading-relaxed">
                       {paymentOption === 'INTL'
-                        ? '🌍 International payment details have not been added yet by the organizer. You can switch to the 🇮🇳 Indian payment option above or contact the organizer.'
-                        : '🇮🇳 Indian payment QR / UPI link has not been added yet by the organizer. Please contact the organizer before enrolling.'}
+                        ? '🔄 Alternate payment details have not been added yet by the organizer. You can switch to the 🇮🇳 Primary payment option above or contact the organizer.'
+                        : '🇮🇳 Primary payment QR / UPI link has not been added yet by the organizer. Please contact the organizer before enrolling.'}
                     </p>
                     {hasAnyPaymentDetails && (
                       <div className="space-y-1.5 pt-1">

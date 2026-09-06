@@ -124,8 +124,10 @@ model Edition {
   enrollmentFee         Float?    @default(0)
   paymentQrUrl          String?
   paymentUpiLink        String?
+  paymentPhoneNumber    String?
   intlPaymentQrUrl      String?
   intlPaymentUpiLink    String?
+  intlPaymentPhone      String?
   publishedAt           DateTime?
   
   prizePool             String    @default("₹0 INR")

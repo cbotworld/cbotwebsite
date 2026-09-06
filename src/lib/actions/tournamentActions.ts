@@ -136,25 +136,30 @@ export async function updateEdition(editionId: string, formData: FormData) {
     const registrationEndDateRaw = formData.get('registrationEndDate') as string | null;
     const paymentQrUrlRaw = formData.get('paymentQrUrl') as string | null;
     const paymentUpiLinkRaw = formData.get('paymentUpiLink') as string | null;
+    const paymentPhoneNumberRaw = formData.get('paymentPhoneNumber') as string | null;
     const intlPaymentQrUrlRaw = formData.get('intlPaymentQrUrl') as string | null;
     const intlPaymentUpiLinkRaw = formData.get('intlPaymentUpiLink') as string | null;
+    const intlPaymentPhoneRaw = formData.get('intlPaymentPhone') as string | null;
 
-    const roundFormatsRaw = formData.get('roundFormats') as string;
-    let roundFormats: string[] = ['SINGLES', 'DOUBLES', 'TRIPLES', 'SINGLES'];
+    const roundFormatsRaw = formData.get('roundFormats') as string | null;
+    let roundFormats: string[] | null = null;
     if (roundFormatsRaw) {
       try { roundFormats = JSON.parse(roundFormatsRaw); } catch (e) {}
     }
 
-    const roundRulesRaw = formData.get('roundRules') as string;
-    let roundRules: string[] = [];
+    const roundRulesRaw = formData.get('roundRules') as string | null;
+    let roundRules: string[] | null = null;
     if (roundRulesRaw) {
       try { roundRules = JSON.parse(roundRulesRaw); } catch (e) {}
     }
 
-    const perRoundBreakdown = roundFormats
-      .map((fmt, idx) => `• Round ${idx + 1} (${fmt})`)
-      .join('\n');
-    const rulesVal = `Multi-Format Round Schedule:\n${perRoundBreakdown}`;
+    let rulesUpdate: { rules?: string } = {};
+    if (roundFormats && roundFormats.length > 0) {
+      const perRoundBreakdown = roundFormats
+        .map((fmt, idx) => `• Round ${idx + 1} (${fmt})`)
+        .join('\n');
+      rulesUpdate = { rules: `Multi-Format Round Schedule:\n${perRoundBreakdown}` };
+    }
 
     // Build slug — but only update if it won't conflict with another edition
     let slugData: { slug?: string } = {};
@@ -220,15 +225,19 @@ export async function updateEdition(editionId: string, formData: FormData) {
     let paymentUpdate: {
       paymentQrUrl?: string | null;
       paymentUpiLink?: string | null;
+      paymentPhoneNumber?: string | null;
       intlPaymentQrUrl?: string | null;
       intlPaymentUpiLink?: string | null;
+      intlPaymentPhone?: string | null;
     } = {};
     if (resolvedFee <= 0) {
       paymentUpdate = {
         paymentQrUrl: null,
         paymentUpiLink: null,
+        paymentPhoneNumber: null,
         intlPaymentQrUrl: null,
         intlPaymentUpiLink: null,
+        intlPaymentPhone: null,
       };
     } else {
       if (paymentQrUrlRaw !== null && paymentQrUrlRaw !== undefined) {
@@ -237,11 +246,17 @@ export async function updateEdition(editionId: string, formData: FormData) {
       if (paymentUpiLinkRaw !== null && paymentUpiLinkRaw !== undefined) {
         paymentUpdate.paymentUpiLink = paymentUpiLinkRaw.trim() || null;
       }
+      if (paymentPhoneNumberRaw !== null && paymentPhoneNumberRaw !== undefined) {
+        paymentUpdate.paymentPhoneNumber = paymentPhoneNumberRaw.trim() || null;
+      }
       if (intlPaymentQrUrlRaw !== null && intlPaymentQrUrlRaw !== undefined) {
         paymentUpdate.intlPaymentQrUrl = intlPaymentQrUrlRaw.trim() || null;
       }
       if (intlPaymentUpiLinkRaw !== null && intlPaymentUpiLinkRaw !== undefined) {
         paymentUpdate.intlPaymentUpiLink = intlPaymentUpiLinkRaw.trim() || null;
+      }
+      if (intlPaymentPhoneRaw !== null && intlPaymentPhoneRaw !== undefined) {
+        paymentUpdate.intlPaymentPhone = intlPaymentPhoneRaw.trim() || null;
       }
     }
 
@@ -271,7 +286,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
           themeDescription: description,
           prizePool,
           maxTeams,
-          rules: rulesVal,
+          ...rulesUpdate,
           ...(totalDays !== undefined ? { totalDays } : {}),
           dayDates,
           ...(resolvedStartDate ? { tournamentStartDate: resolvedStartDate } : {}),
@@ -298,7 +313,7 @@ export async function updateEdition(editionId: string, formData: FormData) {
           themeDescription: description,
           prizePool,
           maxTeams,
-          rules: rulesVal,
+          rules: rulesUpdate.rules || 'Multi-Format Round Schedule:\n• Round 1 (SINGLES)\n• Round 2 (DOUBLES)\n• Round 3 (TRIPLES)\n• Round 4 (SINGLES)',
           totalDays: totalDays ?? 15,
           dayDates,
           ...(startDate ? { tournamentStartDate: startDate } : {}),
@@ -308,36 +323,64 @@ export async function updateEdition(editionId: string, formData: FormData) {
       });
     }
 
-    // Save per-round formats — wrapped separately so it doesn't block the main save
-    try {
-      const defaultPatterns = await prisma.boardPattern.findMany({ take: roundFormats.length });
-      if (defaultPatterns.length > 0) {
-        await prisma.editionBoardPattern.deleteMany({ where: { editionId } });
-        for (let i = 0; i < roundFormats.length; i++) {
-          const pattern = defaultPatterns[i % defaultPatterns.length];
-          await prisma.editionBoardPattern.create({
-            data: {
-              editionId: updatedEdition.id,
-              patternId: pattern.id,
-              sequence: i + 1,
-              matchFormat: roundFormats[i],
-            }
-          });
+    // Save per-round formats only if explicitly passed
+    if (roundFormats && roundFormats.length > 0) {
+      try {
+        const defaultPatterns = await prisma.boardPattern.findMany({ take: roundFormats.length });
+        if (defaultPatterns.length > 0) {
+          await prisma.editionBoardPattern.deleteMany({ where: { editionId } });
+          for (let i = 0; i < roundFormats.length; i++) {
+            const pattern = defaultPatterns[i % defaultPatterns.length];
+            await prisma.editionBoardPattern.create({
+              data: {
+                editionId: updatedEdition.id,
+                patternId: pattern.id,
+                sequence: i + 1,
+                matchFormat: roundFormats[i],
+              }
+            });
+          }
         }
+      } catch (patternErr) {
+        console.warn('[updateEdition] Board pattern update skipped:', patternErr);
       }
-    } catch (patternErr) {
-      console.warn('[updateEdition] Board pattern update skipped:', patternErr);
     }
 
     const fullUpdatedEdition = await prisma.edition.findUnique({
       where: { id: updatedEdition.id },
       include: {
+        participants: {
+          orderBy: [{ gradeAverage: 'asc' }, { user: { name: 'asc' } }],
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                average: true,
+                target: true,
+                role: true,
+                isActivated: true,
+              },
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
+              },
+            },
+          },
+        },
         patterns: {
           orderBy: { sequence: 'asc' },
           include: { pattern: true },
         },
       },
     });
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/', 'layout');
 
     return { success: true, edition: fullUpdatedEdition };
   } catch (error: any) {

@@ -481,7 +481,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setSlotActionBusy('open');
     const res = await openRegistration(selectedEditionId);
     if (res.success && res.edition) {
-      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? res.edition : e)));
+      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? { ...e, ...res.edition, participants: res.edition.participants ?? e.participants } : e)));
     } else {
       alert(res.error || 'Failed to open registration.');
     }
@@ -493,7 +493,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setSlotActionBusy('close');
     const res = await closeRegistration(selectedEditionId);
     if (res.success && res.edition) {
-      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? res.edition : e)));
+      setEditions((prev) => prev.map((e) => (e.id === res.edition.id ? { ...e, ...res.edition, participants: res.edition.participants ?? e.participants } : e)));
     } else {
       alert(res.error || 'Failed to close registration.');
     }
@@ -684,7 +684,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
     const res = await updateEdition(selectedEditionId, formData);
     if (res.success && res.edition) {
-      setEditions(editions.map((ed) => (ed.id === res.edition!.id ? res.edition : ed)));
+      setEditions((prev) => prev.map((ed) => (ed.id === res.edition!.id ? { ...ed, ...res.edition, participants: res.edition!.participants ?? ed.participants } : ed)));
       alert('🏆 Tournament schedule & rounds configuration saved successfully to the database!');
     } else {
       alert('⚠️ Failed to save configuration: ' + (res.error || 'Unknown error'));
@@ -891,8 +891,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     if (!selectedEditionId) return;
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    formData.append('roundFormats', JSON.stringify(roundFormats));
-    formData.append('roundRules', JSON.stringify(roundRules));
 
     // Optimistic update — close modal immediately
     const optimisticTitle = (formData.get('title') as string) || selectedEdition?.title;
@@ -903,9 +901,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     const optimisticFee = parseFloat((formData.get('enrollmentFee') as string) || '0');
     const optimisticQr = (formData.get('paymentQrUrl') as string) || '';
     const optimisticUpi = (formData.get('paymentUpiLink') as string) || '';
+    const optimisticPhone = (formData.get('paymentPhoneNumber') as string) || '';
     const optimisticIntlQr = (formData.get('intlPaymentQrUrl') as string) || '';
     const optimisticIntlUpi = (formData.get('intlPaymentUpiLink') as string) || '';
-    setEditions(editions.map((ed) =>
+    const optimisticIntlPhone = (formData.get('intlPaymentPhone') as string) || '';
+    setEditions((prev) => prev.map((ed) =>
       ed.id === selectedEditionId
         ? {
             ...ed,
@@ -917,8 +917,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             enrollmentFee: Number.isFinite(optimisticFee) ? optimisticFee : ed.enrollmentFee,
             paymentQrUrl: optimisticFee > 0 ? optimisticQr || null : null,
             paymentUpiLink: optimisticFee > 0 ? optimisticUpi || null : null,
+            paymentPhoneNumber: optimisticFee > 0 ? optimisticPhone || null : null,
             intlPaymentQrUrl: optimisticFee > 0 ? optimisticIntlQr || null : null,
             intlPaymentUpiLink: optimisticFee > 0 ? optimisticIntlUpi || null : null,
+            intlPaymentPhone: optimisticFee > 0 ? optimisticIntlPhone || null : null,
           }
         : ed
     ));
@@ -928,7 +930,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     // Persist in background
     const res = await updateEdition(selectedEditionId, formData);
     if (res.success && res.edition) {
-      setEditions(editions.map((ed) => (ed.id === res.edition!.id ? res.edition : ed)));
+      setEditions((prev) => prev.map((ed) => (ed.id === res.edition!.id ? { ...ed, ...res.edition, participants: res.edition!.participants ?? ed.participants } : ed)));
     } else if (!res.success) {
       alert('⚠️ Failed to save edition changes: ' + (res.error || 'Unknown error. Please try again.'));
     }
@@ -2720,54 +2722,70 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   Player Payment Details
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Configure Indian (default) and International payment details. Players can switch between both in the enrollment popup.
+                  Configure Primary and Alternate payment details. Players can switch between both in the enrollment popup.
                 </p>
               </div>
 
-              {/* Indian Payments */}
+              {/* Primary Payments */}
               <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-base">🇮🇳</span>
-                  <span className="text-xs font-black text-foreground uppercase tracking-wider">Indian Payments</span>
+                  <span className="text-xs font-black text-foreground uppercase tracking-wider">Primary Payment (India)</span>
                 </div>
                 <input type="hidden" name="paymentQrUrl" value={editPaymentQrUrl} />
                 <ImageUploader
-                  label="India Payment QR Code"
+                  label="Primary Payment QR Code"
                   value={editPaymentQrUrl}
                   onChange={setEditPaymentQrUrl}
                   bucket="teams"
-                  placeholder="Upload India UPI QR image or paste image URL"
+                  placeholder="Upload Primary UPI QR image or paste image URL"
                 />
                 <div>
-                  <label className="text-xs font-bold block mb-1">India UPI / Payment Link</label>
+                  <label className="text-xs font-bold block mb-1">Primary UPI ID / Payment Link</label>
                   <Input
                     name="paymentUpiLink"
                     defaultValue={selectedEdition?.paymentUpiLink || ''}
-                    placeholder="upi://pay?... or UPI ID / payment link"
+                    placeholder="e.g. username@upi or upi://pay?..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Primary Payment Phone Number (GPay / PhonePe / Paytm)</label>
+                  <Input
+                    name="paymentPhoneNumber"
+                    defaultValue={selectedEdition?.paymentPhoneNumber || ''}
+                    placeholder="e.g. +91 9876543210 or 9876543210"
                   />
                 </div>
               </div>
 
-              {/* International Payments */}
+              {/* Alternate Payment Option */}
               <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-3">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base">🌍</span>
-                  <span className="text-xs font-black text-foreground uppercase tracking-wider">International Payments</span>
+                  <span className="text-base">🔄</span>
+                  <span className="text-xs font-black text-foreground uppercase tracking-wider">Alternate Payment Option</span>
                 </div>
                 <input type="hidden" name="intlPaymentQrUrl" value={editIntlPaymentQrUrl} />
                 <ImageUploader
-                  label="International Payment QR Code"
+                  label="Alternate Payment QR Code"
                   value={editIntlPaymentQrUrl}
                   onChange={setEditIntlPaymentQrUrl}
                   bucket="teams"
-                  placeholder="Upload International QR / PayPal QR image or paste image URL"
+                  placeholder="Upload Alternate UPI / Payment QR image or paste image URL"
                 />
                 <div>
-                  <label className="text-xs font-bold block mb-1">International UPI / Payment Link / ID</label>
+                  <label className="text-xs font-bold block mb-1">Alternate UPI ID / Payment Link</label>
                   <Input
                     name="intlPaymentUpiLink"
                     defaultValue={selectedEdition?.intlPaymentUpiLink || ''}
-                    placeholder="PayPal link, Wise details, or international payment URL"
+                    placeholder="e.g. alternate@upi or payment URL / ID"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">Alternate Payment Phone Number (GPay / PhonePe / Paytm)</label>
+                  <Input
+                    name="intlPaymentPhone"
+                    defaultValue={selectedEdition?.intlPaymentPhone || ''}
+                    placeholder="e.g. +91 9876543210 or alternate contact number"
                   />
                 </div>
               </div>
@@ -2776,8 +2794,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <>
               <input type="hidden" name="paymentQrUrl" value="" />
               <input type="hidden" name="paymentUpiLink" value="" />
+              <input type="hidden" name="paymentPhoneNumber" value="" />
               <input type="hidden" name="intlPaymentQrUrl" value="" />
               <input type="hidden" name="intlPaymentUpiLink" value="" />
+              <input type="hidden" name="intlPaymentPhone" value="" />
             </>
           )}
 

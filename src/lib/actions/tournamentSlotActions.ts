@@ -153,7 +153,6 @@ export async function ensureTournamentSlots() {
           include: editionInclude,
         });
       }
-      await cloneEditionBlueprint(slotA.id, slotB.id);
     } else {
       const nextNumber = await getNextEditionNumber();
       slotB = await prisma.edition.create({
