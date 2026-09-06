@@ -55,6 +55,21 @@ type RegistrationEdition = {
 
 type Step = 'confirm' | 'enrolling' | 'done' | 'already';
 
+function getPlayerInitials(name?: string | null, username?: string | null): string {
+  const raw = (name || username || '').trim();
+  if (!raw) return 'PL';
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0].replace(/[^a-zA-Z0-9]/g, '')[0];
+    const second = parts[1].replace(/[^a-zA-Z0-9]/g, '')[0];
+    if (first && second) return (first + second).toUpperCase();
+  }
+  const clean = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (clean.length >= 2) return clean.slice(0, 2);
+  if (clean.length === 1) return (clean + clean);
+  return 'PL';
+}
+
 export default function EnrollmentFloatingBar({ edition }: { edition: RegistrationEdition }) {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -752,16 +767,8 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                   className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border/70 bg-card/60 hover:bg-accent/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-xs">
-                      {p.user?.image ? (
-                        <img
-                          src={p.user.image}
-                          alt={p.user.name || p.user.username}
-                          className="h-full w-full rounded-xl object-cover"
-                        />
-                      ) : (
-                        (p.user?.name?.[0] || p.user?.username?.[0] || 'P').toUpperCase()
-                      )}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/25 via-amber-600/20 to-amber-700/25 border border-amber-500/40 text-amber-300 font-black text-xs uppercase tracking-wider select-none shadow-sm">
+                      {getPlayerInitials(p.user?.name, p.user?.username)}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">

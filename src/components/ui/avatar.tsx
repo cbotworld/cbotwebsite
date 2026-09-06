@@ -4,13 +4,20 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const GENERIC_AVATAR =
-  /photo-1534528741775-53994a69daeb|api\.dicebear\.com|ui-avatars\.com/i;
+  /photo-1534528741775-53994a69daeb|images\.unsplash\.com|api\.dicebear\.com|ui-avatars\.com/i;
 
 function twoLetterName(value: string) {
-  const letters = (value || '').replace(/[^A-Za-z]/g, '').toUpperCase();
-  if (letters.length >= 2) return letters.slice(0, 2);
-  if (letters.length === 1) return letters;
-  return '?';
+  const raw = (value || '').trim();
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const first = parts[0].replace(/[^a-zA-Z0-9]/g, '')[0];
+    const second = parts[1].replace(/[^a-zA-Z0-9]/g, '')[0];
+    if (first && second) return (first + second).toUpperCase();
+  }
+  const clean = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (clean.length >= 2) return clean.slice(0, 2);
+  if (clean.length === 1) return (clean + clean);
+  return 'PL';
 }
 
 function isGenericAvatarSrc(src?: string) {
