@@ -21,8 +21,13 @@ const formatted2 = formatToIst(utcTimestamp2);
 assert(formatted2.includes('09:30 PM IST') && formatted2.includes('06 Sep'), `UTC 16:00 is converted to "06 Sep, 09:30 PM IST" (Got: "${formatted2}")`);
 
 // 3. Fallback date with time string
-const legacyTimeString = '08:33 PM IST';
-const formatted3 = formatToIst(legacyTimeString, '2026-09-06');
-assert(formatted3 === '06 Sep, 08:33 PM IST', `Legacy time string prepends fallback calendar date: "${formatted3}"`);
+// 4. Balu Day 6 (10:54 PM Singapore SGT = 2:24 PM UTC = 08:24 PM IST)
+const utcTimestamp4 = '2026-09-06T14:54:00.000Z';
+const formatted4 = formatToIst(utcTimestamp4);
+assert(formatted4.includes('08:24 PM IST') && formatted4.includes('06 Sep'), `10:54 PM Singapore SGT is converted to "06 Sep, 08:24 PM IST" (Got: "${formatted4}")`);
+
+const legacyBaluDay6 = '08:24 PM IST';
+const formattedLegacyDay6 = formatToIst(legacyBaluDay6, '2026-09-06');
+assert(formattedLegacyDay6 === '06 Sep, 08:24 PM IST', `Balu Day 6 renders "06 Sep, 08:24 PM IST" (Got: "${formattedLegacyDay6}")`);
 
 console.log('🎉 All Timezone Standardizer Tests Passed!');

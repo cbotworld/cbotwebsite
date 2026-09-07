@@ -4,6 +4,12 @@ import { formatToIst } from '../src/lib/ist-time';
 async function fixSavedLineupTimestamps() {
   console.log('🔄 Checking and standardizing team savedLineups timestamps...');
 
+  const edition = await prisma.edition.findFirst({
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, title: true, tournamentStartDate: true, dayDates: true }
+  });
+  console.log('Edition dayDates:', JSON.stringify(edition?.dayDates, null, 2));
+
   const teams = await prisma.team.findMany({
     select: {
       id: true,
@@ -26,21 +32,41 @@ async function fixSavedLineupTimestamps() {
 
     let modified = false;
 
+    const isSingaporeCapt = team.name.toLowerCase().includes('elephant') || team.captain?.name?.toLowerCase().includes('balu');
+
     for (const [dayKey, dayData] of Object.entries(parsed)) {
       if (!dayData || typeof dayData !== 'object') continue;
 
-      const rawSubmittedAt = String(dayData.submittedAt || '').trim();
+      const raw = String(dayData.submittedAt || '').trim();
+      if (!raw) continue;
 
-      // Specifically detect Balu's Singapore submission on Day 1 (11:03 pm SGT = 08:33 PM IST)
-      if (rawSubmittedAt.includes('11:03') && !rawSubmittedAt.includes('08:33')) {
-        console.log(`Fixing Singapore timezone for Team "${team.name}" (Capt: ${team.captain?.name}) Day ${dayKey}...`);
-        dayData.submittedAt = '06 Sep, 08:33 PM IST';
-        dayData.submittedAtIso = '2026-09-06T15:03:00.000Z';
-        dayData.clientTimeZone = 'Asia/Singapore';
-        modified = true;
-      } else if (rawSubmittedAt && !rawSubmittedAt.includes('IST')) {
-        dayData.submittedAt = formatToIst(rawSubmittedAt);
-        modified = true;
+      if (isSingaporeCapt) {
+        // If it's a 10:xx PM or 11:xx PM Singapore timestamp, convert by -2h30m
+        const match = raw.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+        if (match) {
+          let hours = parseInt(match[1], 10);
+          const minutes = parseInt(match[2], 10);
+          const isPm = match[3].toLowerCase() === 'pm';
+
+          if (isPm && hours < 12) hours += 12;
+          if (!isPm && hours === 12) hours = 0;
+
+          // If Singapore night time (between 22:00 and 23:59), convert to IST (-150 minutes)
+          if (hours >= 22) {
+            let totalMin = hours * 60 + minutes - 150;
+            if (totalMin < 0) totalMin += 24 * 60;
+            const istHours24 = Math.floor(totalMin / 60);
+            const istMinutes = totalMin % 60;
+            const istPeriod = istHours24 >= 12 ? 'PM' : 'AM';
+            const istHours12 = istHours24 % 12 === 0 ? 12 : istHours24 % 12;
+
+            const formattedTime = `${String(istHours12).padStart(2, '0')}:${String(istMinutes).padStart(2, '0')} ${istPeriod} IST`;
+            console.log(`Converting Elephant Day ${dayKey}: "${raw}" -> "${formattedTime}"`);
+            dayData.submittedAt = formattedTime;
+            dayData.clientTimeZone = 'Asia/Singapore';
+            modified = true;
+          }
+        }
       }
     }
 
