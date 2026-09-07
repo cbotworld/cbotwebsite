@@ -29,6 +29,8 @@ import {
   normalizeBoards,
   previewTargetBonus,
   resolveScoreInput,
+  summaryToBoards,
+  MAX_DAY_BOARDS,
   type DayBoardScore,
 } from '@/lib/board-scores';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
@@ -403,6 +405,72 @@ export async function organiserUpsertPlayerDayScore(
   await refreshPlayerEditionAverage(edition.id, userId, (session.user as any).id);
   revalidateScorePages();
   return { success: true };
+}
+
+export async function bulkOrganiserUpsertDayScores(opts: {
+  editionId?: string;
+  dayNumber: number;
+  rows: Array<{
+    userId: string;
+    score?: number | null;
+    boardCount?: number | null;
+    slams?: number | null;
+    isWalkover?: boolean;
+  }>;
+}) {
+  const { session, error } = await requireSession();
+  if (error || !session) return { success: false as const, error };
+  if (!isOrganiser(session)) return { success: false as const, error: 'Organiser access required.' };
+  const edition = opts.editionId ? await loadEditionById(opts.editionId) : await loadLatestEdition();
+  if (!edition) return { success: false as const, error: 'No edition found.' };
+
+  const stages = (await loadStageConfig(edition.id)).stages;
+  const maxDay = calendarDaysInEdition(stages, edition.totalDays);
+  const day = Number(opts.dayNumber);
+  if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
+
+  const entererId = (session.user as any).id;
+  const modifiedUserIds = new Set<string>();
+
+  for (const row of opts.rows) {
+    if (!row.userId) continue;
+
+    if (row.isWalkover || row.score === null || row.score === undefined || isNaN(Number(row.score))) {
+      // Clear/delete manual score so system walkover calculation dynamically takes effect
+      await prisma.playerDayScore.deleteMany({
+        where: {
+          editionId: edition.id,
+          userId: row.userId,
+          dayNumber: day,
+        },
+      });
+      modifiedUserIds.add(row.userId);
+    } else {
+      const scoreVal = Math.max(0, Math.round(Number(row.score)));
+      const boardCountVal = Math.max(1, Math.min(MAX_DAY_BOARDS, Math.round(Number(row.boardCount || 1))));
+      const slamsVal = Math.max(0, Math.round(Number(row.slams || 0)));
+      const boards = summaryToBoards(scoreVal, boardCountVal, slamsVal);
+
+      await upsertDayScore({
+        editionId: edition.id,
+        userId: row.userId,
+        dayNumber: day,
+        score: scoreVal,
+        slams: slamsVal,
+        boards,
+        enteredByUserId: entererId,
+      });
+      modifiedUserIds.add(row.userId);
+    }
+  }
+
+  // Refresh edition averages for all updated players
+  for (const uid of modifiedUserIds) {
+    await refreshPlayerEditionAverage(edition.id, uid, entererId);
+  }
+
+  revalidateScorePages();
+  return { success: true as const, count: modifiedUserIds.size };
 }
 
 export async function getOrganiserScoreDesk(editionId?: string) {

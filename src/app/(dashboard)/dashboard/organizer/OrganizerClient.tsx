@@ -1867,6 +1867,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       <TabsContent value="scores" className="mt-4">
         <OrganizerScoresPanel
           users={usersList}
+          teams={teamsList}
           editionTitle={selectedEdition?.title}
           editionId={selectedEditionId}
         />
