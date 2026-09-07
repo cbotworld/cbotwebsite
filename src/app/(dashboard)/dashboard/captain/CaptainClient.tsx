@@ -400,7 +400,10 @@ export default function CaptainClient({
       playerIds: r.playerIds, // Save player IDs for easy modal pre-population
     }));
 
-    const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ' IST';
+    const now = new Date();
+    const datePart = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' });
+    const timePart = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+    const timeStr = `${datePart}, ${timePart} IST`;
 
     // Persist to database
     const dbSaveRes = await saveTeamDailyLineup(currentTeam.id, selectedDayNumber, rounds, timeStr);
@@ -763,7 +766,7 @@ export default function CaptainClient({
                       </span>
                     ) : isSaved ? (
                       <span className={`text-[9.5px] font-bold flex items-center gap-1 ${isSpocTeam ? 'text-violet-300' : 'text-emerald-400'}`}>
-                        ✓ Saved · {savedDayLineups[dayNum].submittedAt}
+                        ✓ Saved · {savedDayLineups[dayNum].submittedAt?.match(/[a-zA-Z]{3}/) ? savedDayLineups[dayNum].submittedAt : formattedDate ? `${formattedDate}, ${savedDayLineups[dayNum].submittedAt}` : savedDayLineups[dayNum].submittedAt}
                       </span>
                     ) : (
                       <span className="text-[9.5px] font-bold text-amber-400/90 flex items-center gap-1" title={effectiveCombi?.reason}>
@@ -846,7 +849,7 @@ export default function CaptainClient({
                             ⚡ Day {dayNum} Combi
                           </span>
                           <span className="text-[9px] font-bold text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-full">
-                            Saved at {data.submittedAt}
+                            Saved at {data.submittedAt?.match(/[a-zA-Z]{3}/) ? data.submittedAt : dayDatesMap[dayNum] ? `${formatIsoDateLabel(dayDatesMap[dayNum], { day: 'numeric', month: 'short' })}, ${data.submittedAt}` : data.submittedAt}
                           </span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">

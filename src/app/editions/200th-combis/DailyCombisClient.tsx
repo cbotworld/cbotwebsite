@@ -601,16 +601,34 @@ function buildCombiSchedule(opts?: {
   return days;
 }
 
-function renderCombiBadge(combi?: ResolvedTeamCombi) {
+function formatSubmittedAt(rawSubmittedAt?: string, calendarDate?: string) {
+  if (!rawSubmittedAt) return '';
+  const trimmed = rawSubmittedAt.trim();
+  const hasDate = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2})/i.test(trimmed);
+  if (hasDate) {
+    return trimmed;
+  }
+  if (calendarDate) {
+    const [y, m, d] = calendarDate.split('-').map(Number);
+    if (d && m) {
+      const dayLabel = `${String(d).padStart(2, '0')} ${MONTHS[(m || 1) - 1]}`;
+      return `${dayLabel}, ${trimmed}`;
+    }
+  }
+  return trimmed;
+}
+
+function renderCombiBadge(combi?: ResolvedTeamCombi, calendarDate?: string) {
   if (!combi) return null;
   if (!combi.isFallback) {
+    const timeLabel = formatSubmittedAt(combi.submittedAt, calendarDate);
     return (
       <span
         className="inline-flex items-center gap-1 text-[8px] sm:text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-xs"
-        title="Official combination submitted by Team Captain"
+        title={`Official combination submitted by Team Captain on ${timeLabel || 'time'}`}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-        <span>✓ Submitted{combi.submittedAt ? ` (${combi.submittedAt})` : ''}</span>
+        <span>✓ Submitted{timeLabel ? ` (${timeLabel})` : ''}</span>
       </span>
     );
   }
@@ -1087,7 +1105,7 @@ export default function DailyCombisClient({
                         Capt: <span className="text-foreground uppercase font-extrabold">{t1.captain}</span>
                       </div>
                       <div className="mt-1">
-                        {renderCombiBadge(match.t1Combi)}
+                        {renderCombiBadge(match.t1Combi, activeDayFixture.calendarDate)}
                       </div>
                     </div>
                   </div>
@@ -1109,7 +1127,7 @@ export default function DailyCombisClient({
                         Capt: <span className="text-foreground uppercase font-extrabold">{t2.captain}</span>
                       </div>
                       <div className="mt-1 flex justify-end">
-                        {renderCombiBadge(match.t2Combi)}
+                        {renderCombiBadge(match.t2Combi, activeDayFixture.calendarDate)}
                       </div>
                     </div>
                     <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
