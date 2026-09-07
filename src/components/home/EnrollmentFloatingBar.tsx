@@ -24,6 +24,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ type RegistrationEdition = {
   title: string;
   number: number;
   theme?: string | null;
+  description?: string | null;
   enrollmentFee?: number | null;
   registrationEndDate?: string | Date | null;
   paymentQrUrl?: string | null;
@@ -209,6 +211,20 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
 
   // Only show on Website Home page ('/') - do NOT show on dashboard pages (player/organizer/captain) or other routes
   if (pathname !== '/') return null;
+
+  // Do NOT show floating enrollment bar for organizers (e.g. Carrom Balu)
+  const userRole = String((session?.user as any)?.role || '').toUpperCase();
+  const userName = String(session?.user?.name || '').toLowerCase().trim();
+  const userUsername = String((session?.user as any)?.username || '').toLowerCase().trim();
+  const isOrganiserUser =
+    userRole === 'ORGANIZER' ||
+    userRole === 'ORGANISER' ||
+    userRole === 'SUPER_ADMIN' ||
+    userName.includes('carrom balu') ||
+    userUsername.includes('carrombalu') ||
+    userUsername === 'balu';
+
+  if (isOrganiserUser) return null;
 
   // If dismissed - do NOT show this new edition enroll floating box
   if (dismissed) return null;
@@ -468,6 +484,17 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
                   <span className="font-bold">{cutoff}</span>
                 </div>
               )}
+
+              {edition.description ? (
+                <div className="pt-2.5 border-t border-border/60 text-xs space-y-1">
+                  <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1">
+                    <Info className="h-3.5 w-3.5" /> Edition Description
+                  </span>
+                  <p className="text-slate-300 font-normal leading-relaxed text-xs bg-background/60 p-2.5 rounded-lg border border-border/80 whitespace-pre-line">
+                    {edition.description}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {/* First-Come First-Served & Multiple of 8 Rule Notice */}

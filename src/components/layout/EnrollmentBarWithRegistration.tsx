@@ -11,6 +11,12 @@ export async function EnrollmentBarWithRegistration() {
       edition.organizer?.username?.trim() ||
       'Organizer';
 
+    const description =
+      edition.themeDescription?.trim() ||
+      edition.themeHint?.trim() ||
+      edition.rules?.trim() ||
+      null;
+
     return (
       <EnrollmentFloatingBar
         edition={{
@@ -18,6 +24,7 @@ export async function EnrollmentBarWithRegistration() {
           title: edition.title,
           number: edition.number,
           theme: edition.theme ?? null,
+          description,
           enrollmentFee: edition.enrollmentFee ?? 0,
           registrationEndDate: edition.registrationEndDate
             ? edition.registrationEndDate.toISOString()
