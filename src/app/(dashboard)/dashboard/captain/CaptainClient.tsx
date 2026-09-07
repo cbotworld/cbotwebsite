@@ -31,6 +31,7 @@ import {
   normalizeDayDates,
 } from '@/lib/combi-cutoff';
 import { combiRoundLabel } from '@/lib/combi-round-label';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import PlayerClient from '../player/PlayerClient';
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
   return isCombiSubmissionLocked(dayNum, dayDatesMap);
@@ -289,8 +290,9 @@ export default function CaptainClient({
         const savedRound = saved.rounds[ri];
         const numPlayers = playersForFormat(fmt);
         if (savedRound) {
-          if (savedRound.playerIds && Array.isArray(savedRound.playerIds)) {
-            return { playerIds: Array.from({ length: numPlayers }, (_, i) => savedRound.playerIds[i] || '') };
+          const ids = savedRound.playerIds;
+          if (ids && Array.isArray(ids)) {
+            return { playerIds: Array.from({ length: numPlayers }, (_, i) => ids[i] || '') };
           }
           // Fallback: look up player IDs by name
           return {
@@ -308,7 +310,43 @@ export default function CaptainClient({
       });
       setRoundLineups(populated);
     } else {
-      setRoundLineups(initRoundLineups(dayNum));
+      // Auto pre-fill with effective fallback lineup (Grade sequence on Day 1 or previous day carryover on Day > 1)
+      const effective = resolveEffectiveTeamCombi({
+        team: {
+          ...currentTeam,
+          savedLineups: savedDayLineups,
+          members: teamMembers,
+        },
+        dayNumber: dayNum,
+        roundFormats: editionRoundFormats,
+      });
+
+      if (effective && effective.rounds && effective.rounds.length > 0) {
+        const populated = editionRoundFormats.map((fmt, ri) => {
+          const round = effective.rounds[ri];
+          const numPlayers = playersForFormat(fmt);
+          if (round) {
+            const ids = round.playerIds;
+            if (ids && Array.isArray(ids)) {
+              return { playerIds: Array.from({ length: numPlayers }, (_, i) => ids[i] || '') };
+            }
+            return {
+              playerIds: Array.from({ length: numPlayers }, (_, slotIdx) => {
+                const playerName = round.players?.[slotIdx];
+                if (playerName) {
+                  const matchedMember = teamMembers.find((m: any) => m.name === playerName);
+                  return matchedMember ? matchedMember.id : '';
+                }
+                return '';
+              })
+            };
+          }
+          return { playerIds: Array.from({ length: numPlayers }, () => '') };
+        });
+        setRoundLineups(populated);
+      } else {
+        setRoundLineups(initRoundLineups(dayNum));
+      }
     }
 
     setDayLineupModalOpen(true);
@@ -658,6 +696,13 @@ export default function CaptainClient({
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {combiDayNumbers.map((dayNum) => {
               const isSaved = !!savedDayLineups[dayNum];
+              const effectiveCombi = !isSaved
+                ? resolveEffectiveTeamCombi({
+                    team: { ...currentTeam, savedLineups: savedDayLineups, members: teamMembers },
+                    dayNumber: dayNum,
+                    roundFormats: editionRoundFormats,
+                  })
+                : null;
               const isSelected = dayNum === selectedDayNumber;
               const isLocked = isDayLocked(dayNum, dayDatesMap);
               const rawDate = dayDatesMap[dayNum];
@@ -713,15 +758,17 @@ export default function CaptainClient({
                   </div>
                   <div className="mt-1.5 pt-1 border-t border-border/40">
                     {isLocked ? (
-                      <span className="text-[9.5px] font-bold text-rose-400 flex items-center gap-1">
-                        🔒 Locked (Past 9:30 PM)
+                      <span className="text-[9.5px] font-bold text-rose-400 flex items-center gap-1" title={effectiveCombi?.reason}>
+                        {isSaved ? `🔒 Locked · Saved` : `🔒 Locked · ${effectiveCombi?.fallbackType === 'PREVIOUS_DAY' ? `Day ${effectiveCombi.sourceDay}` : 'Grade G1→GN'}`}
                       </span>
                     ) : isSaved ? (
                       <span className={`text-[9.5px] font-bold flex items-center gap-1 ${isSpocTeam ? 'text-violet-300' : 'text-emerald-400'}`}>
                         ✓ Saved · {savedDayLineups[dayNum].submittedAt}
                       </span>
                     ) : (
-                      <span className="text-[9.5px] font-bold text-muted-foreground/60">Not submitted</span>
+                      <span className="text-[9.5px] font-bold text-amber-400/90 flex items-center gap-1" title={effectiveCombi?.reason}>
+                        {effectiveCombi?.fallbackType === 'PREVIOUS_DAY' ? `⚡ Auto: Day ${effectiveCombi.sourceDay}` : `⚡ Auto: Grade G1→GN`}
+                      </span>
                     )}
                   </div>
                 </button>
@@ -1068,6 +1115,17 @@ export default function CaptainClient({
                   <div className="p-3 rounded-xl border border-rose-500/40 bg-rose-500/10 text-xs font-bold text-rose-400 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 shrink-0" />
                     <span>🔒 Submissions for Day {selectedDayNumber} closed at 9:30 PM IST. This combi is locked and read-only.</span>
+                  </div>
+                )}
+
+                {!savedDayLineups[selectedDayNumber] && (
+                  <div className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-xs font-semibold text-amber-300 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
+                    <span>
+                      {selectedDayNumber === 1
+                        ? '⚡ Auto-prefilled with Grade Sequence (G1 → GN). You can adjust and save.'
+                        : '⚡ Auto-prefilled from previous day\'s combi. You can adjust and save.'}
+                    </span>
                   </div>
                 )}
 

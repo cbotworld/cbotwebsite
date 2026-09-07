@@ -15,6 +15,7 @@ import { combiCalendarDate } from '@/lib/combi-cutoff';
 import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 import {
   parseSavedLineups,
+  roundFormat,
   scoreMatchDay,
   sideScoreSum,
   type DayScoreMap,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/combi-results';
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
 import { combiRoundLabel } from '@/lib/combi-round-label';
+import { resolveEffectiveTeamCombi, type ResolvedTeamCombi } from '@/lib/combi-fallback';
 import * as XLSX from 'xlsx';
 interface TeamInfo {
   name: string;
@@ -290,14 +292,17 @@ function scoreFixtureMatch(
   teamsList: any[],
   scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>,
   revealed: boolean,
+  userGradeMap?: Map<string, string>,
 ): MatchDayResult | null {
   if (!revealed) return null;
   const t1 = findTeamByKey(t1Key, teamsList);
   const t2 = findTeamByKey(t2Key, teamsList);
   if (!t1 || !t2) return null;
+  const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: dayNum, userGradeMap });
+  const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: dayNum, userGradeMap });
   return scoreMatchDay(
-    parseSavedLineups(t1.savedLineups)[String(dayNum)]?.rounds as LineupRound[] | undefined,
-    parseSavedLineups(t2.savedLineups)[String(dayNum)]?.rounds as LineupRound[] | undefined,
+    combi1.rounds,
+    combi2.rounds,
     teamRoster(t1),
     teamRoster(t2),
     scoreMapForDay(scores, dayNum),
@@ -311,9 +316,11 @@ function withMatchResults(
   teamsList: any[],
   scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>,
   revealed: boolean,
+  userGradeMap?: Map<string, string>,
 ): MatchCombiData {
-  const events = buildMatchEvents(t1Key, t2Key, dayNum, teamsList, []);
-  const scored = scoreFixtureMatch(t1Key, t2Key, dayNum, teamsList, scores, revealed);
+  const matchData = buildMatchEvents(t1Key, t2Key, dayNum, teamsList, [], userGradeMap);
+  const events = matchData.events;
+  const scored = scoreFixtureMatch(t1Key, t2Key, dayNum, teamsList, scores, revealed, userGradeMap);
   if (!scored) {
     return { team1Key: t1Key, team2Key: t2Key, events, scored: false };
   }
@@ -385,30 +392,28 @@ function eventSlotsFromFormats(formats: string[]): FormatSlot[] {
   });
 }
 
-function lineupRoundsForDay(teamKey: string, dayNum: number, teamsList: any[]): any[] {
-  const team = findTeamByKey(teamKey, teamsList);
-  if (!team?.savedLineups) return [];
-  try {
-    const parsed = typeof team.savedLineups === 'string' ? JSON.parse(team.savedLineups) : team.savedLineups;
-    const dayData = parsed?.[dayNum] || parsed?.[String(dayNum)];
-    return Array.isArray(dayData?.rounds) ? dayData.rounds : [];
-  } catch {
-    return [];
-  }
-}
-
-function playerStringForSlot(
+function effectiveCombiForTeam(
   teamKey: string,
   dayNum: number,
   teamsList: any[],
+  formats: string[] = [],
+  userGradeMap?: Map<string, string>
+): ResolvedTeamCombi {
+  const team = findTeamByKey(teamKey, teamsList);
+  return resolveEffectiveTeamCombi({
+    team,
+    dayNumber: dayNum,
+    roundFormats: formats,
+    userGradeMap,
+  });
+}
+
+function playerStringForSlot(
+  teamCombi: ResolvedTeamCombi,
   slot: FormatSlot,
   slotIndex: number
 ): string {
-  const isDay1 = Number(dayNum) === 1;
-  const keyUpper = teamKey.trim().toUpperCase();
-  const defaultCombi: Record<string, string> = isDay1 ? (OFFICIAL_TEAM_COMBIS[keyUpper] || {}) : {};
-  const rounds = lineupRoundsForDay(teamKey, dayNum, teamsList);
-
+  const rounds = teamCombi.rounds || [];
   if (rounds.length) {
     const byName = rounds.find((r: any) => {
       const rName = r?.name ? String(r.name).toLowerCase().replace(/\s+/g, '') : '';
@@ -417,9 +422,7 @@ function playerStringForSlot(
     if (byName) return playersFromRound(byName);
     if (rounds[slotIndex]) return playersFromRound(rounds[slotIndex]);
   }
-
-  const fallback = String(defaultCombi[slot.key] || '').trim();
-  return fallback === 'NA' ? '' : fallback;
+  return '';
 }
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -598,25 +601,66 @@ function buildCombiSchedule(opts?: {
   return days;
 }
 
+function renderCombiBadge(combi?: ResolvedTeamCombi) {
+  if (!combi) return null;
+  if (!combi.isFallback) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[8px] sm:text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-xs"
+        title="Official combination submitted by Team Captain"
+      >
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span>✓ Submitted{combi.submittedAt ? ` (${combi.submittedAt})` : ''}</span>
+      </span>
+    );
+  }
+  if (combi.fallbackType === 'PREVIOUS_DAY') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[8px] sm:text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 cursor-help shadow-xs"
+        title={combi.reason}
+      >
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+        <span>⚡ Carried from Day {combi.sourceDay}</span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[8px] sm:text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 cursor-help shadow-xs"
+      title={combi.reason}
+    >
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+      <span>⚡ Auto (Grade G1→GN)</span>
+    </span>
+  );
+}
+
 function buildMatchEvents(
   t1Key: string,
   t2Key: string,
   dayNum: number = 1,
   teamsList: any[] = [],
-  formats: string[] = []
-): EventSlot[] {
+  formats: string[] = [],
+  userGradeMap?: Map<string, string>
+): {
+  events: EventSlot[];
+  t1Combi: ResolvedTeamCombi;
+  t2Combi: ResolvedTeamCombi;
+} {
+  const t1Combi = effectiveCombiForTeam(t1Key, dayNum, teamsList, formats, userGradeMap);
+  const t2Combi = effectiveCombiForTeam(t2Key, dayNum, teamsList, formats, userGradeMap);
+
   let slots = eventSlotsFromFormats(formats);
 
   if (!slots.length) {
-    const leftRounds = lineupRoundsForDay(t1Key, dayNum, teamsList);
-    const rightRounds = lineupRoundsForDay(t2Key, dayNum, teamsList);
-    const count = Math.max(leftRounds.length, rightRounds.length);
+    const count = Math.max(t1Combi.rounds.length, t2Combi.rounds.length);
     if (count > 0) {
       const inferred = Array.from({ length: count }, (_, i) =>
-        String(leftRounds[i]?.format || rightRounds[i]?.format || 'SINGLES').toUpperCase()
+        String(t1Combi.rounds[i]?.name ? roundFormat(t1Combi.rounds[i]?.name) : 'SINGLES').toUpperCase()
       );
       slots = eventSlotsFromFormats(inferred).map((slot, i) => {
-        const name = leftRounds[i]?.name || rightRounds[i]?.name;
+        const name = t1Combi.rounds[i]?.name || t2Combi.rounds[i]?.name;
         if (!name) return slot;
         return {
           ...slot,
@@ -627,11 +671,13 @@ function buildMatchEvents(
     }
   }
 
-  return slots.map((slot, idx) => ({
+  const events: EventSlot[] = slots.map((slot, idx) => ({
     label: slot.label,
-    leftPlayers: playerStringForSlot(t1Key, dayNum, teamsList, slot, idx),
-    rightPlayers: playerStringForSlot(t2Key, dayNum, teamsList, slot, idx),
+    leftPlayers: playerStringForSlot(t1Combi, slot, idx),
+    rightPlayers: playerStringForSlot(t2Combi, slot, idx),
   }));
+
+  return { events, t1Combi, t2Combi };
 }
 
 export default function DailyCombisClient({
@@ -648,6 +694,7 @@ export default function DailyCombisClient({
   const [dbTeams, setDbTeams] = React.useState<any[]>(initialTeams);
   const [pickedDayNum, setPickedDayNum] = React.useState<number>(0);
   const [searchTerm, setSearchTerm] = React.useState<string>('');
+  const [userGradeMap, setUserGradeMap] = React.useState<Map<string, string>>(new Map());
   const [scheduleMeta, setScheduleMeta] = React.useState<{
     totalDays?: number;
     dayDates?: Record<number, string>;
@@ -705,6 +752,9 @@ export default function DailyCombisClient({
               }
             });
           }
+          if (res.userGradeMap) {
+            setUserGradeMap(new Map(Object.entries(res.userGradeMap)));
+          }
           const pairings = resolveOrganizerPairings(
             (res as any).stageConfig?.stages || [],
             res.teams || [],
@@ -742,10 +792,15 @@ export default function DailyCombisClient({
   const cutoffTimeMs = new Date(activeDayFixture.cutoffIso).getTime();
   const isRevealed = nowMs >= cutoffTimeMs;
 
-  const filteredMatches = activeDayFixture.matches.map((m) => ({
-    ...m,
-    events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats),
-  })).filter((m) => {
+  const filteredMatches = activeDayFixture.matches.map((m) => {
+    const matchData = buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats, userGradeMap);
+    return {
+      ...m,
+      events: matchData.events,
+      t1Combi: matchData.t1Combi,
+      t2Combi: matchData.t2Combi,
+    };
+  }).filter((m) => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase().trim();
     const t1KeyUpper = m.team1Key?.trim().toUpperCase();
@@ -759,10 +814,15 @@ export default function DailyCombisClient({
   });
 
   const handleDownloadExcel = () => {
-    const activeMatches = activeDayFixture.matches.map((m) => ({
-      ...m,
-      events: buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats),
-    }));
+    const activeMatches = activeDayFixture.matches.map((m) => {
+      const matchData = buildMatchEvents(m.team1Key, m.team2Key, selectedDayNum, dbTeams, roundFormats, userGradeMap);
+      return {
+        ...m,
+        events: matchData.events,
+        t1Combi: matchData.t1Combi,
+        t2Combi: matchData.t2Combi,
+      };
+    });
 
     const rows: any[] = [];
 
@@ -774,16 +834,21 @@ export default function DailyCombisClient({
       const t2Name = dbTeam2?.name || TEAMS_INFO[match.team2Key]?.name || match.team2Key;
       const t2Capt = dbTeam2?.captain?.name || dbTeam2?.captain?.username || TEAMS_INFO[match.team2Key]?.captain || 'Captain';
 
+      const t1Status = !match.t1Combi.isFallback ? `Submitted (${match.t1Combi.submittedAt || 'on time'})` : match.t1Combi.reason;
+      const t2Status = !match.t2Combi.isFallback ? `Submitted (${match.t2Combi.submittedAt || 'on time'})` : match.t2Combi.reason;
+
       match.events.forEach((evt) => {
         rows.push({
           'Match No': `Match ${matchIdx + 1}`,
           'Team 1': `${t1Name} (${match.team1Key})`,
+          'Team 1 Status': t1Status,
           'Team 1 Captain': t1Capt,
           'Event Slot': evt.label,
           'Team 1 Player(s)': evt.leftPlayers,
           'VS': 'VS',
           'Team 2 Player(s)': evt.rightPlayers,
           'Team 2': `${t2Name} (${match.team2Key})`,
+          'Team 2 Status': t2Status,
           'Team 2 Captain': t2Capt,
         });
       });
@@ -793,12 +858,14 @@ export default function DailyCombisClient({
     worksheet['!cols'] = [
       { wch: 10 },
       { wch: 25 },
+      { wch: 30 },
       { wch: 18 },
       { wch: 14 },
       { wch: 38 },
       { wch: 6 },
       { wch: 38 },
       { wch: 25 },
+      { wch: 30 },
       { wch: 18 },
     ];
 
@@ -889,6 +956,18 @@ export default function DailyCombisClient({
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9 text-xs font-bold bg-background border-border/60"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* COMBI POLICY NOTICE BANNER */}
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 sm:p-4 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div className="text-[11px] sm:text-xs text-foreground/90 font-semibold leading-relaxed">
+            <strong className="text-amber-400 font-extrabold">Combi Policy:</strong> Captains must submit daily combis before <strong>9:30 PM IST</strong>. On Day 1, unsubmitted combis auto-assign by player grade sequence (<strong>G1 → GN</strong>). On Day 2+, the previous day&apos;s combi is carried forward.
           </div>
         </div>
       </div>
@@ -1007,6 +1086,9 @@ export default function DailyCombisClient({
                       <div className="text-[9px] sm:text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t1.captain}</span>
                       </div>
+                      <div className="mt-1">
+                        {renderCombiBadge(match.t1Combi)}
+                      </div>
                     </div>
                   </div>
 
@@ -1025,6 +1107,9 @@ export default function DailyCombisClient({
                       </div>
                       <div className="text-[9px] sm:text-[10px] font-bold text-muted-foreground truncate mt-0.5">
                         Capt: <span className="text-foreground uppercase font-extrabold">{t2.captain}</span>
+                      </div>
+                      <div className="mt-1 flex justify-end">
+                        {renderCombiBadge(match.t2Combi)}
                       </div>
                     </div>
                     <div className={`h-10 w-10 min-[400px]:h-12 min-[400px]:w-12 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950/90 p-0.5 sm:p-1 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>

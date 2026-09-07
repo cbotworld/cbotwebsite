@@ -17,6 +17,7 @@
  */
 
 import { parseSavedLineups, resolveRoundPlayerIds, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 
 export type WalkoverCalcParams = {
   /** Scores of teammates playing with Player A in the same event */
@@ -194,12 +195,11 @@ export function resolveDayWalkoversAndScores(opts: {
     const t1 = teamMap.get(pair.team1Id);
     const t2 = teamMap.get(pair.team2Id);
     if (!t1 || !t2) continue;
+    const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber, userGradeMap });
+    const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber, userGradeMap });
 
-    const lineups1 = parseSavedLineups(t1.savedLineups);
-    const lineups2 = parseSavedLineups(t2.savedLineups);
-
-    const rounds1: LineupRound[] = lineups1[String(dayNumber)]?.rounds || [];
-    const rounds2: LineupRound[] = lineups2[String(dayNumber)]?.rounds || [];
+    const rounds1: LineupRound[] = combi1.rounds || [];
+    const rounds2: LineupRound[] = combi2.rounds || [];
     const maxRounds = Math.max(rounds1.length, rounds2.length);
 
     for (let r = 0; r < maxRounds; r++) {

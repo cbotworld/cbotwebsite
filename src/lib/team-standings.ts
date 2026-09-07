@@ -3,6 +3,7 @@ import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff'
 import { isDayScorePublished } from '@/lib/day-scoring';
 import { previewTargetBonus } from '@/lib/board-scores';
 import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import { daysForStage } from '@/lib/player-ranking';
 import { filterMainTeams, filterSpocTeams } from '@/lib/spoc-teams';
 
@@ -230,9 +231,11 @@ function applyPairings(
     const r1 = rowsByTeam.get(pair.team1Id);
     const r2 = rowsByTeam.get(pair.team2Id);
     if (!t1 || !t2 || !r1 || !r2) continue;
+    const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: pair.dayNumber });
+    const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: pair.dayNumber });
     const result = scoreMatchDay(
-      parseSavedLineups(t1.savedLineups)[String(pair.dayNumber)]?.rounds as LineupRound[] | undefined,
-      parseSavedLineups(t2.savedLineups)[String(pair.dayNumber)]?.rounds as LineupRound[] | undefined,
+      combi1.rounds,
+      combi2.rounds,
       t1.members,
       t2.members,
       scoreMapForDay(scores, pair.dayNumber),

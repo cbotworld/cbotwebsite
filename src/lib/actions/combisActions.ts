@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
+import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
 
 async function fetchCurrentEditionCombisData() {
   try {
@@ -88,6 +89,20 @@ async function fetchCurrentEditionCombisData() {
       },
     });
 
+    let userGradeMap: Record<string, string> = {};
+    if (editionId) {
+      const gradingSetting = await prisma.systemSetting.findUnique({
+        where: { key: gradingSettingKey(editionId) },
+      });
+      if (gradingSetting?.value) {
+        const grid = parseGradingGrid(gradingSetting.value);
+        const updates = computePlayerGradeUpdates(grid);
+        updates.forEach((u) => {
+          userGradeMap[u.userId] = u.grade;
+        });
+      }
+    }
+
     return {
       success: true,
       edition,
@@ -95,6 +110,7 @@ async function fetchCurrentEditionCombisData() {
       teams,
       matches,
       scores,
+      userGradeMap,
     };
   } catch (error) {
     console.error('Failed to fetch live edition combis data:', error);
@@ -104,6 +120,7 @@ async function fetchCurrentEditionCombisData() {
       teams: [],
       matches: [],
       scores: [],
+      userGradeMap: {},
     };
   }
 }
