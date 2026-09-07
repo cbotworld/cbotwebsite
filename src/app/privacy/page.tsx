@@ -37,45 +37,114 @@ export default async function PrivacyPolicyPage() {
         {/* Content */}
         <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
           <p>
-            {`${site.organizationName} (${site.shortName}) is committed to protecting your privacy. This policy outlines how we handle player and participant information.`}
+            {`${site.organizationName} (${site.shortName}) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and process your personal information and data accessed through third-party services.`}
           </p>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">Information We Collect</h2>
+            <h2 className="text-base font-bold text-foreground">1. Information We Collect</h2>
             <p>
-              We collect your name, username, email, WhatsApp phone number, and location solely to manage your registrations, standings, schedules, and profile on the tournament leaderboard.
+              We collect player profile information (name, username, email, WhatsApp phone number, and location) solely to manage tournament registrations, standings, schedules, leaderboard rankings, and match communication.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">How We Use Your Data</h2>
+            <h2 className="text-base font-bold text-foreground">2. YouTube API Services & Integration</h2>
             <p>
-              Your data is used exclusively to facilitate fair-play tournament matchups, verify match streams, and distribute match login PIN notifications.
+              Our application uses <strong>YouTube API Services</strong> to facilitate tournament live streaming, generate official match broadcasts, verify fair-play match gameplay, and archive match recordings.
+            </p>
+            <p>
+              By using these features and our application, you acknowledge and agree that you are also bound by the{' '}
+              <a
+                href="https://www.youtube.com/t/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-400 font-bold underline hover:text-amber-300"
+              >
+                YouTube Terms of Service
+              </a>
+              .
+            </p>
+            <p>
+              For more information about how Google collects and uses your data, please review the{' '}
+              <a
+                href="http://www.google.com/policies/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-400 font-bold underline hover:text-amber-300"
+              >
+                Google Privacy Policy
+              </a>
+              .
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">Data Protection & Sharing</h2>
+            <h2 className="text-base font-bold text-foreground">3. YouTube Data Access, Storage & Deletion</h2>
             <p>
-              We guarantee that your personal information is stored securely and is <strong>never shared, sold, or rented</strong> to third-party sponsors, advertisers, or external organizations.
+              When organizers and authorized tournament creators connect YouTube, our application accesses YouTube broadcast and stream metadata (such as broadcast title, live stream status, RTMP ingestion URL, stream keys, and video IDs) solely to initialize match streams and display live video feeds to viewers.
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Data Storage:</strong> We do not store sensitive private Google credentials permanently. OAuth tokens are stored in an encrypted database strictly for the duration of the tournament broadcast session.
+              </li>
+              <li>
+                <strong>Data Retention & Deletion:</strong> Broadcast identifiers are retained only as long as required for tournament record-keeping. You may request immediate deletion of any associated account data or stored video records at any time by contacting{' '}
+                <a href="mailto:cbotworld@gmail.com" className="text-amber-400 font-bold underline">
+                  cbotworld@gmail.com
+                </a>
+                .
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-base font-bold text-foreground">4. Revocation of Access to Google & YouTube Data</h2>
+            <p>
+              You can revoke our application&apos;s access to your Google and YouTube account data at any time via the official{' '}
+              <a
+                href="https://security.google.com/settings/security/permissions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-400 font-bold underline hover:text-amber-300"
+              >
+                Google Security Settings Permissions Page
+              </a>
+              .
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">Contact Us</h2>
+            <h2 className="text-base font-bold text-foreground">5. Data Protection & Sharing</h2>
             <p>
-              If you have any questions or wish to delete your account, please email us directly at <span className="text-amber-400 font-bold">cbotworld@gmail.com</span>.
+              We guarantee that your personal information is stored securely and is <strong>never shared, sold, or rented</strong> to third-party advertisers, data brokers, or external commercial organizations.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-base font-bold text-foreground">6. Contact Us</h2>
+            <p>
+              If you have any questions about this Privacy Policy, YouTube API data handling, or wish to delete your account, please email us directly at{' '}
+              <a href="mailto:cbotworld@gmail.com" className="text-amber-400 font-bold">
+                cbotworld@gmail.com
+              </a>
+              .
             </p>
           </div>
         </div>
 
         {/* Back link */}
-        <div className="pt-4 border-t border-border/40">
+        <div className="pt-4 border-t border-border/40 flex items-center justify-between text-xs">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors"
+            className="inline-flex items-center gap-2 font-bold text-amber-500 hover:text-amber-400 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Return to Home
+          </Link>
+          <Link
+            href="/terms"
+            className="font-bold text-muted-foreground hover:text-amber-400 transition-colors"
+          >
+            Terms of Service →
           </Link>
         </div>
 
