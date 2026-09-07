@@ -16,7 +16,8 @@ import {
 } from '@/lib/board-scores';
 import { averageForDay, logsForUser } from '@/lib/player-average';
 import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
-import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
+import { scoreMatchDay, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 
 export type RankedPlayer = {
   userId: string;
@@ -206,6 +207,8 @@ export function computeEventWinsMap(
   scores: PlayerDayScoreRow[],
   dayDates?: DayDatesInput,
   now = new Date(),
+  userGradeMap?: Map<string, string>,
+  roundFormats?: string[],
 ): Map<string, number> {
   const winsMap = new Map<string, number>();
   const scoreMapByDay = new Map<number, Record<string, { score: number; slams: number; isWalkover?: boolean }>>();
@@ -220,11 +223,11 @@ export function computeEventWinsMap(
     const t1 = byId.get(pair.team1Id);
     const t2 = byId.get(pair.team2Id);
     if (!t1 || !t2) continue;
-    const lineups1 = parseSavedLineups(t1.savedLineups);
-    const lineups2 = parseSavedLineups(t2.savedLineups);
+    const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: pair.dayNumber, userGradeMap, roundFormats });
+    const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: pair.dayNumber, userGradeMap, roundFormats });
     const result = scoreMatchDay(
-      lineups1[String(pair.dayNumber)]?.rounds as LineupRound[] | undefined,
-      lineups2[String(pair.dayNumber)]?.rounds as LineupRound[] | undefined,
+      combi1.rounds as LineupRound[] | undefined,
+      combi2.rounds as LineupRound[] | undefined,
       t1.members,
       t2.members,
       scoreMapByDay.get(pair.dayNumber) || {},
@@ -255,8 +258,10 @@ export function countEventWinsForPlayer(
   scores: PlayerDayScoreRow[],
   dayDates?: DayDatesInput,
   now = new Date(),
+  userGradeMap?: Map<string, string>,
+  roundFormats?: string[],
 ): number {
-  const winsMap = computeEventWinsMap(teams, pairings, scores, dayDates, now);
+  const winsMap = computeEventWinsMap(teams, pairings, scores, dayDates, now, userGradeMap, roundFormats);
   return winsMap.get(userId) || 0;
 }
 

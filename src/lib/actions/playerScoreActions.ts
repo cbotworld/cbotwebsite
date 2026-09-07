@@ -1018,7 +1018,7 @@ async function loadPublicStandings() {
   const finals = blocks.find((b) => b.kind === 'FINALS');
   const placement = finals?.knockout ? placementRanking(finals.knockout) : [];
 
-  const eventWinsMap = computeEventWinsMap(standingTeams, pairings, scoreRows, edition.dayDates);
+  const eventWinsMap = computeEventWinsMap(standingTeams, pairings, scoreRows, edition.dayDates, undefined, userGradeMap);
 
   const rosterPlayers = standingTeams
     .filter((t) => t.teamType !== 'SPOC_EXHIBITION')
@@ -1060,31 +1060,37 @@ export async function getAverageReviewPrompt(editionId?: string) {
 export async function getEditionProfileStatsForUser(userId: string) {
   const edition = await loadLatestEdition();
   if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0 };
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
-  const scores = await prisma.playerDayScore.findMany({ where: { editionId: edition.id, userId } });
-  const logs = await prisma.playerAverageLog.findMany({
-    where: { editionId: edition.id, userId },
-    orderBy: { effectiveFrom: 'asc' },
-  });
-  const targetLogs = await prisma.playerTargetLog.findMany({
-    where: { editionId: edition.id, userId },
-    orderBy: { effectiveFrom: 'asc' },
-  });
-  const config = await loadStageConfig(edition.id);
-  const teams = await prisma.team.findMany({
-    where: { editionId: edition.id },
-    include: { members: { include: { user: { select: { id: true, name: true } } } } },
-  });
+  const [user, scores, logs, targetLogs, config, teams, gradingSetting, editionParticipants] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
+    prisma.playerDayScore.findMany({ where: { editionId: edition.id, userId } }),
+    prisma.playerAverageLog.findMany({
+      where: { editionId: edition.id, userId },
+      orderBy: { effectiveFrom: 'asc' },
+    }),
+    prisma.playerTargetLog.findMany({
+      where: { editionId: edition.id, userId },
+      orderBy: { effectiveFrom: 'asc' },
+    }),
+    loadStageConfig(edition.id),
+    prisma.team.findMany({
+      where: { editionId: edition.id },
+      include: { members: { include: { user: { select: { id: true, name: true, average: true, target: true } } } } },
+    }),
+    prisma.systemSetting.findUnique({ where: { key: `edition_${edition.id}_grading` } }),
+    prisma.editionParticipant.findMany({ where: { editionId: edition.id }, select: { userId: true, category: true } }),
+  ]);
+
+  const standingTeams = buildRosterTeams(teams);
+  const { userGradeMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+
   const wins = countEventWinsForPlayer(
     userId,
-    teams.map((t) => ({
-      id: t.id,
-      savedLineups: t.savedLineups,
-      members: t.members.map((m) => ({ id: m.user.id, name: m.user.name })),
-    })),
+    standingTeams,
     pairingsFromStages(config.stages),
     scores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
     edition.dayDates,
+    undefined,
+    userGradeMap,
   );
   const stats = editionProfileStats({
     userId,
