@@ -261,17 +261,17 @@ export default function OrganizerScoresPanel({
 
         {existing ? (
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200">
-            Day {day} already has boards from the {existing.source.toLowerCase()}
+            Day {day} already has scores from the {existing.source.toLowerCase()}
             {existing.enteredByName && existing.source !== 'Player' ? ` (${existing.enteredByName})` : ''}.
-            {' '}They are filled in below — edit if needed, then save.
+            {' '}Edit Total Score, Slams, and Boards below, or switch to Board-by-Board details, then save.
           </div>
         ) : (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs font-semibold text-muted-foreground">
-            No score for this player on Day {day} yet. Enter boards below and save.
+            No score for this player on Day {day} yet. Enter Total Score, Slams, and No. of Boards below and save.
           </div>
         )}
 
-        <BoardScoreEditor boards={boards} onChange={setBoards} target={target} />
+        <BoardScoreEditor boards={boards} onChange={setBoards} target={target} defaultMode="summary" />
         {msg && <p className="text-xs font-semibold">{msg}</p>}
         <Button
           disabled={busy || !userId}

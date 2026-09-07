@@ -179,3 +179,30 @@ export function draftToPayload(drafts: BoardDraft[]) {
     slams: parseInt(b.slams || '0', 10),
   }));
 }
+
+export function summaryToBoards(totalScore: number, boardCount: number, slams: number): DayBoardScore[] {
+  const count = Math.max(1, Math.min(MAX_DAY_BOARDS, Math.floor(boardCount) || 1));
+  const score = Math.max(0, Math.floor(totalScore) || 0);
+  const totalSlams = Math.max(0, Math.floor(slams) || 0);
+
+  const baseScore = Math.floor(score / count);
+  const remainder = score % count;
+
+  const boards: DayBoardScore[] = [];
+  for (let i = 0; i < count; i++) {
+    boards.push({
+      score: baseScore + (i < remainder ? 1 : 0),
+      slams: i < totalSlams ? 1 : 0,
+    });
+  }
+  return boards;
+}
+
+export function summaryToDraft(totalScore: string | number, boardCount: string | number, slams: string | number): BoardDraft[] {
+  const s = typeof totalScore === 'number' ? totalScore : parseInt(String(totalScore ?? ''), 10) || 0;
+  const c = typeof boardCount === 'number' ? boardCount : parseInt(String(boardCount ?? ''), 10) || 1;
+  const sl = typeof slams === 'number' ? slams : parseInt(String(slams ?? ''), 10) || 0;
+  const boards = summaryToBoards(s, c, sl);
+  return boards.map((b) => ({ score: String(b.score), slams: String(b.slams) }));
+}
+
