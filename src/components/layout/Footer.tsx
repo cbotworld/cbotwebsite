@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Youtube } from 'lucide-react';
 import { DEFAULT_WEBSITE_CMS, type WebsiteFooterCms } from '@/lib/website-cms';
 
 type FooterProps = {
@@ -32,6 +33,18 @@ export function Footer({
             <p className="text-muted-foreground text-xs leading-relaxed max-w-sm">
               {footerCms.brandDescription}
             </p>
+            <div className="pt-1">
+              <a
+                href="https://www.youtube.com/@CBOTworld"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 text-red-400 hover:text-red-300 text-xs font-bold transition-all group shadow-xs"
+                title="Watch CBOT World Matches on YouTube"
+              >
+                <Youtube className="h-4 w-4 text-red-500 group-hover:scale-110 transition-transform fill-current" />
+                <span>Watch on YouTube (@CBOTworld)</span>
+              </a>
+            </div>
           </div>
 
           <div>
