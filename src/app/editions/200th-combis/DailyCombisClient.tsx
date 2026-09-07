@@ -26,6 +26,7 @@ import {
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
 import { combiRoundLabel } from '@/lib/combi-round-label';
 import { resolveEffectiveTeamCombi, type ResolvedTeamCombi } from '@/lib/combi-fallback';
+import { formatToIst } from '@/lib/ist-time';
 import * as XLSX from 'xlsx';
 interface TeamInfo {
   name: string;
@@ -603,19 +604,7 @@ function buildCombiSchedule(opts?: {
 
 function formatSubmittedAt(rawSubmittedAt?: string, calendarDate?: string) {
   if (!rawSubmittedAt) return '';
-  const trimmed = rawSubmittedAt.trim();
-  const hasDate = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2})/i.test(trimmed);
-  if (hasDate) {
-    return trimmed;
-  }
-  if (calendarDate) {
-    const [y, m, d] = calendarDate.split('-').map(Number);
-    if (d && m) {
-      const dayLabel = `${String(d).padStart(2, '0')} ${MONTHS[(m || 1) - 1]}`;
-      return `${dayLabel}, ${trimmed}`;
-    }
-  }
-  return trimmed;
+  return formatToIst(rawSubmittedAt, calendarDate);
 }
 
 function renderCombiBadge(combi?: ResolvedTeamCombi, calendarDate?: string) {

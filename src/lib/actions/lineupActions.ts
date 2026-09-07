@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { isCombiSubmissionLocked, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEdition } from '@/lib/current-edition';
+import { currentServerIstTimestamp } from '@/lib/ist-time';
 
 export async function submitMatchLineup(data: {
   matchId: string;
@@ -253,7 +254,13 @@ export async function sendLineupEmailAction(data: {
   }
 }
 
-export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rounds: any[], submittedAt: string) {
+export async function saveTeamDailyLineup(
+  teamId: string,
+  dayNumber: number,
+  rounds: any[],
+  submittedAtInput?: string,
+  clientTimeZone?: string,
+) {
   try {
     const editionRef = await resolveCurrentEdition();
     const activeEdition = editionRef
@@ -303,10 +310,18 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
       }
     }
 
+    // Always compute official server IST timestamp
+    const { formattedIst, isoString } = currentServerIstTimestamp();
+    const submittedAt = submittedAtInput && submittedAtInput.includes('IST') && /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(submittedAtInput)
+      ? submittedAtInput
+      : formattedIst;
+
     // Merge or update the lineup for the specified day
     lineupsObj[dayNumber] = {
       rounds,
-      submittedAt
+      submittedAt,
+      submittedAtIso: isoString,
+      clientTimeZone: clientTimeZone || 'Asia/Kolkata',
     };
 
     await prisma.team.update({
@@ -317,7 +332,9 @@ export async function saveTeamDailyLineup(teamId: string, dayNumber: number, rou
     });
 
     revalidatePath('/dashboard/captain');
-    return { success: true };
+    revalidatePath('/combis');
+    revalidatePath('/editions/200th-combis');
+    return { success: true, submittedAt, submittedAtIso: isoString };
   } catch (error: any) {
     console.error('[saveTeamDailyLineup] Error:', error);
     return { success: false, error: error?.message || 'Failed to save lineup to database' };

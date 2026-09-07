@@ -32,6 +32,7 @@ import {
 } from '@/lib/combi-cutoff';
 import { combiRoundLabel } from '@/lib/combi-round-label';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
+import { formatToIst, getClientTimeZone } from '@/lib/ist-time';
 import PlayerClient from '../player/PlayerClient';
 function isDayLocked(dayNum: number, dayDatesMap: Record<number, string>): boolean {
   return isCombiSubmissionLocked(dayNum, dayDatesMap);
@@ -400,19 +401,17 @@ export default function CaptainClient({
       playerIds: r.playerIds, // Save player IDs for easy modal pre-population
     }));
 
-    const now = new Date();
-    const datePart = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' });
-    const timePart = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
-    const timeStr = `${datePart}, ${timePart} IST`;
+    const clientTimeZone = getClientTimeZone();
 
-    // Persist to database
-    const dbSaveRes = await saveTeamDailyLineup(currentTeam.id, selectedDayNumber, rounds, timeStr);
+    // Persist to database (server will calculate and standardize exact IST timestamp)
+    const dbSaveRes = await saveTeamDailyLineup(currentTeam.id, selectedDayNumber, rounds, undefined, clientTimeZone);
     if (!dbSaveRes.success) {
       alert('⚠️ Failed to save lineup to database: ' + (dbSaveRes.error || 'Unknown error'));
       setIsSubmitting(false);
       return;
     }
 
+    const finalSubmittedAt = dbSaveRes.submittedAt || formatToIst(new Date());
     const teamId = currentTeam.id;
     setLineupsByTeamId((prev) => ({
       ...prev,
@@ -420,7 +419,7 @@ export default function CaptainClient({
         ...(prev[teamId] || {}),
         [selectedDayNumber]: {
           rounds,
-          submittedAt: timeStr,
+          submittedAt: finalSubmittedAt,
         },
       },
     }));
