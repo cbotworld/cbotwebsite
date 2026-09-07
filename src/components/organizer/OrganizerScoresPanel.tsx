@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Check, ChevronDown, Search, User, X } from 'lucide-react';
 import {
   organiserUpsertPlayerDayScore,
   getOrganiserScoreDesk,
@@ -25,6 +25,135 @@ type DeskScore = {
   enteredByName?: string | null;
 };
 
+function SearchablePlayerSelect({
+  users,
+  value,
+  onChange,
+}: {
+  users: Array<{ id: string; name?: string; username?: string; target?: number | null }>;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const selectedUser = users.find((u) => u.id === value);
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) =>
+      `${u.name || ''} ${u.username || ''}`.toLowerCase().includes(q)
+    );
+  }, [users, query]);
+
+  React.useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm font-semibold flex items-center justify-between gap-2 hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-amber-500/40 transition-colors text-left shadow-xs"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="truncate text-foreground">
+            {selectedUser ? (selectedUser.name || selectedUser.username) : 'Select a player...'}
+          </span>
+          {Number(selectedUser?.target) > 0 && (
+            <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold shrink-0">
+              tgt {selectedUser?.target}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-lg border border-border bg-popover shadow-2xl p-2 space-y-1.5 backdrop-blur-md">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by player name or username…"
+              className="w-full h-8.5 rounded-md border border-input bg-background pl-8 pr-7 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-56 overflow-y-auto divide-y divide-border/20 rounded-md">
+            {filtered.length === 0 ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                No players found matching &ldquo;{query}&rdquo;
+              </div>
+            ) : (
+              filtered.map((u) => {
+                const isSelected = u.id === value;
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(u.id);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    className={`w-full px-2.5 py-2 text-left text-xs font-semibold flex items-center justify-between gap-2 rounded transition-colors ${
+                      isSelected
+                        ? 'bg-amber-500/20 text-amber-200'
+                        : 'hover:bg-accent text-foreground'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-bold">{u.name || u.username}</div>
+                      {u.username && u.name && (
+                        <div className="text-[10px] text-muted-foreground truncate">@{u.username}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {Number(u.target) > 0 && (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                          tgt {u.target}
+                        </span>
+                      )}
+                      {isSelected && <Check className="h-3.5 w-3.5 text-amber-400" />}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OrganizerScoresPanel({
   users,
   editionTitle,
@@ -36,7 +165,6 @@ export default function OrganizerScoresPanel({
 }) {
   const [userId, setUserId] = React.useState(users[0]?.id || '');
   const [day, setDay] = React.useState(1);
-  const [playerQuery, setPlayerQuery] = React.useState('');
   const [boards, setBoards] = React.useState([emptyBoardDraft()]);
   const [msg, setMsg] = React.useState<string | null>(null);
   const [days, setDays] = React.useState<DeskDay[]>([]);
@@ -47,17 +175,6 @@ export default function OrganizerScoresPanel({
   const selected = users.find((u) => u.id === userId);
   const target = Number(selected?.target) || 0;
   const existing = scores.find((s) => s.userId === userId && s.dayNumber === day) || null;
-  const filteredUsers = React.useMemo(() => {
-    const q = playerQuery.trim().toLowerCase();
-    const matches = q
-      ? users.filter((u) => `${u.name || ''} ${u.username || ''}`.toLowerCase().includes(q))
-      : users;
-    if (userId && !matches.some((u) => u.id === userId)) {
-      const keep = users.find((u) => u.id === userId);
-      return keep ? [keep, ...matches] : matches;
-    }
-    return matches;
-  }, [users, playerQuery, userId]);
 
   const loadDesk = React.useCallback(async () => {
     const desk = await getOrganiserScoreDesk(editionId);
@@ -115,31 +232,10 @@ export default function OrganizerScoresPanel({
           </div>
         ) : null}
 
-        <div>
-          <label className="text-xs font-bold block mb-1">Find player</label>
-          <Input
-            value={playerQuery}
-            onChange={(e) => setPlayerQuery(e.target.value)}
-            placeholder="Type a name…"
-            className="h-9 text-sm"
-          />
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-bold block mb-1">Player</label>
-            <select
-              className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-            >
-              {(filteredUsers.length ? filteredUsers : users).map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name || u.username}
-                  {Number(u.target) > 0 ? ` · tgt ${u.target}` : ''}
-                </option>
-              ))}
-            </select>
+            <SearchablePlayerSelect users={users} value={userId} onChange={setUserId} />
           </div>
           <div>
             <label className="text-xs font-bold block mb-1">Day</label>
