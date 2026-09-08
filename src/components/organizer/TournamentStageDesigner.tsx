@@ -183,6 +183,7 @@ function EditablePairingRow({
   onTeam1,
   onTeam2,
   onDay,
+  onLabel,
   onRemove,
   warning,
   locked = false,
@@ -198,49 +199,82 @@ function EditablePairingRow({
   onTeam1: (id: string) => void;
   onTeam2: (id: string) => void;
   onDay?: (day: number) => void;
+  onLabel?: (label: string) => void;
   onRemove?: () => void;
   warning?: string;
   locked?: boolean;
   takenIds?: Set<string>;
 }) {
   return (
-    <div className={`rounded-xl border p-4 space-y-2 ${locked ? 'border-border/60 bg-muted/20 opacity-90' : 'border-border bg-card'}`}>
-      {meta ? <div className="text-[10px] font-bold uppercase tracking-wider text-amber-500">{meta}{locked ? ' · Locked' : ''}</div> : locked ? (
-        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Completed day · locked</div>
-      ) : null}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.8fr)_1fr_auto_1fr_auto] gap-3 items-end">
-      {onDay && dayOptions?.length ? (
-        <div>
-          <label className="text-[10px] font-bold uppercase text-amber-500 block mb-1">Match day</label>
-          <Select
-            value={String(dayNumber || '')}
-            onChange={(e) => onDay(parseInt(e.target.value, 10))}
-            disabled={locked}
-            className="h-9 text-xs font-bold"
-          >
-            <option value="">Assign day…</option>
-            {dayOptions.map((opt) => (
-              <option key={opt.day} value={opt.day} disabled={opt.completed && opt.day !== dayNumber}>
-                Day {opt.day}{opt.date ? ` · ${opt.date}` : ''}{opt.completed ? ' (done)' : ''}
-              </option>
-            ))}
-          </Select>
+    <div className={`rounded-xl border p-3.5 space-y-2.5 ${locked ? 'border-border/60 bg-muted/20 opacity-90' : 'border-border bg-card'}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-border/40">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {meta ? (
+            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-500">{meta}{locked ? ' · Locked' : ''}</div>
+          ) : locked ? (
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Completed day · locked</div>
+          ) : null}
         </div>
-      ) : null}
-      <div>
-        <label className="text-[10px] font-bold uppercase text-emerald-400 block mb-1">{label} · Team 1</label>
-        <TeamSlotSelect value={team1Id} teams={teams} onChange={onTeam1} locked={locked} takenIds={takenIds} />
+        {onRemove && !locked ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10"
+            onClick={onRemove}
+            aria-label="Remove match"
+            title="Remove match"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
       </div>
-      <div className="text-center text-[10px] font-black text-muted-foreground pb-2">VS</div>
-      <div>
-        <label className="text-[10px] font-bold uppercase text-rose-400 block mb-1">Team 2</label>
-        <TeamSlotSelect value={team2Id} teams={teams} onChange={onTeam2} locked={locked} takenIds={takenIds} />
-      </div>
-      {onRemove && !locked ? (
-        <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground" onClick={onRemove} aria-label="Remove match">
-          <X className="h-4 w-4" />
-        </Button>
-      ) : null}
+
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_1.1fr_auto_1.1fr] gap-3 items-end">
+        {onDay && dayOptions?.length ? (
+          <div>
+            <label className="text-[10px] font-bold uppercase text-amber-500 block mb-1">Match day</label>
+            <Select
+              value={String(dayNumber || '')}
+              onChange={(e) => onDay(parseInt(e.target.value, 10))}
+              disabled={locked}
+              className="h-9 text-xs font-bold"
+            >
+              <option value="">Assign day…</option>
+              {dayOptions.map((opt) => (
+                <option key={opt.day} value={opt.day} disabled={opt.completed && opt.day !== dayNumber}>
+                  Day {opt.day}{opt.date ? ` · ${opt.date}` : ''}{opt.completed ? ' (done)' : ''}
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
+
+        {/* Match Title Editable Input */}
+        <div>
+          <label className="text-[10px] font-bold uppercase text-amber-400/90 block mb-1">Match Title</label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => onLabel?.(e.target.value)}
+            disabled={locked}
+            placeholder="e.g. Qualifier 1"
+            className="flex h-9 w-full rounded-md border border-input bg-background px-2.5 py-1 text-xs font-bold text-foreground shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Organizer can change match title (e.g. Qualifier 1, Eliminator, etc.)"
+          />
+        </div>
+
+        <div>
+          <label className="text-[10px] font-bold uppercase text-emerald-400 block mb-1 truncate" title={label ? `${label} · Team 1` : 'Team 1'}>
+            {label ? `${label} · Team 1` : 'Team 1'}
+          </label>
+          <TeamSlotSelect value={team1Id} teams={teams} onChange={onTeam1} locked={locked} takenIds={takenIds} />
+        </div>
+        <div className="text-center text-[10px] font-black text-muted-foreground pb-2">VS</div>
+        <div>
+          <label className="text-[10px] font-bold uppercase text-rose-400 block mb-1">Team 2</label>
+          <TeamSlotSelect value={team2Id} teams={teams} onChange={onTeam2} locked={locked} takenIds={takenIds} />
+        </div>
       </div>
       {warning ? <p className="text-[11px] font-bold text-rose-400">{warning}</p> : null}
     </div>
@@ -1178,6 +1212,11 @@ export default function TournamentStageDesigner({
                                 copy[idx] = retargetPairingDay(copy[idx], nextDay, dayDates);
                                 applyRrPairings(copy);
                               }}
+                              onLabel={(label) => {
+                                const copy = [...rrPairings];
+                                copy[idx] = { ...copy[idx], label };
+                                applyRrPairings(copy);
+                              }}
                               onTeam1={(id) => {
                                 const copy = [...rrPairings];
                                 copy[idx] = { ...copy[idx], team1Id: id };
@@ -1220,6 +1259,11 @@ export default function TournamentStageDesigner({
                               if (isDayLocked(nextDay)) return;
                               const copy = [...rrPairings];
                               copy[idx] = retargetPairingDay(copy[idx], nextDay, dayDates);
+                              applyRrPairings(copy);
+                            }}
+                            onLabel={(label) => {
+                              const copy = [...rrPairings];
+                              copy[idx] = { ...copy[idx], label };
                               applyRrPairings(copy);
                             }}
                             onTeam1={(id) => {
@@ -1400,6 +1444,11 @@ export default function TournamentStageDesigner({
                                 copy[idx] = retargetPairingDay(copy[idx], day, dayDates);
                                 applyLeaguePairings(copy);
                               }}
+                              onLabel={(label) => {
+                                const copy = [...leaguePairings];
+                                copy[idx] = { ...copy[idx], label };
+                                applyLeaguePairings(copy);
+                              }}
                               onTeam1={(id) => {
                                 const copy = [...leaguePairings];
                                 copy[idx] = setPairingTeam(copy[idx], 1, id, teams);
@@ -1481,6 +1530,11 @@ export default function TournamentStageDesigner({
                           copy[idx] = retargetPairingDay(copy[idx], day, dayDates);
                           applyQualifierPairings(copy);
                         }}
+                        onLabel={(label) => {
+                          const copy = [...qualifierPairings];
+                          copy[idx] = { ...copy[idx], label };
+                          applyQualifierPairings(copy);
+                        }}
                         onTeam1={(id) => {
                           const copy = [...qualifierPairings];
                           copy[idx] = setPairingTeam(copy[idx], 1, id, teams);
@@ -1534,6 +1588,11 @@ export default function TournamentStageDesigner({
                         if (isDayLocked(day) || isDayLocked(pair.dayNumber)) return;
                         const copy = [...finalsPairings];
                         copy[idx] = retargetPairingDay(copy[idx], day, dayDates);
+                        applyFinalsPairings(copy);
+                      }}
+                      onLabel={(label) => {
+                        const copy = [...finalsPairings];
+                        copy[idx] = { ...copy[idx], label };
                         applyFinalsPairings(copy);
                       }}
                       onTeam1={(id) => {
@@ -1628,6 +1687,11 @@ export default function TournamentStageDesigner({
                         copy[idx] = retargetPairingDay(copy[idx], day, dayDates);
                         applySpocPairings(copy);
                       }}
+                      onLabel={(label) => {
+                        const copy = [...spocPairings];
+                        copy[idx] = { ...copy[idx], label };
+                        applySpocPairings(copy);
+                      }}
                       onTeam1={(id) => {
                         const copy = [...spocPairings];
                         copy[idx] = setPairingTeam(copy[idx], 1, id, activeStageTeams);
@@ -1638,7 +1702,6 @@ export default function TournamentStageDesigner({
                         copy[idx] = setPairingTeam(copy[idx], 2, id, activeStageTeams);
                         applySpocPairings(copy);
                       }}
-                      onRemove={() => applySpocPairings(spocPairings.filter((_, i) => i !== idx))}
                       warning={teamsPlayingTwiceOnDay(allDraftPairings, allDraftPairings.indexOf(pair), activeStageTeams)}
                       takenIds={takenIdsFor(pair)}
                     />

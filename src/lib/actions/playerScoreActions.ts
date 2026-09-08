@@ -1126,6 +1126,7 @@ async function loadPublicStandings() {
     logs: logRows,
     maxDay,
     dayDates: edition.dayDates,
+    pairings,
   });
 
   return {

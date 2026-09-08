@@ -44,6 +44,7 @@ export function rankPlayers(opts: {
   logs: PlayerAverageLogRow[];
   maxDay: number;
   dayDates?: DayDatesInput;
+  pairings?: Array<{ dayNumber: number; team1Id: string; team2Id: string }>;
   now?: Date;
 }): PlayerRankingRow[] {
   const now = opts.now || new Date();
@@ -51,6 +52,16 @@ export function rankPlayers(opts: {
   const scoreKey = (userId: string, day: number) => `${userId}:${day}`;
   const byKey = new Map<string, PlayerDayScoreRow>();
   for (const row of opts.scores) byKey.set(scoreKey(row.userId, row.dayNumber), row);
+
+  // Precompute which teams are scheduled on which days
+  const hasPairings = Boolean(opts.pairings && opts.pairings.length > 0);
+  const teamScheduledDays = new Set<string>();
+  if (hasPairings) {
+    for (const p of opts.pairings!) {
+      if (p.dayNumber && p.team1Id) teamScheduledDays.add(`${p.team1Id}:${p.dayNumber}`);
+      if (p.dayNumber && p.team2Id) teamScheduledDays.add(`${p.team2Id}:${p.dayNumber}`);
+    }
+  }
 
   // Compute highest average among players for walkover penalty calculation
   const allSeedAverages = opts.players
@@ -84,6 +95,15 @@ export function rankPlayers(opts: {
     }> = [];
 
     for (const day of days) {
+      // If pairings/schedule is provided, only consider days where player's team has a scheduled match
+      if (hasPairings && player.teamId) {
+        const isScheduled = teamScheduledDays.has(`${player.teamId}:${day}`);
+        if (!isScheduled) {
+          // Team is not scheduled on this day -> No score considered, no walkover penalty!
+          continue;
+        }
+      }
+
       const row = byKey.get(scoreKey(player.userId, day));
       if (row) {
         if (row.isWalkover) {
@@ -108,7 +128,7 @@ export function rankPlayers(opts: {
           daysProcessed += 1;
         }
       } else {
-        // Walkover: no score submitted by player or captain
+        // Walkover: match was scheduled for this player's team on this day, but no score was submitted
         walkovers += 1;
         const playerBase = running > 0 ? running : seed > 0 ? seed : 0;
         const maxRef = Math.max(highestAverage, playerBase);
@@ -138,7 +158,7 @@ export function rankPlayers(opts: {
       teamName: player.teamName,
       grade: player.grade || null,
       target: player.target ?? null,
-      daysCounted: days.length - walkovers,
+      daysCounted: Math.max(0, daysProcessed - walkovers),
       walkovers,
       totalScore,
       boardCount,
