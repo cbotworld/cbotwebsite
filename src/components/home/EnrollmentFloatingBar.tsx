@@ -212,20 +212,6 @@ export default function EnrollmentFloatingBar({ edition }: { edition: Registrati
   // Only show on Website Home page ('/') - do NOT show on dashboard pages (player/organizer/captain) or other routes
   if (pathname !== '/') return null;
 
-  // Do NOT show floating enrollment bar for organizers (e.g. Carrom Balu)
-  const userRole = String((session?.user as any)?.role || '').toUpperCase();
-  const userName = String(session?.user?.name || '').toLowerCase().trim();
-  const userUsername = String((session?.user as any)?.username || '').toLowerCase().trim();
-  const isOrganiserUser =
-    userRole === 'ORGANIZER' ||
-    userRole === 'ORGANISER' ||
-    userRole === 'SUPER_ADMIN' ||
-    userName.includes('carrom balu') ||
-    userUsername.includes('carrombalu') ||
-    userUsername === 'balu';
-
-  if (isOrganiserUser) return null;
-
   // If dismissed - do NOT show this new edition enroll floating box
   if (dismissed) return null;
 

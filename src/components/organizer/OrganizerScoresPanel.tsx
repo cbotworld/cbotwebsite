@@ -766,7 +766,7 @@ export default function OrganizerScoresPanel({
                     score: null,
                     boardCount: 1,
                     slams: 0,
-                    isWalkover: true,
+                    isWalkover: false,
                     bonusAchieved: null,
                     isValid: true,
                     hasExistingWebScore: false,
@@ -962,7 +962,7 @@ export default function OrganizerScoresPanel({
                   score: null,
                   boardCount: 1,
                   slams: 0,
-                  isWalkover: true,
+                  isWalkover: false,
                   bonusAchieved: null,
                   isValid: true,
                   hasExistingWebScore: false,
@@ -1954,7 +1954,11 @@ export default function OrganizerScoresPanel({
                             <td className="py-2.5 px-3 text-center">
                               {row.isWalkover ? (
                                 <span className="text-sky-300 font-bold text-xs bg-sky-500/10 px-2 py-0.5 rounded">
-                                  WO (Blank)
+                                  WO (Walkover)
+                                </span>
+                              ) : row.score === null || row.score === undefined ? (
+                                <span className="text-muted-foreground text-xs italic">
+                                  — (Unentered)
                                 </span>
                               ) : (
                                 <div className="space-y-0.5">
@@ -1981,10 +1985,16 @@ export default function OrganizerScoresPanel({
                                   </div>
                                 </div>
                               ) : isMatch ? (
-                                <div className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold">
-                                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                  <span>Matches Website ({row.score} pts)</span>
-                                </div>
+                                row.score !== null ? (
+                                  <div className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold">
+                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                    <span>Matches Website ({row.score} pts)</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-[11px] italic">
+                                    ⚪ Unentered in Excel &amp; Website (Skipped)
+                                  </span>
+                                )
                               ) : isNew ? (
                                 <div className="text-sky-300 text-[11px] font-bold flex items-center gap-1">
                                   <span>✨ New Submission</span>
@@ -2005,7 +2015,9 @@ export default function OrganizerScoresPanel({
                                   🎉 Target Bonus
                                 </span>
                               ) : row.isWalkover ? (
-                                <span className="text-sky-300">WO</span>
+                                <span className="text-sky-300 font-bold">WO</span>
+                              ) : row.score === null ? (
+                                <span className="text-muted-foreground font-normal">Unentered</span>
                               ) : (
                                 <span className="text-emerald-400">Ready</span>
                               )}
