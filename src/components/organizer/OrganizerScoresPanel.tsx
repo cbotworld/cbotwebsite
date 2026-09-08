@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Edit3,
   Filter,
+  Layers,
 } from 'lucide-react';
 import {
   organiserUpsertPlayerDayScore,
@@ -234,7 +235,9 @@ export default function OrganizerScoresPanel({
   const [scoresViewMode, setScoresViewMode] = React.useState<'matrix' | 'single'>('matrix');
 
   // Matrix inline editing & filter states
+  const [commonBoardCount, setCommonBoardCount] = React.useState<number>(4);
   const [cellDrafts, setCellDrafts] = React.useState<Record<string, string>>({});
+  const [slamDrafts, setSlamDrafts] = React.useState<Record<string, string>>({});
   const [gridSearchQuery, setGridSearchQuery] = React.useState('');
   const [gridTeamFilter, setGridTeamFilter] = React.useState('ALL');
   const [gridGradeFilter, setGridGradeFilter] = React.useState('ALL');
@@ -429,16 +432,24 @@ export default function OrganizerScoresPanel({
     return Math.max(10, maxDayNum);
   }, [days]);
 
-  // Track dirty (unsaved) cells
+  // Track dirty (unsaved) cells (either score or slams changed)
   const dirtyKeys = React.useMemo(() => {
-    return Object.keys(cellDrafts).filter((k) => {
+    const allKeys = new Set([...Object.keys(cellDrafts), ...Object.keys(slamDrafts)]);
+    return Array.from(allKeys).filter((k) => {
       const [uId, dStr] = k.split('___');
       const dNum = parseInt(dStr, 10);
       const existingScore = scores.find((s) => s.userId === uId && s.dayNumber === dNum);
-      const serverStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
-      return cellDrafts[k].trim() !== serverStr.trim();
+      const serverScoreStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
+      const serverSlamStr = existingScore && existingScore.slams !== null && existingScore.slams !== undefined ? String(existingScore.slams) : '0';
+
+      const currentScoreStr = (k in cellDrafts ? cellDrafts[k] : serverScoreStr).trim();
+      const currentSlamStr = (k in slamDrafts ? slamDrafts[k] : serverSlamStr).trim();
+
+      const isScoreChanged = currentScoreStr !== serverScoreStr.trim();
+      const isSlamChanged = currentSlamStr !== serverSlamStr.trim() && !(currentSlamStr === '0' && serverSlamStr === '');
+      return isScoreChanged || isSlamChanged;
     });
-  }, [cellDrafts, scores]);
+  }, [cellDrafts, slamDrafts, scores]);
 
   const handleSaveGrid = async () => {
     if (dirtyKeys.length === 0) return;
@@ -448,18 +459,25 @@ export default function OrganizerScoresPanel({
     const payload = dirtyKeys.map((k) => {
       const [uId, dStr] = k.split('___');
       const dNum = parseInt(dStr, 10);
-      const rawVal = cellDrafts[k]?.trim() || '';
-      const isWo = /^(wo|walkover|absent|na|none|-)$/i.test(rawVal);
-      const isBlank = rawVal === '';
-      const numScore = isBlank ? null : parseInt(rawVal, 10);
+      const existingScore = scores.find((s) => s.userId === uId && s.dayNumber === dNum);
+      const serverScoreStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
+      const serverSlamStr = existingScore && existingScore.slams !== null && existingScore.slams !== undefined ? String(existingScore.slams) : '0';
+
+      const rawScoreVal = (k in cellDrafts ? cellDrafts[k] : serverScoreStr).trim();
+      const rawSlamVal = (k in slamDrafts ? slamDrafts[k] : serverSlamStr).trim();
+
+      const isWo = /^(wo|walkover|absent|na|none|-)$/i.test(rawScoreVal);
+      const isBlank = rawScoreVal === '';
+      const numScore = isBlank ? null : parseInt(rawScoreVal, 10);
+      const numSlams = Math.max(0, parseInt(rawSlamVal, 10) || 0);
 
       return {
         userId: uId,
         dayNumber: dNum,
         score: isWo ? null : (isNaN(numScore!) ? null : numScore),
-        isWalkover: isWo || isBlank,
-        boardCount: 1,
-        slams: 0,
+        isWalkover: isWo,
+        boardCount: commonBoardCount,
+        slams: numSlams,
       };
     });
 
@@ -469,8 +487,9 @@ export default function OrganizerScoresPanel({
     });
 
     if (res.success) {
-      setMsg(`✅ Successfully saved ${dirtyKeys.length} score update(s) directly to website.`);
+      setMsg(`✅ Successfully saved ${dirtyKeys.length} score & slam update(s) directly to website.`);
       setCellDrafts({});
+      setSlamDrafts({});
       await loadDesk();
     } else {
       setMsg(`❌ Failed to save scores: ${res.error || 'Unknown error'}`);
@@ -480,6 +499,7 @@ export default function OrganizerScoresPanel({
 
   const handleDiscardGrid = () => {
     setCellDrafts({});
+    setSlamDrafts({});
     setMsg('Unsaved changes discarded.');
   };
 
@@ -814,6 +834,13 @@ export default function OrganizerScoresPanel({
                 });
               } else {
                 const numScore = parseInt(rawCellVal, 10);
+                // Extract slams if provided in wide format cell (e.g., "65 (1s)", "65 + 1 slam", "65/1s", "65, 1")
+                let numSlams = 0;
+                const slamMatch = rawCellVal.match(/(?:[\+,\/\*\(]|\b(?:slam|slams|s)\b)\s*(\d+)/i) || rawCellVal.match(/(\d+)\s*(?:s|slam|slams)/i);
+                if (slamMatch) {
+                  numSlams = parseInt(slamMatch[1], 10) || 0;
+                }
+
                 if (isNaN(numScore) || numScore < 0) {
                   parsed.push({
                     userId: matchedUser.id,
@@ -850,14 +877,22 @@ export default function OrganizerScoresPanel({
                     diffDescription = `New Entry for Day ${dayNumber} (Not submitted on website)`;
                   } else {
                     const scoreMatches = numScore === webScore;
-                    if (scoreMatches) {
+                    const slamsMatches = numSlams === (webSlams ?? 0);
+                    if (scoreMatches && slamsMatches) {
                       diffType = 'MATCH';
-                      diffDescription = `Matches website score (${webScore} pts) — Skipped (Identical)`;
+                      diffDescription = `Matches website score (${webScore} pts${(webSlams ?? 0) > 0 ? `, ${webSlams} slams` : ''}) — Skipped (Identical)`;
                     } else {
                       diffType = 'DIFF';
-                      const diff = numScore - webScore;
-                      const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
-                      diffDescription = `Score: Web ${webScore} ➔ Excel ${numScore} (${diffSign})`;
+                      const parts: string[] = [];
+                      if (!scoreMatches) {
+                        const diff = numScore - webScore;
+                        const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
+                        parts.push(`Score: Web ${webScore} ➔ Excel ${numScore} (${diffSign})`);
+                      }
+                      if (!slamsMatches) {
+                        parts.push(`Slams: Web ${webSlams ?? 0} ➔ Excel ${numSlams}`);
+                      }
+                      diffDescription = parts.join(' | ');
                     }
                   }
 
@@ -871,7 +906,7 @@ export default function OrganizerScoresPanel({
                     target: matchedUser.target,
                     score: numScore,
                     boardCount: 1,
-                    slams: 0,
+                    slams: numSlams,
                     isWalkover: false,
                     bonusAchieved,
                     isValid: true,
@@ -1367,6 +1402,29 @@ export default function OrganizerScoresPanel({
                     ))}
                   </select>
                 )}
+
+                {/* Common No. of Boards Setting */}
+                <div className="flex items-center gap-1.5 bg-background border border-amber-500/40 px-2.5 py-1 rounded-lg shadow-xs shrink-0">
+                  <span className="text-[11px] font-black text-amber-300 flex items-center gap-1">
+                    <Layers className="h-3.5 w-3.5 text-amber-400" />
+                    <span>No. of Boards:</span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={commonBoardCount}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setCommonBoardCount(isNaN(v) ? 1 : Math.max(1, Math.min(10, v)));
+                    }}
+                    className="w-12 h-6 text-center text-xs font-black font-mono bg-muted/60 border border-border rounded text-amber-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    title="Common number of boards across all players (e.g. 4 boards -> Player Day Average = Total Score ÷ 4)"
+                  />
+                  <span className="text-[10px] text-muted-foreground font-mono font-semibold hidden sm:inline">
+                    (Avg = Score ÷ {commonBoardCount})
+                  </span>
+                </div>
               </div>
 
               {/* Status Counters */}
@@ -1415,10 +1473,13 @@ export default function OrganizerScoresPanel({
                     {Array.from({ length: totalDays }, (_, i) => i + 1).map((dNum) => (
                       <th
                         key={dNum}
-                        className="py-2.5 px-1 text-center min-w-[58px] font-mono font-black border-l border-border/40 text-slate-200"
+                        className="py-2 px-1 text-center min-w-[72px] font-mono font-black border-l border-border/40 text-slate-200"
                         title={`Day ${dNum}`}
                       >
-                        Day{dNum}
+                        <div className="flex flex-col items-center">
+                          <span>Day{dNum}</span>
+                          <span className="text-[9px] font-normal text-muted-foreground font-sans">pts · 🔥slam</span>
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -1481,9 +1542,16 @@ export default function OrganizerScoresPanel({
                           {Array.from({ length: totalDays }, (_, i) => i + 1).map((dNum) => {
                             const key = `${u.id}___${dNum}`;
                             const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === dNum);
-                            const serverStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
-                            const currentVal = key in cellDrafts ? cellDrafts[key] : serverStr;
-                            const isDirty = (key in cellDrafts) && (cellDrafts[key].trim() !== serverStr.trim());
+                            const serverScoreStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
+                            const serverSlamStr = existingScore && existingScore.slams !== null && existingScore.slams !== undefined ? String(existingScore.slams) : '0';
+
+                            const currentVal = key in cellDrafts ? cellDrafts[key] : serverScoreStr;
+                            const currentSlamVal = key in slamDrafts ? slamDrafts[key] : (serverSlamStr === '0' ? '' : serverSlamStr);
+                            const numSlams = parseInt(currentSlamVal, 10) || 0;
+
+                            const isScoreDirty = (key in cellDrafts) && (cellDrafts[key].trim() !== serverScoreStr.trim());
+                            const isSlamDirty = (key in slamDrafts) && (slamDrafts[key].trim() !== serverSlamStr.trim()) && !(slamDrafts[key].trim() === '0' && serverSlamStr === '0');
+                            const isDirty = isScoreDirty || isSlamDirty;
 
                             const trimmed = currentVal.trim();
                             const isWo = /^(wo|walkover|absent|-)$/i.test(trimmed);
@@ -1497,7 +1565,8 @@ export default function OrganizerScoresPanel({
                                   isDirty ? 'bg-amber-500/15' : ''
                                 }`}
                               >
-                                <div className="relative flex items-center justify-center">
+                                <div className="relative flex flex-col items-center justify-center gap-0.5">
+                                  {/* Score Input */}
                                   <input
                                     type="text"
                                     value={currentVal}
@@ -1506,7 +1575,7 @@ export default function OrganizerScoresPanel({
                                       const val = e.target.value;
                                       setCellDrafts((prev) => ({ ...prev, [key]: val }));
                                     }}
-                                    className={`w-12 h-7.5 text-center text-xs font-mono font-bold rounded border transition-all focus:outline-none focus:ring-2 ${
+                                    className={`w-13 h-7 text-center text-xs font-mono font-bold rounded border transition-all focus:outline-none focus:ring-2 ${
                                       isDirty
                                         ? 'border-amber-400 bg-amber-500/25 text-amber-200 focus:ring-amber-500 shadow-xs'
                                         : isBonus
@@ -1519,6 +1588,39 @@ export default function OrganizerScoresPanel({
                                     }`}
                                     title={`Day ${dNum} score for ${u.name || u.username}${existingScore?.source ? ` · Source: ${existingScore.source}` : ''}`}
                                   />
+
+                                  {/* Slams Counter & Input */}
+                                  <div className="flex items-center justify-center gap-0.5 w-full" title={`Day ${dNum} slams for ${u.name || u.username}`}>
+                                    <button
+                                      type="button"
+                                      tabIndex={-1}
+                                      onClick={() => {
+                                        const next = (parseInt(currentSlamVal, 10) || 0) + 1;
+                                        setSlamDrafts((prev) => ({ ...prev, [key]: String(next > 10 ? 0 : next) }));
+                                      }}
+                                      className="text-[11px] leading-none hover:scale-125 transition-transform select-none cursor-pointer"
+                                      title="Click to add/increment slam"
+                                    >
+                                      🔥
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={20}
+                                      value={currentSlamVal}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setSlamDrafts((prev) => ({ ...prev, [key]: val }));
+                                      }}
+                                      placeholder="0"
+                                      className={`w-7 h-4 text-center text-[10px] font-mono font-bold rounded border transition-colors focus:outline-none ${
+                                        numSlams > 0
+                                          ? 'bg-amber-500/25 text-amber-300 border-amber-500/60 font-black'
+                                          : 'bg-muted/20 text-muted-foreground/60 border-border/30 hover:border-border/60 focus:border-amber-500 focus:text-foreground'
+                                      }`}
+                                      title={`Slams: ${numSlams}`}
+                                    />
+                                  </div>
 
                                   {/* Quick Switch to Board Editor Button on Hover */}
                                   <button
@@ -1548,7 +1650,7 @@ export default function OrganizerScoresPanel({
             {/* Helper Tips & Floating Save Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
               <div className="text-muted-foreground text-[11px] space-y-0.5">
-                <p>💡 <strong>Tip:</strong> Type total score directly into any cell. Type <code className="text-sky-300">WO</code> for walkover, or leave blank for unentered.</p>
+                <p>💡 <strong>Tip:</strong> Type total score directly into any cell. Click 🔥 or type in mini box to add <strong>Slams</strong>. Type <code className="text-sky-300">WO</code> for walkover, or leave blank for unentered.</p>
                 <p>✨ Green score denotes <strong className="text-emerald-400">Target Bonus</strong> (&lt; target). Click ✏️ icon on any cell for detailed board-by-board breakdown.</p>
               </div>
 
