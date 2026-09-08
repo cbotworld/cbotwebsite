@@ -374,40 +374,66 @@ export default function OrganizerScoresPanel({
         return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
       });
 
-    const rows: Array<Record<string, any>> = [];
+    // Total days in tournament (at least 10 or max day number)
+    const maxDayNum = days.length > 0 ? Math.max(...days.map((d) => d.dayNumber), 10) : 10;
+    const totalDays = Math.max(10, maxDayNum);
 
-    // Loop through all days in the edition (Day 1..Day N)
-    for (const d of dayOptions) {
-      for (const u of assignedUsers) {
-        const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === d.dayNumber);
-        const teamName = u.teamName || userTeamMap.get(u.id) || '';
-        const playerGrade = getGrade(u);
+    const aoa: any[][] = [];
 
-        rows.push({
-          'Day': d.dayNumber,
-          'Team': teamName,
-          'Player Name': u.name || u.username || 'Player',
-          'Grade': playerGrade,
-          'Total Score (Leave blank for WO)': existingScore ? existingScore.score : '',
-          'No. of Boards': existingScore ? (Array.isArray(existingScore.boards) ? existingScore.boards.length : 1) : 1,
-          'Slams': existingScore ? (existingScore.slams || 0) : 0,
-        });
+    // Row 1: Top merged header with "Daily Scores" spanning across Day columns
+    const row1: any[] = ['', '', '', ''];
+    row1.push('Daily Scores');
+    for (let i = 1; i < totalDays; i++) {
+      row1.push('');
+    }
+    aoa.push(row1);
+
+    // Row 2: Sub-headers matching image: Sl.No | TEAMS | Player | Group | Day1 | Day2 | Day3 ...
+    const row2: any[] = ['Sl.No', 'TEAMS', 'Player', 'Group'];
+    for (let d = 1; d <= totalDays; d++) {
+      row2.push(`Day${d}`);
+    }
+    aoa.push(row2);
+
+    // Rows: Players sorted Team-wise, then Grade-wise
+    let slNo = 1;
+    for (const u of assignedUsers) {
+      const teamName = u.teamName || userTeamMap.get(u.id) || '';
+      const playerName = u.name || u.username || 'Player';
+      const playerGrade = getGrade(u);
+
+      const row: any[] = [slNo++, teamName, playerName, playerGrade];
+
+      for (let d = 1; d <= totalDays; d++) {
+        const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === d);
+        if (existingScore && existingScore.score !== null && existingScore.score !== undefined) {
+          row.push(existingScore.score);
+        } else {
+          row.push('');
+        }
       }
+
+      aoa.push(row);
     }
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Merge "Daily Scores" across the day columns (from column index 4 to 4 + totalDays - 1)
+    ws['!merges'] = [
+      { s: { r: 0, c: 4 }, e: { r: 0, c: 4 + totalDays - 1 } },
+    ];
+
+    // Column widths
     ws['!cols'] = [
-      { wch: 8 },  // Day
-      { wch: 18 }, // Team
-      { wch: 24 }, // Player Name
-      { wch: 10 }, // Grade
-      { wch: 32 }, // Total Score (Leave blank for WO)
-      { wch: 14 }, // No. of Boards
-      { wch: 10 }, // Slams
+      { wch: 8 },  // Sl.No
+      { wch: 22 }, // TEAMS
+      { wch: 24 }, // Player
+      { wch: 10 }, // Group
+      ...Array.from({ length: totalDays }, () => ({ wch: 9 })), // Day1 .. DayN
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `All Days Scores`);
+    XLSX.utils.book_append_sheet(wb, ws, `Daily Scores`);
     XLSX.writeFile(wb, `CBOT_Scores_Template_All_Days.xlsx`);
   };
 
@@ -424,9 +450,11 @@ export default function OrganizerScoresPanel({
         const wb = XLSX.read(bstr, { type: 'binary' });
         const sheetName = wb.SheetNames[0];
         const ws = wb.Sheets[sheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-        if (!rawJson.length) {
+        // Read as array of arrays (AOA) to handle multi-row headers flexibly
+        const aoa: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        if (!aoa || !aoa.length) {
           setUploadError('The uploaded file contains no rows or data.');
           return;
         }
@@ -440,19 +468,104 @@ export default function OrganizerScoresPanel({
           return [`${tName}___${pName}`, u];
         }));
 
+        // Find the header row (the row that contains "Player", "Teams", or "Day1", etc.)
+        let headerRowIdx = -1;
+        for (let r = 0; r < Math.min(aoa.length, 10); r++) {
+          const row = aoa[r];
+          if (!Array.isArray(row)) continue;
+          const strRow = row.map((cell) => String(cell || '').trim().toLowerCase());
+          const hasPlayer = strRow.some((c) => c.includes('player') || c === 'name');
+          const hasTeam = strRow.some((c) => c.includes('team'));
+          const hasDayCol = strRow.some((c) => /^(?:day\s*\d+|d\d+|day)$/i.test(c));
+          if ((hasPlayer || hasTeam) && (hasDayCol || strRow.some((c) => c.includes('group') || c.includes('grade')))) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+
+        // If no explicit header row found, default to row 0 or row 1
+        if (headerRowIdx === -1) {
+          headerRowIdx = aoa.length > 1 && aoa[1].some((c: any) => String(c).toLowerCase().includes('player')) ? 1 : 0;
+        }
+
+        const headerRow = aoa[headerRowIdx] || [];
+        const headerStrings = headerRow.map((c: any) => String(c || '').trim());
+
+        // Identify column indexes
+        let slNoCol = -1;
+        let teamCol = -1;
+        let playerCol = -1;
+        let groupCol = -1;
+        let userIdCol = -1;
+        let usernameCol = -1;
+        let flatDayCol = -1;
+        let flatScoreCol = -1;
+        let flatBoardsCol = -1;
+        let flatSlamsCol = -1;
+
+        const wideDayCols: Array<{ dayNumber: number; colIdx: number }> = [];
+
+        headerStrings.forEach((hdr, idx) => {
+          const lower = hdr.toLowerCase();
+          if (/^(?:sl\.?\s*no|s\.?\s*no|serial|#)$/i.test(lower)) {
+            slNoCol = idx;
+          } else if (/^(?:teams?|team\s*name)$/i.test(lower)) {
+            teamCol = idx;
+          } else if (/^(?:player|player\s*name|name)$/i.test(lower)) {
+            playerCol = idx;
+          } else if (/^(?:group|grade|category|tier)$/i.test(lower)) {
+            groupCol = idx;
+          } else if (/^(?:user\s*id|userid|uid|id)$/i.test(lower)) {
+            userIdCol = idx;
+          } else if (/^(?:username|handle)$/i.test(lower)) {
+            usernameCol = idx;
+          } else if (/^(?:day|day\s*number|daynumber)$/i.test(lower)) {
+            flatDayCol = idx;
+          } else if (/score|total/i.test(lower) && !/^(?:day\s*\d+|d\d+)$/i.test(lower)) {
+            flatScoreCol = idx;
+          } else if (/board/i.test(lower)) {
+            flatBoardsCol = idx;
+          } else if (/slam/i.test(lower)) {
+            flatSlamsCol = idx;
+          }
+
+          // Check if this column is a Day column in Wide Format (e.g. "Day1", "Day 1", "Day2", "D1", etc.)
+          const dayMatch = hdr.match(/^(?:day\s*|d)(\d+)$/i);
+          if (dayMatch) {
+            wideDayCols.push({ dayNumber: parseInt(dayMatch[1], 10), colIdx: idx });
+          }
+        });
+
+        // Fallback: if player column not found, find first non-team column with strings
+        if (playerCol === -1) {
+          playerCol = headerStrings.findIndex((h) => h.toLowerCase().includes('player') || h.toLowerCase().includes('name'));
+        }
+
+        const isWideFormat = wideDayCols.length > 0;
+        wideDayCols.sort((a, b) => a.dayNumber - b.dayNumber);
+
         const parsed: ParsedUploadRow[] = [];
 
-        for (const row of rawJson) {
-          const rawDayStr = String(row['Day'] || row['day'] || row['Day Number'] || row['dayNumber'] || '').trim();
-          const rowDay = parseInt(rawDayStr, 10) || day;
-          const rawId = String(row['User ID'] || row['userId'] || row['id'] || row['UID'] || '').trim().toLowerCase();
-          const rawUsername = String(row['Username'] || row['username'] || '').trim().toLowerCase().replace('@', '');
-          const rawName = String(row['Player Name'] || row['Player'] || row['Name'] || row['player_name'] || '').trim();
-          const rawTeam = String(row['Team'] || row['Team Name'] || '').trim();
-          const rawGrade = String(row['Grade'] || row['grade'] || row['Category'] || row['category'] || '').trim();
+        for (let r = headerRowIdx + 1; r < aoa.length; r++) {
+          const row = aoa[r];
+          if (!Array.isArray(row) || !row.length) continue;
+
+          // Check if entire row is empty
+          if (row.every((cell) => cell === undefined || String(cell).trim() === '')) {
+            continue;
+          }
+
+          const rawTeam = teamCol !== -1 ? String(row[teamCol] || '').trim() : '';
+          const rawName = playerCol !== -1 ? String(row[playerCol] || '').trim() : '';
+          const rawGrade = groupCol !== -1 ? String(row[groupCol] || '').trim() : '';
+          const rawId = userIdCol !== -1 ? String(row[userIdCol] || '').trim().toLowerCase() : '';
+          const rawUsername = usernameCol !== -1 ? String(row[usernameCol] || '').trim().toLowerCase().replace('@', '') : '';
+
+          if (!rawName && !rawId && !rawUsername && !rawTeam) {
+            continue;
+          }
 
           const teamKey = `${rawTeam.toLowerCase().trim()}___${rawName.toLowerCase().trim()}`;
-
           const matchedUser =
             (rawTeam && rawName && userByTeamAndName.get(teamKey)) ||
             (rawName && userByName.get(rawName.toLowerCase().trim())) ||
@@ -462,95 +575,305 @@ export default function OrganizerScoresPanel({
 
           const playerGrade = rawGrade || (matchedUser ? getGrade(matchedUser) : '');
 
-          if (!matchedUser) {
-            parsed.push({
-              userId: '',
-              dayNumber: rowDay,
-              playerName: rawName || 'Unknown Player',
-              username: rawUsername || '',
-              grade: playerGrade,
-              teamName: rawTeam || '',
-              score: null,
-              boardCount: 1,
-              slams: 0,
-              isWalkover: true,
-              bonusAchieved: null,
-              isValid: false,
-              errorReason: 'Player not found in edition roster',
-              hasExistingWebScore: false,
-              diffType: 'DIFF',
-              diffDescription: 'Unmatched player in edition roster',
-            });
-            continue;
-          }
+          if (isWideFormat) {
+            // Process each day in wide format
+            for (const { dayNumber, colIdx } of wideDayCols) {
+              const rawCellVal = row[colIdx] !== undefined ? String(row[colIdx]).trim() : '';
 
-          // Check for existing score in website for this player on rowDay
-          const existingScore = scores.find((s) => s.userId === matchedUser.id && s.dayNumber === rowDay);
-          const hasExisting = !!existingScore;
-          const webScore = existingScore ? existingScore.score : null;
-          const webSlams = existingScore ? (existingScore.slams ?? 0) : null;
-          const webBoards = existingScore ? (existingScore.boards?.length || 1) : null;
-          const webSource = existingScore ? existingScore.source : null;
+              if (!matchedUser) {
+                // If cell is empty, skip unassigned / unknown player
+                if (!rawCellVal) continue;
+                parsed.push({
+                  userId: '',
+                  dayNumber,
+                  playerName: rawName || 'Unknown Player',
+                  username: rawUsername || '',
+                  grade: playerGrade,
+                  teamName: rawTeam || '',
+                  score: null,
+                  boardCount: 1,
+                  slams: 0,
+                  isWalkover: true,
+                  bonusAchieved: null,
+                  isValid: false,
+                  errorReason: 'Player not found in edition roster',
+                  hasExistingWebScore: false,
+                  diffType: 'DIFF',
+                  diffDescription: 'Unmatched player in edition roster',
+                });
+                continue;
+              }
 
-          // Read Total Score
-          const rawScoreStr = String(
-            row['Total Score (Leave blank for WO)'] ??
-            row['Total Score'] ??
-            row['Total'] ??
-            row['Score'] ??
-            row['score'] ??
-            row['total_score'] ??
-            ''
-          ).trim();
+              // Check existing website score
+              const existingScore = scores.find((s) => s.userId === matchedUser.id && s.dayNumber === dayNumber);
+              const hasExisting = !!existingScore;
+              const webScore = existingScore ? existingScore.score : null;
+              const webSlams = existingScore ? (existingScore.slams ?? 0) : null;
+              const webBoards = existingScore ? (existingScore.boards?.length || 1) : null;
+              const webSource = existingScore ? existingScore.source : null;
 
-          // Read Boards
-          const rawBoardsStr = String(
-            row['No. of Boards'] ??
-            row['Boards'] ??
-            row['no_of_boards'] ??
-            row['board_count'] ??
-            '1'
-          ).trim();
+              const isBlank = rawCellVal === '';
+              const isExplicitWo = /^(wo|walkover|absent|na|none|null|-)$/i.test(rawCellVal);
 
-          // Read Slams
-          const rawSlamsStr = String(
-            row['Slams'] ??
-            row['No. of Slams'] ??
-            row['slams'] ??
-            '0'
-          ).trim();
+              if (isBlank) {
+                // When uploading partial days or leaving future days blank:
+                // - If website already has score for this day, preserve it (MATCH / Skipped / Untouched)
+                // - If website has NO score, it's an unentered day / empty slot (MATCH / Skipped)
+                if (hasExisting && webScore !== null) {
+                  parsed.push({
+                    userId: matchedUser.id,
+                    dayNumber,
+                    playerName: matchedUser.name || matchedUser.username || 'Player',
+                    username: matchedUser.username,
+                    grade: playerGrade,
+                    teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                    target: matchedUser.target,
+                    score: webScore,
+                    boardCount: webBoards || 1,
+                    slams: webSlams || 0,
+                    isWalkover: false,
+                    bonusAchieved: (Number(matchedUser.target) || 0) > 0 ? (webScore < (Number(matchedUser.target) || 0)) : null,
+                    isValid: true,
+                    hasExistingWebScore: true,
+                    existingWebScore: webScore,
+                    existingWebSlams: webSlams,
+                    existingWebBoards: webBoards,
+                    existingWebSource: webSource,
+                    diffType: 'MATCH',
+                    diffDescription: `Preserved website score (${webScore} pts · ${webSource}) — blank in Excel (Untouched)`,
+                  });
+                } else {
+                  parsed.push({
+                    userId: matchedUser.id,
+                    dayNumber,
+                    playerName: matchedUser.name || matchedUser.username || 'Player',
+                    username: matchedUser.username,
+                    grade: playerGrade,
+                    teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                    target: matchedUser.target,
+                    score: null,
+                    boardCount: 1,
+                    slams: 0,
+                    isWalkover: true,
+                    bonusAchieved: null,
+                    isValid: true,
+                    hasExistingWebScore: false,
+                    existingWebScore: null,
+                    existingWebSlams: null,
+                    existingWebBoards: null,
+                    existingWebSource: null,
+                    diffType: 'MATCH',
+                    diffDescription: `Unentered / Blank for Day ${dayNumber} (Skipped)`,
+                  });
+                }
+              } else if (isExplicitWo) {
+                let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'WO';
+                let diffDescription = `Day ${dayNumber} Explicit Walkover (WO)`;
 
-          const isBlank = rawScoreStr === '';
-          const isExplicitWo = /^(wo|walkover|absent|na|none|null|-)$/i.test(rawScoreStr);
+                if (hasExisting && webScore !== null) {
+                  diffType = 'DIFF';
+                  diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Explicit Walkover in Excel`;
+                } else if (!hasExisting) {
+                  diffType = 'WO';
+                  diffDescription = `Explicit Walkover (WO) for Day ${dayNumber}`;
+                }
 
-          if (isBlank) {
-            // When uploading partial days or leaving future days blank:
-            // - If the website already has a score for this player on this day, preserve it (MATCH / Skipped)
-            // - If the website has NO score, it's an unentered day / empty slot (MATCH / Skipped)
-            if (hasExisting && webScore !== null) {
+                parsed.push({
+                  userId: matchedUser.id,
+                  dayNumber,
+                  playerName: matchedUser.name || matchedUser.username || 'Player',
+                  username: matchedUser.username,
+                  grade: playerGrade,
+                  teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                  target: matchedUser.target,
+                  score: null,
+                  boardCount: 1,
+                  slams: 0,
+                  isWalkover: true,
+                  bonusAchieved: null,
+                  isValid: true,
+                  hasExistingWebScore: hasExisting,
+                  existingWebScore: webScore,
+                  existingWebSlams: webSlams,
+                  existingWebBoards: webBoards,
+                  existingWebSource: webSource,
+                  diffType,
+                  diffDescription,
+                });
+              } else {
+                const numScore = parseInt(rawCellVal, 10);
+                if (isNaN(numScore) || numScore < 0) {
+                  parsed.push({
+                    userId: matchedUser.id,
+                    dayNumber,
+                    playerName: matchedUser.name || matchedUser.username || 'Player',
+                    username: matchedUser.username,
+                    grade: playerGrade,
+                    teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                    target: matchedUser.target,
+                    score: null,
+                    boardCount: 1,
+                    slams: 0,
+                    isWalkover: false,
+                    bonusAchieved: null,
+                    isValid: false,
+                    errorReason: `Invalid score "${rawCellVal}"`,
+                    hasExistingWebScore: hasExisting,
+                    existingWebScore: webScore,
+                    existingWebSlams: webSlams,
+                    existingWebBoards: webBoards,
+                    existingWebSource: webSource,
+                    diffType: 'DIFF',
+                    diffDescription: `Invalid score format "${rawCellVal}"`,
+                  });
+                } else {
+                  const tgt = Number(matchedUser.target) || 0;
+                  const bonusAchieved = tgt > 0 ? numScore < tgt : null;
+
+                  let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'NEW';
+                  let diffDescription = 'Not submitted on website yet (New entry)';
+
+                  if (!hasExisting || webScore === null) {
+                    diffType = 'NEW';
+                    diffDescription = `New Entry for Day ${dayNumber} (Not submitted on website)`;
+                  } else {
+                    const scoreMatches = numScore === webScore;
+                    if (scoreMatches) {
+                      diffType = 'MATCH';
+                      diffDescription = `Matches website score (${webScore} pts) — Skipped (Identical)`;
+                    } else {
+                      diffType = 'DIFF';
+                      const diff = numScore - webScore;
+                      const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
+                      diffDescription = `Score: Web ${webScore} ➔ Excel ${numScore} (${diffSign})`;
+                    }
+                  }
+
+                  parsed.push({
+                    userId: matchedUser.id,
+                    dayNumber,
+                    playerName: matchedUser.name || matchedUser.username || 'Player',
+                    username: matchedUser.username,
+                    grade: playerGrade,
+                    teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                    target: matchedUser.target,
+                    score: numScore,
+                    boardCount: 1,
+                    slams: 0,
+                    isWalkover: false,
+                    bonusAchieved,
+                    isValid: true,
+                    hasExistingWebScore: hasExisting,
+                    existingWebScore: webScore,
+                    existingWebSlams: webSlams,
+                    existingWebBoards: webBoards,
+                    existingWebSource: webSource,
+                    diffType,
+                    diffDescription,
+                  });
+                }
+              }
+            }
+          } else {
+            // Flat Format
+            const rawDayStr = flatDayCol !== -1 ? String(row[flatDayCol] || '').trim() : '';
+            const rowDay = parseInt(rawDayStr, 10) || day;
+            const rawScoreStr = flatScoreCol !== -1 ? String(row[flatScoreCol] || '').trim() : '';
+            const rawBoardsStr = flatBoardsCol !== -1 ? String(row[flatBoardsCol] || '1').trim() : '1';
+            const rawSlamsStr = flatSlamsCol !== -1 ? String(row[flatSlamsCol] || '0').trim() : '0';
+
+            if (!matchedUser) {
               parsed.push({
-                userId: matchedUser.id,
+                userId: '',
                 dayNumber: rowDay,
-                playerName: matchedUser.name || matchedUser.username || 'Player',
-                username: matchedUser.username,
+                playerName: rawName || 'Unknown Player',
+                username: rawUsername || '',
                 grade: playerGrade,
-                teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
-                target: matchedUser.target,
-                score: webScore,
-                boardCount: webBoards || 1,
-                slams: webSlams || 0,
-                isWalkover: false,
-                bonusAchieved: (Number(matchedUser.target) || 0) > 0 ? (webScore < (Number(matchedUser.target) || 0)) : null,
-                isValid: true,
-                hasExistingWebScore: true,
-                existingWebScore: webScore,
-                existingWebSlams: webSlams,
-                existingWebBoards: webBoards,
-                existingWebSource: webSource,
-                diffType: 'MATCH',
-                diffDescription: `Preserved website score (${webScore} pts · ${webSource}) — blank in Excel (Untouched)`,
+                teamName: rawTeam || '',
+                score: null,
+                boardCount: 1,
+                slams: 0,
+                isWalkover: true,
+                bonusAchieved: null,
+                isValid: false,
+                errorReason: 'Player not found in edition roster',
+                hasExistingWebScore: false,
+                diffType: 'DIFF',
+                diffDescription: 'Unmatched player in edition roster',
               });
-            } else {
+              continue;
+            }
+
+            const existingScore = scores.find((s) => s.userId === matchedUser.id && s.dayNumber === rowDay);
+            const hasExisting = !!existingScore;
+            const webScore = existingScore ? existingScore.score : null;
+            const webSlams = existingScore ? (existingScore.slams ?? 0) : null;
+            const webBoards = existingScore ? (existingScore.boards?.length || 1) : null;
+            const webSource = existingScore ? existingScore.source : null;
+
+            const isBlank = rawScoreStr === '';
+            const isExplicitWo = /^(wo|walkover|absent|na|none|null|-)$/i.test(rawScoreStr);
+
+            if (isBlank) {
+              if (hasExisting && webScore !== null) {
+                parsed.push({
+                  userId: matchedUser.id,
+                  dayNumber: rowDay,
+                  playerName: matchedUser.name || matchedUser.username || 'Player',
+                  username: matchedUser.username,
+                  grade: playerGrade,
+                  teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                  target: matchedUser.target,
+                  score: webScore,
+                  boardCount: webBoards || 1,
+                  slams: webSlams || 0,
+                  isWalkover: false,
+                  bonusAchieved: (Number(matchedUser.target) || 0) > 0 ? (webScore < (Number(matchedUser.target) || 0)) : null,
+                  isValid: true,
+                  hasExistingWebScore: true,
+                  existingWebScore: webScore,
+                  existingWebSlams: webSlams,
+                  existingWebBoards: webBoards,
+                  existingWebSource: webSource,
+                  diffType: 'MATCH',
+                  diffDescription: `Preserved website score (${webScore} pts · ${webSource}) — blank in Excel (Untouched)`,
+                });
+              } else {
+                parsed.push({
+                  userId: matchedUser.id,
+                  dayNumber: rowDay,
+                  playerName: matchedUser.name || matchedUser.username || 'Player',
+                  username: matchedUser.username,
+                  grade: playerGrade,
+                  teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                  target: matchedUser.target,
+                  score: null,
+                  boardCount: 1,
+                  slams: 0,
+                  isWalkover: true,
+                  bonusAchieved: null,
+                  isValid: true,
+                  hasExistingWebScore: false,
+                  existingWebScore: null,
+                  existingWebSlams: null,
+                  existingWebBoards: null,
+                  existingWebSource: null,
+                  diffType: 'MATCH',
+                  diffDescription: `Unentered / Blank for Day ${rowDay} (Skipped)`,
+                });
+              }
+            } else if (isExplicitWo) {
+              let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'WO';
+              let diffDescription = `Day ${rowDay} Explicit Walkover (WO)`;
+
+              if (hasExisting && webScore !== null) {
+                diffType = 'DIFF';
+                diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Explicit Walkover in Excel`;
+              } else if (!hasExisting) {
+                diffType = 'WO';
+                diffDescription = `Explicit Walkover (WO) for Day ${rowDay}`;
+              }
+
               parsed.push({
                 userId: matchedUser.id,
                 dayNumber: rowDay,
@@ -565,124 +888,6 @@ export default function OrganizerScoresPanel({
                 isWalkover: true,
                 bonusAchieved: null,
                 isValid: true,
-                hasExistingWebScore: false,
-                existingWebScore: null,
-                existingWebSlams: null,
-                existingWebBoards: null,
-                existingWebSource: null,
-                diffType: 'MATCH',
-                diffDescription: `Unentered / Blank for Day ${rowDay} (Skipped)`,
-              });
-            }
-          } else if (isExplicitWo) {
-            let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'WO';
-            let diffDescription = `Day ${rowDay} Explicit Walkover (WO)`;
-
-            if (hasExisting && webScore !== null) {
-              diffType = 'DIFF';
-              diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Explicit Walkover in Excel`;
-            } else if (!hasExisting) {
-              diffType = 'WO';
-              diffDescription = `Explicit Walkover (WO) for Day ${rowDay}`;
-            }
-
-            parsed.push({
-              userId: matchedUser.id,
-              dayNumber: rowDay,
-              playerName: matchedUser.name || matchedUser.username || 'Player',
-              username: matchedUser.username,
-              grade: playerGrade,
-              teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
-              target: matchedUser.target,
-              score: null,
-              boardCount: 1,
-              slams: 0,
-              isWalkover: true,
-              bonusAchieved: null,
-              isValid: true,
-              hasExistingWebScore: hasExisting,
-              existingWebScore: webScore,
-              existingWebSlams: webSlams,
-              existingWebBoards: webBoards,
-              existingWebSource: webSource,
-              diffType,
-              diffDescription,
-            });
-          } else {
-            const numScore = parseInt(rawScoreStr, 10);
-            const numBoards = Math.max(1, Math.min(10, parseInt(rawBoardsStr, 10) || 1));
-            const numSlams = Math.max(0, parseInt(rawSlamsStr, 10) || 0);
-
-            if (isNaN(numScore) || numScore < 0) {
-              parsed.push({
-                userId: matchedUser.id,
-                dayNumber: rowDay,
-                playerName: matchedUser.name || matchedUser.username || 'Player',
-                username: matchedUser.username,
-                grade: playerGrade,
-                teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
-                target: matchedUser.target,
-                score: null,
-                boardCount: 1,
-                slams: 0,
-                isWalkover: false,
-                bonusAchieved: null,
-                isValid: false,
-                errorReason: `Invalid score "${rawScoreStr}"`,
-                hasExistingWebScore: hasExisting,
-                existingWebScore: webScore,
-                existingWebSlams: webSlams,
-                existingWebBoards: webBoards,
-                existingWebSource: webSource,
-                diffType: 'DIFF',
-                diffDescription: `Invalid score format "${rawScoreStr}"`,
-              });
-            } else {
-              const tgt = Number(matchedUser.target) || 0;
-              const bonusAchieved = tgt > 0 ? numScore < tgt : null;
-
-              let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'NEW';
-              let diffDescription = 'Not submitted on website yet (New entry)';
-
-              if (!hasExisting || webScore === null) {
-                diffType = 'NEW';
-                diffDescription = `New Entry for Day ${rowDay} (Not submitted on website)`;
-              } else {
-                const scoreMatches = numScore === webScore;
-                const slamsMatches = numSlams === webSlams;
-
-                if (scoreMatches && slamsMatches) {
-                  diffType = 'MATCH';
-                  diffDescription = `Matches website score (${webScore} pts, ${webSlams} slams) — Skipped (Identical)`;
-                } else {
-                  diffType = 'DIFF';
-                  const parts: string[] = [];
-                  if (!scoreMatches) {
-                    const diff = numScore - (webScore ?? 0);
-                    const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
-                    parts.push(`Score: Web ${webScore} ➔ Excel ${numScore} (${diffSign})`);
-                  }
-                  if (!slamsMatches) {
-                    parts.push(`Slams: Web ${webSlams ?? 0} ➔ Excel ${numSlams}`);
-                  }
-                  diffDescription = parts.join(' | ');
-                }
-              }
-
-              parsed.push({
-                userId: matchedUser.id,
-                dayNumber: rowDay,
-                playerName: matchedUser.name || matchedUser.username || 'Player',
-                username: matchedUser.username,
-                grade: playerGrade,
-                teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
-                target: matchedUser.target,
-                score: numScore,
-                boardCount: numBoards,
-                slams: numSlams,
-                isWalkover: false,
-                bonusAchieved,
-                isValid: true,
                 hasExistingWebScore: hasExisting,
                 existingWebScore: webScore,
                 existingWebSlams: webSlams,
@@ -691,6 +896,90 @@ export default function OrganizerScoresPanel({
                 diffType,
                 diffDescription,
               });
+            } else {
+              const numScore = parseInt(rawScoreStr, 10);
+              const numBoards = Math.max(1, Math.min(10, parseInt(rawBoardsStr, 10) || 1));
+              const numSlams = Math.max(0, parseInt(rawSlamsStr, 10) || 0);
+
+              if (isNaN(numScore) || numScore < 0) {
+                parsed.push({
+                  userId: matchedUser.id,
+                  dayNumber: rowDay,
+                  playerName: matchedUser.name || matchedUser.username || 'Player',
+                  username: matchedUser.username,
+                  grade: playerGrade,
+                  teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                  target: matchedUser.target,
+                  score: null,
+                  boardCount: 1,
+                  slams: 0,
+                  isWalkover: false,
+                  bonusAchieved: null,
+                  isValid: false,
+                  errorReason: `Invalid score "${rawScoreStr}"`,
+                  hasExistingWebScore: hasExisting,
+                  existingWebScore: webScore,
+                  existingWebSlams: webSlams,
+                  existingWebBoards: webBoards,
+                  existingWebSource: webSource,
+                  diffType: 'DIFF',
+                  diffDescription: `Invalid score format "${rawScoreStr}"`,
+                });
+              } else {
+                const tgt = Number(matchedUser.target) || 0;
+                const bonusAchieved = tgt > 0 ? numScore < tgt : null;
+
+                let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'NEW';
+                let diffDescription = 'Not submitted on website yet (New entry)';
+
+                if (!hasExisting || webScore === null) {
+                  diffType = 'NEW';
+                  diffDescription = `New Entry for Day ${rowDay} (Not submitted on website)`;
+                } else {
+                  const scoreMatches = numScore === webScore;
+                  const slamsMatches = numSlams === webSlams;
+
+                  if (scoreMatches && slamsMatches) {
+                    diffType = 'MATCH';
+                    diffDescription = `Matches website score (${webScore} pts, ${webSlams} slams) — Skipped (Identical)`;
+                  } else {
+                    diffType = 'DIFF';
+                    const parts: string[] = [];
+                    if (!scoreMatches) {
+                      const diff = numScore - (webScore ?? 0);
+                      const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
+                      parts.push(`Score: Web ${webScore} ➔ Excel ${numScore} (${diffSign})`);
+                    }
+                    if (!slamsMatches) {
+                      parts.push(`Slams: Web ${webSlams ?? 0} ➔ Excel ${numSlams}`);
+                    }
+                    diffDescription = parts.join(' | ');
+                  }
+                }
+
+                parsed.push({
+                  userId: matchedUser.id,
+                  dayNumber: rowDay,
+                  playerName: matchedUser.name || matchedUser.username || 'Player',
+                  username: matchedUser.username,
+                  grade: playerGrade,
+                  teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                  target: matchedUser.target,
+                  score: numScore,
+                  boardCount: numBoards,
+                  slams: numSlams,
+                  isWalkover: false,
+                  bonusAchieved,
+                  isValid: true,
+                  hasExistingWebScore: hasExisting,
+                  existingWebScore: webScore,
+                  existingWebSlams: webSlams,
+                  existingWebBoards: webBoards,
+                  existingWebSource: webSource,
+                  diffType,
+                  diffDescription,
+                });
+              }
             }
           }
         }
