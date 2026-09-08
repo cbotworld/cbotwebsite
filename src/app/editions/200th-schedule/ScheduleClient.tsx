@@ -363,7 +363,7 @@ export function ScheduleClient({
                           : 'border-border/70 bg-card/90 hover:border-amber-500/40 hover:bg-card'
                       }`}
                     >
-                      {isSpoc && (
+                      {isSpoc ? (
                         <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
                           <Badge variant="outline" className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest border-violet-500/50 text-violet-300 bg-violet-500/10 px-2.5 sm:px-3 py-0.5 sm:py-1">
                             <Sparkles className="h-3 w-3 mr-1 inline" />
@@ -373,7 +373,14 @@ export function ScheduleClient({
                             <span className="text-[10px] font-bold text-violet-300/80">{match.matchLabel}</span>
                           ) : null}
                         </div>
-                      )}
+                      ) : match.matchLabel ? (
+                        <div className="flex items-center justify-center gap-2 mb-2.5 sm:mb-3">
+                          <span className="text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 shadow-xs">
+                            <Trophy className="h-3 w-3 text-amber-400 shrink-0" />
+                            <span>{match.matchLabel}</span>
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center justify-between gap-2 sm:gap-3">
                       {/* Team 1 */}
                       <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
