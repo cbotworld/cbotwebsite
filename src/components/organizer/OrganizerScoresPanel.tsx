@@ -19,6 +19,12 @@ import {
   Loader2,
   Sparkles,
   Flame,
+  Table as TableIcon,
+  LayoutGrid,
+  Save,
+  RotateCcw,
+  Edit3,
+  Filter,
 } from 'lucide-react';
 import {
   organiserUpsertPlayerDayScore,
@@ -225,6 +231,15 @@ export default function OrganizerScoresPanel({
   const [review, setReview] = React.useState<{ finishedStageName: string; nextStageName: string | null } | null>(null);
   const [busy, setBusy] = React.useState(false);
 
+  const [scoresViewMode, setScoresViewMode] = React.useState<'matrix' | 'single'>('matrix');
+
+  // Matrix inline editing & filter states
+  const [cellDrafts, setCellDrafts] = React.useState<Record<string, string>>({});
+  const [gridSearchQuery, setGridSearchQuery] = React.useState('');
+  const [gridTeamFilter, setGridTeamFilter] = React.useState('ALL');
+  const [gridGradeFilter, setGridGradeFilter] = React.useState('ALL');
+  const [gridSaving, setGridSaving] = React.useState(false);
+
   // Bulk Upload state
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadModalOpen, setUploadModalOpen] = React.useState(false);
@@ -333,23 +348,22 @@ export default function OrganizerScoresPanel({
     ? days
     : Array.from({ length: 15 }, (_, i) => ({ dayNumber: i + 1, calendarDate: '', published: false }));
 
-  // ── Download Master All Days Excel Template ──────────────────────────────
-  const downloadScoresTemplate = () => {
-    const isUnassigned = (name?: string | null) => {
-      if (!name) return true;
-      const normalized = name.trim().toLowerCase();
-      return (
-        !normalized ||
-        normalized === 'unassigned' ||
-        normalized === 'none' ||
-        normalized === 'no team' ||
-        normalized === 'free agent' ||
-        normalized === '-'
-      );
-    };
+  const isUnassigned = React.useCallback((name?: string | null) => {
+    if (!name) return true;
+    const normalized = name.trim().toLowerCase();
+    return (
+      !normalized ||
+      normalized === 'unassigned' ||
+      normalized === 'none' ||
+      normalized === 'no team' ||
+      normalized === 'free agent' ||
+      normalized === '-'
+    );
+  }, []);
 
-    // Only include assigned players who belong to a valid team, sorted Team-Wise, then Grade-Wise (G1, G2, G3...)
-    const assignedUsers = users
+  // Assigned players who belong to a valid team, sorted Team-Wise, then Grade-Wise (G1, G2, G3...)
+  const assignedUsers = React.useMemo(() => {
+    return users
       .filter((u) => {
         const teamName = u.teamName || userTeamMap.get(u.id);
         return !isUnassigned(teamName);
@@ -373,6 +387,104 @@ export default function OrganizerScoresPanel({
         const nameB = (b.name || b.username || '').trim();
         return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
       });
+  }, [users, userTeamMap, getGrade, isUnassigned]);
+
+  const uniqueTeams = React.useMemo(() => {
+    const set = new Set<string>();
+    assignedUsers.forEach((u) => {
+      const t = (u.teamName || userTeamMap.get(u.id) || '').trim();
+      if (t) set.add(t);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
+  }, [assignedUsers, userTeamMap]);
+
+  const uniqueGrades = React.useMemo(() => {
+    const set = new Set<string>();
+    assignedUsers.forEach((u) => {
+      const g = getGrade(u);
+      if (g) set.add(g);
+    });
+    return Array.from(set).sort((a, b) => parseGradeRank(a) - parseGradeRank(b));
+  }, [assignedUsers, getGrade]);
+
+  const filteredGridUsers = React.useMemo(() => {
+    return assignedUsers.filter((u) => {
+      const t = (u.teamName || userTeamMap.get(u.id) || '').trim();
+      const g = getGrade(u);
+      if (gridTeamFilter && gridTeamFilter !== 'ALL' && t !== gridTeamFilter) return false;
+      if (gridGradeFilter && gridGradeFilter !== 'ALL' && g !== gridGradeFilter) return false;
+      if (!gridSearchQuery.trim()) return true;
+      const q = gridSearchQuery.toLowerCase().trim();
+      return (
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q) ||
+        t.toLowerCase().includes(q) ||
+        g.toLowerCase().includes(q)
+      );
+    });
+  }, [assignedUsers, userTeamMap, getGrade, gridTeamFilter, gridGradeFilter, gridSearchQuery]);
+
+  const totalDays = React.useMemo(() => {
+    const maxDayNum = days.length > 0 ? Math.max(...days.map((d) => d.dayNumber), 10) : 10;
+    return Math.max(10, maxDayNum);
+  }, [days]);
+
+  // Track dirty (unsaved) cells
+  const dirtyKeys = React.useMemo(() => {
+    return Object.keys(cellDrafts).filter((k) => {
+      const [uId, dStr] = k.split('___');
+      const dNum = parseInt(dStr, 10);
+      const existingScore = scores.find((s) => s.userId === uId && s.dayNumber === dNum);
+      const serverStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
+      return cellDrafts[k].trim() !== serverStr.trim();
+    });
+  }, [cellDrafts, scores]);
+
+  const handleSaveGrid = async () => {
+    if (dirtyKeys.length === 0) return;
+    setGridSaving(true);
+    setMsg(null);
+
+    const payload = dirtyKeys.map((k) => {
+      const [uId, dStr] = k.split('___');
+      const dNum = parseInt(dStr, 10);
+      const rawVal = cellDrafts[k]?.trim() || '';
+      const isWo = /^(wo|walkover|absent|na|none|-)$/i.test(rawVal);
+      const isBlank = rawVal === '';
+      const numScore = isBlank ? null : parseInt(rawVal, 10);
+
+      return {
+        userId: uId,
+        dayNumber: dNum,
+        score: isWo ? null : (isNaN(numScore!) ? null : numScore),
+        isWalkover: isWo || isBlank,
+        boardCount: 1,
+        slams: 0,
+      };
+    });
+
+    const res = await bulkOrganiserUpsertDayScores({
+      editionId,
+      rows: payload,
+    });
+
+    if (res.success) {
+      setMsg(`✅ Successfully saved ${dirtyKeys.length} score update(s) directly to website.`);
+      setCellDrafts({});
+      await loadDesk();
+    } else {
+      setMsg(`❌ Failed to save scores: ${res.error || 'Unknown error'}`);
+    }
+    setGridSaving(false);
+  };
+
+  const handleDiscardGrid = () => {
+    setCellDrafts({});
+    setMsg('Unsaved changes discarded.');
+  };
+
+  // ── Download Master All Days Excel Template ──────────────────────────────
+  const downloadScoresTemplate = () => {
 
     // Total days in tournament (at least 10 or max day number)
     const maxDayNum = days.length > 0 ? Math.max(...days.map((d) => d.dayNumber), 10) : 10;
@@ -1128,71 +1240,425 @@ export default function OrganizerScoresPanel({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 max-w-2xl">
-        <ScoreEditRules note={SCORE_EDIT_ORGANISER_HELP} />
-        {review ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200">
-            {review.finishedStageName} just finished. Review player averages
-            {review.nextStageName ? ` for ${review.nextStageName}` : ' for the next stage'}
-            {' '}on each player’s edit form. Changes apply from tomorrow IST.
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold block mb-1">Player</label>
-            <SearchablePlayerSelect users={users} value={userId} onChange={setUserId} />
-          </div>
-          <div>
-            <label className="text-xs font-bold block mb-1">Day</label>
-            <select
-              className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold"
-              value={day}
-              onChange={(e) => setDay(parseInt(e.target.value, 10) || 1)}
+      <CardContent className="space-y-4">
+        {/* View Switcher & Quick Save Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-muted/40 border border-border/50">
+            <button
+              type="button"
+              onClick={() => setScoresViewMode('matrix')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                scoresViewMode === 'matrix'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              {dayOptions.map((d) => {
-                const row = scores.find((s) => s.userId === userId && s.dayNumber === d.dayNumber);
-                const status = row ? ` · ${row.source}` : ' · empty';
-                return (
-                  <option key={d.dayNumber} value={d.dayNumber}>
-                    Day {d.dayNumber}
-                    {d.calendarDate ? ` · ${d.calendarDate}` : ''}
-                    {status}
-                  </option>
-                );
-              })}
-            </select>
+              <TableIcon className="h-4 w-4" />
+              <span>Daily Scores Matrix (All Days)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setScoresViewMode('single')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                scoresViewMode === 'single'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Edit3 className="h-4 w-4" />
+              <span>Single Player / Board Details</span>
+            </button>
           </div>
+
+          {/* Save / Discard buttons when in matrix mode */}
+          {scoresViewMode === 'matrix' && dirtyKeys.length > 0 && (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-200">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleDiscardGrid}
+                disabled={gridSaving}
+                className="text-xs font-bold border-rose-500/40 text-rose-300 hover:bg-rose-500/15 h-8 gap-1"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Discard</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveGrid}
+                disabled={gridSaving}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs h-8 gap-1.5 shadow-md shadow-amber-500/20 animate-pulse"
+              >
+                {gridSaving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5" />
+                    <span>Save {dirtyKeys.length} Changes</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
 
-        {existing ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200">
-            Day {day} already has scores from the {existing.source.toLowerCase()}
-            {existing.enteredByName && existing.source !== 'Player' ? ` (${existing.enteredByName})` : ''}.
-            {' '}Edit Total Score, Slams, and Boards below, or switch to Board-by-Board details, then save.
-          </div>
-        ) : (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs font-semibold text-muted-foreground">
-            No score for this player on Day {day} yet. Enter Total Score, Slams, and No. of Boards below and save.
+        {msg && (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-semibold flex items-center justify-between gap-2">
+            <span>{msg}</span>
+            <button type="button" onClick={() => setMsg(null)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
           </div>
         )}
 
-        <BoardScoreEditor boards={boards} onChange={setBoards} target={target} defaultMode="summary" />
-        {msg && <p className="text-xs font-semibold">{msg}</p>}
-        <Button
-          disabled={busy || !userId}
-          onClick={async () => {
-            setBusy(true);
-            setMsg(null);
-            const payload = draftToPayload(boards);
-            const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload, editionId);
-            setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
-            if (res.success) await loadDesk();
-            setBusy(false);
-          }}
-        >
-          {busy ? 'Saving…' : existing ? `Update Day ${day}` : `Save Day ${day}`}
-        </Button>
+        {/* ── MODE 1: DAILY SCORES MATRIX (SPREADSHEET GRID) ────────────────── */}
+        {scoresViewMode === 'matrix' && (
+          <div className="space-y-3">
+            {/* Filter controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 p-2.5 rounded-xl border border-border/40 text-xs">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                {/* Search player / team */}
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={gridSearchQuery}
+                    onChange={(e) => setGridSearchQuery(e.target.value)}
+                    placeholder="Search player, team, grade…"
+                    className="h-8 pl-8 pr-7 text-xs bg-background"
+                  />
+                  {gridSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setGridSearchQuery('')}
+                      className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Team Filter */}
+                {uniqueTeams.length > 1 && (
+                  <select
+                    value={gridTeamFilter}
+                    onChange={(e) => setGridTeamFilter(e.target.value)}
+                    className="h-8 text-xs font-semibold rounded-md bg-background border border-border px-2 text-foreground"
+                  >
+                    <option value="ALL">All Teams ({uniqueTeams.length})</option>
+                    {uniqueTeams.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Grade Filter */}
+                {uniqueGrades.length > 1 && (
+                  <select
+                    value={gridGradeFilter}
+                    onChange={(e) => setGridGradeFilter(e.target.value)}
+                    className="h-8 text-xs font-semibold rounded-md bg-background border border-border px-2 text-foreground"
+                  >
+                    <option value="ALL">All Groups/Grades ({uniqueGrades.length})</option>
+                    {uniqueGrades.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Status Counters */}
+              <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground shrink-0">
+                <span>Showing {filteredGridUsers.length} of {assignedUsers.length} players</span>
+                {dirtyKeys.length > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    {dirtyKeys.length} unsaved
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Matrix Table */}
+            <div className="w-full overflow-x-auto rounded-xl border border-border/80 shadow-md bg-card max-h-[72vh] overflow-y-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-30 bg-muted text-foreground font-black border-b border-border/80 shadow-xs">
+                  {/* Row 1: Merged Daily Scores Header */}
+                  <tr className="bg-muted/95 border-b border-border/60 text-[11px]">
+                    <th className="py-2 px-2 text-center text-muted-foreground sticky left-0 z-40 bg-muted/95 w-11 border-r border-border/40"></th>
+                    <th className="py-2 px-3 text-muted-foreground sticky left-[44px] z-40 bg-muted/95 min-w-[130px] border-r border-border/40"></th>
+                    <th className="py-2 px-3 text-muted-foreground sticky left-[174px] z-40 bg-muted/95 min-w-[160px] border-r border-border/40"></th>
+                    <th className="py-2 px-2 text-center text-muted-foreground sticky left-[334px] z-40 bg-muted/95 w-16 border-r border-border/60"></th>
+                    <th
+                      colSpan={totalDays}
+                      className="py-1.5 px-3 text-center text-amber-400 font-black uppercase tracking-widest text-xs bg-muted/90"
+                    >
+                      Daily Scores
+                    </th>
+                  </tr>
+
+                  {/* Row 2: Column Headers */}
+                  <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/80">
+                    <th className="py-2.5 px-2 text-center sticky left-0 z-40 bg-muted w-11 border-r border-border/40">
+                      Sl.No
+                    </th>
+                    <th className="py-2.5 px-3 sticky left-[44px] z-40 bg-muted min-w-[130px] border-r border-border/40 text-foreground font-black">
+                      TEAMS
+                    </th>
+                    <th className="py-2.5 px-3 sticky left-[174px] z-40 bg-muted min-w-[160px] border-r border-border/40 text-foreground font-black">
+                      Player
+                    </th>
+                    <th className="py-2.5 px-2 text-center sticky left-[334px] z-40 bg-muted w-16 border-r border-border/60 text-foreground font-black">
+                      Group
+                    </th>
+                    {Array.from({ length: totalDays }, (_, i) => i + 1).map((dNum) => (
+                      <th
+                        key={dNum}
+                        className="py-2.5 px-1 text-center min-w-[58px] font-mono font-black border-l border-border/40 text-slate-200"
+                        title={`Day ${dNum}`}
+                      >
+                        Day{dNum}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-border/40 text-xs">
+                  {filteredGridUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4 + totalDays} className="py-12 text-center text-muted-foreground font-semibold">
+                        No players matching &ldquo;{gridSearchQuery}&rdquo; in the selected team/grade.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredGridUsers.map((u, idx) => {
+                      const teamName = u.teamName || userTeamMap.get(u.id) || '—';
+                      const playerGrade = getGrade(u);
+                      const targetVal = Number(u.target) || 0;
+
+                      return (
+                        <tr key={u.id} className="hover:bg-accent/30 transition-colors group">
+                          {/* Sl.No */}
+                          <td className="py-2 px-2 text-center font-mono font-bold text-muted-foreground sticky left-0 z-20 bg-card group-hover:bg-muted/80 border-r border-border/40">
+                            {idx + 1}
+                          </td>
+
+                          {/* TEAMS */}
+                          <td className="py-2 px-3 font-bold text-amber-300/90 truncate max-w-[130px] sticky left-[44px] z-20 bg-card group-hover:bg-muted/80 border-r border-border/40" title={teamName}>
+                            {teamName}
+                          </td>
+
+                          {/* Player */}
+                          <td className="py-2 px-3 sticky left-[174px] z-20 bg-card group-hover:bg-muted/80 border-r border-border/40 min-w-[160px]">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-foreground truncate block">{u.name || u.username}</span>
+                                {u.username && u.name && (
+                                  <span className="text-[10px] text-muted-foreground font-mono truncate block">@{u.username}</span>
+                                )}
+                              </div>
+                              {targetVal > 0 && (
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-muted/80 text-muted-foreground font-mono font-bold shrink-0" title={`Target: ${targetVal}`}>
+                                  tgt {targetVal}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Group / Grade */}
+                          <td className="py-2 px-2 text-center sticky left-[334px] z-20 bg-card group-hover:bg-muted/80 border-r border-border/60">
+                            {playerGrade ? (
+                              <span className="text-[10.5px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-black border border-amber-500/30 font-mono">
+                                {playerGrade}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-[10px]">—</span>
+                            )}
+                          </td>
+
+                          {/* Day Columns */}
+                          {Array.from({ length: totalDays }, (_, i) => i + 1).map((dNum) => {
+                            const key = `${u.id}___${dNum}`;
+                            const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === dNum);
+                            const serverStr = existingScore && existingScore.score !== null && existingScore.score !== undefined ? String(existingScore.score) : '';
+                            const currentVal = key in cellDrafts ? cellDrafts[key] : serverStr;
+                            const isDirty = (key in cellDrafts) && (cellDrafts[key].trim() !== serverStr.trim());
+
+                            const trimmed = currentVal.trim();
+                            const isWo = /^(wo|walkover|absent|-)$/i.test(trimmed);
+                            const numScore = parseInt(trimmed, 10);
+                            const isBonus = targetVal > 0 && !isNaN(numScore) && numScore < targetVal;
+
+                            return (
+                              <td
+                                key={dNum}
+                                className={`p-1 text-center border-l border-border/30 transition-colors ${
+                                  isDirty ? 'bg-amber-500/15' : ''
+                                }`}
+                              >
+                                <div className="relative flex items-center justify-center">
+                                  <input
+                                    type="text"
+                                    value={currentVal}
+                                    placeholder="—"
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setCellDrafts((prev) => ({ ...prev, [key]: val }));
+                                    }}
+                                    className={`w-12 h-7.5 text-center text-xs font-mono font-bold rounded border transition-all focus:outline-none focus:ring-2 ${
+                                      isDirty
+                                        ? 'border-amber-400 bg-amber-500/25 text-amber-200 focus:ring-amber-500 shadow-xs'
+                                        : isBonus
+                                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 focus:ring-emerald-500'
+                                        : isWo
+                                        ? 'border-sky-500/40 bg-sky-500/10 text-sky-300 font-bold'
+                                        : trimmed !== ''
+                                        ? 'border-border/80 bg-background/80 text-foreground focus:ring-amber-500/50'
+                                        : 'border-border/30 bg-muted/10 text-muted-foreground hover:border-border focus:ring-amber-500/40'
+                                    }`}
+                                    title={`Day ${dNum} score for ${u.name || u.username}${existingScore?.source ? ` · Source: ${existingScore.source}` : ''}`}
+                                  />
+
+                                  {/* Quick Switch to Board Editor Button on Hover */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setUserId(u.id);
+                                      setDay(dNum);
+                                      setScoresViewMode('single');
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 hover:!opacity-100 text-[9px] text-muted-foreground hover:text-amber-300 absolute -top-1 -right-1 p-0.5 bg-popover rounded border border-border/60 shadow-xs z-10"
+                                    title="Edit board-by-board detail"
+                                  >
+                                    ✏️
+                                  </button>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Helper Tips & Floating Save Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
+              <div className="text-muted-foreground text-[11px] space-y-0.5">
+                <p>💡 <strong>Tip:</strong> Type total score directly into any cell. Type <code className="text-sky-300">WO</code> for walkover, or leave blank for unentered.</p>
+                <p>✨ Green score denotes <strong className="text-emerald-400">Target Bonus</strong> (&lt; target). Click ✏️ icon on any cell for detailed board-by-board breakdown.</p>
+              </div>
+
+              {dirtyKeys.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDiscardGrid}
+                    disabled={gridSaving}
+                    className="text-xs font-bold border-rose-500/40 text-rose-300 hover:bg-rose-500/15 h-8 gap-1"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Discard</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveGrid}
+                    disabled={gridSaving}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs h-8 gap-1.5 shadow-md shadow-amber-500/20 animate-pulse"
+                  >
+                    {gridSaving ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-3.5 w-3.5" />
+                        <span>Save {dirtyKeys.length} Changes</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── MODE 2: SINGLE PLAYER DETAILED EDITOR ────────────────────────── */}
+        {scoresViewMode === 'single' && (
+          <div className="space-y-4 max-w-2xl">
+            <ScoreEditRules note={SCORE_EDIT_ORGANISER_HELP} />
+            {review ? (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200">
+                {review.finishedStageName} just finished. Review player averages
+                {review.nextStageName ? ` for ${review.nextStageName}` : ' for the next stage'}
+                {' '}on each player’s edit form. Changes apply from tomorrow IST.
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold block mb-1">Player</label>
+                <SearchablePlayerSelect users={users} value={userId} onChange={setUserId} />
+              </div>
+              <div>
+                <label className="text-xs font-bold block mb-1">Day</label>
+                <select
+                  className="w-full h-10 rounded-md border border-input bg-background px-2 text-sm font-semibold"
+                  value={day}
+                  onChange={(e) => setDay(parseInt(e.target.value, 10) || 1)}
+                >
+                  {dayOptions.map((d) => {
+                    const row = scores.find((s) => s.userId === userId && s.dayNumber === d.dayNumber);
+                    const status = row ? ` · ${row.source}` : ' · empty';
+                    return (
+                      <option key={d.dayNumber} value={d.dayNumber}>
+                        Day {d.dayNumber}
+                        {d.calendarDate ? ` · ${d.calendarDate}` : ''}
+                        {status}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {existing ? (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200">
+                Day {day} already has scores from the {existing.source.toLowerCase()}
+                {existing.enteredByName && existing.source !== 'Player' ? ` (${existing.enteredByName})` : ''}.
+                {' '}Edit Total Score, Slams, and Boards below, or switch to Board-by-Board details, then save.
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs font-semibold text-muted-foreground">
+                No score for this player on Day {day} yet. Enter Total Score, Slams, and No. of Boards below and save.
+              </div>
+            )}
+
+            <BoardScoreEditor boards={boards} onChange={setBoards} target={target} defaultMode="summary" />
+            <Button
+              disabled={busy || !userId}
+              onClick={async () => {
+                setBusy(true);
+                setMsg(null);
+                const payload = draftToPayload(boards);
+                const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload, editionId);
+                setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
+                if (res.success) await loadDesk();
+                setBusy(false);
+              }}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+            >
+              {busy ? 'Saving…' : existing ? `Update Day ${day}` : `Save Day ${day}`}
+            </Button>
+          </div>
+        )}
       </CardContent>
 
       {/* ── Bulk Upload Preview Modal with Differences Detection ───────────── */}
