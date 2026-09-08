@@ -173,8 +173,10 @@ function SearchablePlayerSelect({
 
 type ParsedUploadRow = {
   userId: string;
+  dayNumber: number;
   playerName: string;
   username?: string;
+  grade?: string;
   teamName?: string;
   target?: number | null;
   score: number | null;
@@ -195,14 +197,21 @@ type ParsedUploadRow = {
   diffDescription: string;
 };
 
+function parseGradeRank(grade?: string | null): number {
+  if (!grade) return 999999;
+  const match = String(grade).match(/\d+/);
+  if (match) return parseInt(match[0], 10);
+  return 999999;
+}
+
 export default function OrganizerScoresPanel({
   users,
   teams = [],
   editionTitle,
   editionId,
 }: {
-  users: Array<{ id: string; name?: string; username?: string; target?: number | null; teamName?: string }>;
-  teams?: Array<{ id: string; name: string; members?: Array<{ user?: { id?: string } }>; spocMembers?: Array<{ user?: { id?: string } }> }>;
+  users: Array<{ id: string; name?: string; username?: string; target?: number | null; teamName?: string; grade?: string | null; category?: string | null }>;
+  teams?: Array<{ id: string; name: string; members?: Array<{ user?: { id?: string; grade?: string | null; category?: string | null } }>; spocMembers?: Array<{ user?: { id?: string; grade?: string | null; category?: string | null } }> }>;
   editionTitle?: string;
   editionId?: string;
 }) {
@@ -212,6 +221,7 @@ export default function OrganizerScoresPanel({
   const [msg, setMsg] = React.useState<string | null>(null);
   const [days, setDays] = React.useState<DeskDay[]>([]);
   const [scores, setScores] = React.useState<DeskScore[]>([]);
+  const [deskUserGradeMap, setDeskUserGradeMap] = React.useState<Record<string, string>>({});
   const [review, setReview] = React.useState<{ finishedStageName: string; nextStageName: string | null } | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -221,6 +231,7 @@ export default function OrganizerScoresPanel({
   const [parsedRows, setParsedRows] = React.useState<ParsedUploadRow[]>([]);
   const [uploadFilter, setUploadFilter] = React.useState('');
   const [diffTabFilter, setDiffTabFilter] = React.useState<'ALL' | 'DIFF' | 'NEW' | 'MATCH' | 'WO'>('ALL');
+  const [modalDayFilter, setModalDayFilter] = React.useState<number | 'ALL'>('ALL');
   const [uploadBusy, setUploadBusy] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
 
@@ -250,11 +261,51 @@ export default function OrganizerScoresPanel({
     return map;
   }, [teams]);
 
+  // Build a map of userId -> Grade from teams prop
+  const memberGradeMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    if (teams && teams.length > 0) {
+      for (const t of teams) {
+        if (Array.isArray(t.members)) {
+          for (const m of t.members) {
+            const uid = m.user?.id || (m as any).userId || (m as any).id;
+            const g = (m as any).grade || (m as any).category || (m.user as any)?.grade || (m.user as any)?.category;
+            if (uid && g) map.set(uid, String(g));
+          }
+        }
+        if (Array.isArray(t.spocMembers)) {
+          for (const m of t.spocMembers) {
+            const uid = m.user?.id || (m as any).userId || (m as any).id;
+            const g = (m as any).grade || (m as any).category || (m.user as any)?.grade || (m.user as any)?.category;
+            if (uid && g) map.set(uid, String(g));
+          }
+        }
+      }
+    }
+    return map;
+  }, [teams]);
+
+  const getGrade = React.useCallback(
+    (usr: { id: string; grade?: string | null; category?: string | null }) => {
+      return (
+        deskUserGradeMap[usr.id] ||
+        memberGradeMap.get(usr.id) ||
+        (usr as any).grade ||
+        (usr as any).category ||
+        ''
+      );
+    },
+    [deskUserGradeMap, memberGradeMap]
+  );
+
   const loadDesk = React.useCallback(async () => {
     const desk = await getOrganiserScoreDesk(editionId);
     if (desk.success) {
       setDays(desk.days || []);
       setScores(desk.scores || []);
+      if ((desk as any).userGradeMap) {
+        setDeskUserGradeMap((desk as any).userGradeMap);
+      }
     }
     return desk;
   }, [editionId]);
@@ -282,40 +333,75 @@ export default function OrganizerScoresPanel({
     ? days
     : Array.from({ length: 15 }, (_, i) => ({ dayNumber: i + 1, calendarDate: '', published: false }));
 
-  // ── Download Day Excel Template ──────────────────────────────────────────
-  const downloadDayTemplate = () => {
-    // Only include assigned players who belong to a team
+  // ── Download Master All Days Excel Template ──────────────────────────────
+  const downloadScoresTemplate = () => {
+    const isUnassigned = (name?: string | null) => {
+      if (!name) return true;
+      const normalized = name.trim().toLowerCase();
+      return (
+        !normalized ||
+        normalized === 'unassigned' ||
+        normalized === 'none' ||
+        normalized === 'no team' ||
+        normalized === 'free agent' ||
+        normalized === '-'
+      );
+    };
+
+    // Only include assigned players who belong to a valid team, sorted Team-Wise, then Grade-Wise (G1, G2, G3...)
     const assignedUsers = users
       .filter((u) => {
         const teamName = u.teamName || userTeamMap.get(u.id);
-        return Boolean(teamName && teamName.trim() !== '' && teamName.trim().toLowerCase() !== 'unassigned');
+        return !isUnassigned(teamName);
       })
       .sort((a, b) => {
-        const teamA = (a.teamName || userTeamMap.get(a.id) || '').toLowerCase();
-        const teamB = (b.teamName || userTeamMap.get(b.id) || '').toLowerCase();
-        if (teamA !== teamB) return teamA.localeCompare(teamB);
-        const nameA = (a.name || a.username || '').toLowerCase();
-        const nameB = (b.name || b.username || '').toLowerCase();
-        return nameA.localeCompare(nameB);
+        const teamA = (a.teamName || userTeamMap.get(a.id) || '').trim();
+        const teamB = (b.teamName || userTeamMap.get(b.id) || '').trim();
+        // 1. Primary: Sort by Team Name (Team-wise grouping)
+        const teamDiff = teamA.localeCompare(teamB, undefined, { sensitivity: 'base', numeric: true });
+        if (teamDiff !== 0) return teamDiff;
+
+        // 2. Secondary: Sort by Grade rank (G1, G2, G3...)
+        const gradeA = getGrade(a);
+        const gradeB = getGrade(b);
+        const rankA = parseGradeRank(gradeA);
+        const rankB = parseGradeRank(gradeB);
+        if (rankA !== rankB) return rankA - rankB;
+
+        // 3. Tertiary: Sort by Player Name within that grade
+        const nameA = (a.name || a.username || '').trim();
+        const nameB = (b.name || b.username || '').trim();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base', numeric: true });
       });
 
-    const rows = assignedUsers.map((u) => {
-      const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === day);
-      const teamName = u.teamName || userTeamMap.get(u.id) || '';
-      return {
-        'Team': teamName,
-        'Player Name': u.name || u.username || 'Player',
-        'User ID': u.id,
-        'Total Score (Leave blank for WO)': existingScore ? existingScore.score : '',
-        'No. of Boards': existingScore ? (Array.isArray(existingScore.boards) ? existingScore.boards.length : 1) : 1,
-        'Slams': existingScore ? (existingScore.slams || 0) : 0,
-      };
-    });
+    const rows: Array<Record<string, any>> = [];
+
+    // Loop through all days in the edition (Day 1..Day N)
+    for (const d of dayOptions) {
+      for (const u of assignedUsers) {
+        const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === d.dayNumber);
+        const teamName = u.teamName || userTeamMap.get(u.id) || '';
+        const playerGrade = getGrade(u);
+
+        rows.push({
+          'Day': d.dayNumber,
+          'Team': teamName,
+          'Player Name': u.name || u.username || 'Player',
+          'Grade': playerGrade,
+          'User ID': u.id,
+          'Total Score (Leave blank for WO)': existingScore ? existingScore.score : '',
+          'No. of Boards': existingScore ? (Array.isArray(existingScore.boards) ? existingScore.boards.length : 1) : 1,
+          'Slams': existingScore ? (existingScore.slams || 0) : 0,
+        });
+      }
+    }
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
+      { wch: 8 },  // Day
       { wch: 18 }, // Team
       { wch: 24 }, // Player Name
+      { wch: 10 }, // Grade
       { wch: 30 }, // User ID
       { wch: 32 }, // Total Score (Leave blank for WO)
       { wch: 14 }, // No. of Boards
@@ -323,8 +409,8 @@ export default function OrganizerScoresPanel({
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Day ${day} Scores`);
-    XLSX.writeFile(wb, `CBOT_Day_${day}_Score_Upload_Template.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, `All Days Scores`);
+    XLSX.writeFile(wb, `CBOT_Scores_Template_All_Days.xlsx`);
   };
 
   // ── Parse Uploaded Excel File ────────────────────────────────────────────
@@ -354,10 +440,13 @@ export default function OrganizerScoresPanel({
         const parsed: ParsedUploadRow[] = [];
 
         for (const row of rawJson) {
+          const rawDayStr = String(row['Day'] || row['day'] || row['Day Number'] || row['dayNumber'] || '').trim();
+          const rowDay = parseInt(rawDayStr, 10) || day;
           const rawId = String(row['User ID'] || row['userId'] || row['id'] || row['UID'] || '').trim().toLowerCase();
           const rawUsername = String(row['Username'] || row['username'] || '').trim().toLowerCase().replace('@', '');
           const rawName = String(row['Player Name'] || row['Player'] || row['Name'] || row['player_name'] || '').trim();
           const rawTeam = String(row['Team'] || row['Team Name'] || '').trim();
+          const rawGrade = String(row['Grade'] || row['grade'] || row['Category'] || row['category'] || '').trim();
 
           const matchedUser =
             (rawId && userById.get(rawId)) ||
@@ -365,11 +454,15 @@ export default function OrganizerScoresPanel({
             (rawName && userByName.get(rawName.toLowerCase())) ||
             null;
 
+          const playerGrade = rawGrade || (matchedUser ? getGrade(matchedUser) : '');
+
           if (!matchedUser) {
             parsed.push({
               userId: '',
+              dayNumber: rowDay,
               playerName: rawName || 'Unknown Player',
               username: rawUsername || '',
+              grade: playerGrade,
               teamName: rawTeam || '',
               score: null,
               boardCount: 1,
@@ -385,8 +478,8 @@ export default function OrganizerScoresPanel({
             continue;
           }
 
-          // Check for existing score in website for this player on selected day
-          const existingScore = scores.find((s) => s.userId === matchedUser.id && s.dayNumber === day);
+          // Check for existing score in website for this player on rowDay
+          const existingScore = scores.find((s) => s.userId === matchedUser.id && s.dayNumber === rowDay);
           const hasExisting = !!existingScore;
           const webScore = existingScore ? existingScore.score : null;
           const webSlams = existingScore ? (existingScore.slams ?? 0) : null;
@@ -427,20 +520,22 @@ export default function OrganizerScoresPanel({
 
           if (isBlankOrWo) {
             let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'WO';
-            let diffDescription = 'Walkover (Blank / WO)';
+            let diffDescription = `Day ${rowDay} Walkover (Blank / WO)`;
 
             if (hasExisting && webScore !== null) {
               diffType = 'DIFF';
               diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Excel is marked Walkover`;
             } else if (!hasExisting) {
               diffType = 'WO';
-              diffDescription = 'Walkover (No score on website)';
+              diffDescription = `Walkover (No score on website for Day ${rowDay})`;
             }
 
             parsed.push({
               userId: matchedUser.id,
+              dayNumber: rowDay,
               playerName: matchedUser.name || matchedUser.username || 'Player',
               username: matchedUser.username,
+              grade: playerGrade,
               teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
               target: matchedUser.target,
               score: null,
@@ -465,8 +560,10 @@ export default function OrganizerScoresPanel({
             if (isNaN(numScore) || numScore < 0) {
               parsed.push({
                 userId: matchedUser.id,
+                dayNumber: rowDay,
                 playerName: matchedUser.name || matchedUser.username || 'Player',
                 username: matchedUser.username,
+                grade: playerGrade,
                 teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
                 target: matchedUser.target,
                 score: null,
@@ -493,7 +590,7 @@ export default function OrganizerScoresPanel({
 
               if (!hasExisting || webScore === null) {
                 diffType = 'NEW';
-                diffDescription = 'New Entry (Player has not submitted on website)';
+                diffDescription = `New Entry for Day ${rowDay} (Not submitted on website)`;
               } else {
                 const scoreMatches = numScore === webScore;
                 const slamsMatches = numSlams === webSlams;
@@ -518,8 +615,10 @@ export default function OrganizerScoresPanel({
 
               parsed.push({
                 userId: matchedUser.id,
+                dayNumber: rowDay,
                 playerName: matchedUser.name || matchedUser.username || 'Player',
                 username: matchedUser.username,
+                grade: playerGrade,
                 teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
                 target: matchedUser.target,
                 score: numScore,
@@ -542,6 +641,7 @@ export default function OrganizerScoresPanel({
 
         setParsedRows(parsed);
         setDiffTabFilter('ALL');
+        setModalDayFilter('ALL');
         setUploadModalOpen(true);
       } catch (err: any) {
         setUploadError(err.message || 'Failed to parse Excel file.');
@@ -562,6 +662,7 @@ export default function OrganizerScoresPanel({
 
     const payload = validRows.map((r) => ({
       userId: r.userId,
+      dayNumber: r.dayNumber,
       score: r.isWalkover ? null : r.score,
       boardCount: r.boardCount,
       slams: r.slams,
@@ -570,19 +671,26 @@ export default function OrganizerScoresPanel({
 
     const res = await bulkOrganiserUpsertDayScores({
       editionId,
-      dayNumber: day,
       rows: payload,
     });
 
     if (res.success) {
       setUploadModalOpen(false);
-      setMsg(`✅ Successfully updated ${res.count} player scores for Day ${day}.`);
+      setMsg(`✅ Successfully updated ${res.count} player scores across edition days.`);
       await loadDesk();
     } else {
       setUploadError(res.error || 'Failed to save bulk scores.');
     }
     setUploadBusy(false);
   };
+
+  const uploadedDays = React.useMemo(() => {
+    const set = new Set<number>();
+    for (const r of parsedRows) {
+      if (r.dayNumber) set.add(r.dayNumber);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [parsedRows]);
 
   const validParsedCount = parsedRows.filter((r) => r.isValid && !r.isWalkover).length;
   const walkoverCount = parsedRows.filter((r) => r.isValid && r.isWalkover).length;
@@ -592,6 +700,9 @@ export default function OrganizerScoresPanel({
   const matchCount = parsedRows.filter((r) => r.isValid && r.diffType === 'MATCH').length;
 
   const filteredPreviewRows = parsedRows.filter((r) => {
+    // Day filter
+    if (modalDayFilter !== 'ALL' && r.dayNumber !== modalDayFilter) return false;
+
     // Diff tab filter
     if (diffTabFilter === 'DIFF' && r.diffType !== 'DIFF') return false;
     if (diffTabFilter === 'NEW' && r.diffType !== 'NEW') return false;
@@ -605,6 +716,8 @@ export default function OrganizerScoresPanel({
       r.playerName.toLowerCase().includes(q) ||
       (r.username && r.username.toLowerCase().includes(q)) ||
       (r.teamName && r.teamName.toLowerCase().includes(q)) ||
+      (r.grade && r.grade.toLowerCase().includes(q)) ||
+      `day ${r.dayNumber}`.includes(q) ||
       r.diffDescription.toLowerCase().includes(q)
     );
   });
@@ -624,7 +737,7 @@ export default function OrganizerScoresPanel({
                   {' · '}
                 </>
               ) : null}
-              Pick a player and day, or use Bulk Upload to import all player scores at once from Excel.
+              Pick a player and day, or use Master Excel to upload and update all days continuously.
             </CardDescription>
           </div>
 
@@ -634,12 +747,12 @@ export default function OrganizerScoresPanel({
               type="button"
               variant="outline"
               size="sm"
-              onClick={downloadDayTemplate}
+              onClick={downloadScoresTemplate}
               className="text-xs font-bold border-amber-500/30 hover:bg-amber-500/10 text-amber-300 gap-1.5 h-9"
-              title={`Download pre-filled Excel template for Day ${day}`}
+              title="Download master all-days Excel template with pre-filled scores"
             >
               <Download className="h-3.5 w-3.5 text-amber-400" />
-              <span>Day {day} Template</span>
+              <span>All Days Template (.xlsx)</span>
             </Button>
 
             <Button
@@ -647,7 +760,7 @@ export default function OrganizerScoresPanel({
               size="sm"
               onClick={() => fileInputRef.current?.click()}
               className="text-xs font-black bg-amber-500 hover:bg-amber-400 text-slate-950 gap-1.5 h-9 shadow-xs"
-              title={`Bulk upload scores for Day ${day} from Excel (.xlsx)`}
+              title="Bulk upload scores from master Excel (.xlsx)"
             >
               <Upload className="h-3.5 w-3.5" />
               <span>Bulk Upload (.xlsx)</span>
@@ -739,7 +852,9 @@ export default function OrganizerScoresPanel({
               <div>
                 <h3 className="text-lg font-black text-amber-400 flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5" />
-                  <span>Bulk Upload Scores — Day {day} Comparison & Preview</span>
+                  <span>
+                    Bulk Upload Scores — {uploadedDays.length > 1 ? `Master All Days (${uploadedDays.length} Days)` : `Day ${uploadedDays[0] || day}`} Comparison & Preview
+                  </span>
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Compare Excel scores against player/website submissions, verify walkovers, and audit differences before saving.
@@ -758,7 +873,7 @@ export default function OrganizerScoresPanel({
             <div className="p-3 sm:p-4 border-b border-border/40 bg-muted/20 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-1 rounded-lg bg-background border border-border font-bold text-foreground">
-                  Total: <strong>{parsedRows.length}</strong>
+                  Total Rows: <strong>{parsedRows.length}</strong>
                 </span>
 
                 {diffCount > 0 ? (
@@ -798,75 +913,99 @@ export default function OrganizerScoresPanel({
                 <Input
                   value={uploadFilter}
                   onChange={(e) => setUploadFilter(e.target.value)}
-                  placeholder="Search player, team, notes…"
+                  placeholder="Search player, team, day…"
                   className="h-8 text-xs bg-background"
                 />
               </div>
             </div>
 
-            {/* Quick Filter Tabs */}
-            <div className="px-4 py-2 border-b border-border/30 bg-muted/10 flex items-center gap-1.5 overflow-x-auto text-xs">
-              <button
-                type="button"
-                onClick={() => setDiffTabFilter('ALL')}
-                className={`px-3 py-1 rounded-md font-bold transition-all ${
-                  diffTabFilter === 'ALL'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                All ({parsedRows.length})
-              </button>
+            {/* Quick Filter Tabs (Diffs + Days) */}
+            <div className="px-4 py-2 border-b border-border/30 bg-muted/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setDiffTabFilter('ALL')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    diffTabFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  All ({parsedRows.length})
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDiffTabFilter('DIFF')}
-                className={`px-3 py-1 rounded-md font-bold transition-all flex items-center gap-1 ${
-                  diffTabFilter === 'DIFF'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : diffCount > 0
-                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span>⚠️ Differences ({diffCount})</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffTabFilter('DIFF')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all flex items-center gap-1 ${
+                    diffTabFilter === 'DIFF'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : diffCount > 0
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>⚠️ Differences ({diffCount})</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDiffTabFilter('NEW')}
-                className={`px-3 py-1 rounded-md font-bold transition-all ${
-                  diffTabFilter === 'NEW'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                ✨ New ({newCount})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffTabFilter('NEW')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    diffTabFilter === 'NEW'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  ✨ New ({newCount})
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDiffTabFilter('MATCH')}
-                className={`px-3 py-1 rounded-md font-bold transition-all ${
-                  diffTabFilter === 'MATCH'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                ✓ Matching ({matchCount})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffTabFilter('MATCH')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    diffTabFilter === 'MATCH'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  ✓ Matching ({matchCount})
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setDiffTabFilter('WO')}
-                className={`px-3 py-1 rounded-md font-bold transition-all ${
-                  diffTabFilter === 'WO'
-                    ? 'bg-amber-500 text-slate-950 shadow-xs'
-                    : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Walkovers ({walkoverCount})
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffTabFilter('WO')}
+                  className={`px-3 py-1 rounded-md font-bold transition-all ${
+                    diffTabFilter === 'WO'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'bg-muted/50 text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Walkovers ({walkoverCount})
+                </button>
+              </div>
+
+              {/* Day filter selector if multiple days present */}
+              {uploadedDays.length > 1 && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-muted-foreground">Filter Day:</span>
+                  <select
+                    className="h-7 text-xs font-bold rounded-md bg-background border border-border px-2 text-foreground"
+                    value={modalDayFilter}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setModalDayFilter(val === 'ALL' ? 'ALL' : parseInt(val, 10));
+                    }}
+                  >
+                    <option value="ALL">All Days ({uploadedDays.length})</option>
+                    {uploadedDays.map((dNum) => (
+                      <option key={dNum} value={dNum}>
+                        Day {dNum} ({parsedRows.filter((r) => r.dayNumber === dNum).length} rows)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Modal Table Body */}
@@ -905,6 +1044,7 @@ export default function OrganizerScoresPanel({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-muted/60 text-muted-foreground uppercase text-[10px] font-black border-b border-border/80">
                     <tr>
+                      <th className="py-2.5 px-3 text-center">Day</th>
                       <th className="py-2.5 px-3">Team & Player</th>
                       <th className="py-2.5 px-3 text-center">Target</th>
                       <th className="py-2.5 px-3">Website Submission</th>
@@ -916,7 +1056,7 @@ export default function OrganizerScoresPanel({
                   <tbody className="divide-y divide-border/40">
                     {filteredPreviewRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-muted-foreground text-xs font-semibold">
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground text-xs font-semibold">
                           No players matching this filter.
                         </td>
                       </tr>
@@ -939,10 +1079,20 @@ export default function OrganizerScoresPanel({
                                 : 'hover:bg-accent/40'
                             }`}
                           >
+                            {/* Day Column */}
+                            <td className="py-2.5 px-3 text-center font-black text-amber-400 font-mono text-xs">
+                              Day {row.dayNumber}
+                            </td>
+
                             {/* Team & Player */}
                             <td className="py-2.5 px-3 font-semibold">
                               <div className="font-bold text-foreground flex items-center gap-1.5">
                                 <span>{row.playerName}</span>
+                                {row.grade && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30">
+                                    {row.grade}
+                                  </span>
+                                )}
                                 {row.username && (
                                   <span className="text-[10px] text-muted-foreground font-mono font-normal">
                                     @{row.username}
@@ -1072,13 +1222,13 @@ export default function OrganizerScoresPanel({
                 {uploadBusy ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Saving Day {day} Scores…</span>
+                    <span>Saving All Scores…</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
                     <span>
-                      Confirm & Save All Day {day} Scores ({validParsedCount + walkoverCount})
+                      Confirm & Save All Scores ({validParsedCount + walkoverCount})
                     </span>
                   </>
                 )}

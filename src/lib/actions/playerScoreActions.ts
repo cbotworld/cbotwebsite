@@ -409,9 +409,10 @@ export async function organiserUpsertPlayerDayScore(
 
 export async function bulkOrganiserUpsertDayScores(opts: {
   editionId?: string;
-  dayNumber: number;
+  dayNumber?: number;
   rows: Array<{
     userId: string;
+    dayNumber?: number;
     score?: number | null;
     boardCount?: number | null;
     slams?: number | null;
@@ -426,14 +427,14 @@ export async function bulkOrganiserUpsertDayScores(opts: {
 
   const stages = (await loadStageConfig(edition.id)).stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
-  const day = Number(opts.dayNumber);
-  if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
 
   const entererId = (session.user as any).id;
   const modifiedUserIds = new Set<string>();
 
   for (const row of opts.rows) {
     if (!row.userId) continue;
+    const rowDay = Number(row.dayNumber || opts.dayNumber || 1);
+    if (!Number.isInteger(rowDay) || rowDay < 1 || rowDay > maxDay) continue;
 
     if (row.isWalkover || row.score === null || row.score === undefined || isNaN(Number(row.score))) {
       // Clear/delete manual score so system walkover calculation dynamically takes effect
@@ -441,7 +442,7 @@ export async function bulkOrganiserUpsertDayScores(opts: {
         where: {
           editionId: edition.id,
           userId: row.userId,
-          dayNumber: day,
+          dayNumber: rowDay,
         },
       });
       modifiedUserIds.add(row.userId);
@@ -454,7 +455,7 @@ export async function bulkOrganiserUpsertDayScores(opts: {
       await upsertDayScore({
         editionId: edition.id,
         userId: row.userId,
-        dayNumber: day,
+        dayNumber: rowDay,
         score: scoreVal,
         slams: slamsVal,
         boards,
@@ -508,10 +509,28 @@ export async function getOrganiserScoreDesk(editionId?: string) {
       published: isDayScorePublished(dayNumber, edition.dayDates),
     };
   });
+  const [gradingSetting, editionParticipants, targetLogs, editionTeams] = await Promise.all([
+    prisma.systemSetting.findUnique({ where: { key: `edition_${edition.id}_grading` } }),
+    prisma.editionParticipant.findMany({ where: { editionId: edition.id }, select: { userId: true, category: true } }),
+    prisma.playerTargetLog.findMany({ where: { editionId: edition.id }, select: { userId: true, target: true } }),
+    prisma.team.findMany({
+      where: { editionId: edition.id },
+      include: {
+        captain: { select: { id: true, name: true, username: true, average: true, target: true } },
+        members: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
+        spocMembers: { include: { user: { select: { id: true, name: true, username: true, average: true, target: true } } } },
+      },
+    }),
+  ]);
+  const rosterTeams = buildRosterTeams(editionTeams);
+  const { userGradeMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
+  const userGradeRecord = Object.fromEntries(userGradeMap.entries());
+
   return {
     success: true as const,
     maxDay,
     days,
+    userGradeMap: userGradeRecord,
     scores: rows.map((s) => {
       const enterer = s.enteredByUserId ? byEnterer.get(s.enteredByUserId) : null;
       const source =
