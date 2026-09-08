@@ -520,20 +520,70 @@ export default function OrganizerScoresPanel({
             '0'
           ).trim();
 
-          const isBlankOrWo =
-            rawScoreStr === '' ||
-            /^(wo|walkover|absent|na|none|null|-)$/i.test(rawScoreStr);
+          const isBlank = rawScoreStr === '';
+          const isExplicitWo = /^(wo|walkover|absent|na|none|null|-)$/i.test(rawScoreStr);
 
-          if (isBlankOrWo) {
+          if (isBlank) {
+            // When uploading partial days or leaving future days blank:
+            // - If the website already has a score for this player on this day, preserve it (MATCH / Skipped)
+            // - If the website has NO score, it's an unentered day / empty slot (MATCH / Skipped)
+            if (hasExisting && webScore !== null) {
+              parsed.push({
+                userId: matchedUser.id,
+                dayNumber: rowDay,
+                playerName: matchedUser.name || matchedUser.username || 'Player',
+                username: matchedUser.username,
+                grade: playerGrade,
+                teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                target: matchedUser.target,
+                score: webScore,
+                boardCount: webBoards || 1,
+                slams: webSlams || 0,
+                isWalkover: false,
+                bonusAchieved: (Number(matchedUser.target) || 0) > 0 ? (webScore < (Number(matchedUser.target) || 0)) : null,
+                isValid: true,
+                hasExistingWebScore: true,
+                existingWebScore: webScore,
+                existingWebSlams: webSlams,
+                existingWebBoards: webBoards,
+                existingWebSource: webSource,
+                diffType: 'MATCH',
+                diffDescription: `Preserved website score (${webScore} pts · ${webSource}) — blank in Excel (Untouched)`,
+              });
+            } else {
+              parsed.push({
+                userId: matchedUser.id,
+                dayNumber: rowDay,
+                playerName: matchedUser.name || matchedUser.username || 'Player',
+                username: matchedUser.username,
+                grade: playerGrade,
+                teamName: matchedUser.teamName || userTeamMap.get(matchedUser.id) || rawTeam || '',
+                target: matchedUser.target,
+                score: null,
+                boardCount: 1,
+                slams: 0,
+                isWalkover: true,
+                bonusAchieved: null,
+                isValid: true,
+                hasExistingWebScore: false,
+                existingWebScore: null,
+                existingWebSlams: null,
+                existingWebBoards: null,
+                existingWebSource: null,
+                diffType: 'MATCH',
+                diffDescription: `Unentered / Blank for Day ${rowDay} (Skipped)`,
+              });
+            }
+          } else if (isExplicitWo) {
             let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'WO';
-            let diffDescription = `Day ${rowDay} Walkover (Blank / WO)`;
+            let diffDescription = `Day ${rowDay} Explicit Walkover (WO)`;
 
             if (hasExisting && webScore !== null) {
               diffType = 'DIFF';
-              diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Excel is marked Walkover`;
+              diffDescription = `Website has ${webScore} pts (${webSource}) ➔ Explicit Walkover in Excel`;
             } else if (!hasExisting) {
               diffType = 'WO';
-              diffDescription = `Walkover (No score on website for Day ${rowDay})`;
+              diffDescription = `Explicit Walkover (WO) for Day ${rowDay}`;
             }
 
             parsed.push({
@@ -603,7 +653,7 @@ export default function OrganizerScoresPanel({
 
                 if (scoreMatches && slamsMatches) {
                   diffType = 'MATCH';
-                  diffDescription = `Matches website score (${webScore} pts, ${webSlams} slams)`;
+                  diffDescription = `Matches website score (${webScore} pts, ${webSlams} slams) — Skipped (Identical)`;
                 } else {
                   diffType = 'DIFF';
                   const parts: string[] = [];
@@ -658,15 +708,21 @@ export default function OrganizerScoresPanel({
     reader.readAsBinaryString(file);
   };
 
-  // ── Apply Bulk Save ──────────────────────────────────────────────────────
+  // ── Apply Bulk Save (Only changes and new additions; identical MATCH rows skipped) ──
   const handleConfirmBulkUpload = async () => {
-    const validRows = parsedRows.filter((r) => r.isValid && r.userId);
-    if (!validRows.length) return;
+    const rowsToApply = parsedRows.filter(
+      (r) => r.isValid && r.userId && (r.diffType === 'DIFF' || r.diffType === 'NEW' || (r.diffType === 'WO' && r.isWalkover))
+    );
+    if (!rowsToApply.length) {
+      alert('All scores in the uploaded file already match the website or are blank/unchanged. No updates needed.');
+      setUploadModalOpen(false);
+      return;
+    }
 
     setUploadBusy(true);
     setUploadError(null);
 
-    const payload = validRows.map((r) => ({
+    const payload = rowsToApply.map((r) => ({
       userId: r.userId,
       dayNumber: r.dayNumber,
       score: r.isWalkover ? null : r.score,
@@ -682,7 +738,7 @@ export default function OrganizerScoresPanel({
 
     if (res.success) {
       setUploadModalOpen(false);
-      setMsg(`✅ Successfully updated ${res.count} player scores across edition days.`);
+      setMsg(`✅ Successfully updated ${res.count} player scores across edition days (identical/blank scores skipped).`);
       await loadDesk();
     } else {
       setUploadError(res.error || 'Failed to save bulk scores.');
@@ -704,6 +760,7 @@ export default function OrganizerScoresPanel({
   const diffCount = parsedRows.filter((r) => r.isValid && r.diffType === 'DIFF').length;
   const newCount = parsedRows.filter((r) => r.isValid && r.diffType === 'NEW').length;
   const matchCount = parsedRows.filter((r) => r.isValid && r.diffType === 'MATCH').length;
+  const rowsToApplyCount = parsedRows.filter((r) => r.isValid && r.userId && (r.diffType === 'DIFF' || r.diffType === 'NEW' || (r.diffType === 'WO' && r.isWalkover))).length;
 
   const filteredPreviewRows = parsedRows.filter((r) => {
     // Day filter
@@ -1221,20 +1278,22 @@ export default function OrganizerScoresPanel({
 
               <Button
                 type="button"
-                disabled={uploadBusy || validParsedCount + walkoverCount === 0}
+                disabled={uploadBusy || rowsToApplyCount === 0}
                 onClick={handleConfirmBulkUpload}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs gap-1.5 shadow-md"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs gap-1.5 shadow-md disabled:opacity-50"
               >
                 {uploadBusy ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Saving All Scores…</span>
+                    <span>Saving Updates…</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
                     <span>
-                      Confirm & Save All Scores ({validParsedCount + walkoverCount})
+                      {rowsToApplyCount > 0
+                        ? `Confirm & Save ${rowsToApplyCount} Updates (${matchCount} identical skipped)`
+                        : 'All Scores Match Website (0 Updates Needed)'}
                     </span>
                   </>
                 )}
