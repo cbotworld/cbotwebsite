@@ -388,7 +388,6 @@ export default function OrganizerScoresPanel({
           'Team': teamName,
           'Player Name': u.name || u.username || 'Player',
           'Grade': playerGrade,
-          'User ID': u.id,
           'Total Score (Leave blank for WO)': existingScore ? existingScore.score : '',
           'No. of Boards': existingScore ? (Array.isArray(existingScore.boards) ? existingScore.boards.length : 1) : 1,
           'Slams': existingScore ? (existingScore.slams || 0) : 0,
@@ -402,7 +401,6 @@ export default function OrganizerScoresPanel({
       { wch: 18 }, // Team
       { wch: 24 }, // Player Name
       { wch: 10 }, // Grade
-      { wch: 30 }, // User ID
       { wch: 32 }, // Total Score (Leave blank for WO)
       { wch: 14 }, // No. of Boards
       { wch: 10 }, // Slams
@@ -436,6 +434,11 @@ export default function OrganizerScoresPanel({
         const userById = new Map(users.map((u) => [u.id.toLowerCase().trim(), u]));
         const userByUsername = new Map(users.filter((u) => u.username).map((u) => [u.username!.toLowerCase().replace('@', '').trim(), u]));
         const userByName = new Map(users.filter((u) => u.name).map((u) => [u.name!.toLowerCase().trim(), u]));
+        const userByTeamAndName = new Map(users.map((u) => {
+          const tName = (u.teamName || userTeamMap.get(u.id) || '').toLowerCase().trim();
+          const pName = (u.name || u.username || '').toLowerCase().trim();
+          return [`${tName}___${pName}`, u];
+        }));
 
         const parsed: ParsedUploadRow[] = [];
 
@@ -448,10 +451,13 @@ export default function OrganizerScoresPanel({
           const rawTeam = String(row['Team'] || row['Team Name'] || '').trim();
           const rawGrade = String(row['Grade'] || row['grade'] || row['Category'] || row['category'] || '').trim();
 
+          const teamKey = `${rawTeam.toLowerCase().trim()}___${rawName.toLowerCase().trim()}`;
+
           const matchedUser =
+            (rawTeam && rawName && userByTeamAndName.get(teamKey)) ||
+            (rawName && userByName.get(rawName.toLowerCase().trim())) ||
             (rawId && userById.get(rawId)) ||
             (rawUsername && userByUsername.get(rawUsername)) ||
-            (rawName && userByName.get(rawName.toLowerCase())) ||
             null;
 
           const playerGrade = rawGrade || (matchedUser ? getGrade(matchedUser) : '');
