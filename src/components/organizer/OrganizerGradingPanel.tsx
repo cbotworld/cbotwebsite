@@ -318,6 +318,7 @@ function PlayerCellPicker({
   players,
   assignedElsewhere,
   cellTarget,
+  participantMap,
   onSelect,
   onClear,
 }: {
@@ -325,6 +326,7 @@ function PlayerCellPicker({
   players: PlayerLite[];
   assignedElsewhere: Set<string>;
   cellTarget: number | null;
+  participantMap?: Map<string, EnrolledParticipantLite>;
   onSelect: (userId: string) => void;
   onClear: () => void;
 }) {
@@ -468,6 +470,7 @@ function PlayerCellPicker({
           <>
             {selectableOptions.map((p, index) => {
               const isActive = index === activeIndex;
+              const avg = participantMap ? getGradeAverageForUser(p, participantMap) : (p.average != null && Number(p.average) > 0 ? Number(p.average) : null);
               return (
                 <button
                   key={p.id}
@@ -480,18 +483,25 @@ function PlayerCellPicker({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1 w-full min-w-0">
-                    <span className="truncate">{playerLabel(p)}</span>
-                    {p.target !== null && p.target !== undefined && Number(p.target) >= 0 ? (
-                      Number(p.target) > 0 ? (
-                        <span className="shrink-0 font-mono text-[9px] font-bold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
-                          Target {p.target}
+                    <span className="truncate font-bold">{playerLabel(p)}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {avg !== null ? (
+                        <span className="font-mono text-[9px] font-extrabold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
+                          Avg {avg.toFixed(1)}
                         </span>
-                      ) : (
-                        <span className="shrink-0 font-mono text-[9px] font-bold text-muted-foreground bg-muted/40 px-1 py-0.5 rounded border border-border/40">
-                          No target
-                        </span>
-                      )
-                    ) : null}
+                      ) : null}
+                      {p.target !== null && p.target !== undefined && Number(p.target) >= 0 ? (
+                        Number(p.target) > 0 ? (
+                          <span className="shrink-0 font-mono text-[9px] font-bold text-violet-400 bg-violet-500/10 px-1 py-0.5 rounded border border-violet-500/20">
+                            Target {p.target}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 font-mono text-[9px] font-bold text-muted-foreground bg-muted/40 px-1 py-0.5 rounded border border-border/40">
+                            No target
+                          </span>
+                        )
+                      ) : null}
+                    </div>
                   </div>
                 </button>
               );
@@ -512,6 +522,12 @@ function PlayerCellPicker({
         ? Number(selected.target)
         : null;
 
+  const gradeAvg = selected
+    ? (participantMap
+        ? getGradeAverageForUser(selected, participantMap)
+        : (selected.average != null && Number(selected.average) > 0 ? Number(selected.average) : null))
+    : null;
+
   return (
     <div ref={wrapRef} className="relative min-w-[140px]">
       <button
@@ -527,13 +543,28 @@ function PlayerCellPicker({
       >
         <div className="flex items-center justify-between gap-1.5">
           <div className="min-w-0 flex-1">
-            <div className="truncate leading-tight">{selected ? playerLabel(selected) : 'Select player…'}</div>
-            {selected && targetToDisplay !== null ? (
-              targetToDisplay > 0 ? (
-                <div className="text-[10px] font-bold text-violet-300 leading-tight">Target {targetToDisplay}</div>
-              ) : (
-                <div className="text-[10px] font-bold text-muted-foreground leading-tight">No target</div>
-              )
+            <div className="truncate leading-tight font-bold text-foreground">
+              {selected ? playerLabel(selected) : 'Select player…'}
+            </div>
+            {selected ? (
+              <div className="flex items-center gap-1.5 flex-wrap mt-1 leading-tight">
+                {gradeAvg !== null ? (
+                  <span className="text-[9.5px] font-extrabold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 font-mono">
+                    Avg {gradeAvg.toFixed(1)}
+                  </span>
+                ) : (
+                  <span className="text-[9.5px] font-medium text-muted-foreground">
+                    No avg
+                  </span>
+                )}
+                {targetToDisplay !== null ? (
+                  targetToDisplay > 0 ? (
+                    <span className="text-[9.5px] font-bold text-violet-300">Target {targetToDisplay}</span>
+                  ) : (
+                    <span className="text-[9.5px] font-medium text-muted-foreground">No target</span>
+                  )
+                ) : null}
+              </div>
             ) : null}
           </div>
           {selected ? (
@@ -981,23 +1012,43 @@ export default function OrganizerGradingPanel({
                   <th className="sticky left-0 z-20 min-w-[52px] border-b border-r border-border/60 bg-card/95 px-3 py-3 text-left align-top">
                     <Grid3X3 className="h-4 w-4 text-muted-foreground" />
                   </th>
-                  {grid.columns.map((col) => (
-                    <th
-                      key={col.id}
-                      className="min-w-[200px] border-b border-r border-border/60 px-2 py-2 text-center align-top last:border-r-0"
-                    >
-                      <Input
-                        value={col.label}
-                        onChange={(e) => renameColumn(col.id, e.target.value)}
-                        className="h-8 text-center text-xs font-black uppercase tracking-wide border-violet-500/30 bg-background/60"
-                      />
-                      <ColumnTargetControl
-                        column={col}
-                        rowCount={grid.rowCount}
-                        onChange={(tiers) => setColumnTiers(col.id, tiers)}
-                      />
-                    </th>
-                  ))}
+                  {grid.columns.map((col) => {
+                    const colAssignedPlayers = Array.from({ length: grid.rowCount }, (_, rIdx) => {
+                      const uId = grid.cells[cellKey(col.id, rIdx)];
+                      return uId ? gradableUsers.find((u) => u.id === uId) : null;
+                    }).filter(Boolean) as PlayerLite[];
+
+                    const colAverages = colAssignedPlayers
+                      .map((p) => getGradeAverageForUser(p, participantMap))
+                      .filter((a): a is number => a !== null);
+
+                    const colAvg = colAverages.length > 0
+                      ? (colAverages.reduce((sum, a) => sum + a, 0) / colAverages.length).toFixed(1)
+                      : null;
+
+                    return (
+                      <th
+                        key={col.id}
+                        className="min-w-[200px] border-b border-r border-border/60 px-2 py-2 text-center align-top last:border-r-0"
+                      >
+                        <Input
+                          value={col.label}
+                          onChange={(e) => renameColumn(col.id, e.target.value)}
+                          className="h-8 text-center text-xs font-black uppercase tracking-wide border-violet-500/30 bg-background/60"
+                        />
+                        {colAvg !== null ? (
+                          <div className="text-[10px] font-black text-amber-400 font-mono my-1 bg-amber-500/10 py-0.5 rounded border border-amber-500/20">
+                            Grade Avg: {colAvg}
+                          </div>
+                        ) : null}
+                        <ColumnTargetControl
+                          column={col}
+                          rowCount={grid.rowCount}
+                          onChange={(tiers) => setColumnTiers(col.id, tiers)}
+                        />
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -1025,6 +1076,7 @@ export default function OrganizerGradingPanel({
                             players={gradableUsers}
                             assignedElsewhere={assignedElsewhere}
                             cellTarget={cellTarget}
+                            participantMap={participantMap}
                             onSelect={(id) => setCell(col.id, rowIndex, id)}
                             onClear={() => setCell(col.id, rowIndex, null)}
                           />
