@@ -10,12 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
-import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck } from 'lucide-react';
+import { Crown, Trophy, Calendar, CheckCircle2, Send, AlertCircle, Lock, Save, Sparkles, ChevronRight, History, RotateCcw, X, UserCheck, PartyPopper, ShieldCheck, Info, CreditCard } from 'lucide-react';
 import { sendLineupEmailAction, saveTeamDailyLineup } from '@/lib/actions/lineupActions';
 import { getTeamDayScores, submitTeamDayScores, getPublicScoreboard } from '@/lib/actions/playerScoreActions';
 import { BoardScoreEditor } from '@/components/scores/BoardScoreEditor';
 import { ScoreEditRules } from '@/components/scores/ScoreEditRules';
 import { SCORE_EDIT_CAPTAIN_CLOSED, SCORE_EDIT_CAPTAIN_HELP } from '@/lib/score-edit-policy';
+import { PlayerEnrollmentCard, type PlayerEnrollmentInfo } from '@/components/player/PlayerEnrollmentCard';
+import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 import {
   aggregateBoards,
   boardsToDraft,
@@ -117,6 +119,10 @@ export default function CaptainClient({
   initialPlayerMatches = [],
   initialPlayerStreams = [],
   initialPatterns = [],
+  registrationEnrollment = null,
+  currentEditionInfo = null,
+  shortName = DEFAULT_WEBSITE_CMS.site.shortName,
+  editionLabel = DEFAULT_WEBSITE_CMS.site.editionLabel,
 }: {
   initialTeam?: any;
   initialMembers?: any[];
@@ -130,6 +136,10 @@ export default function CaptainClient({
   initialPlayerMatches?: any[];
   initialPlayerStreams?: any[];
   initialPatterns?: any[];
+  registrationEnrollment?: PlayerEnrollmentInfo | null;
+  currentEditionInfo?: { id: string; title: string; number: number; status: string } | null;
+  shortName?: string;
+  editionLabel?: string;
 }) {
   const { data: session } = useSession();
   const sessionUser = (session?.user as any);
@@ -180,7 +190,7 @@ export default function CaptainClient({
 
   // Roster view
   const [rosterViewMode, setRosterViewMode] = React.useState<'MY_TEAM' | 'ALL_TEAMS'>('MY_TEAM');
-  const [captainTab, setCaptainTab] = React.useState<'combis' | 'scores' | 'roster' | 'player'>('combis');
+  const [captainTab, setCaptainTab] = React.useState<'combis' | 'scores' | 'roster' | 'enrollment' | 'player'>('combis');
 
   // Day lineup state
   const [selectedDayNumber, setSelectedDayNumber] = React.useState<number>(() => {
@@ -510,7 +520,7 @@ export default function CaptainClient({
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <button
           type="button"
           onClick={() => setCaptainTab('combis')}
@@ -562,6 +572,31 @@ export default function CaptainClient({
           </div>
           <div className="text-xl sm:text-2xl font-black text-foreground mt-1">
             {teamMembers.length} <span className="text-xs font-normal text-muted-foreground">Players</span>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCaptainTab('enrollment')}
+          className={`text-left p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+            captainTab === 'enrollment'
+              ? 'border-indigo-500/60 bg-indigo-500/15 shadow-sm ring-1 ring-indigo-500/40'
+              : 'border-indigo-500/30 bg-indigo-500/5 hover:border-indigo-500/50 hover:bg-indigo-500/10'
+          }`}
+        >
+          <div className="text-[10px] font-bold text-indigo-400 uppercase flex items-center justify-between">
+            <span>Next Edition</span>
+            <PartyPopper className="h-3.5 w-3.5" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-foreground mt-1 truncate">
+            {registrationEnrollment?.paymentStatus === 'VERIFIED'
+              ? 'Verified'
+              : registrationEnrollment
+                ? 'Enrolled'
+                : 'Not Enrolled'}{' '}
+            <span className="text-xs font-normal text-muted-foreground">
+              {registrationEnrollment ? `· #${registrationEnrollment.edition?.number || ''}` : '· Next Cup'}
+            </span>
           </div>
         </button>
 
@@ -631,6 +666,34 @@ export default function CaptainClient({
           <span>Team Roster</span>
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${captainTab === 'roster' ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'}`}>
             {teamMembers.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCaptainTab('enrollment')}
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-all cursor-pointer ${
+            captainTab === 'enrollment'
+              ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
+              : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-indigo-500/30'
+          }`}
+        >
+          <PartyPopper className="h-4 w-4" />
+          <span>Next Edition Status</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+            captainTab === 'enrollment'
+              ? 'bg-white/20 text-white'
+              : registrationEnrollment?.paymentStatus === 'VERIFIED'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : registrationEnrollment
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-muted text-muted-foreground'
+          }`}>
+            {registrationEnrollment?.paymentStatus === 'VERIFIED'
+              ? '✓ Verified'
+              : registrationEnrollment
+                ? (registrationEnrollment.enrollmentNumber ? `#${registrationEnrollment.enrollmentNumber}` : 'Enrolled')
+                : 'Not Enrolled'}
           </span>
         </button>
 
@@ -1039,7 +1102,43 @@ export default function CaptainClient({
         </Card>
       )}
 
-      {/* TAB 4: MY PLAYER PORTAL */}
+      {/* TAB 4: NEXT EDITION ENROLLMENT STATUS */}
+      {captainTab === 'enrollment' && (
+        <div className="space-y-6">
+          {registrationEnrollment ? (
+            <PlayerEnrollmentCard enrollment={registrationEnrollment} />
+          ) : (
+            <Card className="border-amber-500/30">
+              <CardHeader className="border-b border-border pb-4">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <PartyPopper className="h-5 w-5 text-amber-500" /> Next Edition Enrollment Status
+                </CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Registration and payment status for the upcoming tournament edition.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 text-center space-y-4">
+                <div className="p-8 rounded-2xl border border-dashed border-border bg-muted/10 space-y-3">
+                  <Info className="h-10 w-10 text-muted-foreground/50 mx-auto" />
+                  <h3 className="font-bold text-foreground text-sm">No Active Next Edition Enrollment Found</h3>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    You are not currently enrolled for the next upcoming tournament edition. Visit the tournaments page or contact the organizer to register.
+                  </p>
+                  <div className="pt-2">
+                    <Link href="/tournaments">
+                      <Button variant="carrom" size="sm" className="font-bold text-xs">
+                        View Tournaments & Register
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* TAB 5: MY PLAYER PORTAL */}
       {captainTab === 'player' && (
         <div className="pt-2">
           <PlayerClient
@@ -1052,6 +1151,10 @@ export default function CaptainClient({
             initialMatches={initialPlayerMatches}
             initialPatterns={initialPatterns}
             initialStreams={initialPlayerStreams}
+            registrationEnrollment={registrationEnrollment}
+            currentEditionInfo={currentEditionInfo}
+            shortName={shortName}
+            editionLabel={editionLabel}
           />
         </div>
       )}

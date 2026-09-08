@@ -15,6 +15,8 @@ import {
 import { listCaptainDesks } from '@/lib/mobile-team';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
+import { getMyRegistrationEnrollment } from '@/lib/actions/tournamentSlotActions';
+import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
 export const revalidate = 0;
 
@@ -189,6 +191,27 @@ export default async function CaptainPage() {
 
   const boardPatterns = await prisma.boardPattern.findMany({ take: 5 });
 
+  const websiteCms = await getWebsiteCmsContent();
+  let registrationEnrollment: any = null;
+  try {
+    const enrollmentRes = await getMyRegistrationEnrollment(captainUser?.id || userId);
+    if (enrollmentRes?.success && enrollmentRes?.enrollment?.edition) {
+      registrationEnrollment = {
+        ...enrollmentRes.enrollment,
+        enrolledAt: enrollmentRes.enrollment.enrolledAt
+          ? (typeof enrollmentRes.enrollment.enrolledAt === 'string'
+              ? enrollmentRes.enrollment.enrolledAt
+              : enrollmentRes.enrollment.enrolledAt instanceof Date && !isNaN(enrollmentRes.enrollment.enrolledAt.getTime())
+                ? enrollmentRes.enrollment.enrolledAt.toISOString()
+                : String(enrollmentRes.enrollment.enrolledAt))
+          : null,
+      };
+    }
+  } catch (err) {
+    console.error('[CaptainPage] enrollment fetch error:', err);
+    registrationEnrollment = null;
+  }
+
   return (
     <CaptainClient
       initialTeam={team}
@@ -212,6 +235,15 @@ export default async function CaptainPage() {
       initialPlayerMatches={captainPlayerMatches as any}
       initialPlayerStreams={captainLiveStreams as any}
       initialPatterns={boardPatterns as any}
+      registrationEnrollment={registrationEnrollment}
+      currentEditionInfo={activeEdition ? {
+        id: activeEdition.id,
+        title: activeEdition.title,
+        number: activeEdition.number,
+        status: activeEdition.status,
+      } : null}
+      shortName={websiteCms.site.shortName}
+      editionLabel={websiteCms.site.editionLabel}
     />
   );
 }
