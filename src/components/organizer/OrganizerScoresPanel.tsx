@@ -284,33 +284,42 @@ export default function OrganizerScoresPanel({
 
   // ── Download Day Excel Template ──────────────────────────────────────────
   const downloadDayTemplate = () => {
-    const rows = users.map((u) => {
+    // Only include assigned players who belong to a team
+    const assignedUsers = users
+      .filter((u) => {
+        const teamName = u.teamName || userTeamMap.get(u.id);
+        return Boolean(teamName && teamName.trim() !== '' && teamName.trim().toLowerCase() !== 'unassigned');
+      })
+      .sort((a, b) => {
+        const teamA = (a.teamName || userTeamMap.get(a.id) || '').toLowerCase();
+        const teamB = (b.teamName || userTeamMap.get(b.id) || '').toLowerCase();
+        if (teamA !== teamB) return teamA.localeCompare(teamB);
+        const nameA = (a.name || a.username || '').toLowerCase();
+        const nameB = (b.name || b.username || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+
+    const rows = assignedUsers.map((u) => {
       const existingScore = scores.find((s) => s.userId === u.id && s.dayNumber === day);
-      const teamName = u.teamName || userTeamMap.get(u.id) || 'Unassigned';
+      const teamName = u.teamName || userTeamMap.get(u.id) || '';
       return {
         'Team': teamName,
         'Player Name': u.name || u.username || 'Player',
-        'Username': u.username ? `@${u.username}` : '',
         'User ID': u.id,
-        'Target': Number(u.target) > 0 ? Number(u.target) : '',
         'Total Score (Leave blank for WO)': existingScore ? existingScore.score : '',
         'No. of Boards': existingScore ? (Array.isArray(existingScore.boards) ? existingScore.boards.length : 1) : 1,
         'Slams': existingScore ? (existingScore.slams || 0) : 0,
-        'Target Bonus': '=IF(F2="","WO",IF(F2<E2,"BONUS ACHIEVED","NO BONUS"))',
       };
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 16 }, // Team
-      { wch: 22 }, // Player Name
-      { wch: 18 }, // Username
-      { wch: 28 }, // User ID
-      { wch: 10 }, // Target
-      { wch: 30 }, // Total Score
+      { wch: 18 }, // Team
+      { wch: 24 }, // Player Name
+      { wch: 30 }, // User ID
+      { wch: 32 }, // Total Score (Leave blank for WO)
       { wch: 14 }, // No. of Boards
       { wch: 10 }, // Slams
-      { wch: 18 }, // Target Bonus
     ];
 
     const wb = XLSX.utils.book_new();
