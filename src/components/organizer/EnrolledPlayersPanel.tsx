@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw, CheckCircle2, Check, Clock } from 'lucide-react';
+import { UserCheck, Search, Plus, Trash2, Loader2, AlertCircle, RefreshCw, CheckCircle2, Check, Clock, Download, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -348,6 +349,59 @@ export default function EnrolledPlayersPanel({
     setInlineStatSaving(null);
   };
 
+  const downloadEnrolledPlayersExcel = () => {
+    if (!participants.length) {
+      alert('No enrolled players to download.');
+      return;
+    }
+
+    const sortedChronologically = sortByEnrollmentTimeAsc(participants);
+
+    const rows = sortedChronologically.map((p, idx) => {
+      const u = p.user;
+      const enrolledTime = p.enrolledAt ? formatEnrolledTimestamp(p.enrolledAt) : '';
+      const currentAvg = u?.average != null ? Number(u.average).toFixed(1) : '';
+      const gradeAvg = p.gradeAverage != null ? Number(p.gradeAverage).toFixed(1) : (u?.average != null ? Number(u.average).toFixed(1) : '');
+
+      return {
+        '#': idx + 1,
+        'Player Name': u?.name || u?.username || 'Player',
+        'Username': u?.username ? `@${u.username}` : '',
+        'Current Avg': currentAvg,
+        'Grade Avg': gradeAvg,
+        'SPoC': p.isSpoc ? 'Yes' : 'No',
+        'Payment Status': p.paymentStatus || (showPaymentColumns ? 'PENDING' : 'FREE'),
+        'Payment Amount (₹)': Number(p.paymentAmount || (p.paymentStatus === 'VERIFIED' ? enrollmentFee || 0 : 0)),
+        'Payment Method': p.paymentMethod || '',
+        'Comments / Transaction ID': p.paymentTransactionId || '',
+        'Enrolled Date & Time': enrolledTime,
+        'Status': p.status || 'CONFIRMED',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 6 },  // #
+      { wch: 24 }, // Player Name
+      { wch: 18 }, // Username
+      { wch: 14 }, // Current Avg
+      { wch: 14 }, // Grade Avg
+      { wch: 8 },  // SPoC
+      { wch: 16 }, // Payment Status
+      { wch: 20 }, // Payment Amount (₹)
+      { wch: 18 }, // Payment Method
+      { wch: 36 }, // Comments / Transaction ID
+      { wch: 24 }, // Enrolled Date & Time
+      { wch: 14 }, // Status
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Enrolled Players');
+    const safeEditionTitle = (editionTitle || 'Next_Edition').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const todayDate = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Enrolled_Players_${safeEditionTitle}_${todayDate}.xlsx`);
+  };
+
   if (!editionId) {
     return (
       <Card className="border-border">
@@ -379,7 +433,18 @@ export default function EnrolledPlayersPanel({
             Grade average syncs from current average until you edit it manually.
           </p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={downloadEnrolledPlayersExcel}
+            className="h-9 text-xs font-bold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500 shrink-0 shadow-xs"
+            title="Download list of enrolled players till today (.xlsx)"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Download Excel (.xlsx)
+          </Button>
           <Button
             type="button"
             size="sm"
