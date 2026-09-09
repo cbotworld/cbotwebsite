@@ -35,6 +35,7 @@ const MAX_CAMERA_RETRIES = 30;
 const RETRY_DELAY_MS = 1000;
 const LIVE_VIDEO_WIDTH = 1280;
 const LIVE_VIDEO_HEIGHT = 720;
+const AUTO_DIM_DELAY_MS = 30000; // 30 seconds inactivity dimming
 
 function toSecureIngestionUrl(address: string): string {
   return address.replace(/^rtmp:\/\//i, "rtmps://");
@@ -139,7 +140,10 @@ export function LiveScreen({ route, navigation }: Props) {
   const [stopped, setStopped] = useState(false); // show post-stream "ended" screen
   const [orientationLocked, setOrientationLocked] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [isDimmed, setIsDimmed] = useState(false);
 
+  const dimAnim = useRef(new Animated.Value(0)).current;
+  const dimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<BroadcastSession | null>(null);
   const goLiveCalledRef = useRef(false);
@@ -150,6 +154,35 @@ export function LiveScreen({ route, navigation }: Props) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
   const allowLeaveRef = useRef(false);
+
+  const resetDimTimer = useCallback(() => {
+    if (dimTimerRef.current) {
+      clearTimeout(dimTimerRef.current);
+      dimTimerRef.current = null;
+    }
+    setIsDimmed(false);
+    Animated.timing(dimAnim, {
+      toValue: 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+
+    // Inactivity dim timer runs only when live streaming or session active
+    if (sessionRef.current || streamStartRef.current) {
+      dimTimerRef.current = setTimeout(() => {
+        setIsDimmed(true);
+        Animated.timing(dimAnim, {
+          toValue: 0.92,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      }, AUTO_DIM_DELAY_MS);
+    }
+  }, [dimAnim]);
+
+  const handleUserActivity = useCallback(() => {
+    resetDimTimer();
+  }, [resetDimTimer]);
 
   const startCountdown = useCallback((seconds: number = 5) => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -198,8 +231,26 @@ export function LiveScreen({ route, navigation }: Props) {
   useEffect(() => {
     return () => {
       clearCountdown();
+      if (dimTimerRef.current) {
+        clearTimeout(dimTimerRef.current);
+        dimTimerRef.current = null;
+      }
     };
   }, [clearCountdown]);
+
+  // Manage dimming lifecycle based on session & streaming
+  useEffect(() => {
+    if (session || stream.isStreaming) {
+      resetDimTimer();
+    } else {
+      if (dimTimerRef.current) {
+        clearTimeout(dimTimerRef.current);
+        dimTimerRef.current = null;
+      }
+      setIsDimmed(false);
+      dimAnim.setValue(0);
+    }
+  }, [dimAnim, resetDimTimer, session, stream.isStreaming]);
 
   useEffect(() => {
     if (!getSession()?.token) {
@@ -632,7 +683,17 @@ export function LiveScreen({ route, navigation }: Props) {
   const bitrateKbps = typeof stream.statistics?.bitrate === "number" ? stream.statistics.bitrate : undefined;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onStartShouldSetResponderCapture={() => {
+        handleUserActivity();
+        return false;
+      }}
+      onMoveShouldSetResponderCapture={() => {
+        handleUserActivity();
+        return false;
+      }}
+    >
       <View style={StyleSheet.absoluteFill}>
         {session ? (
           <ExpoLiveStreamPublisherView
@@ -755,6 +816,24 @@ export function LiveScreen({ route, navigation }: Props) {
             </Pressable>
           )}
         </View>
+
+        {/* Auto-Dim Overlay (OLED Battery Saver after 30s inactivity) */}
+        <Animated.View
+          style={[
+            styles.dimOverlay,
+            { opacity: dimAnim },
+          ]}
+          pointerEvents={isDimmed ? "auto" : "none"}
+        >
+          {isDimmed ? (
+            <Pressable style={styles.dimPressable} onPress={handleUserActivity}>
+              <View style={styles.dimBadge}>
+                <Ionicons name="moon" size={16} color="#38bdf8" />
+                <Text style={styles.dimBadgeText}>Screen dimmed • Tap anywhere to wake</Text>
+              </View>
+            </Pressable>
+          ) : null}
+        </Animated.View>
 
         {/* On-screen Countdown Overlay */}
         {countdown !== null ? (
@@ -975,5 +1054,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginTop: 3,
+  },
+
+  // Auto-Dim (OLED Battery Saver) Overlay
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    zIndex: 35,
+  },
+  dimPressable: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 48,
+  },
+  dimBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.4)",
+    shadowColor: "#38bdf8",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dimBadgeText: {
+    color: "#e2e8f0",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
 });
