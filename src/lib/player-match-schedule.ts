@@ -200,8 +200,7 @@ export async function getPlayerMatchSchedule(
             (Boolean(d.isSpocDay) || d.stageKind === 'SPOC_EXHIBITION') &&
             !d.matches.some((m) => !m.isSpocExhibition);
           if (spocOnly) return false;
-          if (matchForTeam(d)) return true;
-          return !d.matches.some((m) => !m.isSpocExhibition);
+          return true;
         })
         .map((d) => d.dayNumber)
         .filter((n, i, arr) => n > 0 && arr.indexOf(n) === i)

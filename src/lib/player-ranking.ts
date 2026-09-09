@@ -94,6 +94,8 @@ export function rankPlayers(opts: {
       breakdown?: any;
     }> = [];
 
+    let scheduledMatchesCount = 0;
+
     for (const day of days) {
       // If pairings/schedule is provided, only consider days where player's team has a scheduled match
       if (hasPairings && player.teamId) {
@@ -103,6 +105,8 @@ export function rankPlayers(opts: {
           continue;
         }
       }
+
+      scheduledMatchesCount += 1;
 
       const row = byKey.get(scoreKey(player.userId, day));
       if (row) {
@@ -158,6 +162,7 @@ export function rankPlayers(opts: {
       teamName: player.teamName,
       grade: player.grade || null,
       target: player.target ?? null,
+      matches: scheduledMatchesCount,
       daysCounted: Math.max(0, daysProcessed - walkovers),
       walkovers,
       totalScore,

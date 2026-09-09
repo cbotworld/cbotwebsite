@@ -372,6 +372,7 @@ export interface PlayerRankingRow {
   teamName: string;
   grade?: string | null;
   target?: number | null;
+  matches?: number;
   daysCounted: number;
   walkovers: number;
   totalScore: number;

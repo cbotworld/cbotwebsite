@@ -232,8 +232,6 @@ export default function PlayerClient({
       const computedStatus = windowStatus === 'completed' ? 'COMPLETED' : windowStatus === 'live' ? 'LIVE' : 'SCHEDULED';
 
       if (!fix) {
-        const assignedOnDay = playerView === 'spoc' ? day.matches.some((m) => m.isSpocExhibition) : hasMainMatches;
-        if (assignedOnDay) return null;
         return {
           id: `schedule_${day.dayNumber}_TBD`,
           matchNumber: day.dayNumber,
@@ -253,7 +251,7 @@ export default function PlayerClient({
           team2Id: 'tbd',
           team2: {
             id: 'tbd',
-            name: 'TBD',
+            name: 'TBD / Open Play',
             logo: '',
           },
         };

@@ -116,6 +116,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     <TableHead className="w-12">#</TableHead>
                     <TableHead>Player</TableHead>
                     <TableHead>Team</TableHead>
+                    <TableHead className="text-center">Matches</TableHead>
                     <TableHead className="text-center">Slams</TableHead>
                     <TableHead className="text-center">WO</TableHead>
                     <TableHead className="text-right">Avg</TableHead>
@@ -145,6 +146,9 @@ export default function StandingsClient({ payload }: { payload: any }) {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">{row.teamName}</TableCell>
+                      <TableCell className="text-center font-bold text-xs text-foreground">
+                        {row.matches ?? row.daysCounted ?? 0}
+                      </TableCell>
                       <TableCell className="text-center">
                         {row.slams > 0 ? (
                           <span className="text-xs font-bold text-amber-400 flex items-center justify-center gap-0.5">
@@ -490,7 +494,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
               <div className="p-2.5 rounded-xl bg-card border border-border">
                 <div className="text-[10px] font-bold uppercase text-muted-foreground">Rank</div>
                 <div className="text-base font-black text-amber-400">#{selectedPlayer.rank}</div>
@@ -500,8 +504,12 @@ export default function StandingsClient({ payload }: { payload: any }) {
                 <div className="text-base font-black text-foreground">{selectedPlayer.boardAverage == null ? '—' : Number(selectedPlayer.boardAverage).toFixed(2)}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-card border border-border">
-                <div className="text-[10px] font-bold uppercase text-muted-foreground">Matches Won</div>
-                <div className="text-base font-black text-foreground">{selectedPlayer.matchesWon ?? 0}</div>
+                <div className="text-[10px] font-bold uppercase text-muted-foreground">Matches</div>
+                <div className="text-base font-black text-foreground">{selectedPlayer.matches ?? selectedPlayer.daysCounted ?? 0}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-card border border-border">
+                <div className="text-[10px] font-bold uppercase text-muted-foreground">Slams</div>
+                <div className="text-base font-black text-amber-400">{selectedPlayer.slams ?? 0}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-card border border-border">
                 <div className="text-[10px] font-bold uppercase text-muted-foreground">Walkovers</div>
