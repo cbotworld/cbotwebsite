@@ -926,7 +926,14 @@ export default function DailyCombisClient({
 
         {/* DAY SELECTOR TABS & SEARCH & EXCEL DOWNLOAD */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 relative z-10 pt-1">
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x scrollbar-none pb-1.5 w-full">
+          <div
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x desktop-slim-scrollbar pb-2 w-full md:flex-1 min-w-0"
+          >
             {scheduleDays.map((d) => {
               const isSelected = d.dayNumber === selectedDayNum;
               const dCutoff = new Date(d.cutoffIso).getTime();

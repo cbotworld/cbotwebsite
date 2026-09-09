@@ -24,6 +24,7 @@ export function normalizeBoards(
   raw: unknown,
   fallbackScore?: number | null,
   fallbackSlams?: number | null,
+  defaultBoardCount = 4,
 ): DayBoardScore[] {
   if (Array.isArray(raw) && raw.length > 0) {
     const boards: DayBoardScore[] = [];
@@ -39,7 +40,7 @@ export function normalizeBoards(
     if (boards.length) return boards;
   }
   if (fallbackScore == null || !Number.isFinite(Number(fallbackScore))) return [];
-  return [{ score: Number(fallbackScore), slams: Number(fallbackSlams) || 0 }];
+  return summaryToBoards(Number(fallbackScore), defaultBoardCount, Number(fallbackSlams) || 0);
 }
 
 export function aggregateBoards(boards: DayBoardScore[]) {

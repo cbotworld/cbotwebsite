@@ -194,7 +194,14 @@ export function ScheduleClient({
         {/* SEARCH & DAY FILTER TABS */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 pt-1 sm:pt-2 relative z-10">
           {/* Day Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto touch-scroll-x scrollbar-none pb-1.5 w-full md:flex-1">
+          <div
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className="flex items-center gap-1.5 overflow-x-auto touch-scroll-x desktop-slim-scrollbar pb-2 w-full md:flex-1 min-w-0"
+          >
             <button
               onClick={() => setSelectedDay('ALL')}
               className={`px-3 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-extrabold whitespace-nowrap transition-all shrink-0 ${

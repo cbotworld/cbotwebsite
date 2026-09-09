@@ -144,6 +144,43 @@
   background: rgba(156, 163, 175, 0.5);
 }
 
+/* Sleek slim scrollbar without bulky handles (desktop only) */
+@media (min-width: 768px) {
+  .desktop-slim-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(245, 158, 11, 0.45) rgba(255, 255, 255, 0.05);
+  }
+  .desktop-slim-scrollbar::-webkit-scrollbar {
+    display: block !important;
+    height: 4px;
+    width: 4px;
+  }
+  .desktop-slim-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 9999px;
+  }
+  .desktop-slim-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(245, 158, 11, 0.4);
+    border-radius: 9999px;
+    transition: background 0.15s ease;
+  }
+  .desktop-slim-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 158, 11, 0.75);
+  }
+}
+
+@media (max-width: 767px) {
+  .desktop-slim-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  .desktop-slim-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
 .grading-player-list {
   scrollbar-width: auto;
   scrollbar-color: rgba(251, 191, 36, 0.55) rgba(255, 255, 255, 0.08);

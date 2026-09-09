@@ -227,7 +227,14 @@ export default function PlayerScoresClient({
 
       {/* ── Day Selector Buttons ───────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x scrollbar-none pb-1.5 flex-1 min-w-0">
+        <div
+          onWheel={(e) => {
+            if (e.deltaY !== 0) {
+              e.currentTarget.scrollLeft += e.deltaY;
+            }
+          }}
+          className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto touch-scroll-x desktop-slim-scrollbar pb-2 flex-1 min-w-0"
+        >
           {dayList.map((d) => (
             <button
               key={d.dayNumber}
