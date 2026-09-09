@@ -138,7 +138,9 @@ export function LiveScreen({ route, navigation }: Props) {
   const [isMuted, setIsMuted] = useState(true);
   const [stopped, setStopped] = useState(false); // show post-stream "ended" screen
   const [orientationLocked, setOrientationLocked] = useState(true);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<BroadcastSession | null>(null);
   const goLiveCalledRef = useRef(false);
   const muteAppliedRef = useRef(false);
@@ -148,6 +150,29 @@ export function LiveScreen({ route, navigation }: Props) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
   const allowLeaveRef = useRef(false);
+
+  const startCountdown = useCallback((seconds: number = 5) => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setCountdown(seconds);
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const clearCountdown = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
 
   const stream = useLiveStream({
     autoStopOnUnmount: true,
@@ -169,6 +194,12 @@ export function LiveScreen({ route, navigation }: Props) {
     },
     [],
   );
+
+  useEffect(() => {
+    return () => {
+      clearCountdown();
+    };
+  }, [clearCountdown]);
 
   useEffect(() => {
     if (!getSession()?.token) {
@@ -263,12 +294,15 @@ export function LiveScreen({ route, navigation }: Props) {
     async (broadcastId: string) => {
       if (goLiveCalledRef.current) return;
       goLiveCalledRef.current = true;
+      startCountdown(5);
       setStatus("Going live on YouTube…", "info");
 
       try {
         await goLive(broadcastId);
+        clearCountdown();
         setStatus("🔴 Live on YouTube", "info");
       } catch (error) {
+        clearCountdown();
         const message = error instanceof Error ? error.message : "Go live request failed";
         setStatus("Streaming — YouTube may take a moment", "warn");
         console.warn("goLive:", message);
@@ -276,7 +310,7 @@ export function LiveScreen({ route, navigation }: Props) {
         setBusy(false);
       }
     },
-    [setStatus],
+    [clearCountdown, setStatus, startCountdown],
   );
 
   const scheduleStartAttempt = useCallback(() => {
@@ -698,7 +732,9 @@ export function LiveScreen({ route, navigation }: Props) {
               {busy ? (
                 <View style={styles.busyRow}>
                   <ActivityIndicator color="#fff" />
-                  <Text style={styles.recordButtonText}>  Setting up…</Text>
+                  <Text style={styles.recordButtonText}>
+                    {countdown !== null ? `  Going Live (${countdown}s)…` : "  Setting up…"}
+                  </Text>
                 </View>
               ) : (
                 <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
@@ -709,7 +745,9 @@ export function LiveScreen({ route, navigation }: Props) {
               {busy ? (
                 <View style={styles.busyRow}>
                   <ActivityIndicator color="#fff" />
-                  <Text style={styles.recordButtonText}>  Stopping…</Text>
+                  <Text style={styles.recordButtonText}>
+                    {countdown !== null ? `  Going Live (${countdown}s)…` : "  Stopping…"}
+                  </Text>
                 </View>
               ) : (
                 <Text style={styles.recordButtonText}>⏹  STOP STREAM</Text>
@@ -717,6 +755,19 @@ export function LiveScreen({ route, navigation }: Props) {
             </Pressable>
           )}
         </View>
+
+        {/* On-screen Countdown Overlay */}
+        {countdown !== null ? (
+          <View style={styles.countdownOverlay} pointerEvents="none">
+            <View style={styles.countdownBadge}>
+              <View style={styles.countdownPulseCircle}>
+                <Text style={styles.countdownNumber}>{countdown}</Text>
+              </View>
+              <Text style={styles.countdownTitle}>GOING LIVE</Text>
+              <Text style={styles.countdownSub}>Connecting to YouTube…</Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -870,4 +921,59 @@ const styles = StyleSheet.create({
     backgroundColor: "#1e293b",
   },
   buttonText: { color: "#fff", fontWeight: "700" },
+
+  // Countdown Overlay
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 40,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  countdownBadge: {
+    backgroundColor: "rgba(15, 23, 42, 0.92)",
+    borderRadius: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "rgba(239, 68, 68, 0.7)",
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    elevation: 14,
+    minWidth: 200,
+  },
+  countdownPulseCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(239, 68, 68, 0.18)",
+    borderWidth: 2,
+    borderColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  countdownNumber: {
+    color: "#ef4444",
+    fontSize: 36,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  countdownTitle: {
+    color: "#f8fafc",
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginTop: 2,
+  },
+  countdownSub: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 3,
+  },
 });

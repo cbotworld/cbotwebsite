@@ -295,21 +295,68 @@ export async function listOfficialChannelVideos(limit = 300): Promise<ChannelVid
 
 export async function transitionBroadcast(broadcastId: string, status: 'live' | 'complete') {
   const accessToken = await getAccessToken();
-  const maxAttempts = status === 'live' ? 12 : 1;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=${status}&id=${encodeURIComponent(broadcastId)}&part=id,status`,
-      {
-        method: 'POST',
-        headers: ytHeaders(accessToken),
-      },
-    );
-    const data = await res.json();
-    if (!data.error) return;
-    if (status !== 'live' || attempt === maxAttempts - 1) {
-      youtubeError(data, `Failed to set broadcast ${status}.`);
+  if (status === 'complete') {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=complete&id=${encodeURIComponent(broadcastId)}&part=id,status`,
+        {
+          method: 'POST',
+          headers: ytHeaders(accessToken),
+        },
+      );
+      const data = await res.json();
+      if (data.error && !String(data.error.message || '').toLowerCase().includes('redundant')) {
+        console.warn('YouTube complete transition warning:', data.error);
+      }
+    } catch (err) {
+      console.warn('YouTube complete transition error:', err);
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return;
+  }
+
+  // status === 'live'
+  const maxAttempts = 6;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?broadcastStatus=live&id=${encodeURIComponent(broadcastId)}&part=id,status`,
+        {
+          method: 'POST',
+          headers: ytHeaders(accessToken),
+        },
+      );
+      const data = await res.json();
+      if (!data.error) return;
+
+      const errMsg = String(data.error?.message || '').toLowerCase();
+      const reason = String(data.error?.errors?.[0]?.reason || '').toLowerCase();
+      // If already live, redundant transition, or auto-started, return immediately without delay
+      if (errMsg.includes('redundant') || errMsg.includes('already') || reason.includes('redundant')) {
+        return;
+      }
+
+      // Check broadcast lifeCycle status directly
+      if (attempt >= 1) {
+        const checkRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(broadcastId)}&part=status`,
+          { headers: ytHeaders(accessToken) },
+        );
+        const checkData = await checkRes.json();
+        const lifeCycle = checkData.items?.[0]?.status?.lifeCycleStatus;
+        if (lifeCycle === 'live' || lifeCycle === 'liveStarting' || lifeCycle === 'testing' || lifeCycle === 'ready') {
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn(`YouTube live transition attempt ${attempt + 1} warning:`, err);
+    }
+
+    if (attempt === maxAttempts - 1) {
+      // Auto-start is enabled, broadcast will start as frames flow
+      console.log('YouTube transition finished attempts, auto-start stream active.');
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }

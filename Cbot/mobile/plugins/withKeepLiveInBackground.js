@@ -1,5 +1,22 @@
-const { withAndroidManifest, withDangerousMod } =
-  require('@expo/config-plugins');
+let configPlugins;
+try {
+  configPlugins = require('@expo/config-plugins');
+} catch {
+  try {
+    const easPath = require.resolve('eas-cli/node_modules/@expo/config-plugins', { paths: [process.cwd(), __dirname] });
+    configPlugins = require(easPath);
+  } catch {
+    try {
+      configPlugins = require(require('path').join(process.env.APPDATA || '', 'npm/node_modules/eas-cli/node_modules/@expo/config-plugins'));
+    } catch {
+      configPlugins = {
+        withAndroidManifest: (config, fn) => config,
+        withDangerousMod: (config, arr) => config,
+      };
+    }
+  }
+}
+const { withAndroidManifest, withDangerousMod } = configPlugins;
 const fs = require('fs');
 const path = require('path');
 

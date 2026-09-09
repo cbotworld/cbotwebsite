@@ -13,31 +13,7 @@
       "backgroundColor": "#1c0205"
     },
     "plugins": [
-      "expo-dev-client",
-      "expo-screen-orientation",
-      "./plugins/withKeepLiveInBackground",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Cbot needs camera access to live stream to YouTube.",
-          "microphonePermission": "Cbot needs microphone access to live stream to YouTube.",
-          "recordAudioAndroid": true
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Cbot needs photo access to attach screenshots to issue reports.",
-          "androidPhotoPicker": true
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#f59e0b"
-        }
-      ]
+      "./plugins/withKeepLiveInBackground"
     ],
     "ios": {
       "supportsTablet": true,
