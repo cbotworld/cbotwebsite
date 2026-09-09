@@ -67,8 +67,8 @@ async function enrichStagePairingNames(editionId: string, config: TournamentStag
       ...stage,
       matchPairings: (stage.matchPairings || []).map((p) => ({
         ...p,
-        team1Name: byId.get(p.team1Id) || p.team1Name || '',
-        team2Name: byId.get(p.team2Id) || p.team2Name || '',
+        team1Name: p.team1Id ? byId.get(p.team1Id) || '' : '',
+        team2Name: p.team2Id ? byId.get(p.team2Id) || '' : '',
       })),
     })),
   };
@@ -358,37 +358,50 @@ export type StagePairingInput = {
   tableNumber?: number;
 };
 
-async function loadStageConfig(editionId: string, teamCount = 8): Promise<TournamentStageConfig> {
+async function loadStageConfig(editionId: string, teamCount = 0): Promise<TournamentStageConfig> {
   const setting = await prisma.systemSetting.findUnique({
     where: { key: stageConfigKey(editionId) },
   });
-  if (!setting?.value) return defaultTournamentStages(teamCount);
+  const editionTeams = await prisma.team.findMany({
+    where: { editionId },
+    select: { id: true, name: true },
+  });
+  const actualTeamCount = editionTeams.length;
+  const validTeamMap = new Map(editionTeams.map((t) => [t.id, t.name]));
+
+  if (!setting?.value) return defaultTournamentStages(actualTeamCount);
   try {
     const parsed = JSON.parse(setting.value);
-    const editionTeams = await prisma.team.findMany({
-      where: { editionId },
-      select: { id: true },
-    });
-    const validTeamIds = new Set(editionTeams.map((t) => t.id));
+
+    if (actualTeamCount === 0) {
+      return defaultTournamentStages(0);
+    }
 
     if (parsed?.stages && Array.isArray(parsed.stages)) {
       parsed.stages = parsed.stages.map((st: any) => ({
         ...st,
-        matchPairings: (st.matchPairings || []).filter(
-          (p: any) =>
-            (p.team1Id && validTeamIds.has(p.team1Id)) ||
-            (p.team2Id && validTeamIds.has(p.team2Id))
-        ),
+        teamCount: actualTeamCount,
+        matchPairings: (st.matchPairings || [])
+          .filter(
+            (p: any) =>
+              (p.team1Id && validTeamMap.has(p.team1Id)) ||
+              (p.team2Id && validTeamMap.has(p.team2Id))
+          )
+          .map((p: any) => ({
+            ...p,
+            team1Name: p.team1Id ? validTeamMap.get(p.team1Id) || '' : '',
+            team2Name: p.team2Id ? validTeamMap.get(p.team2Id) || '' : '',
+          })),
         groups: (st.groups || []).map((g: any) => ({
           ...g,
-          teamIds: (g.teamIds || []).filter((id: string) => validTeamIds.has(id)),
+          teamIds: (g.teamIds || []).map((id: string) => (validTeamMap.has(id) ? id : '')),
         })),
       }));
     }
 
-    return normalizeStageConfig(parsed, teamCount);
+    return normalizeStageConfig(parsed, actualTeamCount);
   } catch {
-    return defaultTournamentStages(teamCount);
+    return defaultTournamentStages(actualTeamCount);
   }
 }
 
@@ -440,7 +453,7 @@ export async function getEditionStageSnapshot(editionId: string): Promise<
 
     const teams = filterMainTeams(allTeams);
     const spocTeams = filterSpocTeams(allTeams);
-    const config = await loadStageConfig(editionId, teams.length || 8);
+    const config = await loadStageConfig(editionId, teams.length);
     const rrStandings = computeStandings(teams, matches, (stage) => matchesStageKind(stage, 'ROUND_ROBIN'));
 
     const standingsByGroup: Record<string, ReturnType<typeof computeStandings>> = {};

@@ -22,9 +22,9 @@ export function stageConfigKey(editionId: string) {
   return `${STAGE_SETTING_PREFIX}${editionId}`;
 }
 
-export function defaultTournamentStages(teamCount = 8): TournamentStageConfig {
+export function defaultTournamentStages(teamCount = 0): TournamentStageConfig {
   const groupsNeeded = 2;
-  const perGroup = Math.max(2, Math.ceil(teamCount / groupsNeeded));
+  const perGroup = teamCount > 0 ? Math.max(2, Math.ceil(teamCount / groupsNeeded)) : 4;
   return {
     scheduleMode: 'DIVIDED',
     stages: [
@@ -36,6 +36,7 @@ export function defaultTournamentStages(teamCount = 8): TournamentStageConfig {
         teamCount,
         startDay: 1,
         durationDays: 7,
+        matchPairings: [],
       },
       {
         id: 'stage-2',
@@ -50,6 +51,7 @@ export function defaultTournamentStages(teamCount = 8): TournamentStageConfig {
         groups: emptyGroups(groupsNeeded, perGroup),
         startDay: 8,
         durationDays: 3,
+        matchPairings: [],
       },
       {
         id: 'stage-3',
@@ -59,6 +61,7 @@ export function defaultTournamentStages(teamCount = 8): TournamentStageConfig {
         pairing: 'CROSS',
         startDay: 11,
         durationDays: 2,
+        matchPairings: [],
       },
       {
         id: 'stage-4',
@@ -68,6 +71,7 @@ export function defaultTournamentStages(teamCount = 8): TournamentStageConfig {
         includeThirdPlace: false,
         startDay: 13,
         durationDays: 1,
+        matchPairings: [],
       },
     ],
   };
@@ -679,13 +683,13 @@ export const STAGE_PATHS: Array<{ id: string; label: string; hint: string; kinds
 export function createTournamentStage(
   kind: StageKind,
   order: number,
-  teamCount = 8,
+  teamCount = 0,
   leagueIndex = 1
 ): TournamentStage {
   const id = `stage-${kind.toLowerCase().replace('_', '-')}-${order}-${leagueIndex}`;
   if (kind === 'LEAGUE') {
     const groupCount = 2;
-    const teamsPerGroup = Math.max(2, Math.ceil(teamCount / groupCount));
+    const teamsPerGroup = teamCount > 0 ? Math.max(2, Math.ceil(teamCount / groupCount)) : 4;
     return {
       id,
       order,
@@ -698,6 +702,7 @@ export function createTournamentStage(
       leagueIndex,
       groups: emptyGroups(groupCount, teamsPerGroup),
       durationDays: defaultDurationForKind('LEAGUE'),
+      matchPairings: [],
     };
   }
   if (kind === 'QUALIFIER') {
@@ -708,10 +713,11 @@ export function createTournamentStage(
       name: leagueIndex > 1 ? 'Qualifiers 2' : 'Qualifiers',
       pairing: 'CROSS',
       durationDays: 2,
+      matchPairings: [],
     };
   }
   if (kind === 'FINALS') {
-    return { id, order, kind, name: 'Finals', includeThirdPlace: false, durationDays: 1 };
+    return { id, order, kind, name: 'Finals', includeThirdPlace: false, durationDays: 1, matchPairings: [] };
   }
   if (kind === 'SPOC_EXHIBITION') {
     return {
@@ -725,13 +731,13 @@ export function createTournamentStage(
       matchPairings: [],
     };
   }
-  return { id, order, kind, name: 'Round Robin', teamCount, startDay: 1, durationDays: defaultDurationForKind('ROUND_ROBIN') };
+  return { id, order, kind, name: 'Round Robin', teamCount, startDay: 1, durationDays: defaultDurationForKind('ROUND_ROBIN'), matchPairings: [] };
 }
 
 export function stagesFromPath(
   kinds: StageKind[],
   existing: TournamentStage[] = [],
-  teamCount = 8
+  teamCount = 0
 ): TournamentStage[] {
   const usedIds = new Set<string>();
   let leagueCount = 0;

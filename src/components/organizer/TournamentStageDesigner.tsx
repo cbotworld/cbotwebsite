@@ -330,7 +330,33 @@ export default function TournamentStageDesigner({
     const res = await getEditionStageSnapshot(editionId);
     if (res.success) {
       const lastDone = lastCompletedDay(dayDates);
-      const nextConfig = res.config || defaultTournamentStages(res.teams.length || teams.length || 0);
+      const teamCount = res.teams?.length ?? teams.length ?? 0;
+      const nextConfig = res.config || defaultTournamentStages(teamCount);
+      const validTeamIds = new Set((res.teams || teams).map((t) => t.id));
+      nextConfig.stages = (nextConfig.stages || []).map((stage) => {
+        if (validTeamIds.size === 0) {
+          return {
+            ...stage,
+            teamCount: 0,
+            matchPairings: [],
+            groups: (stage.groups || []).map((g) => ({
+              ...g,
+              teamIds: (g.teamIds || []).map(() => ''),
+            })),
+          };
+        }
+        return {
+          ...stage,
+          teamCount: stage.teamCount || validTeamIds.size,
+          matchPairings: (stage.matchPairings || []).filter(
+            (p) => (p.team1Id && validTeamIds.has(p.team1Id)) || (p.team2Id && validTeamIds.has(p.team2Id))
+          ),
+          groups: (stage.groups || []).map((g) => ({
+            ...g,
+            teamIds: (g.teamIds || []).map((id) => (validTeamIds.has(id) ? id : '')),
+          })),
+        };
+      });
       nextConfig.stages = layoutStageDays(nextConfig.stages, lastDone);
       setConfig(nextConfig);
       if (nextConfig.scheduleMode) setScheduleMode(nextConfig.scheduleMode);
@@ -339,7 +365,7 @@ export default function TournamentStageDesigner({
       setMessage({ type: 'err', text: res.error || 'Could not load stage design.' });
     }
     setLoading(false);
-  }, [editionId, teams.length]);
+  }, [editionId, teams]);
 
   React.useEffect(() => {
     loadSnapshot();
@@ -539,11 +565,14 @@ export default function TournamentStageDesigner({
   const leagueGroupSignature = JSON.stringify(active?.kind === 'LEAGUE' ? active.groups || [] : []);
 
   const applyLeaguePairings = (next: SuggestedPairing[]) => {
-    const enriched = next.map((p) => ({
-      ...p,
-      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
-      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
-    }));
+    const validTeamIds = new Set(teams.map((t) => t.id));
+    const enriched = next
+      .filter((p) => (!p.team1Id || validTeamIds.has(p.team1Id)) && (!p.team2Id || validTeamIds.has(p.team2Id)))
+      .map((p) => ({
+        ...p,
+        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || '',
+        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || '',
+      }));
     setLeaguePairings(enriched);
     updateStage({ matchPairings: enriched });
   };
@@ -564,6 +593,10 @@ export default function TournamentStageDesigner({
 
   React.useEffect(() => {
     if (active?.kind !== 'LEAGUE') return;
+    if (teams.length < 2) {
+      setLeaguePairings([]);
+      return;
+    }
     const sig = leagueGroupSignature;
     const groupsChanged = sig !== lastLeagueGroupSig.current && lastLeagueGroupSig.current !== '';
     lastLeagueGroupSig.current = sig;
@@ -574,26 +607,31 @@ export default function TournamentStageDesigner({
       return;
     }
     if (active.matchPairings?.length) {
-      const existing = active.matchPairings;
-      if (official) {
-        const pairKey = (p: SuggestedPairing) => [p.team1Id, p.team2Id].filter(Boolean).sort().join('|');
-        const officialKeys = new Set(official.map(pairKey));
-        const matchesOfficial =
-          existing.length === official.length && existing.every((p) => officialKeys.has(pairKey(p)));
-        if (!matchesOfficial) {
-          applyLeaguePairings(official);
-          return;
+      const validTeamIds = new Set(teams.map((t) => t.id));
+      const existing = active.matchPairings.filter(
+        (p) => (p.team1Id && validTeamIds.has(p.team1Id)) || (p.team2Id && validTeamIds.has(p.team2Id))
+      );
+      if (existing.length > 0) {
+        if (official) {
+          const pairKey = (p: SuggestedPairing) => [p.team1Id, p.team2Id].filter(Boolean).sort().join('|');
+          const officialKeys = new Set(official.map(pairKey));
+          const matchesOfficial =
+            existing.length === official.length && existing.every((p) => officialKeys.has(pairKey(p)));
+          if (!matchesOfficial) {
+            applyLeaguePairings(official);
+            return;
+          }
         }
+        const start = active.startDay || 8;
+        const needsSlot =
+          !pairingsAlreadyScheduled(existing) &&
+          (existing.some((p) => !p.dayNumber) ||
+            hasTeamPlayingTwiceOnSameDay(existing) ||
+            existing.some((p) => p.round && p.dayNumber !== start + (p.round - 1)));
+        if (needsSlot) applyLeaguePairings(slotLeaguePairings(existing));
+        else setLeaguePairings(existing);
+        return;
       }
-      const start = active.startDay || 8;
-      const needsSlot =
-        !pairingsAlreadyScheduled(existing) &&
-        (existing.some((p) => !p.dayNumber) ||
-          hasTeamPlayingTwiceOnSameDay(existing) ||
-          existing.some((p) => p.round && p.dayNumber !== start + (p.round - 1)));
-      if (needsSlot) applyLeaguePairings(slotLeaguePairings(existing));
-      else setLeaguePairings(existing);
-      return;
     }
     if (stageMatches.length) {
       const fromMatches = stageMatches.map((m, idx) => ({
@@ -610,16 +648,19 @@ export default function TournamentStageDesigner({
     }
     applyLeaguePairings(slotLeaguePairings(leaguePairingsSource()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.kind, active?.id, leagueGroupSignature]);
+  }, [active?.kind, active?.id, leagueGroupSignature, teams.length]);
 
   const [rrPairings, setRrPairings] = React.useState<SuggestedPairing[]>([]);
 
   const applyRrPairings = (next: SuggestedPairing[]) => {
-    const enriched = next.map((p) => ({
-      ...p,
-      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
-      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
-    }));
+    const validTeamIds = new Set(teams.map((t) => t.id));
+    const enriched = next
+      .filter((p) => (!p.team1Id || validTeamIds.has(p.team1Id)) && (!p.team2Id || validTeamIds.has(p.team2Id)))
+      .map((p) => ({
+        ...p,
+        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || '',
+        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || '',
+      }));
     setRrPairings(enriched);
     updateStage({ matchPairings: enriched });
   };
@@ -635,9 +676,19 @@ export default function TournamentStageDesigner({
 
   React.useEffect(() => {
     if (active?.kind !== 'ROUND_ROBIN') return;
-    if (active.matchPairings?.length) {
-      setRrPairings(active.matchPairings);
+    if (teams.length < 2) {
+      setRrPairings([]);
       return;
+    }
+    if (active.matchPairings?.length) {
+      const validTeamIds = new Set(teams.map((t) => t.id));
+      const valid = active.matchPairings.filter(
+        (p) => (p.team1Id && validTeamIds.has(p.team1Id)) || (p.team2Id && validTeamIds.has(p.team2Id))
+      );
+      if (valid.length > 0) {
+        setRrPairings(valid);
+        return;
+      }
     }
     if (stageMatches.length) {
       applyRrPairings(
@@ -693,21 +744,27 @@ export default function TournamentStageDesigner({
   );
 
   const applyQualifierPairings = (next: SuggestedPairing[]) => {
-    const enriched = next.map((p) => ({
-      ...p,
-      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
-      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
-    }));
+    const validTeamIds = new Set(teams.map((t) => t.id));
+    const enriched = next
+      .filter((p) => (!p.team1Id || validTeamIds.has(p.team1Id)) && (!p.team2Id || validTeamIds.has(p.team2Id)))
+      .map((p) => ({
+        ...p,
+        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || '',
+        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || '',
+      }));
     setQualifierPairings(enriched);
     updateStage({ matchPairings: enriched });
   };
 
   const applyFinalsPairings = (next: SuggestedPairing[]) => {
-    const enriched = next.map((p) => ({
-      ...p,
-      team1Name: teams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
-      team2Name: teams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
-    }));
+    const validTeamIds = new Set(teams.map((t) => t.id));
+    const enriched = next
+      .filter((p) => (!p.team1Id || validTeamIds.has(p.team1Id)) && (!p.team2Id || validTeamIds.has(p.team2Id)))
+      .map((p) => ({
+        ...p,
+        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || '',
+        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || '',
+      }));
     setFinalsPairings(enriched);
     updateStage({
       matchPairings: enriched,
@@ -717,11 +774,14 @@ export default function TournamentStageDesigner({
 
   const [spocPairings, setSpocPairings] = React.useState<SuggestedPairing[]>([]);
   const applySpocPairings = (next: SuggestedPairing[]) => {
-    const enriched = next.map((p) => ({
-      ...p,
-      team1Name: spocTeams.find((t) => t.id === p.team1Id)?.name || p.team1Name || '',
-      team2Name: spocTeams.find((t) => t.id === p.team2Id)?.name || p.team2Name || '',
-    }));
+    const validSpocIds = new Set(spocTeams.map((t) => t.id));
+    const enriched = next
+      .filter((p) => (!p.team1Id || validSpocIds.has(p.team1Id)) && (!p.team2Id || validSpocIds.has(p.team2Id)))
+      .map((p) => ({
+        ...p,
+        team1Name: (p.team1Id && spocTeams.find((t) => t.id === p.team1Id)?.name) || '',
+        team2Name: (p.team2Id && spocTeams.find((t) => t.id === p.team2Id)?.name) || '',
+      }));
     setSpocPairings(enriched);
     updateStage({ matchPairings: enriched });
   };
@@ -1189,6 +1249,11 @@ export default function TournamentStageDesigner({
                     Every team plays each other once. Each day follows the event start date above, so changing that
                     date moves these fixtures with it. Days that have finished stay locked.
                   </p>
+                  {teams.length < 2 && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-400 font-semibold">
+                      No teams created yet for this edition. Create and assign teams under the <strong>Teams</strong> tab first to auto-fill Round Robin fixtures.
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {rrDayGroups.map(({ day, entries, locked, live, dateLabel }) => (
                       <div key={day} className="rounded-xl border border-border bg-card p-3 space-y-2">
