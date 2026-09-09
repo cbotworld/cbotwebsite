@@ -824,16 +824,37 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   const [autoAssigning, setAutoAssigning] = React.useState(false);
   const [teamsNotice, setTeamsNotice] = React.useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [spocWarningModalOpen, setSpocWarningModalOpen] = React.useState(false);
+  const [spocWarningData, setSpocWarningData] = React.useState<{
+    warning: string;
+    spocCount: number;
+    teamCount: number;
+    missingSpocCount: number;
+  } | null>(null);
 
-  const handleAutoAssignPlayers = async () => {
+  const handleAutoAssignPlayers = async (force = false) => {
     const editionId = selectedEditionId || slotAEdition?.id || '';
     if (!editionId || autoAssigning) return;
     setAutoAssigning(true);
     setTeamsNotice(null);
 
-    const res = await autoAssignPlayersToTeams(editionId);
+    const res = await autoAssignPlayersToTeams(editionId, force);
+
+    if (res.requiresConfirmation) {
+      setSpocWarningData({
+        warning: res.warning || 'At least one team does not have a SPOC.',
+        spocCount: res.spocCount || 0,
+        teamCount: res.teamCount || 0,
+        missingSpocCount: res.missingSpocCount || 0,
+      });
+      setSpocWarningModalOpen(true);
+      setAutoAssigning(false);
+      return;
+    }
 
     if (res.success) {
+      setSpocWarningModalOpen(false);
+      setSpocWarningData(null);
       const spread = (res.breakdown || []).map((b: any) => `${b.name}: ${b.count}`).join(' · ');
       setTeamsNotice({
         kind: 'ok',
@@ -1816,7 +1837,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Button
               variant="outline"
               size="sm"
-              onClick={handleAutoAssignPlayers}
+              onClick={() => void handleAutoAssignPlayers(false)}
               disabled={autoAssigning || selectedEditionTeams.length === 0}
               className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
               title="Spread every player evenly across these teams, keeping each captain on their own team"
@@ -3423,6 +3444,55 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               ) : (
                 'Clear all tournament data'
               )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog open={spocWarningModalOpen} onOpenChange={setSpocWarningModalOpen}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-amber-400">
+            <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" /> SPOC Assignment Warning
+          </DialogTitle>
+          <DialogDescription>
+            {spocWarningData?.warning || 'At least one team will not have a SPOC assigned.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 space-y-1">
+            <p className="font-semibold text-amber-400">Assignment Notice:</p>
+            <p>
+              Total Teams: <strong>{spocWarningData?.teamCount}</strong> · Total SPOCs: <strong>{spocWarningData?.spocCount}</strong>
+            </p>
+            <p>
+              <strong>{spocWarningData?.missingSpocCount}</strong> team(s) will be formed without a dedicated SPOC.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            You can proceed with auto-assigning players now, or cancel to designate more SPOCs in the Enrolled Players tab.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setSpocWarningModalOpen(false);
+                setSpocWarningData(null);
+              }}
+              disabled={autoAssigning}
+              className="text-xs font-semibold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="carrom"
+              onClick={() => void handleAutoAssignPlayers(true)}
+              disabled={autoAssigning}
+              className="text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
+            >
+              {autoAssigning ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+              Proceed Anyway
             </Button>
           </div>
         </div>

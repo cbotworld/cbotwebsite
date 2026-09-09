@@ -17,6 +17,7 @@ import { syncCaptainRole } from '@/lib/captain-role';
 import { filterMainTeams } from '@/lib/spoc-teams';
 import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 import { getNextEditionNumber } from '@/lib/current-edition';
+import { gradingSettingKey, parseGradingGrid, cellKey } from '@/lib/grading';
 
 export async function createEdition(formData: FormData, organizerId: string) {
   const session = await getServerSession(authOptions);
@@ -786,12 +787,26 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 /**
- * Spreads every eligible player across the edition's main teams as evenly as
- * possible, replacing whatever rosters exist. Each team keeps the captain it
- * was given, and an uneven total puts the spare players on the first teams —
- * 129 players over 8 teams gives one team 17 and the rest 16.
+ * Spreads every eligible player across the edition's main teams evenly:
+ * 1. Assigns captains to their respective teams.
+ * 2. Ensures at least 1 SPOC per team (warning if SPOC count is insufficient).
+ * 3. Arranges players by Grade (G1 -> Gn) avoiding duplicate grades on the same team.
  */
-export async function autoAssignPlayersToTeams(editionId: string) {
+export async function autoAssignPlayersToTeams(
+  editionId: string,
+  force = false,
+): Promise<{
+  success: boolean;
+  requiresConfirmation?: boolean;
+  spocCount?: number;
+  teamCount?: number;
+  missingSpocCount?: number;
+  warning?: string;
+  assigned?: number;
+  teamCountAssigned?: number;
+  breakdown?: Array<{ name: string; count: number }>;
+  error?: string;
+}> {
   const session = await getServerSession(authOptions);
   if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
     return { success: false, error: 'Unauthorized: Organizer access required.' };
@@ -808,85 +823,349 @@ export async function autoAssignPlayersToTeams(editionId: string) {
       return { success: false, error: 'Add the teams first, then auto-assign players.' };
     }
 
-    const players = await prisma.user.findMany({
+    // 1. Fetch enrolled edition participants
+    const enrolledParticipants = await prisma.editionParticipant.findMany({
       where: {
-        role: 'PLAYER',
-        NOT: { username: { in: AUTO_ASSIGN_EXCLUDED_USERNAMES } },
+        editionId,
+        status: { notIn: ['CANCELLED', 'DROPPED', 'REJECTED'] },
       },
-      select: { id: true },
-      orderBy: { name: 'asc' },
+      include: {
+        user: {
+          select: { id: true, name: true, username: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
     });
-    if (!players.length) {
+
+    // 2. Fetch player pool
+    let candidateUsers: Array<{
+      id: string;
+      name?: string | null;
+      username?: string | null;
+      category?: string | null;
+      isSpoc?: boolean;
+    }> = [];
+
+    if (enrolledParticipants.length > 0) {
+      candidateUsers = enrolledParticipants
+        .filter((p) => p.user && !AUTO_ASSIGN_EXCLUDED_USERNAMES.includes(p.user.username || ''))
+        .map((p) => ({
+          id: p.user.id,
+          name: p.user.name,
+          username: p.user.username,
+          category: p.category,
+          isSpoc: Boolean(p.isSpoc),
+        }));
+
+      // Ensure any assigned captain is included if missing from participants
+      const participantUserIds = new Set(candidateUsers.map((u) => u.id));
+      const missingCaptains = teams
+        .map((t) => t.captainId)
+        .filter((cid): cid is string => typeof cid === 'string' && cid.length > 0 && !participantUserIds.has(cid));
+
+      if (missingCaptains.length > 0) {
+        const extraCaptains = await prisma.user.findMany({
+          where: { id: { in: missingCaptains } },
+          select: { id: true, name: true, username: true },
+        });
+        for (const cap of extraCaptains) {
+          candidateUsers.push({
+            id: cap.id,
+            name: cap.name,
+            username: cap.username,
+            category: null,
+            isSpoc: false,
+          });
+        }
+      }
+    } else {
+      const allPlayers = await prisma.user.findMany({
+        where: {
+          role: 'PLAYER',
+          NOT: { username: { in: AUTO_ASSIGN_EXCLUDED_USERNAMES } },
+        },
+        select: { id: true, name: true, username: true },
+        orderBy: { name: 'asc' },
+      });
+      candidateUsers = allPlayers.map((u) => ({
+        id: u.id,
+        name: u.name,
+        username: u.username,
+        category: null,
+        isSpoc: false,
+      }));
+    }
+
+    if (!candidateUsers.length) {
       return { success: false, error: 'There are no eligible players to assign.' };
     }
 
-    const playerIds = new Set(players.map((p) => p.id));
+    // 3. Load edition grading grid to resolve exact player grades (G1, G2, etc.)
+    const gradingRow = await prisma.systemSetting.findUnique({
+      where: { key: gradingSettingKey(editionId) },
+    });
+    const grid = parseGradingGrid(gradingRow?.value);
+    const gridUserGradeMap = new Map<string, string>();
+    grid.columns.forEach((col) => {
+      const gradeLabel = (col.label || '').trim().toUpperCase();
+      for (let r = 0; r < grid.rowCount; r++) {
+        const uid = grid.cells[cellKey(col.id, r)];
+        if (uid) {
+          gridUserGradeMap.set(uid, gradeLabel);
+        }
+      }
+    });
 
-    // Even split, with the remainder landing one-per-team on the first teams.
-    const base = Math.floor(players.length / teams.length);
-    const remainder = players.length % teams.length;
+    // 4. Map candidates with resolved Grade & SPOC
+    const candidateList = candidateUsers.map((p) => {
+      let grade = gridUserGradeMap.get(p.id) || p.category || '';
+      grade = grade.trim().toUpperCase();
+      if (!grade) grade = 'G?';
+
+      const m = grade.match(/^G(\d+)$/i);
+      const gradeRank = m ? parseInt(m[1], 10) : 999;
+
+      return {
+        id: p.id,
+        name: p.name || p.username || 'Player',
+        grade,
+        gradeRank,
+        isSpoc: Boolean(p.isSpoc),
+      };
+    });
+
+    const spocCount = candidateList.filter((p) => p.isSpoc).length;
+    const teamCount = teams.length;
+
+    // Pre-check: If SPOC count is less than team count and not forced
+    if (spocCount < teamCount && !force) {
+      return {
+        success: false,
+        requiresConfirmation: true,
+        spocCount,
+        teamCount,
+        missingSpocCount: teamCount - spocCount,
+        warning: `Only ${spocCount} SPOC${spocCount === 1 ? '' : 's'} available for ${teamCount} teams. ${teamCount - spocCount} team${teamCount - spocCount === 1 ? '' : 's'} will not have a SPOC. Do you want to proceed anyway?`,
+      };
+    }
+
+    // 5. Team distribution capacity calculation
+    const base = Math.floor(candidateList.length / teams.length);
+    const remainder = candidateList.length % teams.length;
     const capacity = new Map<string, number>(
       teams.map((team, index) => [team.id, base + (index < remainder ? 1 : 0)]),
     );
 
-    // A captain belongs on the team they captain, so seat them before the rest.
-    const rosters = new Map<string, string[]>(teams.map((team) => [team.id, []]));
-    const seated = new Set<string>();
+    type TeamState = {
+      id: string;
+      name: string;
+      members: string[];
+      grades: Set<string>;
+      hasSpoc: boolean;
+      targetCapacity: number;
+    };
+
+    const teamStates: TeamState[] = teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      members: [],
+      grades: new Set<string>(),
+      hasSpoc: false,
+      targetCapacity: capacity.get(team.id) || 0,
+    }));
+    const teamMap = new Map(teamStates.map((t) => [t.id, t]));
+    const assignedPlayerIds = new Set<string>();
+
+    // Step 1: Assign Captains to their designated teams
     for (const team of teams) {
       const captainId = team.captainId;
-      if (captainId && playerIds.has(captainId) && !seated.has(captainId)) {
-        rosters.get(team.id)!.push(captainId);
-        seated.add(captainId);
+      if (captainId) {
+        const player = candidateList.find((p) => p.id === captainId);
+        if (player && !assignedPlayerIds.has(player.id)) {
+          const state = teamMap.get(team.id)!;
+          state.members.push(player.id);
+          if (player.grade && player.grade !== 'G?') {
+            state.grades.add(player.grade);
+          }
+          if (player.isSpoc) {
+            state.hasSpoc = true;
+          }
+          assignedPlayerIds.add(player.id);
+        }
       }
     }
 
-    const queue = shuffled(players.map((p) => p.id).filter((id) => !seated.has(id)));
-    for (const team of teams) {
-      const roster = rosters.get(team.id)!;
-      while (roster.length < (capacity.get(team.id) || 0) && queue.length) {
-        roster.push(queue.pop()!);
-      }
-    }
-    // Anything left over (teams already full of captains) tops up the smallest team.
-    while (queue.length) {
-      const smallest = teams.reduce((a, b) =>
-        rosters.get(a.id)!.length <= rosters.get(b.id)!.length ? a : b,
+    // Step 2: Assign at least 1 SPOC to each team that lacks a SPOC
+    const unassignedSpocs = candidateList.filter((p) => p.isSpoc && !assignedPlayerIds.has(p.id));
+    const shuffledSpocs = shuffled(unassignedSpocs);
+
+    for (const state of teamStates) {
+      if (state.hasSpoc) continue;
+      if (!shuffledSpocs.length) break;
+
+      // Prefer a SPOC without grade collision on this team
+      let pickIndex = shuffledSpocs.findIndex(
+        (p) => !p.grade || p.grade === 'G?' || !state.grades.has(p.grade),
       );
-      rosters.get(smallest.id)!.push(queue.pop()!);
+      if (pickIndex === -1) {
+        pickIndex = 0;
+      }
+
+      const [spoc] = shuffledSpocs.splice(pickIndex, 1);
+      state.members.push(spoc.id);
+      if (spoc.grade && spoc.grade !== 'G?') {
+        state.grades.add(spoc.grade);
+      }
+      state.hasSpoc = true;
+      assignedPlayerIds.add(spoc.id);
     }
 
-    const existing = await prisma.editionParticipant.findMany({
-      where: { editionId },
-      select: { id: true, userId: true },
+    const teamsWithoutSpoc = teamStates.filter((t) => !t.hasSpoc);
+    if (teamsWithoutSpoc.length > 0 && !force) {
+      return {
+        success: false,
+        requiresConfirmation: true,
+        spocCount,
+        teamCount,
+        missingSpocCount: teamsWithoutSpoc.length,
+        warning: `${teamsWithoutSpoc.length} team${teamsWithoutSpoc.length === 1 ? '' : 's'} (${teamsWithoutSpoc.map((t) => t.name).join(', ')}) will not have a SPOC. Do you want to proceed anyway?`,
+      };
+    }
+
+    // Step 3: Arrange remaining players by Grade (G1 -> G2 -> ... -> Gn)
+    // No two players of the same grade in one team (unless players in that grade exceed teams)
+    const unassignedPlayers = candidateList.filter((p) => !assignedPlayerIds.has(p.id));
+    const gradeGroups = new Map<string, typeof candidateList>();
+
+    for (const p of unassignedPlayers) {
+      const g = p.grade || 'G?';
+      if (!gradeGroups.has(g)) {
+        gradeGroups.set(g, []);
+      }
+      gradeGroups.get(g)!.push(p);
+    }
+
+    // Sort grade tiers: G1, G2, G3...
+    const sortedGradeKeys = Array.from(gradeGroups.keys()).sort((a, b) => {
+      const mA = a.match(/^G(\d+)$/i);
+      const mB = b.match(/^G(\d+)$/i);
+      if (mA && mB) return parseInt(mA[1], 10) - parseInt(mB[1], 10);
+      if (mA) return -1;
+      if (mB) return 1;
+      return a.localeCompare(b);
     });
-    const participantIdByUser = new Map(existing.map((p) => [p.userId, p.id]));
+
+    for (const gradeKey of sortedGradeKeys) {
+      if (gradeKey === 'G?') continue;
+      const group = shuffled(gradeGroups.get(gradeKey)!);
+
+      while (group.length > 0) {
+        // Find teams without this grade that still need players under target capacity
+        let eligibleTeams = teamStates.filter(
+          (t) => !t.grades.has(gradeKey) && t.members.length < t.targetCapacity,
+        );
+
+        if (eligibleTeams.length === 0) {
+          // If no team without this grade has room under capacity, check any team under capacity
+          eligibleTeams = teamStates.filter((t) => t.members.length < t.targetCapacity);
+        }
+
+        if (eligibleTeams.length === 0) {
+          // If all teams reached capacity, pick teams with fewest members
+          const minMembers = Math.min(...teamStates.map((t) => t.members.length));
+          eligibleTeams = teamStates.filter((t) => t.members.length === minMembers);
+        }
+
+        // Balance by lowest member count first
+        eligibleTeams.sort((a, b) => a.members.length - b.members.length);
+
+        const targetTeam = eligibleTeams[0];
+        const player = group.pop()!;
+        targetTeam.members.push(player.id);
+        targetTeam.grades.add(gradeKey);
+        assignedPlayerIds.add(player.id);
+      }
+    }
+
+    // Step 4: Distribute 'G?' and remaining players
+    const remainingQueue = shuffled(
+      candidateList.filter((p) => !assignedPlayerIds.has(p.id)),
+    );
+
+    while (remainingQueue.length > 0) {
+      let eligibleTeams = teamStates.filter((t) => t.members.length < t.targetCapacity);
+      if (eligibleTeams.length === 0) {
+        eligibleTeams = teamStates;
+      }
+      eligibleTeams.sort((a, b) => a.members.length - b.members.length);
+
+      const targetTeam = eligibleTeams[0];
+      const player = remainingQueue.pop()!;
+      targetTeam.members.push(player.id);
+      if (player.grade && player.grade !== 'G?') {
+        targetTeam.grades.add(player.grade);
+      }
+      assignedPlayerIds.add(player.id);
+    }
+
+    // Step 5: Save assignments in database transaction
+    const participantMapByUser = new Map(
+      (
+        await prisma.editionParticipant.findMany({
+          where: { editionId },
+          select: { id: true, userId: true },
+        })
+      ).map((p) => [p.userId, p.id]),
+    );
+
+    const candidateMap = new Map(candidateList.map((c) => [c.id, c]));
 
     await prisma.$transaction(async (tx) => {
-      // Clear every existing link first so nobody keeps a stale team.
+      // Clear every existing team link first so nobody keeps a stale team
       await tx.editionParticipant.updateMany({
         where: { editionId },
         data: { teamId: null },
       });
 
-      const missing: Array<{ editionId: string; userId: string; teamId: string; status: string }> = [];
-      for (const team of teams) {
-        const roster = rosters.get(team.id)!;
-        const known = roster
-          .map((userId) => participantIdByUser.get(userId))
-          .filter((id): id is string => Boolean(id));
-        if (known.length) {
-          await tx.editionParticipant.updateMany({
-            where: { id: { in: known } },
-            data: { teamId: team.id },
-          });
-        }
-        for (const userId of roster) {
-          if (!participantIdByUser.has(userId)) {
-            missing.push({ editionId, userId, teamId: team.id, status: 'REGISTERED' });
+      const missing: Array<{
+        editionId: string;
+        userId: string;
+        teamId: string;
+        status: string;
+        category?: string | null;
+        isSpoc?: boolean;
+      }> = [];
+
+      for (const team of teamStates) {
+        for (const userId of team.members) {
+          const participantId = participantMapByUser.get(userId);
+          const cand = candidateMap.get(userId);
+          const cat = cand?.grade && cand.grade !== 'G?' ? cand.grade : null;
+          const isSpoc = Boolean(cand?.isSpoc);
+
+          if (participantId) {
+            await tx.editionParticipant.update({
+              where: { id: participantId },
+              data: {
+                teamId: team.id,
+                ...(cat ? { category: cat } : {}),
+                isSpoc,
+              },
+            });
+          } else {
+            missing.push({
+              editionId,
+              userId,
+              teamId: team.id,
+              status: 'REGISTERED',
+              category: cat,
+              isSpoc,
+            });
           }
         }
       }
-      if (missing.length) {
+
+      if (missing.length > 0) {
         await tx.editionParticipant.createMany({ data: missing });
       }
     });
@@ -894,17 +1173,15 @@ export async function autoAssignPlayersToTeams(editionId: string) {
     revalidatePath('/dashboard/organizer');
     revalidatePath('/teams');
     revalidatePath('/teams-and-players');
-    // The homepage marquee and fixtures render team posters and are ISR-cached,
-    // so they have to be invalidated too or a new logo stays hidden for an hour.
     revalidatePath('/', 'layout');
 
     return {
       success: true,
-      assigned: players.length,
+      assigned: candidateList.length,
       teamCount: teams.length,
-      breakdown: teams.map((team) => ({
+      breakdown: teamStates.map((team) => ({
         name: team.name,
-        count: rosters.get(team.id)!.length,
+        count: team.members.length,
       })),
     };
   } catch (error: any) {
