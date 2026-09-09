@@ -2,12 +2,16 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter } from 'lucide-react';
+import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter, Crown, ChevronRight, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
 import { getCurrentEditionCombisData } from '@/lib/actions/combisActions';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
+import { scoreMatchDay } from '@/lib/combi-results';
+import { isCombiSubmissionLocked } from '@/lib/combi-cutoff';
 import {
   buildOrganizerScheduleDays,
   formatCalendarDate,
@@ -79,6 +83,154 @@ const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; bor
   },
 };
 
+function findTeamByKey(teamKey: string, teamsList: any[]) {
+  if (!teamKey) return undefined;
+  const keyUpper = teamKey.trim().toUpperCase();
+  return (teamsList || []).find((t: any) => {
+    if (!t) return false;
+    if (t.id && (t.id === teamKey || String(t.id).toUpperCase() === keyUpper)) return true;
+    const nameUpper = (t.name || '').trim().toUpperCase();
+    const tagUpper = (t.tag || '').trim().toUpperCase();
+    return (
+      nameUpper === keyUpper ||
+      tagUpper === keyUpper ||
+      (keyUpper.length >= 3 && nameUpper.startsWith(keyUpper)) ||
+      (nameUpper.length >= 3 && keyUpper.startsWith(nameUpper))
+    );
+  });
+}
+
+function teamRoster(team: any) {
+  if (!team) return [];
+  const rows = team.members || [];
+  const byId = new Map<string, { id: string; name?: string | null }>();
+  if (team.captain?.id) {
+    byId.set(team.captain.id, { id: team.captain.id, name: team.captain.name || team.captain.username });
+  }
+  for (const row of rows) {
+    const user = row.user || row;
+    if (!user?.id) continue;
+    byId.set(user.id, { id: user.id, name: user.name || user.username });
+  }
+  return Array.from(byId.values());
+}
+
+function scoreMapForDay(scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>, dayNum: number) {
+  const map: Record<string, { score: number; slams: number; isWalkover?: boolean }> = {};
+  for (const row of scores || []) {
+    if (row.dayNumber !== dayNum) continue;
+    map[row.userId] = { score: row.score, slams: row.slams || 0, isWalkover: Boolean((row as any).isWalkover) };
+  }
+  return map;
+}
+
+function getDetailedMatchCombiData({
+  dayNumber,
+  team1Name,
+  team2Name,
+  dbTeams,
+  dbScores,
+}: {
+  dayNumber: number;
+  team1Name: string;
+  team2Name: string;
+  dbTeams: any[];
+  dbScores: any[];
+}) {
+  const t1 = findTeamByKey(team1Name, dbTeams);
+  const t2 = findTeamByKey(team2Name, dbTeams);
+  if (!t1 || !t2) return null;
+
+  const roster1 = teamRoster(t1);
+  const roster2 = teamRoster(t2);
+  const rosterMap1 = new Map(roster1.map((p) => [p.id, p.name || 'Player']));
+  const rosterMap2 = new Map(roster2.map((p) => [p.id, p.name || 'Player']));
+
+  const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber });
+  const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber });
+
+  const scoreMap = scoreMapForDay(dbScores, dayNumber);
+  const matchResult = scoreMatchDay(combi1.rounds, combi2.rounds, roster1, roster2, scoreMap);
+
+  const events = matchResult.events.map((ev, idx) => {
+    const r1 = combi1.rounds?.[idx];
+    const r2 = combi2.rounds?.[idx];
+
+    const t1PlayerList = (ev.team1PlayerIds && ev.team1PlayerIds.length > 0 ? ev.team1PlayerIds : (r1?.playerIds || [])).map((id: any) => {
+      const pId = String(id || '');
+      const name = rosterMap1.get(pId) || (r1?.players && r1.players[0]) || 'Player';
+      const scoreObj = scoreMap[pId];
+      const isWO = !scoreObj || Boolean(scoreObj.isWalkover);
+      return {
+        id: pId,
+        name,
+        score: scoreObj?.score ?? null,
+        slams: scoreObj?.slams ?? 0,
+        isWalkover: isWO,
+      };
+    });
+
+    const t2PlayerList = (ev.team2PlayerIds && ev.team2PlayerIds.length > 0 ? ev.team2PlayerIds : (r2?.playerIds || [])).map((id: any) => {
+      const pId = String(id || '');
+      const name = rosterMap2.get(pId) || (r2?.players && r2.players[0]) || 'Player';
+      const scoreObj = scoreMap[pId];
+      const isWO = !scoreObj || Boolean(scoreObj.isWalkover);
+      return {
+        id: pId,
+        name,
+        score: scoreObj?.score ?? null,
+        slams: scoreObj?.slams ?? 0,
+        isWalkover: isWO,
+      };
+    });
+
+    const t1SumScore = t1PlayerList.reduce((sum, p) => sum + (p.score || 0), 0);
+    const t2SumScore = t2PlayerList.reduce((sum, p) => sum + (p.score || 0), 0);
+    const t1HasWO = t1PlayerList.length === 0 || t1PlayerList.some((p) => p.isWalkover);
+    const t2HasWO = t2PlayerList.length === 0 || t2PlayerList.some((p) => p.isWalkover);
+
+    let explanation = '';
+    if (ev.reason === 'double-walkover') {
+      explanation = 'Double Walkover (0 pts)';
+    } else if (ev.reason === 'walkover') {
+      if (ev.winnerTeam === 1) {
+        explanation = `${t2.name} Walkover (${t1.name} +2 pts)`;
+      } else {
+        explanation = `${t1.name} Walkover (${t2.name} +2 pts)`;
+      }
+    } else if (ev.reason === 'tie') {
+      explanation = `Tied score (${t1SumScore} vs ${t2SumScore}) · 1 pt each`;
+    } else if (ev.winnerTeam === 1) {
+      explanation = `${t1.name} won by lower score (${t1SumScore} vs ${t2SumScore}) · +2 pts`;
+    } else if (ev.winnerTeam === 2) {
+      explanation = `${t2.name} won by lower score (${t2SumScore} vs ${t1SumScore}) · +2 pts`;
+    }
+
+    return {
+      name: ev.name,
+      format: ev.format,
+      winnerTeam: ev.winnerTeam,
+      reason: ev.reason,
+      team1Pts: ev.team1Pts,
+      team2Pts: ev.team2Pts,
+      team1PlayerList: t1PlayerList.length > 0 ? t1PlayerList : (r1?.players || []).map((name) => ({ name, score: null, isWalkover: false })),
+      team2PlayerList: t2PlayerList.length > 0 ? t2PlayerList : (r2?.players || []).map((name) => ({ name, score: null, isWalkover: false })),
+      team1SumScore: t1HasWO ? null : t1SumScore,
+      team2SumScore: t2HasWO ? null : t2SumScore,
+      t1HasWO,
+      t2HasWO,
+      explanation,
+    };
+  });
+
+  return {
+    t1,
+    t2,
+    matchResult,
+    events,
+  };
+}
+
 export function ScheduleClient({
   pageCms = DEFAULT_WEBSITE_CMS.pages.schedule,
 }: {
@@ -89,6 +241,30 @@ export function ScheduleClient({
   const [nowMs, setNowMs] = React.useState(() => Date.now());
   const [scheduleDays, setScheduleDays] = React.useState<OrganizerScheduleDay[]>([]);
   const [stages, setStages] = React.useState<Array<{ order?: number; kind?: string; name?: string; startDay?: number; durationDays?: number }>>([]);
+  const [dbTeams, setDbTeams] = React.useState<any[]>([]);
+  const [dbScores, setDbScores] = React.useState<any[]>([]);
+  const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
+  const [selectedMatch, setSelectedMatch] = React.useState<{
+    dayNumber: number;
+    stageLabel: string;
+    calendarDate: string;
+    title: string;
+    matchLabel?: string;
+    t1: any;
+    t2: any;
+    isSpoc?: boolean;
+  } | null>(null);
+
+  const matchDetails = React.useMemo(() => {
+    if (!selectedMatch) return null;
+    return getDetailedMatchCombiData({
+      dayNumber: selectedMatch.dayNumber,
+      team1Name: selectedMatch.t1.name,
+      team2Name: selectedMatch.t2.name,
+      dbTeams,
+      dbScores,
+    });
+  }, [selectedMatch, dbTeams, dbScores]);
 
   const liveDayNum = React.useMemo(
     () => scheduleDays.find((d) => monumentStatus(d, nowMs) === 'live')?.dayNumber ?? null,
@@ -110,6 +286,9 @@ export function ScheduleClient({
           } catch {}
         }
         setStages(nextStages);
+        setDbTeams(res.teams || []);
+        setDbScores(res.scores || []);
+        setDayDatesMap(dayDates);
         setScheduleDays(
           buildOrganizerScheduleDays({
             totalDays: res.edition?.totalDays,
@@ -138,6 +317,26 @@ export function ScheduleClient({
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, []);
+
+  const getMatchScoreResult = React.useCallback(
+    (dayNum: number, team1Name: string, team2Name: string) => {
+      const locked = isCombiSubmissionLocked(dayNum, dayDatesMap, new Date(nowMs));
+      if (!locked) return null;
+      const t1 = findTeamByKey(team1Name, dbTeams);
+      const t2 = findTeamByKey(team2Name, dbTeams);
+      if (!t1 || !t2) return null;
+      const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: dayNum });
+      const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: dayNum });
+      return scoreMatchDay(
+        combi1.rounds,
+        combi2.rounds,
+        teamRoster(t1),
+        teamRoster(t2),
+        scoreMapForDay(dbScores, dayNum)
+      );
+    },
+    [dayDatesMap, nowMs, dbTeams, dbScores]
+  );
 
   const filteredDays = scheduleDays.filter((d) => {
     if (selectedDay !== 'ALL' && d.dayNumber !== selectedDay) return false;
@@ -352,6 +551,12 @@ export function ScheduleClient({
                     bg: t2Face.bg || TEAMS_INFO[t2Face.name]?.bg || 'bg-muted',
                   };
 
+                  const matchResult = !isSpoc ? getMatchScoreResult(d.dayNumber, t1.name, t2.name) : null;
+                  const hasResult = matchResult !== null;
+                  const isT1Winner = hasResult && matchResult.matchWinner === 1;
+                  const isT2Winner = hasResult && matchResult.matchWinner === 2;
+                  const isTie = hasResult && matchResult.matchWinner === 0;
+
                   const isMatchHighlighted = searchTerm.trim() && (
                     t1.name.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
                     t2.name.toLowerCase().includes(searchTerm.toLowerCase().trim())
@@ -360,13 +565,27 @@ export function ScheduleClient({
                   return (
                     <div
                       key={matchIdx}
-                      className={`p-3 sm:p-5 rounded-2xl border transition-all ${
+                      onClick={() => {
+                        setSelectedMatch({
+                          dayNumber: d.dayNumber,
+                          stageLabel: d.stageLabel,
+                          calendarDate: d.calendarDate,
+                          title: d.title,
+                          matchLabel: match.matchLabel,
+                          t1,
+                          t2,
+                          isSpoc,
+                        });
+                      }}
+                      className={`p-3 sm:p-5 rounded-2xl border transition-all cursor-pointer group ${
                         isSpoc ? 'md:col-span-2' : ''
                       } ${
                         isMatchHighlighted
                           ? 'border-amber-400 bg-amber-500/15 shadow-md shadow-amber-500/20'
                           : isSpoc
                           ? 'border-violet-500/50 bg-violet-950/20 hover:border-violet-400/60'
+                          : hasResult
+                          ? 'border-border/80 bg-card/95 hover:border-amber-500/60 hover:shadow-lg shadow-sm'
                           : 'border-border/70 bg-card/90 hover:border-amber-500/40 hover:bg-card'
                       }`}
                     >
@@ -389,54 +608,101 @@ export function ScheduleClient({
                         </div>
                       ) : null}
                       <div className="flex items-center justify-between gap-2 sm:gap-3">
-                      {/* Team 1 */}
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className={`${isSpoc ? 'h-16 w-14 sm:h-32 sm:w-24' : 'h-11 w-11 min-[400px]:h-13 min-[400px]:w-13 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
-                          <img
-                            src={t1.logo}
-                            alt={t1.name}
-                            className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
-                          />
+                        {/* Team 1 */}
+                        <div className={`flex items-center gap-2 sm:gap-3 flex-1 min-w-0 transition-opacity ${isT2Winner ? 'opacity-55' : 'opacity-100'}`}>
+                          <div className={`relative ${isSpoc ? 'h-16 w-14 sm:h-32 sm:w-24' : 'h-11 w-11 min-[400px]:h-13 min-[400px]:w-13 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${isT1Winner ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-emerald-500/20 shadow-lg' : t1.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                            <img
+                              src={t1.logo}
+                              alt={t1.name}
+                              className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
+                            />
+                            {isT1Winner && (
+                              <div className="absolute -top-1 -right-1 bg-emerald-500 text-slate-950 rounded-full p-0.5 shadow-md">
+                                <Crown className="h-3 w-3 fill-current" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : isT1Winner ? 'text-emerald-400 font-extrabold' : t1.color}`} title={t1.name}>
+                                {t1.name}
+                              </span>
+                              {isT1Winner && (
+                                <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
+                                  <Crown className="h-2.5 w-2.5 text-emerald-400 inline" /> Winner
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                              {t1.tag}
+                            </span>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t1.color}`} title={t1.name}>
-                            {t1.name}
-                          </span>
-                          <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
-                            {t1.tag}
-                          </span>
+
+                        {/* VS / Score Divider */}
+                        {hasResult ? (
+                          <div className="flex flex-col items-center justify-center shrink-0 px-1.5 sm:px-3">
+                            <div className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-xs sm:text-base bg-slate-950/90 border border-border/80 shadow-md">
+                              <span className={isT1Winner ? 'text-emerald-400 font-extrabold text-sm sm:text-lg' : isT2Winner ? 'text-muted-foreground/70' : 'text-foreground'}>
+                                {matchResult.team1EventPts}
+                              </span>
+                              <span className="text-muted-foreground/40 text-[10px] sm:text-xs font-normal">–</span>
+                              <span className={isT2Winner ? 'text-emerald-400 font-extrabold text-sm sm:text-lg' : isT1Winner ? 'text-muted-foreground/70' : 'text-foreground'}>
+                                {matchResult.team2EventPts}
+                              </span>
+                            </div>
+                            <span className="text-[8px] sm:text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mt-0.5">
+                              {isTie ? 'Tie / Draw' : 'Event Pts'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-2">
+                            <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-sm ${
+                              isSpoc
+                                ? 'text-violet-300 bg-violet-500/15 border border-violet-500/40'
+                                : 'text-amber-500 bg-amber-500/10 border border-amber-500/30'
+                            }`}>
+                              VS
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Team 2 */}
+                        <div className={`flex items-center justify-end gap-2 sm:gap-3 flex-1 min-w-0 text-right transition-opacity ${isT1Winner ? 'opacity-55' : 'opacity-100'}`}>
+                          <div className="min-w-0 flex flex-col items-end">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {isT2Winner && (
+                                <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
+                                  <Crown className="h-2.5 w-2.5 text-emerald-400 inline" /> Winner
+                                </span>
+                              )}
+                              <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : isT2Winner ? 'text-emerald-400 font-extrabold' : t2.color}`} title={t2.name}>
+                                {t2.name}
+                              </span>
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                              {t2.tag}
+                            </span>
+                          </div>
+                          <div className={`relative ${isSpoc ? 'h-16 w-14 sm:h-32 sm:w-24' : 'h-11 w-11 min-[400px]:h-13 min-[400px]:w-13 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${isT2Winner ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-emerald-500/20 shadow-lg' : t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
+                            <img
+                              src={t2.logo}
+                              alt={t2.name}
+                              className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
+                            />
+                            {isT2Winner && (
+                              <div className="absolute -top-1 -right-1 bg-emerald-500 text-slate-950 rounded-full p-0.5 shadow-md">
+                                <Crown className="h-3 w-3 fill-current" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* VS Divider */}
-                      <div className="flex flex-col items-center justify-center shrink-0 px-1 sm:px-2">
-                        <span className={`text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg shadow-sm ${
-                          isSpoc
-                            ? 'text-violet-300 bg-violet-500/15 border border-violet-500/40'
-                            : 'text-amber-500 bg-amber-500/10 border border-amber-500/30'
-                        }`}>
-                          VS
-                        </span>
-                      </div>
-
-                      {/* Team 2 */}
-                      <div className="flex items-center justify-end gap-2 sm:gap-3 flex-1 min-w-0 text-right">
-                        <div className="min-w-0">
-                          <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : t2.color}`} title={t2.name}>
-                            {t2.name}
-                          </span>
-                          <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
-                            {t2.tag}
-                          </span>
-                        </div>
-                        <div className={`${isSpoc ? 'h-16 w-14 sm:h-32 sm:w-24' : 'h-11 w-11 min-[400px]:h-13 min-[400px]:w-13 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
-                          <img
-                            src={t2.logo}
-                            alt={t2.name}
-                            className={`h-full w-full ${isSpoc ? 'object-cover rounded-lg' : 'object-contain'}`}
-                          />
-                        </div>
-                      </div>
+                      {/* Click helper cue */}
+                      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-bold text-muted-foreground group-hover:text-amber-400 transition-colors">
+                        <span>{hasResult ? 'Click to view combi scores & event breakdown' : 'Click to view match fixture details'}</span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-amber-400 transition-all" />
                       </div>
                     </div>
                   );
@@ -446,6 +712,233 @@ export function ScheduleClient({
           );
         })}
       </div>
+
+      {/* MATCH DETAIL & COMBI SCORECARD MODAL */}
+      <Dialog open={Boolean(selectedMatch)} onOpenChange={(open) => !open && setSelectedMatch(null)}>
+        {selectedMatch && (
+          <div className="space-y-5 text-left">
+            <DialogHeader className="border-b border-border/60 pb-3 text-left">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <Badge variant="outline" className="text-[10px] font-bold border-amber-500/40 text-amber-400 bg-amber-500/10">
+                  Day {selectedMatch.dayNumber} · {selectedMatch.stageLabel}
+                </Badge>
+                {selectedMatch.matchLabel && (
+                  <Badge variant="secondary" className="text-[10px] font-bold">
+                    {selectedMatch.matchLabel}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {formatCalendarDate(selectedMatch.calendarDate)}
+                </span>
+              </div>
+              <DialogTitle className="text-lg sm:text-xl font-black flex items-center justify-between gap-2">
+                <span>Match Breakdown & Scores</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Lineup combis, individual player scores, event points, and match outcome breakdown.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Match Score Banner */}
+            {matchDetails?.matchResult ? (
+              <div className="space-y-4">
+                {/* Teams and Scorecard Banner */}
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-background p-4 shadow-inner">
+                  <div className="flex items-center justify-between gap-2 sm:gap-4">
+                    {/* Team 1 */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                      <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${matchDetails.matchResult.matchWinner === 1 ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/20' : selectedMatch.t1.border} shrink-0 flex items-center justify-center`}>
+                        <img src={selectedMatch.t1.logo} alt={selectedMatch.t1.name} className="h-full w-full object-contain" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black truncate text-foreground" title={selectedMatch.t1.name}>
+                            {selectedMatch.t1.name}
+                          </span>
+                          {matchDetails.matchResult.matchWinner === 1 && (
+                            <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
+                              <Crown className="h-2.5 w-2.5 text-emerald-400" /> Winner
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t1.tag}</span>
+                      </div>
+                    </div>
+
+                    {/* Score Display */}
+                    <div className="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl bg-slate-950 border border-border shadow-inner shrink-0">
+                      <div className="flex items-center gap-2 font-mono font-black text-base sm:text-2xl">
+                        <span className={matchDetails.matchResult.matchWinner === 1 ? 'text-emerald-400 font-extrabold' : 'text-foreground'}>
+                          {matchDetails.matchResult.team1EventPts}
+                        </span>
+                        <span className="text-muted-foreground/50 text-xs sm:text-sm">–</span>
+                        <span className={matchDetails.matchResult.matchWinner === 2 ? 'text-emerald-400 font-extrabold' : 'text-foreground'}>
+                          {matchDetails.matchResult.team2EventPts}
+                        </span>
+                      </div>
+                      <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-muted-foreground">Event Pts</span>
+                    </div>
+
+                    {/* Team 2 */}
+                    <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-1 min-w-0 text-right">
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {matchDetails.matchResult.matchWinner === 2 && (
+                            <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
+                              <Crown className="h-2.5 w-2.5 text-emerald-400" /> Winner
+                            </span>
+                          )}
+                          <span className="text-xs sm:text-sm font-black truncate text-foreground" title={selectedMatch.t2.name}>
+                            {selectedMatch.t2.name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t2.tag}</span>
+                      </div>
+                      <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${matchDetails.matchResult.matchWinner === 2 ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/20' : selectedMatch.t2.border} shrink-0 flex items-center justify-center`}>
+                        <img src={selectedMatch.t2.logo} alt={selectedMatch.t2.name} className="h-full w-full object-contain" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Winner Explanation Banner */}
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-black text-emerald-400">
+                    <Trophy className="h-4 w-4 shrink-0 text-amber-400" />
+                    <span>How this match was decided:</span>
+                  </div>
+                  <p className="text-xs text-foreground/90 font-medium leading-relaxed">
+                    {matchDetails.matchResult.matchWinner === 1 ? (
+                      <>
+                        <strong className="text-emerald-400 font-extrabold">{selectedMatch.t1.name}</strong> won the match by securing{' '}
+                        <strong className="text-emerald-400 font-extrabold">{matchDetails.matchResult.team1EventPts} Event Points</strong> across the combi rounds compared to{' '}
+                        <strong className="text-foreground">{selectedMatch.t2.name}</strong> ({matchDetails.matchResult.team2EventPts} pts).
+                      </>
+                    ) : matchDetails.matchResult.matchWinner === 2 ? (
+                      <>
+                        <strong className="text-emerald-400 font-extrabold">{selectedMatch.t2.name}</strong> won the match by securing{' '}
+                        <strong className="text-emerald-400 font-extrabold">{matchDetails.matchResult.team2EventPts} Event Points</strong> across the combi rounds compared to{' '}
+                        <strong className="text-foreground">{selectedMatch.t1.name}</strong> ({matchDetails.matchResult.team1EventPts} pts).
+                      </>
+                    ) : (
+                      <>
+                        The match concluded in a <strong className="text-amber-400 font-extrabold">DRAW / TIE</strong> with both teams securing{' '}
+                        <strong className="text-amber-400 font-extrabold">{matchDetails.matchResult.team1EventPts} Event Points</strong> each.
+                      </>
+                    )}
+                  </p>
+                  <p className="text-[10.5px] text-muted-foreground">
+                    💡 <em>Rule:</em> Each event win awards 2 points (ties award 1 point; walkover awards 2 points to the opponent). The team with the highest total event points wins the match.
+                  </p>
+                </div>
+
+                {/* Event by Event Combi Table */}
+                <div className="space-y-2">
+                  <div className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Combi Event Breakdown ({matchDetails.events.length} Events)</span>
+                  </div>
+
+                  <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                    {matchDetails.events.map((ev: any, idx: number) => {
+                      const isT1EvWin = ev.winnerTeam === 1;
+                      const isT2EvWin = ev.winnerTeam === 2;
+                      const isEvTie = ev.winnerTeam === 0;
+
+                      return (
+                        <div key={idx} className="rounded-xl border border-border/70 bg-card/80 p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                                {ev.format}
+                              </span>
+                              <span className="text-xs font-black text-foreground">{ev.name}</span>
+                            </div>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                              isT1EvWin || isT2EvWin
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                            }`}>
+                              {ev.explanation}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                            {/* Left Team Combi */}
+                            <div className={`p-2.5 rounded-lg border ${isT1EvWin ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-muted/30 border-border/50'}`}>
+                              <div className="flex items-center justify-between font-bold text-[11px] mb-1.5">
+                                <span className={selectedMatch.t1.color}>{selectedMatch.t1.name}</span>
+                                <span className="font-mono text-emerald-400 font-black">+{ev.team1Pts} pts</span>
+                              </div>
+                              <div className="space-y-1">
+                                {ev.team1PlayerList.map((p: any, pIdx: number) => (
+                                  <div key={pIdx} className="flex items-center justify-between text-[11px]">
+                                    <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
+                                      {p.name}
+                                    </span>
+                                    {p.isWalkover ? (
+                                      <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
+                                        Walkover
+                                      </Badge>
+                                    ) : (
+                                      <span className="font-mono text-muted-foreground font-bold">
+                                        {p.score != null ? `Score: ${p.score}` : '—'}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                                {ev.team1SumScore != null && (
+                                  <div className="text-[10.5px] font-black text-muted-foreground text-right pt-1.5 border-t border-border/40">
+                                    Total: <span className="text-foreground">{ev.team1SumScore}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Right Team Combi */}
+                            <div className={`p-2.5 rounded-lg border ${isT2EvWin ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-muted/30 border-border/50'}`}>
+                              <div className="flex items-center justify-between font-bold text-[11px] mb-1.5">
+                                <span className={selectedMatch.t2.color}>{selectedMatch.t2.name}</span>
+                                <span className="font-mono text-emerald-400 font-black">+{ev.team2Pts} pts</span>
+                              </div>
+                              <div className="space-y-1">
+                                {ev.team2PlayerList.map((p: any, pIdx: number) => (
+                                  <div key={pIdx} className="flex items-center justify-between text-[11px]">
+                                    <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
+                                      {p.name}
+                                    </span>
+                                    {p.isWalkover ? (
+                                      <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
+                                        Walkover
+                                      </Badge>
+                                    ) : (
+                                      <span className="font-mono text-muted-foreground font-bold">
+                                        {p.score != null ? `Score: ${p.score}` : '—'}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                                {ev.team2SumScore != null && (
+                                  <div className="text-[10.5px] font-black text-muted-foreground text-right pt-1.5 border-t border-border/40">
+                                    Total: <span className="text-foreground">{ev.team2SumScore}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                Combi lineups and individual scores will be available after the submission cutoff for Day {selectedMatch.dayNumber}.
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
 
     </div>
   );
