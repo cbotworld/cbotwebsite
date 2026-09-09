@@ -151,7 +151,7 @@ export function validateBoardsPayload(raw: unknown): { ok: true; boards: DayBoar
   return { ok: true, boards, score: agg.score, slams: agg.slams };
 }
 
-export function resolveScoreInput(score: unknown, slams: unknown, boards?: unknown) {
+export function resolveScoreInput(score: unknown, slams: unknown, boards?: unknown, defaultBoardCount = 4) {
   if (boards !== undefined && boards !== null) {
     return validateBoardsPayload(boards);
   }
@@ -165,7 +165,7 @@ export function resolveScoreInput(score: unknown, slams: unknown, boards?: unkno
   }
   return {
     ok: true as const,
-    boards: [{ score: parsedScore, slams: parsedSlams }],
+    boards: summaryToBoards(parsedScore, defaultBoardCount, parsedSlams),
     score: parsedScore,
     slams: parsedSlams,
   };

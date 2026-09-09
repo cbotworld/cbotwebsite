@@ -448,7 +448,7 @@ export async function bulkOrganiserUpsertDayScores(opts: {
       modifiedUserIds.add(row.userId);
     } else {
       const scoreVal = Math.max(0, Math.round(Number(row.score)));
-      const boardCountVal = Math.max(1, Math.min(MAX_DAY_BOARDS, Math.round(Number(row.boardCount || 1))));
+      const boardCountVal = Math.max(1, Math.min(MAX_DAY_BOARDS, Math.round(Number(row.boardCount || 4))));
       const slamsVal = Math.max(0, Math.round(Number(row.slams || 0)));
       const boards = summaryToBoards(scoreVal, boardCountVal, slamsVal);
 
