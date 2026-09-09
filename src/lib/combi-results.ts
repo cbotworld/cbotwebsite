@@ -44,12 +44,29 @@ export function roundFormat(name: string | undefined): string {
 
 export function resolveRoundPlayerIds(round: LineupRound | undefined, roster: RosterPlayer[]): string[] {
   if (!round) return [];
-  const fromIds = (round.playerIds || []).map((id) => String(id || '').trim()).filter(Boolean);
-  if (fromIds.length) return fromIds;
-  const names = (round.players || []).map((n) => String(n || '').trim()).filter(Boolean);
-  if (!names.length) return [];
+  const rosterIds = new Set(roster.map((p) => p.id));
   const byName = new Map(roster.map((p) => [normName(p.name), p.id]));
-  return names.map((n) => byName.get(normName(n)) || '').filter(Boolean);
+
+  const fromIds = (round.playerIds || []).map((id) => String(id || '').trim()).filter(Boolean);
+  const fromNames = (round.players || []).map((n) => String(n || '').trim()).filter(Boolean);
+
+  const matchedIds: string[] = [];
+  for (const id of fromIds) {
+    if (rosterIds.has(id)) {
+      matchedIds.push(id);
+    } else {
+      const byN = byName.get(normName(id));
+      if (byN) matchedIds.push(byN);
+      else matchedIds.push(id);
+    }
+  }
+  for (const name of fromNames) {
+    const id = byName.get(normName(name));
+    if (id && !matchedIds.includes(id)) {
+      matchedIds.push(id);
+    }
+  }
+  return matchedIds.length > 0 ? matchedIds : fromIds;
 }
 
 export function parseSavedLineups(raw?: string | null): Record<string, { rounds?: LineupRound[]; submittedAt?: string }> {
@@ -266,11 +283,16 @@ export function playerMatchEvent(opts: {
   };
   if (!opts.revealed) return empty;
 
+  const rounds1 = opts.playerIsTeam1 ? opts.roundsMine : opts.roundsOpp;
+  const rounds2 = opts.playerIsTeam1 ? opts.roundsOpp : opts.roundsMine;
+  const roster1 = opts.playerIsTeam1 ? opts.rosterMine : opts.rosterOpp;
+  const roster2 = opts.playerIsTeam1 ? opts.rosterOpp : opts.rosterMine;
+
   const scored = scoreMatchDay(
-    opts.roundsMine,
-    opts.roundsOpp,
-    opts.rosterMine,
-    opts.rosterOpp,
+    rounds1,
+    rounds2,
+    roster1,
+    roster2,
     opts.scores,
   );
   const hit = scored.events.find((ev) => {

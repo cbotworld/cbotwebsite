@@ -17,6 +17,8 @@ import { isCombiSubmissionLocked } from '@/lib/combi-cutoff';
 import { isDayScorePublished } from '@/lib/day-scoring';
 import { isSpocExhibitionTeam } from '@/lib/spoc-teams';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
+import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
 import {
   parseSavedLineups,
   playerMatchEvent,
@@ -30,7 +32,9 @@ export async function getPlayerMatchSchedule(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
-  const edition = await resolveCurrentEditionRecord();
+  const edition = await resolveCurrentEditionRecord({
+    patterns: { orderBy: { sequence: 'asc' } },
+  });
 
   const cmsSite = await getWebsiteCmsSite();
   const fallbackEditionTitle = `${cmsSite.shortName} ${cmsSite.editionLabel}`;
@@ -215,6 +219,28 @@ export async function getPlayerMatchSchedule(
       (fixtureDays.length ? fixtureDays[fixtureDays.length - 1] : currentDay)
     : currentDay;
 
+  const userGradeMap = new Map<string, string>();
+  if (edition?.id) {
+    const gradingSetting = await prisma.systemSetting.findUnique({
+      where: { key: gradingSettingKey(edition.id) },
+    });
+    if (gradingSetting?.value) {
+      const grid = parseGradingGrid(gradingSetting.value);
+      const updates = computePlayerGradeUpdates(grid);
+      updates.forEach((u) => userGradeMap.set(u.userId, u.grade));
+    }
+  }
+
+  const roundFormats = (edition as any)?.patterns?.map((bp: any) => bp.matchFormat || 'SINGLES').filter(Boolean) || [
+    'SINGLES',
+    'SINGLES',
+    'SINGLES',
+    'SINGLES',
+    'DOUBLES',
+    'TRIPLES',
+    'TRIPLES',
+  ];
+
   const days = !team
     ? []
     : fixtureDays.map((dayNumber) => {
@@ -278,6 +304,18 @@ export async function getPlayerMatchSchedule(
       for (const s of dayScores) {
         if (s.dayNumber === dayNumber) scoreMap[s.userId] = { score: s.score, slams: s.slams };
       }
+      const mineCombi = resolveEffectiveTeamCombi({
+        team: myTeamRow,
+        dayNumber,
+        roundFormats,
+        userGradeMap,
+      });
+      const oppCombi = resolveEffectiveTeamCombi({
+        team: oppRow,
+        dayNumber,
+        roundFormats,
+        userGradeMap,
+      });
       const myEvent =
         fix && myTeamRow && !oppMissing
           ? playerMatchEvent({
@@ -285,8 +323,8 @@ export async function getPlayerMatchSchedule(
               playerIsTeam1: isT1,
               revealed,
               scoresReady,
-              roundsMine: parseSavedLineups(myTeamRow.savedLineups)[String(dayNumber)]?.rounds as LineupRound[] | undefined,
-              roundsOpp: parseSavedLineups(oppRow?.savedLineups)[String(dayNumber)]?.rounds as LineupRound[] | undefined,
+              roundsMine: mineCombi.rounds,
+              roundsOpp: oppCombi.rounds,
               rosterMine: rosterOf(myTeamRow),
               rosterOpp: rosterOf(oppRow || undefined),
               scores: scoreMap,

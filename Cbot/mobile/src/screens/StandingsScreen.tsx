@@ -1,7 +1,7 @@
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -61,6 +62,8 @@ export function StandingsScreen(_props: Props) {
   const [tab, setTab] = useState<'teams' | 'players'>('teams');
   const [stageId, setStageId] = useState('');
   const [open, setOpen] = useState<{ row: any; focus: FocusCol } | null>(null);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +93,21 @@ export function StandingsScreen(_props: Props) {
   const players = payload?.players || [];
   const placement = payload?.placement || [];
   const days = open?.row?.days || [];
+
+  const toggleMatchExpanded = (key: string) => {
+    setExpandedMatches((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const filteredPlayers = useMemo(() => {
+    const q = playerSearch.trim().toLowerCase();
+    if (!q) return players;
+    return players.filter((p: any) => {
+      const name = (p.name || '').toLowerCase();
+      const team = (p.teamName || '').toLowerCase();
+      const grade = (p.grade || '').toLowerCase();
+      return name.includes(q) || team.includes(q) || grade.includes(q);
+    });
+  }, [players, playerSearch]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
@@ -121,8 +139,27 @@ export function StandingsScreen(_props: Props) {
         </View>
       ) : tab === 'players' ? (
         <ScrollView contentContainerStyle={styles.list} horizontal={false}>
-          {players.length === 0 ? (
-            <Text style={styles.empty}>No players on the edition roster yet.</Text>
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search player, team or grade..."
+              placeholderTextColor="#64748b"
+              value={playerSearch}
+              onChangeText={setPlayerSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {playerSearch.length > 0 && (
+              <Pressable style={styles.clearBtn} onPress={() => setPlayerSearch('')}>
+                <Text style={styles.clearBtnText}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {filteredPlayers.length === 0 ? (
+            <Text style={styles.empty}>
+              {playerSearch ? `No players found matching "${playerSearch}".` : 'No players on the edition roster yet.'}
+            </Text>
           ) : (
             <View style={styles.groupCard}>
               <Text style={styles.groupTitle}>Player ranking</Text>
@@ -133,26 +170,59 @@ export function StandingsScreen(_props: Props) {
                 <Text style={[styles.th, styles.colRank]}>#</Text>
                 <Text style={[styles.th, styles.colPlayer]}>PLAYER</Text>
                 <Text style={[styles.th, styles.colTeam]}>TEAM</Text>
-                <Text style={[styles.th, styles.colNum]}>SLAMS</Text>
+                <Text style={[styles.th, styles.colGrd]}>GRD</Text>
+                <Text style={[styles.th, styles.colTgt]}>TGT</Text>
+                <Text style={[styles.th, styles.colNum]}>SLM</Text>
                 <Text style={[styles.th, styles.colWo]}>WO</Text>
                 <Text style={[styles.th, styles.colAvg]}>AVG</Text>
               </View>
-              {players.map((row: any) => (
-                <View key={row.userId} style={styles.tableRow}>
-                  <Text style={[styles.tdRank, styles.colRank]}>{row.rank}</Text>
-                  <Text style={[styles.tdName, styles.colPlayer]} numberOfLines={2}>
-                    {row.name}
-                  </Text>
-                  <Text style={[styles.td, styles.colTeam]} numberOfLines={2}>
-                    {row.teamName}
-                  </Text>
-                  <Text style={[styles.td, styles.colNum]}>{row.slams ?? 0}</Text>
-                  <Text style={[styles.td, styles.colWo]}>{row.walkovers}</Text>
-                  <Text style={[styles.tdStrong, styles.colAvg]}>
-                    {row.boardAverage == null ? '—' : Number(row.boardAverage).toFixed(2)}
-                  </Text>
-                </View>
-              ))}
+              {filteredPlayers.map((row: any) => {
+                const rankNum = Number(row.rank);
+                const isTop1 = rankNum === 1;
+                const isTop2 = rankNum === 2;
+                const isTop3 = rankNum === 3;
+                return (
+                  <View key={row.userId} style={styles.tableRow}>
+                    <View style={[styles.colRank, styles.rankCell]}>
+                      <Text
+                        style={[
+                          styles.tdRank,
+                          isTop1 && styles.rankGold,
+                          isTop2 && styles.rankSilver,
+                          isTop3 && styles.rankBronze,
+                        ]}
+                      >
+                        {row.rank}
+                      </Text>
+                    </View>
+                    <View style={styles.colPlayer}>
+                      <Text style={styles.tdName} numberOfLines={2}>
+                        {row.name}
+                      </Text>
+                    </View>
+                    <View style={styles.colTeam}>
+                      <Text style={styles.td} numberOfLines={1}>
+                        {row.teamName}
+                      </Text>
+                    </View>
+                    <View style={styles.colGrd}>
+                      {row.grade ? (
+                        <View style={styles.gradeBadge}>
+                          <Text style={styles.gradeBadgeText}>{row.grade}</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.tdDim}>—</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.td, styles.colTgt]}>{row.target ?? '—'}</Text>
+                    <Text style={[styles.td, styles.colNum]}>{row.slams ?? 0}</Text>
+                    <Text style={[styles.td, styles.colWo]}>{row.walkovers ?? 0}</Text>
+                    <Text style={[styles.tdStrong, styles.colAvg]}>
+                      {row.boardAverage == null ? '—' : Number(row.boardAverage).toFixed(2)}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           )}
         </ScrollView>
@@ -188,17 +258,202 @@ export function StandingsScreen(_props: Props) {
             <Text style={styles.empty}>No stages configured yet.</Text>
           ) : stage.knockout?.length ? (
             <>
-              {stage.knockout.map((m: any, i: number) => (
-                <View key={`${m.label}-${i}`} style={styles.koCard}>
-                  <Text style={styles.koLabel}>{m.label}</Text>
-                  <Text style={styles.koMatch}>
-                    {m.team1Name} vs {m.team2Name}
-                  </Text>
-                  <Text style={styles.koScore}>
-                    {m.team1EventPts == null ? 'After 9:30pm' : `${m.team1EventPts} – ${m.team2EventPts}`}
-                  </Text>
-                </View>
-              ))}
+              {stage.knockout.map((m: any, i: number) => {
+                const isT1Winner =
+                  m.team1EventPts != null &&
+                  m.team2EventPts != null &&
+                  m.team1EventPts > m.team2EventPts;
+                const isT2Winner =
+                  m.team1EventPts != null &&
+                  m.team2EventPts != null &&
+                  m.team2EventPts > m.team1EventPts;
+                const isDraw =
+                  m.team1EventPts != null &&
+                  m.team2EventPts != null &&
+                  m.team1EventPts === m.team2EventPts;
+
+                const matchKey = `${m.label || 'match'}-${i}-${m.team1Name}-${m.team2Name}`;
+                const isExpanded = Boolean(expandedMatches[matchKey]);
+                const hasEvents = Array.isArray(m.events) && m.events.length > 0;
+
+                return (
+                  <View key={matchKey} style={styles.koCard}>
+                    {/* Header */}
+                    <View style={styles.koHeaderRow}>
+                      <View style={styles.koLabelBadge}>
+                        <Text style={styles.koLabelText}>{m.label || 'PLAYOFF'}</Text>
+                      </View>
+                      {m.dayNumber && (
+                        <Text style={styles.koDayText}>Day {m.dayNumber}</Text>
+                      )}
+                    </View>
+
+                    {/* Match matchup & scores */}
+                    <View style={styles.koMatchRow}>
+                      <View style={styles.koTeamBlock}>
+                        <Text
+                          style={[
+                            styles.koTeamName,
+                            isT1Winner && styles.koWinnerName,
+                            isT2Winner && styles.koLoserName,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {m.team1Name}
+                        </Text>
+                        {isT1Winner && (
+                          <View style={styles.winnerBadge}>
+                            <Text style={styles.winnerBadgeText}>WINNER</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.koScoreContainer}>
+                        {m.team1EventPts == null ? (
+                          <Text style={styles.koScorePending}>After 9:30pm IST</Text>
+                        ) : (
+                          <View style={styles.koScorePill}>
+                            <Text
+                              style={[
+                                styles.koScoreNum,
+                                isT1Winner && styles.koScoreWinner,
+                              ]}
+                            >
+                              {m.team1EventPts}
+                            </Text>
+                            <Text style={styles.koScoreSep}>–</Text>
+                            <Text
+                              style={[
+                                styles.koScoreNum,
+                                isT2Winner && styles.koScoreWinner,
+                              ]}
+                            >
+                              {m.team2EventPts}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={[styles.koTeamBlock, styles.koTeamBlockRight]}>
+                        <Text
+                          style={[
+                            styles.koTeamName,
+                            styles.koTeamNameRight,
+                            isT2Winner && styles.koWinnerName,
+                            isT1Winner && styles.koLoserName,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {m.team2Name}
+                        </Text>
+                        {isT2Winner && (
+                          <View style={styles.winnerBadge}>
+                            <Text style={styles.winnerBadgeText}>WINNER</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Toggle Combis Breakdown Button */}
+                    {hasEvents && (
+                      <Pressable
+                        style={styles.combiToggleBtn}
+                        onPress={() => toggleMatchExpanded(matchKey)}
+                      >
+                        <Text style={styles.combiToggleText}>
+                          {isExpanded ? 'Hide Combis ▲' : 'View Combis & Scores ▼'}
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {/* Combi Events Breakdown (Expanded) */}
+                    {isExpanded && hasEvents && (
+                      <View style={styles.combiBreakdown}>
+                        <Text style={styles.combiSectionTitle}>
+                          Combi Events & Individual Scores
+                        </Text>
+                        {m.events.map((ev: any, evIdx: number) => {
+                          const isWin = String(ev.result || '').includes('Win');
+                          const isLoss = String(ev.result || '').includes('Loss');
+                          const isWO =
+                            String(ev.result || '').includes('WO') ||
+                            ev.reason === 'walkover' ||
+                            ev.reason === 'double-walkover';
+
+                          return (
+                            <View
+                              key={`${matchKey}-ev-${evIdx}`}
+                              style={styles.combiEventCard}
+                            >
+                              <View style={styles.combiEventHeader}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.combiEventName}>
+                                    {ev.name}
+                                    {ev.format ? ` (${ev.format})` : ''}
+                                  </Text>
+                                </View>
+                                <View
+                                  style={[
+                                    styles.combiPtsBadge,
+                                    isWin && styles.ptsWin,
+                                    isLoss && styles.ptsLoss,
+                                    isWO && styles.ptsWo,
+                                  ]}
+                                >
+                                  <Text style={styles.combiPtsText}>
+                                    {ev.team1Pts ?? 0} – {ev.team2Pts ?? 0} pts
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Team 1 Players & Scores */}
+                              <View style={styles.combiTeamSide}>
+                                <Text style={styles.combiTeamTagT1}>
+                                  {m.team1Name}
+                                </Text>
+                                <Text style={styles.combiPlayersLine}>
+                                  {ev.team1PlayerList && ev.team1PlayerList.length > 0
+                                    ? ev.team1PlayerList
+                                        .map(
+                                          (p: any) =>
+                                            `${p.name}${p.score != null ? ` (${p.score})` : ''}${p.isWalkover ? ' [WO]' : ''}`,
+                                        )
+                                        .join(', ')
+                                    : ev.team1Players || '—'}
+                                  {ev.team1Score != null ? (
+                                    <Text style={styles.combiSum}> = {ev.team1Score}</Text>
+                                  ) : null}
+                                </Text>
+                              </View>
+
+                              {/* Team 2 Players & Scores */}
+                              <View style={styles.combiTeamSide}>
+                                <Text style={styles.combiTeamTagT2}>
+                                  {m.team2Name}
+                                </Text>
+                                <Text style={styles.combiPlayersLine}>
+                                  {ev.team1PlayerList && ev.team2PlayerList?.length > 0
+                                    ? ev.team2PlayerList
+                                        .map(
+                                          (p: any) =>
+                                            `${p.name}${p.score != null ? ` (${p.score})` : ''}${p.isWalkover ? ' [WO]' : ''}`,
+                                        )
+                                        .join(', ')
+                                    : ev.team2Players || '—'}
+                                  {ev.team2Score != null ? (
+                                    <Text style={styles.combiSum}> = {ev.team2Score}</Text>
+                                  ) : null}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
               {placement.length > 0 ? (
                 <View style={styles.groupCard}>
                   <Text style={styles.groupTitle}>Final ranking 1–8</Text>
@@ -289,10 +544,10 @@ export function StandingsScreen(_props: Props) {
                     <Text style={[styles.td, styles.colStat, open?.focus === 'event' && styles.tdOn]}>
                       {d.eventPts}
                     </Text>
-                    <Text style={[styles.td, styles.colStat, open?.focus === 'slams' && styles.tdOn]}>
+                    <Text style={[styles.td, styles.colStat, open?.focus === 'slams' && styles.thOn]}>
                       {d.slamBonus}
                     </Text>
-                    <Text style={[styles.td, styles.colStat, open?.focus === 'avg' && styles.tdOn]}>
+                    <Text style={[styles.td, styles.colStat, open?.focus === 'avg' && styles.thOn]}>
                       {d.avgBonus}
                     </Text>
                     <Text style={[styles.tdStrong, styles.colStat, open?.focus === 'total' && styles.tdOn]}>
@@ -405,6 +660,31 @@ const styles = StyleSheet.create({
   tabBtnText: { color: '#94a3b8', fontWeight: '900', fontSize: 11, letterSpacing: 0.8 },
   tabBtnTextOn: { color: '#0f172a' },
   list: { padding: 14, paddingBottom: 36 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    height: 42,
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  clearBtn: {
+    padding: 6,
+  },
+  clearBtnText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   stageChips: { gap: 8, paddingBottom: 12 },
   stageChip: {
     borderWidth: 1,
@@ -440,17 +720,36 @@ const styles = StyleSheet.create({
   thOn: { color: '#f59e0b' },
   colRank: { width: 22 },
   colName: { flex: 1, minWidth: 72, paddingRight: 4 },
-  colPlayer: { flex: 1.15, minWidth: 64, paddingRight: 4 },
-  colTeam: { flex: 1, minWidth: 56, paddingRight: 4 },
-  colNum: { width: 40, textAlign: 'right' },
-  colWo: { width: 28, textAlign: 'right' },
+  colPlayer: { flex: 1.1, minWidth: 64, paddingRight: 4 },
+  colTeam: { flex: 0.9, minWidth: 48, paddingRight: 4 },
+  colGrd: { width: 34, alignItems: 'center' },
+  colTgt: { width: 28, textAlign: 'center' },
+  colNum: { width: 32, textAlign: 'right' },
+  colWo: { width: 26, textAlign: 'right' },
   colAvg: { width: 44, textAlign: 'right' },
   colStat: { width: 32, textAlign: 'center' },
   td: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
+  tdDim: { color: '#64748b', fontSize: 11, fontWeight: '600' },
   tdOn: { color: '#fbbf24', fontWeight: '900' },
+  rankCell: { alignItems: 'center', justifyContent: 'center' },
   tdRank: { color: '#f59e0b', fontSize: 12, fontWeight: '900' },
+  rankGold: { color: '#fbbf24' },
+  rankSilver: { color: '#cbd5e1' },
+  rankBronze: { color: '#d97706' },
   tdName: { color: '#f8fafc', fontSize: 12, fontWeight: '800' },
-  tdMeta: { color: '#64748b', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  gradeBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  gradeBadgeText: {
+    color: '#fbbf24',
+    fontSize: 9,
+    fontWeight: '800',
+  },
   tdStrong: { color: '#f8fafc', fontSize: 12, fontWeight: '900' },
   statCell: { width: 32, alignItems: 'center' },
   statValue: {
@@ -461,17 +760,219 @@ const styles = StyleSheet.create({
     textDecorationStyle: 'dotted',
   },
   statValueStrong: { color: '#f8fafc', fontWeight: '900' },
+
+  // Knockout Cards
   koCard: {
     backgroundColor: '#0f172a',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#1e293b',
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  koLabel: { color: '#64748b', fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
-  koMatch: { color: '#f8fafc', fontWeight: '800', marginTop: 4 },
-  koScore: { color: '#f59e0b', fontWeight: '800', marginTop: 6, fontSize: 12 },
+  koHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  koLabelBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  koLabelText: {
+    color: '#f59e0b',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  koDayText: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  koMatchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  koTeamBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  koTeamBlockRight: {
+    alignItems: 'flex-end',
+  },
+  koTeamName: {
+    color: '#f8fafc',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  koTeamNameRight: {
+    textAlign: 'right',
+  },
+  koWinnerName: {
+    color: '#34d399',
+    fontWeight: '900',
+  },
+  koLoserName: {
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  winnerBadge: {
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.35)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  winnerBadgeText: {
+    color: '#34d399',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  koScoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  koScorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#020617',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  koScoreNum: {
+    color: '#f8fafc',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  koScoreWinner: {
+    color: '#34d399',
+  },
+  koScoreSep: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  koScorePending: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  combiToggleBtn: {
+    marginTop: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  combiToggleText: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  combiBreakdown: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1e293b',
+    gap: 8,
+  },
+  combiSectionTitle: {
+    color: '#64748b',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  combiEventCard: {
+    backgroundColor: '#020617',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    padding: 10,
+    gap: 6,
+  },
+  combiEventHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  combiEventName: {
+    color: '#f8fafc',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  combiPtsBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+  },
+  ptsWin: {
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    borderColor: 'rgba(52, 211, 153, 0.35)',
+  },
+  ptsLoss: {
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+  },
+  ptsWo: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  combiPtsText: {
+    color: '#f8fafc',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  combiTeamSide: {
+    gap: 1,
+  },
+  combiTeamTagT1: {
+    color: '#38bdf8',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  combiTeamTagT2: {
+    color: '#f472b6',
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  combiPlayersLine: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  combiSum: {
+    color: '#94a3b8',
+    fontWeight: '800',
+  },
+
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   modalSafe: { flex: 1, backgroundColor: '#020617' },
   modalHeader: {

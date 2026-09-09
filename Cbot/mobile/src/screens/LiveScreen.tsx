@@ -137,13 +137,7 @@ export function LiveScreen({ route, navigation }: Props) {
   const [isFrontCamera, setIsFrontCamera] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [stopped, setStopped] = useState(false); // show post-stream "ended" screen
-  const [orientationLocked, setOrientationLocked] = useState(true); // assume success initially
-
-  // On iOS, if the native orientation lock failed, detect portrait and apply a
-  // CSS-level 90° rotation so the UI and camera preview always appear landscape.
-  const isPortraitWindow = winW < winH;
-  const needsManualRotation =
-    Platform.OS === "ios" && !orientationLocked && isPortraitWindow;
+  const [orientationLocked, setOrientationLocked] = useState(true);
 
   const sessionRef = useRef<BroadcastSession | null>(null);
   const goLiveCalledRef = useRef(false);
@@ -603,23 +597,9 @@ export function LiveScreen({ route, navigation }: Props) {
   };
   const bitrateKbps = typeof stream.statistics?.bitrate === "number" ? stream.statistics.bitrate : undefined;
 
-  // When the native orientation lock fails on iOS and the phone is held in portrait,
-  // apply a 90° clockwise rotation so the entire UI renders in landscape.
-  const rotateWrapperStyle = needsManualRotation
-    ? {
-        width: winH,
-        height: winW,
-        transform: [{ rotate: "90deg" as const }],
-        transformOrigin: "center" as const,
-        position: "absolute" as const,
-        top: (winH - winW) / 2,
-        left: -(winH - winW) / 2,
-      }
-    : undefined;
-
   return (
     <View style={styles.container}>
-      <View style={rotateWrapperStyle ?? StyleSheet.absoluteFill}>
+      <View style={StyleSheet.absoluteFill}>
         {session ? (
           <ExpoLiveStreamPublisherView
             key={`publisher-${session.broadcastId}`}
