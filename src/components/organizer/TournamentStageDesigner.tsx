@@ -416,12 +416,7 @@ export default function TournamentStageDesigner({
 
   const isStageLocked = (stage: TournamentStage) => {
     const keys = stageMatchStages(stage);
-    if (matches.some((m) => keys.includes(m.stage || '') && m.status === 'COMPLETED')) return true;
-    const start = stage.startDay || 0;
-    const duration = stage.durationDays || 1;
-    if (!start) return false;
-    const days = Array.from({ length: duration }, (_, i) => start + i);
-    return days.length > 0 && days.every((day) => isDayLocked(day));
+    return matches.some((m) => keys.includes(m.stage || '') && m.status === 'COMPLETED');
   };
 
   const addStage = (kind: StageKind) => {
@@ -432,7 +427,7 @@ export default function TournamentStageDesigner({
     const insertAt = insertIndexForNewStage(stages, kind);
     const leagueIndex = kind === 'LEAGUE' ? stages.filter((s) => s.kind === 'LEAGUE').length + 1 : 1;
     const kindIndex = kind === 'QUALIFIER' ? qualifierCount + 1 : leagueIndex;
-    const created = createTournamentStage(kind, insertAt + 1, teams.length || 8, kindIndex);
+    const created = createTournamentStage(kind, insertAt + 1, teams.length || 0, kindIndex);
     const next = [...stages];
     next.splice(insertAt, 0, created);
     setConfig((prev) => ({ ...prev, stages: layoutStageDays(next, lastDoneDay) }));
@@ -443,7 +438,7 @@ export default function TournamentStageDesigner({
     const stage = stages[idx];
     if (!stage || stages.length <= 1) return;
     if (isStageLocked(stage)) {
-      setMessage({ type: 'err', text: `${stage.name} has completed days and cannot be removed.` });
+      setMessage({ type: 'err', text: `${stage.name} has completed matches and cannot be removed.` });
       return;
     }
     const next = stages.filter((_, i) => i !== idx);

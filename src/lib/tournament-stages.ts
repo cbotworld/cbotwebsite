@@ -9,10 +9,6 @@ import type {
   TournamentStageConfig,
 } from '@/types';
 import {
-  eventDayWindow,
-  eventDayWindows,
-  isMonumentDayCompleted,
-  lastCompletedMonumentDay,
   seedRoyalCarromLeaguePairings,
 } from '@/lib/bicentennial-monuments';
 
@@ -615,32 +611,19 @@ function calendarDateEndMs(dateStr: string): number {
   return new Date(`${ymd}T20:00:00+05:30`).getTime();
 }
 
-/**
- * Official 8pm–8pm IST window end, chained past Days 1–10 so Day 15
- * still runs 23 Aug 8pm → 24 Aug 8pm even if its calendar date was set early.
- */
-function sequentialPlayEndMs(dayNumber: number): number | null {
-  const official = eventDayWindow(dayNumber);
-  if (official) return new Date(official.endIso).getTime();
-  const prior = eventDayWindows()
-    .filter((window) => window.dayNumber < dayNumber)
-    .sort((a, b) => b.dayNumber - a.dayNumber)[0];
-  if (!prior) return null;
-  return new Date(prior.endIso).getTime() + (dayNumber - prior.dayNumber) * MS_PER_DAY;
-}
-
 export function lastCompletedDay(
   dayDates: Record<number, string> | Record<string, string>,
   today = new Date()
 ): number {
   const dates = normalizeDayDates(dayDates);
   const maxDay = Math.max(
-    lastCompletedMonumentDay(today),
     ...Object.keys(dates).map((key) => parseInt(key, 10)).filter((n) => n > 0),
     0
   );
+  if (maxDay === 0 && !dates[1]) return 0;
+  const checkLimit = Math.max(maxDay, 30);
   let last = 0;
-  for (let day = 1; day <= maxDay; day += 1) {
+  for (let day = 1; day <= checkLimit; day += 1) {
     if (!isCalendarDayCompleted(day, dates, today)) break;
     last = day;
   }
@@ -652,17 +635,19 @@ export function isCalendarDayCompleted(
   dayDates: Record<number, string> | Record<string, string>,
   today = new Date()
 ): boolean {
-  // This edition's own calendar decides. Falling back to another edition's
-  // windows first would mark a future tournament's days as already played.
   const dates = normalizeDayDates(dayDates);
   const calendarEnd = dates[dayNumber] ? calendarDateEndMs(dates[dayNumber]) : NaN;
   if (Number.isFinite(calendarEnd)) return today.getTime() >= calendarEnd;
 
-  const monumentDone = isMonumentDayCompleted(dayNumber, today);
-  if (monumentDone !== null) return monumentDone;
-  const sequentialEnd = sequentialPlayEndMs(dayNumber);
-  if (sequentialEnd === null) return false;
-  return today.getTime() >= sequentialEnd;
+  if (dates[1]) {
+    const day1End = calendarDateEndMs(dates[1]);
+    if (Number.isFinite(day1End)) {
+      const calculatedEnd = day1End + (dayNumber - 1) * MS_PER_DAY;
+      return today.getTime() >= calculatedEnd;
+    }
+  }
+
+  return false;
 }
 
 export function defaultDurationForKind(kind: StageKind): number {
@@ -824,7 +809,7 @@ export function stageSpanDays(stages: TournamentStage[]): number {
   }, 0);
 }
 
-export function ensureStageDayWindows(stages: TournamentStage[], lastDoneDay = 7): TournamentStage[] {
+export function ensureStageDayWindows(stages: TournamentStage[], lastDoneDay = 0): TournamentStage[] {
   return layoutStageDays(stages, lastDoneDay);
 }
 
