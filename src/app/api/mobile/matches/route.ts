@@ -38,6 +38,72 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 401, headers: corsHeaders });
     }
 
+    const requestedSlot = (request.nextUrl.searchParams.get('slot') || '').trim().toUpperCase();
+    const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
+
+    let targetEdition: any = null;
+    if (requestedEditionId) {
+      targetEdition = await prisma.edition.findUnique({ where: { id: requestedEditionId } });
+    } else if (requestedSlot === 'B') {
+      targetEdition = await prisma.edition.findFirst({ where: { slot: 'B' } });
+    }
+
+    if (requestedSlot === 'B' || (targetEdition && targetEdition.slot === 'B')) {
+      const edition = targetEdition || await prisma.edition.findFirst({ where: { slot: 'B' } });
+      if (edition) {
+        const participant = await prisma.editionParticipant.findFirst({
+          where: { editionId: edition.id, userId },
+          include: { team: true },
+        });
+
+        const playerScores = await prisma.playerDayScore.findMany({
+          where: { editionId: edition.id, userId },
+          select: { dayNumber: true, score: true },
+        });
+        const submittedMap = new Map(playerScores.map((s) => [s.dayNumber, s.score]));
+
+        // Generate advance day fixtures
+        const totalDays = edition.totalDays || 10;
+        const advanceMatches = [];
+        for (let d = 1; d <= totalDays; d++) {
+          const hasScore = submittedMap.has(d);
+          advanceMatches.push({
+            matchId: `advance-${edition.id}-day-${d}`,
+            editionId: edition.id,
+            editionTitle: edition.title || `Next Edition #${edition.number}`,
+            editionNumber: edition.number,
+            dayNumber: d,
+            round: d,
+            matchNumber: d,
+            stage: `DAY ${d}`,
+            playerName: user.name || user.username || 'Player',
+            playerRole: user.role || 'PLAYER',
+            teamName: participant?.team?.name || 'Your Team (TBD)',
+            teamTag: participant?.team?.tag || 'TBD',
+            teamLogo: participant?.team?.logo || null,
+            opponentName: 'Opponent (TBD)',
+            opponentTag: 'TBD',
+            opponentLogo: null,
+            score1: hasScore ? submittedMap.get(d) : 0,
+            score2: 0,
+            queenStrikes1: 0,
+            queenStrikes2: 0,
+            scheduledTime: null,
+            tableNumber: 1,
+            status: hasScore ? 'COMPLETED' : 'READY_TO_PLAY',
+            isAdvancePlay: true,
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          matches: advanceMatches,
+          isAdvancePlay: true,
+          editionTitle: edition.title,
+        }, { headers: corsHeaders });
+      }
+    }
+
     // Find the player's teams via EditionParticipant
     const participations = await prisma.editionParticipant.findMany({
       where: { userId },
@@ -115,8 +181,10 @@ export async function GET(request: NextRequest) {
 
       return {
         matchId: match.id,
+        editionId: match.editionId,
         editionTitle: match.edition?.title || `CBOT Edition #${match.edition?.number || 1}`,
         editionNumber: match.edition?.number || 1,
+        dayNumber: match.round || 1,
         round: match.round || 1,
         matchNumber: match.matchNumber || 1,
         stage: match.stage || 'LEAGUE',
@@ -135,6 +203,7 @@ export async function GET(request: NextRequest) {
         scheduledTime: match.scheduledTime?.toISOString() || null,
         tableNumber: match.tableNumber || 1,
         status: match.status || 'SCHEDULED',
+        isAdvancePlay: false,
       };
     });
 

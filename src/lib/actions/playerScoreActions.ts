@@ -195,26 +195,33 @@ async function refreshPlayerEditionAverage(editionId: string, userId: string, ch
   await recordPlayerAverageChange(userId, stats.average, changedById, true);
 }
 
-async function userOnEditionTeam(userId: string, editionId: string) {
-  const team = await prisma.team.findFirst({
-    where: {
-      editionId,
-      OR: [
-        { captainId: userId },
-        { members: { some: { userId } } },
-        { spocMembers: { some: { userId } } },
-      ],
-    },
-    select: { id: true },
-  });
-  return Boolean(team);
+async function userOnEditionTeamOrEnrolled(userId: string, editionId: string) {
+  const [team, participant] = await Promise.all([
+    prisma.team.findFirst({
+      where: {
+        editionId,
+        OR: [
+          { captainId: userId },
+          { members: { some: { userId } } },
+          { spocMembers: { some: { userId } } },
+        ],
+      },
+      select: { id: true },
+    }),
+    prisma.editionParticipant.findFirst({
+      where: { editionId, userId },
+      select: { id: true },
+    }),
+  ]);
+  return Boolean(team || participant);
 }
 
-async function playerHasGoneLive(userId: string, editionId?: string): Promise<boolean> {
+async function playerHasGoneLive(userId: string, editionId?: string, dayNumber?: number): Promise<boolean> {
   const count = await prisma.liveStream.count({
     where: {
       playerId: userId,
       ...(editionId ? { editionId } : {}),
+      ...(dayNumber ? { dayNumber } : {}),
     },
   });
   return count > 0;
@@ -242,34 +249,77 @@ export async function submitPlayerDayScoreForUser(
   score: unknown,
   slams: unknown,
   boards?: unknown,
+  requestedEditionId?: string,
+  slot?: 'A' | 'B',
 ) {
   const parsed = resolveScoreInput(score, slams, boards);
   if (!parsed.ok) return { success: false as const, error: parsed.error };
-  const edition = await loadLatestEdition();
-  if (!edition) return { success: false as const, error: 'No edition found.' };
-  if (!(await userOnEditionTeam(userId, edition.id))) {
-    return { success: false as const, error: 'You must be on a team in this edition to submit a day score.' };
+  
+  let edition: any = null;
+  if (requestedEditionId) {
+    edition = await loadEditionById(requestedEditionId);
+  } else if (slot) {
+    const ref = await resolveCurrentEdition();
+    if (slot === 'B') {
+      const nextRef = await prisma.edition.findFirst({
+        where: { slot: 'B' },
+        select: { id: true },
+      });
+      if (nextRef) edition = await loadEditionById(nextRef.id);
+    } else if (ref) {
+      edition = await loadEditionById(ref.id);
+    }
   }
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
+  if (!edition) return { success: false as const, error: 'No edition found.' };
+
+  const isEligible = await userOnEditionTeamOrEnrolled(userId, edition.id);
+  if (!isEligible) {
+    return { success: false as const, error: 'You must be enrolled or on a team in this edition to submit a day score.' };
+  }
+
   const stages = (await loadStageConfig(edition.id)).stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const day = Number(dayNumber);
   if (!Number.isInteger(day) || day < 1 || day > maxDay) return { success: false as const, error: 'Invalid day.' };
 
-  if (day > 1) {
-    const hasLive = await playerHasGoneLive(userId, edition.id);
-    if (!hasLive) {
+  const live = await resolveCurrentEdition();
+  const isAdvancePlay = edition.id !== live?.id;
+
+  if (isAdvancePlay) {
+    // For advance tournament play: enforce strict sequence (Day 1, Day 2...)
+    const priorScores = await prisma.playerDayScore.findMany({
+      where: { editionId: edition.id, userId },
+      select: { dayNumber: true },
+    });
+    const priorDays = priorScores.map((s) => s.dayNumber);
+    for (let p = 1; p < day; p++) {
+      if (!priorDays.includes(p)) {
+        return {
+          success: false as const,
+          error: `Please submit scores for Day ${p} before submitting Day ${day}.`,
+        };
+      }
+    }
+  } else {
+    if (day > 1) {
+      const hasLive = await playerHasGoneLive(userId, edition.id);
+      if (!hasLive) {
+        return {
+          success: false as const,
+          error: `Please go live at least once before submitting scores for Day ${day}.`,
+        };
+      }
+    }
+
+    if (!isScoreSubmitOpen(day, edition.dayDates)) {
       return {
         success: false as const,
-        error: `Please go live at least once before submitting scores for Day ${day}.`,
+        error: SCORE_EDIT_PLAYER_CLOSED,
       };
     }
-  }
-
-  if (!isScoreSubmitOpen(day, edition.dayDates)) {
-    return {
-      success: false as const,
-      error: SCORE_EDIT_PLAYER_CLOSED,
-    };
   }
 
   await upsertDayScore({
@@ -554,8 +604,30 @@ export async function getOrganiserScoreDesk(editionId?: string) {
   };
 }
 
-export async function getMyDayScoresForUser(userId: string) {
-  const edition = await loadLatestEdition();
+export async function getMyDayScoresForUser(
+  userId: string,
+  requestedEditionId?: string,
+  slot?: 'A' | 'B',
+) {
+  let edition: any = null;
+  if (requestedEditionId) {
+    edition = await loadEditionById(requestedEditionId);
+  } else if (slot) {
+    if (slot === 'B') {
+      const nextRef = await prisma.edition.findFirst({
+        where: { slot: 'B' },
+        select: { id: true },
+      });
+      if (nextRef) edition = await loadEditionById(nextRef.id);
+    } else {
+      const currentRef = await resolveCurrentEdition();
+      if (currentRef) edition = await loadEditionById(currentRef.id);
+    }
+  }
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
+
   if (!edition) {
     return {
       success: false as const,
@@ -569,9 +641,25 @@ export async function getMyDayScoresForUser(userId: string) {
       publishedDays: [] as Array<{ dayNumber: number; published: boolean }>,
       cutoffIso: '',
       editionTitle: '',
+      editionNumber: 0,
+      editionId: '',
+      isAdvancePlay: false,
+      isEnrolled: false,
     };
   }
-  const stages = (await loadStageConfig(edition.id)).stages;
+
+  const live = await resolveCurrentEdition();
+  const isAdvancePlay = edition.id !== live?.id;
+
+  const [stagesConfig, participant] = await Promise.all([
+    loadStageConfig(edition.id),
+    prisma.editionParticipant.findFirst({
+      where: { editionId: edition.id, userId },
+      include: { team: { select: { id: true, name: true, tag: true } } },
+    }),
+  ]);
+
+  const stages = stagesConfig.stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const scores = await prisma.playerDayScore.findMany({
     where: { editionId: edition.id, userId },
@@ -580,25 +668,50 @@ export async function getMyDayScoresForUser(userId: string) {
   const hasGoneLive = await playerHasGoneLive(userId, edition.id);
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const submittedDays = scores.map((s) => s.dayNumber);
+
   const days: Array<{
     dayNumber: number;
     windowOpen: boolean;
     windowReason: string | null;
     submitted: boolean;
   }> = [];
-  for (let d = 1; d <= maxDay; d += 1) {
-    const windowForDay = describeScoreWindow(d, edition.dayDates, hasGoneLive);
-    days.push({
-      dayNumber: d,
-      windowOpen: windowForDay.windowOpen,
-      windowReason: windowForDay.windowReason,
-      submitted: submittedDays.includes(d),
-    });
+
+  if (isAdvancePlay) {
+    // In advance tournament, days unlock in strict sequence 1, 2, 3...
+    const nextUnsubmitted = nextEligibleDay(submittedDays, maxDay);
+    for (let d = 1; d <= maxDay; d += 1) {
+      const isSub = submittedDays.includes(d);
+      const isOpen = Boolean(participant) && (d === nextUnsubmitted || isSub);
+      let reason: string | null = null;
+      if (!participant) {
+        reason = 'Enroll in this tournament to play advance days.';
+      } else if (d > nextUnsubmitted) {
+        reason = `Play and submit Day ${d - 1} first.`;
+      }
+      days.push({
+        dayNumber: d,
+        windowOpen: isOpen,
+        windowReason: reason,
+        submitted: isSub,
+      });
+    }
+  } else {
+    for (let d = 1; d <= maxDay; d += 1) {
+      const windowForDay = describeScoreWindow(d, edition.dayDates, hasGoneLive);
+      days.push({
+        dayNumber: d,
+        windowOpen: windowForDay.windowOpen,
+        windowReason: windowForDay.windowReason,
+        submitted: submittedDays.includes(d),
+      });
+    }
   }
-  let eligibleDay =
-    days.find((d) => d.windowOpen)?.dayNumber ||
-    nextEligibleDay(submittedDays, maxDay);
-  if (!isScoreSubmitOpen(eligibleDay, edition.dayDates)) {
+
+  let eligibleDay = isAdvancePlay
+    ? nextEligibleDay(submittedDays, maxDay)
+    : (days.find((d) => d.windowOpen)?.dayNumber || nextEligibleDay(submittedDays, maxDay));
+
+  if (!isAdvancePlay && !isScoreSubmitOpen(eligibleDay, edition.dayDates)) {
     for (let d = eligibleDay - 1; d >= 1; d -= 1) {
       if (isScoreSubmitOpen(d, edition.dayDates) && submittedDays.includes(d)) {
         eligibleDay = d;
@@ -606,13 +719,30 @@ export async function getMyDayScoresForUser(userId: string) {
       }
     }
   }
-  const window = describeScoreWindow(eligibleDay, edition.dayDates, hasGoneLive);
+
+  const window = isAdvancePlay
+    ? { windowOpen: Boolean(participant), windowReason: participant ? null : 'Enroll in this tournament to play advance days.' }
+    : describeScoreWindow(eligibleDay, edition.dayDates, hasGoneLive);
+
   const publishedFlags: Array<{ dayNumber: number; published: boolean }> = [];
   for (let d = 1; d <= maxDay; d += 1) {
-    publishedFlags.push({ dayNumber: d, published: isDayScorePublished(d, edition.dayDates) });
+    publishedFlags.push({
+      dayNumber: d,
+      published: isAdvancePlay ? submittedDays.includes(d) : isDayScorePublished(d, edition.dayDates),
+    });
   }
+
   return {
     success: true as const,
+    editionId: edition.id,
+    editionTitle: edition.title,
+    editionNumber: edition.number,
+    editionSlot: edition.slot || (isAdvancePlay ? 'B' : 'A'),
+    isAdvancePlay,
+    isEnrolled: Boolean(participant),
+    teamId: participant?.team?.id || null,
+    teamName: participant?.team?.name || (isAdvancePlay ? 'TBD (Advance Play)' : null),
+    teamTag: participant?.team?.tag || (isAdvancePlay ? 'TBD' : null),
     scores: scores.map((s) => ({
       dayNumber: s.dayNumber,
       score: s.score,
@@ -624,21 +754,20 @@ export async function getMyDayScoresForUser(userId: string) {
     maxDay,
     windowOpen: window.windowOpen,
     windowReason: window.windowReason,
-    published: isDayScorePublished(eligibleDay, edition.dayDates),
+    published: isAdvancePlay ? submittedDays.includes(eligibleDay) : isDayScorePublished(eligibleDay, edition.dayDates),
     publishedDays: publishedFlags,
     cutoffIso: scoreCutoffIso(eligibleDay, edition.dayDates),
-    editionTitle: edition.title,
     target: user?.target || 0,
     average: user?.average || 0,
   };
 }
 
-export async function getMyDayScores() {
+export async function getMyDayScores(requestedEditionId?: string, slot?: 'A' | 'B') {
   const { session, error } = await requireSession();
   if (error || !session) {
     return { success: false as const, error, scores: [] as any[], eligibleDay: 1, maxDay: 1, windowOpen: false };
   }
-  return getMyDayScoresForUser((session.user as any).id as string);
+  return getMyDayScoresForUser((session.user as any).id as string, requestedEditionId, slot);
 }
 
 export async function getTeamDayScoresForActor(

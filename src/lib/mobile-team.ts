@@ -94,9 +94,14 @@ export async function listCaptainDesks(userId: string, editionId?: string): Prom
 
 export async function resolveEditionAndTeam(
   userId: string,
-  opts?: { preferSpoc?: boolean; teamId?: string },
+  opts?: { preferSpoc?: boolean; teamId?: string; editionId?: string },
 ) {
-  const edition = await resolveLiveEditionForPlayers();
+  const edition = opts?.editionId
+    ? await prisma.edition.findUnique({
+        where: { id: opts.editionId },
+        include: { patterns: { orderBy: { sequence: 'asc' } } },
+      })
+    : await resolveLiveEditionForPlayers();
 
   const participation = await prisma.editionParticipant.findFirst({
     where: edition?.id ? { userId, editionId: edition.id } : { userId },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userFromBearer } from '@/lib/mobile-session';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { resolveEditionAndTeam } from '@/lib/mobile-team';
+import { resolvePlayerTournamentOptions } from '@/lib/current-edition';
 import {
   getEditionProfileStatsForUser,
   getMyDayScoresForUser,
@@ -24,8 +25,20 @@ export async function GET(request: NextRequest) {
     }
     const requestedDay = Number(request.nextUrl.searchParams.get('dayNumber') || '');
     const requestedTeamId = (request.nextUrl.searchParams.get('teamId') || '').trim() || undefined;
-    const mine = await getMyDayScoresForUser(user.id);
-    const { team } = await resolveEditionAndTeam(user.id, { teamId: requestedTeamId });
+    const requestedSlot = (request.nextUrl.searchParams.get('slot') || '').trim().toUpperCase() as 'A' | 'B' | '';
+    const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
+    const slot = requestedSlot === 'B' ? 'B' : requestedSlot === 'A' ? 'A' : undefined;
+
+    const [mine, tournamentOptions] = await Promise.all([
+      getMyDayScoresForUser(user.id, requestedEditionId, slot),
+      resolvePlayerTournamentOptions(user.id),
+    ]);
+
+    const { team } = await resolveEditionAndTeam(user.id, {
+      teamId: requestedTeamId,
+      editionId: requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
+    });
+
     let teammates: any[] = [];
     let teamScoreWindowOpen = false;
     const teamDay =
@@ -41,10 +54,14 @@ export async function GET(request: NextRequest) {
         ...mine,
         success: true,
         teammates,
-        teamId: team?.id || null,
+        teamId: mine.teamId || team?.id || null,
+        teamName: mine.teamName || team?.name || null,
+        teamTag: mine.teamTag || team?.tag || null,
         teamDayNumber: teamDay,
         teamScoreWindowOpen,
         editionStats,
+        tournaments: tournamentOptions,
+        activeSlot: slot || (mine.isAdvancePlay ? 'B' : 'A'),
       },
       { headers: mobileCorsHeaders },
     );
@@ -62,8 +79,12 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json().catch(() => ({}));
     const requestedTeamId = typeof body.teamId === 'string' ? body.teamId.trim() : '';
+    const requestedSlot = typeof body.slot === 'string' ? (body.slot.trim().toUpperCase() as 'A' | 'B') : undefined;
+    const requestedEditionId = typeof body.editionId === 'string' ? body.editionId.trim() : undefined;
+
     const { team } = await resolveEditionAndTeam(user.id, {
       teamId: requestedTeamId || undefined,
+      editionId: requestedEditionId,
     });
 
     if (Array.isArray(body.rows) && team && team.captainId === user.id) {
@@ -83,6 +104,8 @@ export async function POST(request: NextRequest) {
       body.score,
       body.slams,
       body.boards,
+      requestedEditionId,
+      requestedSlot,
     );
     return NextResponse.json(result, { headers: mobileCorsHeaders });
   } catch (error: any) {

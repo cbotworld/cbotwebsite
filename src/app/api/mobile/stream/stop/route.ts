@@ -71,10 +71,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await prisma.match.update({
-      where: { id: stream.matchId },
-      data: { status: 'COMPLETED' },
-    }).catch(() => {});
+    if (stream.matchId) {
+      await prisma.match.update({
+        where: { id: stream.matchId },
+        data: { status: 'COMPLETED' },
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, message: 'Stream ended and match completed.' }, { headers: corsHeaders });
   } catch (error: any) {

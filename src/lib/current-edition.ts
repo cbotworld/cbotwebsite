@@ -137,6 +137,113 @@ export async function resolveRegistrationEdition() {
   });
 }
 
+export async function resolveNextEdition() {
+  const live = await resolveCurrentEdition();
+  const notLive = live ? { NOT: { id: live.id } } : {};
+
+  let next = await prisma.edition.findFirst({
+    where: {
+      slot: 'B',
+      ...notLive,
+    },
+    orderBy: { number: 'desc' },
+  });
+
+  if (!next && live) {
+    next = await prisma.edition.findFirst({
+      where: {
+        number: { gt: live.number },
+        ...notLive,
+      },
+      orderBy: { number: 'asc' },
+    });
+  }
+
+  return next;
+}
+
+export async function resolveEditionBySlotOrId(opts?: {
+  slot?: string | null;
+  editionId?: string | null;
+}) {
+  if (opts?.editionId) {
+    const direct = await prisma.edition.findUnique({
+      where: { id: opts.editionId },
+    });
+    if (direct) return direct;
+  }
+
+  const slotUpper = String(opts?.slot || '').trim().toUpperCase();
+  if (slotUpper === 'B' || slotUpper === 'NEXT') {
+    const next = await resolveNextEdition();
+    if (next) return next;
+  }
+
+  return resolveCurrentEdition();
+}
+
+export async function resolvePlayerTournamentOptions(userId: string) {
+  const live = await resolveCurrentEdition();
+  const next = await resolveNextEdition();
+
+  const [liveRecord, nextRecord] = await Promise.all([
+    live
+      ? prisma.edition.findUnique({
+          where: { id: live.id },
+          include: {
+            participants: { where: { userId }, include: { team: { select: { id: true, name: true, tag: true } } } },
+          },
+        })
+      : null,
+    next
+      ? prisma.edition.findUnique({
+          where: { id: next.id },
+          include: {
+            participants: { where: { userId }, include: { team: { select: { id: true, name: true, tag: true } } } },
+          },
+        })
+      : null,
+  ]);
+
+  const liveParticipant = liveRecord?.participants?.[0];
+  const nextParticipant = nextRecord?.participants?.[0];
+
+  return {
+    currentTournament: liveRecord
+      ? {
+          id: liveRecord.id,
+          number: liveRecord.number,
+          title: liveRecord.title,
+          slug: liveRecord.slug,
+          slot: 'A' as const,
+          status: liveRecord.status,
+          totalDays: liveRecord.totalDays,
+          isEnrolled: Boolean(liveParticipant),
+          teamId: liveParticipant?.team?.id || null,
+          teamName: liveParticipant?.team?.name || null,
+          teamTag: liveParticipant?.team?.tag || null,
+          isAdvancePlay: false as const,
+        }
+      : null,
+    nextTournament: nextRecord
+      ? {
+          id: nextRecord.id,
+          number: nextRecord.number,
+          title: nextRecord.title,
+          slug: nextRecord.slug,
+          slot: 'B' as const,
+          status: nextRecord.status,
+          totalDays: nextRecord.totalDays,
+          isEnrolled: Boolean(nextParticipant),
+          teamId: nextParticipant?.team?.id || null,
+          teamName: nextParticipant?.team?.name || 'TBD (Advance Play)',
+          teamTag: nextParticipant?.team?.tag || 'TBD',
+          isAdvancePlay: true as const,
+        }
+      : null,
+  };
+}
+
 export function editionTitleNeedles(edition: { title: string; number: number; slug?: string | null }) {
   const needles = [edition.title.trim().toLowerCase()];
   if (edition.number) {

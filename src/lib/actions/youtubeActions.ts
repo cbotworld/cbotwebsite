@@ -138,10 +138,12 @@ export async function stopLiveStreamAction(
       if (typeof finalScores.totalSlams === 'number') matchUpdateData.queenStrikes1 = finalScores.totalSlams;
     }
 
-    await prisma.match.update({
-      where: { id: stream.matchId },
-      data: matchUpdateData,
-    }).catch(() => {});
+    if (stream.matchId) {
+      await prisma.match.update({
+        where: { id: stream.matchId },
+        data: matchUpdateData,
+      }).catch(() => {});
+    }
 
     // Transition YouTube Live Broadcast to complete on YouTube if applicable
     const { googleClientId, googleClientSecret, googleRefreshToken } = await getYouTubeOAuthCredentials();
@@ -184,26 +186,30 @@ export async function stopLiveStreamAction(
 
     // Auto-upload recorded video to YouTube channel in background if recorded video exists
     if (recordedVideoUrl && recordedVideoUrl.startsWith('http')) {
-      const matchInfo = await prisma.match.findUnique({
-        where: { id: stream.matchId },
-        include: { edition: true, team1: true, team2: true }
-      }).catch(() => null);
+      const matchInfo = stream.matchId
+        ? await prisma.match.findUnique({
+            where: { id: stream.matchId },
+            include: { edition: true, team1: true, team2: true },
+          }).catch(() => null)
+        : null;
 
       const site = await getWebsiteCmsSite();
       const editionTitle = matchInfo?.edition?.title || site.editionLabel;
-      const matchTitle = `${site.shortName} ${editionTitle} - ${stream.matchId} - ${matchInfo?.team1?.name || 'Team 1'} vs ${matchInfo?.team2?.name || 'Team 2'}`;
+      const matchTitle = stream.matchId
+        ? `${site.shortName} ${editionTitle} - ${stream.matchId} - ${matchInfo?.team1?.name || 'Team 1'} vs ${matchInfo?.team2?.name || 'Team 2'}`
+        : `${site.shortName} ${editionTitle} - Day ${stream.dayNumber || 1} Advance Match Play`;
 
       // Trigger YouTube auto-upload asynchronously
       uploadRecordedVideoToYouTube({
         streamId: stream.id,
         videoUrl: recordedVideoUrl,
         title: matchTitle,
-        description: `Official ${site.shortName} Match Recording\nEdition: ${editionTitle}\nMatch: ${stream.matchId}\nWatch live tournaments at https://www.cbotworld.com/matches/${stream.matchId}`,
+        description: `Official ${site.shortName} Match Recording\nEdition: ${editionTitle}\n${stream.matchId ? `Match: ${stream.matchId}\n` : `Day: ${stream.dayNumber || 1}\n`}Watch live tournaments at https://www.cbotworld.com`,
       }).then(res => {
         if (res.success) {
-          console.log(`✅ Successfully auto-published match ${stream.matchId} to YouTube: ${res.url}`);
+          console.log(`✅ Successfully auto-published match ${stream.matchId || stream.id} to YouTube: ${res.url}`);
         } else {
-          console.warn(`ℹ️ YouTube auto-upload notice for match ${stream.matchId}:`, res.error);
+          console.warn(`ℹ️ YouTube auto-upload notice for match ${stream.matchId || stream.id}:`, res.error);
         }
       }).catch(err => {
         console.error('YouTube auto-upload background error:', err);

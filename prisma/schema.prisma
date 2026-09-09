@@ -433,12 +433,13 @@ model LiveStream {
   id                 String    @id @default(cuid())
   editionId          String
   edition            Edition   @relation(fields: [editionId], references: [id], onDelete: Cascade)
-  matchId            String
-  match              Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchId            String?
+  match              Match?    @relation(fields: [matchId], references: [id], onDelete: Cascade)
   playerId           String
   player             User      @relation("PlayerLiveStreams", fields: [playerId], references: [id], onDelete: Cascade)
   teamId             String?
   team               Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  dayNumber          Int?
 
   youtubeBroadcastId String?   @unique
   youtubeStreamId    String?
@@ -464,6 +465,7 @@ model LiveStream {
   @@index([editionId])
   @@index([matchId])
   @@index([playerId])
+  @@index([dayNumber])
   @@index([status])
 }
 

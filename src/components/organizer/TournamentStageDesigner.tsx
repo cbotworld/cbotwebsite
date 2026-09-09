@@ -64,6 +64,7 @@ import {
   Save,
   Trophy,
   Users,
+  Sparkles,
   X,
 } from 'lucide-react';
 
@@ -993,6 +994,18 @@ export default function TournamentStageDesigner({
           </div>
         ) : (
           <>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 flex items-start gap-2.5 text-xs text-emerald-300">
+              <Sparkles className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-extrabold text-foreground">
+                  Advance Day Play Enabled for Enrolled Players
+                </p>
+                <p className="text-[11.5px] text-muted-foreground">
+                  Once you save the tournament days ({daysNeeded} days), enrolled players can play matches day-by-day in sequence (Day 1..{daysNeeded}) and submit scores on mobile & web even while teams and matchups are TBD. Scores will automatically align with assigned teams and combis later.
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-wider text-amber-500">1. Tournament path</div>

@@ -123,6 +123,7 @@ export default function PlayerClient({
         ? initialTeammates
         : currentTeam?.members?.map((m: any) => m.user) || [];
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [activeTournamentSlot, setActiveTournamentSlot] = React.useState<'A' | 'B'>('A');
   const [dayBoards, setDayBoards] = React.useState([emptyBoardDraft()]);
   const [dayScoreMsg, setDayScoreMsg] = React.useState<string | null>(null);
   const [dayScoreBusy, setDayScoreBusy] = React.useState(false);
@@ -130,8 +131,8 @@ export default function PlayerClient({
   const [selectedScoreDay, setSelectedScoreDay] = React.useState(1);
 
   React.useEffect(() => {
-    getMyDayScores().then((res) => setMyDayInfo(res)).catch(() => {});
-  }, []);
+    getMyDayScores(undefined, activeTournamentSlot).then((res) => setMyDayInfo(res)).catch(() => {});
+  }, [activeTournamentSlot]);
 
   React.useEffect(() => {
     if (myDayInfo?.eligibleDay) setSelectedScoreDay(myDayInfo.eligibleDay);
@@ -808,16 +809,54 @@ export default function PlayerClient({
         <TabsContent value="day-score">
           <Card className="border-amber-500/30">
             <CardHeader>
-              <CardTitle className="text-xl font-bold flex items-center gap-2">
-                <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
-              </CardTitle>
-              <CardDescription>
-                Choose a day. If you already submitted boards, they load here so you can update them until 9:00pm IST.
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/50">
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <Target className="h-5 w-5 text-amber-500" /> Submit Day Score
+                </CardTitle>
+                <div className="flex items-center gap-1.5 p-1 bg-muted/50 rounded-xl border border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTournamentSlot('A')}
+                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                      activeTournamentSlot === 'A'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    🏆 Current Cup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTournamentSlot('B')}
+                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all ${
+                      activeTournamentSlot === 'B'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    🚀 Next Cup (Advance Play)
+                  </button>
+                </div>
+              </div>
+              <CardDescription className="pt-2">
+                {activeTournamentSlot === 'B'
+                  ? 'Play your advance matches day-by-day in sequence for the next edition. Scores will automatically align with your team once teams and combis are published.'
+                  : 'Choose a day. If you already submitted boards, they load here so you can update them until 9:00pm IST.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-xl">
+              {activeTournamentSlot === 'B' && (
+                <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/30 text-xs font-medium text-violet-200 flex items-start gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-violet-300">Advance Match Play Enabled:</span> You are entering scores for{' '}
+                    <strong className="text-white">{myDayInfo?.editionTitle || 'Next Tournament'}</strong>. Days unlock in sequence (Day 1..{myDayInfo?.maxDay || 10}).
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="text-xs font-bold block mb-1.5">Select Day</label>
+                <label className="text-xs font-bold block mb-1.5">Select Day ({myDayInfo?.editionTitle || 'Tournament'})</label>
                 <select
                   className="w-full h-11 rounded-xl border border-amber-500/30 bg-background px-3 text-sm font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                   value={selectedScoreDay}
@@ -830,7 +869,7 @@ export default function PlayerClient({
                       <option key={d} value={d}>
                         Day {d}
                         {saved ? ' · entered' : ' · empty'}
-                        {meta?.windowOpen === false ? ' · closed' : ''}
+                        {meta?.windowOpen === false ? ' · locked' : ''}
                       </option>
                     );
                   })}
@@ -874,7 +913,7 @@ export default function PlayerClient({
                     draftToPayload(dayBoards),
                   );
                   setDayScoreMsg(res.success ? 'Saved.' : res.error || 'Failed');
-                  if (res.success) setMyDayInfo(await getMyDayScores());
+                  if (res.success) setMyDayInfo(await getMyDayScores(undefined, activeTournamentSlot));
                   setDayScoreBusy(false);
                 }}
               >

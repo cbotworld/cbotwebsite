@@ -99,6 +99,7 @@ export async function recordMobileLiveStream(args: RecordArgs) {
   const data = {
     editionId: edition.id,
     matchId: match.id,
+    dayNumber: args.dayNumber,
     playerId: args.userId,
     teamId,
     youtubeBroadcastId: args.youtubeBroadcastId,
