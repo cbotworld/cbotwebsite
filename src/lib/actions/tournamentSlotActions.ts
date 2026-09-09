@@ -9,6 +9,7 @@ import { canPublishDraft, isOrganizerLiveStatus } from '@/lib/tournament-slots';
 import { resolveCurrentEdition, resolveRegistrationEdition, archiveEditionsBefore, getNextEditionNumber } from '@/lib/current-edition';
 import { toCalendarDate } from '@/lib/combi-cutoff';
 import { stageConfigKey } from '@/lib/tournament-stages';
+import { snapshotEditionStandings } from '@/lib/actions/playerScoreActions';
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -283,6 +284,9 @@ export async function publishTournament(draftEditionId: string) {
 
     const nextDraftNumber = draft.number;
     const nextDraftTitle = `Edition ${nextDraftNumber + 1}`;
+
+    // Permanently snapshot the final standings of the completed live cup before swapping slots
+    await snapshotEditionStandings(live.id);
 
     // Swap twin slots: draft → live (A), former live → draft (B) for the next cycle.
     await prisma.edition.update({ where: { id: live.id }, data: { slot: null } });

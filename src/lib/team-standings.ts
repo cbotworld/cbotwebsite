@@ -36,6 +36,20 @@ export type KnockoutMatchRow = {
   team2EventPts: number | null;
   winnerTeamId: string | null;
   dayNumber: number;
+  events?: Array<{
+    name: string;
+    format: string;
+    team1Players: string;
+    team2Players: string;
+    team1PlayerList: any[];
+    team2PlayerList: any[];
+    team1Pts: number;
+    team2Pts: number;
+    team1Score: number | null;
+    team2Score: number | null;
+    result: string;
+    reason?: string;
+  }>;
 };
 
 export type StageStandingBlock = {
@@ -352,10 +366,13 @@ export function buildStageStandingBlocks(opts: {
             let team1EventPts: number | null = null;
             let team2EventPts: number | null = null;
             let winnerTeamId: string | null = null;
+            let events: any[] = [];
             if (ready && t1 && t2) {
+              const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: day });
+              const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: day });
               const result = scoreMatchDay(
-                parseSavedLineups(t1.savedLineups)[String(day)]?.rounds as LineupRound[] | undefined,
-                parseSavedLineups(t2.savedLineups)[String(day)]?.rounds as LineupRound[] | undefined,
+                combi1.rounds,
+                combi2.rounds,
                 t1.members,
                 t2.members,
                 scoreMapForDay(opts.scores, day),
@@ -364,6 +381,21 @@ export function buildStageStandingBlocks(opts: {
               team2EventPts = result.team2EventPts;
               if (result.matchWinner === 1) winnerTeamId = t1.id;
               if (result.matchWinner === 2) winnerTeamId = t2.id;
+              const map = scoreMapForDay(opts.scores, day);
+              events = result.events.map((ev) => ({
+                name: ev.name,
+                format: ev.format,
+                team1Players: namesFor(ev.team1PlayerIds, t1, map),
+                team2Players: namesFor(ev.team2PlayerIds, t2, map),
+                team1PlayerList: playerDetailsFor(ev.team1PlayerIds, t1, map),
+                team2PlayerList: playerDetailsFor(ev.team2PlayerIds, t2, map),
+                team1Pts: ev.team1Pts,
+                team2Pts: ev.team2Pts,
+                team1Score: sideSum(ev.team1PlayerIds, map),
+                team2Score: sideSum(ev.team2PlayerIds, map),
+                result: formatEventResultLabel(ev, 1),
+                reason: ev.reason,
+              }));
             }
             return {
               label: p.label || p.stage || stage.name,
@@ -375,6 +407,7 @@ export function buildStageStandingBlocks(opts: {
               team2EventPts,
               winnerTeamId,
               dayNumber: day,
+              events,
             };
           });
         return {

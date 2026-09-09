@@ -1024,18 +1024,81 @@ async function loadPublicScoreboard() {
   };
 }
 
-export async function getPublicStandings() {
+export async function getPublicStandings(editionId?: string) {
   try {
-    return await loadPublicStandings();
+    return await loadPublicStandings(editionId);
   } catch (error) {
     console.error('getPublicStandings', error);
-    return { edition: null, blocks: [] as any[], players: [] as any[], placement: [] as any[], stages: [] as any[] };
+    return { edition: null, blocks: [] as any[], players: [] as any[], placement: [] as any[], stages: [] as any[], allEditions: [] as any[] };
   }
 }
 
-async function loadPublicStandings() {
-  const edition = await loadLatestEdition();
-  if (!edition) return { edition: null, blocks: [], players: [], placement: [], stages: [] };
+export async function snapshotEditionStandings(editionId: string) {
+  try {
+    const data = await loadPublicStandings(editionId, { skipSnapshotRead: true });
+    if (data && data.edition?.id) {
+      const textJson = JSON.stringify(data);
+      await prisma.systemSetting.upsert({
+        where: { key: `edition_${editionId}_standings_snapshot` },
+        update: { value: textJson },
+        create: { key: `edition_${editionId}_standings_snapshot`, value: textJson },
+      });
+      if (data.edition.number) {
+        await prisma.systemSetting.upsert({
+          where: { key: `edition_num_${data.edition.number}_standings_snapshot` },
+          update: { value: textJson },
+          create: { key: `edition_num_${data.edition.number}_standings_snapshot`, value: textJson },
+        });
+      }
+    }
+    return { success: true as const };
+  } catch (err) {
+    console.error('[snapshotEditionStandings]', err);
+    return { success: false as const, error: 'Failed to snapshot standings.' };
+  }
+}
+
+async function loadPublicStandings(editionId?: string, options?: { skipSnapshotRead?: boolean }) {
+  let edition = editionId ? await loadEditionById(editionId) : null;
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
+  if (!edition) return { edition: null, blocks: [], players: [], placement: [], stages: [], allEditions: [] };
+
+  const allEditionsRaw = await prisma.edition.findMany({
+    where: { status: { in: ['IN_PROGRESS', 'COMPLETED', 'FINISHED', 'ARCHIVED'] } },
+    orderBy: { number: 'desc' },
+    select: { id: true, number: true, title: true, status: true, slot: true },
+  });
+  const allEditions = allEditionsRaw.map((e) => ({
+    id: e.id,
+    number: e.number,
+    title: e.title || `Edition ${e.number}`,
+    status: e.status,
+    isCurrent: e.slot === 'A' || e.status === 'IN_PROGRESS',
+  }));
+
+  const isCompleted = ['COMPLETED', 'FINISHED', 'ARCHIVED'].includes(String(edition.status || '').toUpperCase());
+
+  // If completed and permanent snapshot text exists, load directly from permanent text snapshot
+  if (isCompleted && !options?.skipSnapshotRead) {
+    const snapshotKey = `edition_${edition.id}_standings_snapshot`;
+    const snapshotNumKey = `edition_num_${edition.number}_standings_snapshot`;
+    const existing = await prisma.systemSetting.findFirst({
+      where: { key: { in: [snapshotKey, snapshotNumKey] } },
+    });
+    if (existing?.value) {
+      try {
+        const parsed = JSON.parse(existing.value);
+        return {
+          ...parsed,
+          allEditions,
+        };
+      } catch (e) {
+        console.error('Failed to parse standings snapshot', e);
+      }
+    }
+  }
 
   const [
     stageSetting,
@@ -1129,13 +1192,37 @@ async function loadPublicStandings() {
     pairings,
   });
 
-  return {
-    edition: { id: edition.id, title: edition.title, number: edition.number },
+  const resultPayload = {
+    edition: { id: edition.id, title: edition.title, number: edition.number, status: edition.status },
     blocks,
     players,
     placement,
     stages: stages.map((s: any) => ({ id: s.id, name: s.name, kind: s.kind })),
+    allEditions,
   };
+
+  // If completed, save snapshot text to SystemSetting permanently
+  if (isCompleted) {
+    try {
+      const textJson = JSON.stringify(resultPayload);
+      await prisma.systemSetting.upsert({
+        where: { key: `edition_${edition.id}_standings_snapshot` },
+        update: { value: textJson },
+        create: { key: `edition_${edition.id}_standings_snapshot`, value: textJson },
+      });
+      if (edition.number) {
+        await prisma.systemSetting.upsert({
+          where: { key: `edition_num_${edition.number}_standings_snapshot` },
+          update: { value: textJson },
+          create: { key: `edition_num_${edition.number}_standings_snapshot`, value: textJson },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to auto-save standings snapshot text', e);
+    }
+  }
+
+  return resultPayload;
 }
 
 export async function getAverageReviewPrompt(editionId?: string) {
@@ -1222,7 +1309,7 @@ export async function getEditionProfileStatsForUser(userId: string) {
   }
 
   const standings = await getPublicStandings();
-  const playerRank = standings.players.find((p) => p.userId === userId);
+  const playerRank = (standings.players as any[]).find((p: any) => p.userId === userId);
   const calculatedAverage = playerRank && playerRank.boardAverage != null ? Number(playerRank.boardAverage) : (user?.average || 0);
 
   return {

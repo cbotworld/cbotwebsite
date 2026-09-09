@@ -4,8 +4,14 @@ import StandingsClient from './StandingsClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function StandingsPage() {
-  const payload = JSON.parse(JSON.stringify(await getPublicStandings()));
+export default async function StandingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ editionId?: string; edition?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : {};
+  const requestedEditionId = sp.editionId || sp.edition;
+  const payload = JSON.parse(JSON.stringify(await getPublicStandings(requestedEditionId)));
   return <StandingsClient payload={payload} />;
 }
 

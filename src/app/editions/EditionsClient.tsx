@@ -113,9 +113,9 @@ export default function EditionsClient({
                   </div>
                 </div>
 
-                <Link href={`/tournaments/${ed.slug || ed.id}`} className="block">
-                  <Button variant="outline" className="w-full text-xs font-bold justify-between">
-                    <span>View Details</span>
+                <Link href={`/standings?editionId=${ed.id}`} className="block">
+                  <Button variant="carrom" className="w-full text-xs font-bold justify-between">
+                    <span>View Standings</span>
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>

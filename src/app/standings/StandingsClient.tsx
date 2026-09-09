@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -53,7 +54,9 @@ function constraintBadgeLabel(appliedConstraint?: string) {
 }
 
 export default function StandingsClient({ payload }: { payload: any }) {
+  const router = useRouter();
   const data = payload || {};
+  const allEditions = Array.isArray(data.allEditions) ? data.allEditions : [];
   const blocks = Array.isArray(data.blocks) ? data.blocks : [];
   const [tab, setTab] = React.useState<'teams' | 'players'>('teams');
   const [stageId, setStageId] = React.useState(blocks.find((b: any) => b.current)?.stageId || blocks[0]?.stageId || '');
@@ -82,12 +85,38 @@ export default function StandingsClient({ payload }: { payload: any }) {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-      <div>
-        <Badge variant="carrom" className="mb-2">Standings</Badge>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          One table per organiser stage. Position is determined by <strong>Total Points</strong>. If points are tied between teams, <strong>Number of Match Wins</strong> is considered. If wins are also tied, <strong>Team Total Score</strong> (including walkover scores) determines the rank. Tap Event, Slams, Target+ or Total for the day-wise breakdown.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="carrom">Standings</Badge>
+            {data.edition?.status === 'COMPLETED' && (
+              <Badge variant="outline" className="text-[10px] font-black border-amber-500/40 text-amber-300 bg-amber-500/10">
+                Completed Tournament
+              </Badge>
+            )}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{data.edition?.title || 'Team Standings'}</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-3xl">
+            One table per organiser stage. Position is determined by <strong>Total Points</strong>. If points are tied between teams, <strong>Number of Match Wins</strong> is considered. If wins are also tied, <strong>Team Total Score</strong> (including walkover scores) determines the rank. Tap Event, Slams, Target+ or Total for the day-wise breakdown.
+          </p>
+        </div>
+
+        {allEditions.length > 1 && (
+          <div className="shrink-0 flex items-center gap-2 bg-card/80 p-2.5 rounded-2xl border border-border">
+            <label className="text-xs font-bold text-muted-foreground">Edition:</label>
+            <select
+              value={data.edition?.id || ''}
+              onChange={(e) => router.push(`/standings?editionId=${e.target.value}`)}
+              className="h-8 px-3 text-xs font-bold rounded-lg border border-amber-500/40 bg-background text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            >
+              {allEditions.map((ed: any) => (
+                <option key={ed.id} value={ed.id}>
+                  {ed.title} {ed.isCurrent ? '(Live)' : '(Completed)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div className="flex gap-2">
         <button
@@ -254,20 +283,173 @@ export default function StandingsClient({ payload }: { payload: any }) {
           {!stage ? (
             <p className="text-sm text-muted-foreground">No stages configured yet.</p>
           ) : stage.knockout?.length ? (
-            <div className="space-y-3">
-              {stage.knockout.map((m: any, i: number) => (
-                <Card key={`${m.label}-${i}`}>
-                  <CardContent className="p-4 flex items-center justify-between gap-3 text-sm">
-                    <div>
-                      <div className="text-[10px] font-black uppercase text-muted-foreground">{m.label}</div>
-                      <div className="font-bold">{m.team1Name} vs {m.team2Name}</div>
-                    </div>
-                    <div className="font-mono text-xs">
-                      {m.team1EventPts == null ? 'After 9:30pm' : `${m.team1EventPts} – ${m.team2EventPts}`}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="space-y-4">
+              {stage.knockout.map((m: any, i: number) => {
+                const isT1Winner = m.team1EventPts != null && m.team2EventPts != null && m.team1EventPts > m.team2EventPts;
+                const isT2Winner = m.team1EventPts != null && m.team2EventPts != null && m.team2EventPts > m.team1EventPts;
+
+                return (
+                  <Card key={`${m.label}-${i}`} className="border-border bg-card/80 backdrop-blur-sm overflow-hidden shadow-lg">
+                    <CardHeader className="p-4 bg-muted/20 border-b border-border/50">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              {m.label}
+                            </span>
+                            {m.dayNumber && (
+                              <span className="text-[10px] font-bold text-muted-foreground">
+                                Day {m.dayNumber}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-base sm:text-lg font-black flex items-center gap-2 flex-wrap">
+                            <span className={isT1Winner ? 'text-emerald-400 font-extrabold' : 'text-foreground'}>
+                              {m.team1Name}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-black px-1">vs</span>
+                            <span className={isT2Winner ? 'text-emerald-400 font-extrabold' : 'text-foreground'}>
+                              {m.team2Name}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {m.team1EventPts == null ? (
+                            <Badge variant="outline" className="text-xs font-bold text-muted-foreground">
+                              After 9:30pm IST
+                            </Badge>
+                          ) : (
+                            <div className="flex items-center gap-2 bg-background/80 px-3.5 py-1.5 rounded-xl border border-border shadow-xs">
+                              <span className={`text-base font-black font-mono ${isT1Winner ? 'text-emerald-400' : 'text-foreground'}`}>
+                                {m.team1EventPts}
+                              </span>
+                              <span className="text-xs text-muted-foreground font-bold">–</span>
+                              <span className={`text-base font-black font-mono ${isT2Winner ? 'text-emerald-400' : 'text-foreground'}`}>
+                                {m.team2EventPts}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    {/* Combi Events Breakdown */}
+                    {m.events && m.events.length > 0 && (
+                      <CardContent className="p-4 space-y-2.5 bg-card/40">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground pb-1">
+                          Combi Events & Player Scores
+                        </div>
+                        <div className="space-y-2">
+                          {m.events.map((ev: any, evIdx: number) => {
+                            const isWin = String(ev.result || '').includes('Win');
+                            const isLoss = String(ev.result || '').includes('Loss');
+                            const isWO = String(ev.result || '').includes('WO') || ev.reason === 'walkover' || ev.reason === 'double-walkover';
+
+                            return (
+                              <div
+                                key={`${m.label}-${i}-ev-${evIdx}`}
+                                className="text-xs rounded-xl bg-background/80 border border-border/70 p-3 grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center"
+                              >
+                                {/* Event Title & Points */}
+                                <div className="space-y-1">
+                                  <div className="font-extrabold text-foreground flex items-center gap-1.5 flex-wrap">
+                                    <span>{ev.name}</span>
+                                    {ev.format && (
+                                      <span className="text-[10px] text-muted-foreground font-bold">
+                                        ({ev.format})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black ${
+                                        isWin
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                          : isLoss
+                                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                          : isWO
+                                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                          : 'bg-muted text-muted-foreground border border-border'
+                                      }`}
+                                    >
+                                      {ev.team1Pts} – {ev.team2Pts} pts
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Team 1 Players & Score */}
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-bold text-sky-400 uppercase truncate">
+                                    {m.team1Name}
+                                  </div>
+                                  <div className="text-xs">
+                                    {ev.team1PlayerList && ev.team1PlayerList.length > 0 ? (
+                                      ev.team1PlayerList.map((p: any, idx: number) => (
+                                        <span key={p.id || idx}>
+                                          {idx > 0 && ', '}
+                                          <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                            {p.name}
+                                            {p.score != null ? ` (${p.score})` : ''}
+                                            {p.isWalkover && (
+                                              <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                                WO
+                                              </span>
+                                            )}
+                                          </span>
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span>{ev.team1Players || '—'}</span>
+                                    )}
+                                    {ev.team1Score != null && (
+                                      <span className="font-mono text-muted-foreground font-bold ml-1">
+                                        = {ev.team1Score}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Team 2 Players & Score */}
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] font-bold text-rose-400 uppercase truncate">
+                                    {m.team2Name}
+                                  </div>
+                                  <div className="text-xs">
+                                    {ev.team2PlayerList && ev.team2PlayerList.length > 0 ? (
+                                      ev.team2PlayerList.map((p: any, idx: number) => (
+                                        <span key={p.id || idx}>
+                                          {idx > 0 && ', '}
+                                          <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                            {p.name}
+                                            {p.score != null ? ` (${p.score})` : ''}
+                                            {p.isWalkover && (
+                                              <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                                WO
+                                              </span>
+                                            )}
+                                          </span>
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span>{ev.team2Players || '—'}</span>
+                                    )}
+                                    {ev.team2Score != null && (
+                                      <span className="font-mono text-muted-foreground font-bold ml-1">
+                                        = {ev.team2Score}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
               {placement.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle className="text-lg font-black">Final ranking 1–8</CardTitle></CardHeader>
