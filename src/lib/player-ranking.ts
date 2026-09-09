@@ -79,7 +79,7 @@ export function rankPlayers(opts: {
 
   const rows: PlayerRankingRow[] = opts.players.map((player) => {
     const seed = 0;
-    let running = 0;
+    let totalDayAvgSum = 0;
     let totalScore = 0;
     let boardCount = 0;
     let slams = 0;
@@ -128,13 +128,13 @@ export function rankPlayers(opts: {
         slams += row.slams || agg.slams || 0;
         if (agg.boardCount > 0) {
           const dayAvg = agg.score / agg.boardCount;
-          running = running > 0 ? roundAverage((running + dayAvg) / 2) : roundAverage(dayAvg);
+          totalDayAvgSum += dayAvg;
           daysProcessed += 1;
         }
       } else {
         // Walkover: match was scheduled for this player's team on this day, but no score was submitted
         walkovers += 1;
-        const playerBase = running > 0 ? running : seed > 0 ? seed : 0;
+        const playerBase = daysProcessed > 0 ? totalDayAvgSum / daysProcessed : seed > 0 ? seed : 0;
         const maxRef = Math.max(highestAverage, playerBase);
         const walkoverDayAvg = (maxRef > 0 ? maxRef : 25) + 1;
         dayScores.push({
@@ -143,14 +143,14 @@ export function rankPlayers(opts: {
           slams: 0,
           isWalkover: true,
         });
-        running = running > 0 ? roundAverage((running + walkoverDayAvg) / 2) : roundAverage(walkoverDayAvg);
+        totalDayAvgSum += walkoverDayAvg;
         daysProcessed += 1;
       }
     }
 
     const rankingAverage =
       daysProcessed > 0
-        ? (running > 0 ? running : null)
+        ? roundAverage(totalDayAvgSum / daysProcessed)
         : Number.isFinite(seed) && seed > 0
           ? roundAverage(seed)
           : null;

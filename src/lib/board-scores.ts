@@ -67,8 +67,8 @@ export function computeUpdatedAverage(currentAverage: number | null | undefined,
 }
 
 /**
- * Calculates progressive edition average across submitted days in order using
- * (Current average + that day's average) / 2 for each day.
+ * Calculates edition average across submitted days as:
+ * Sum of each day's match average / Number of matches played.
  */
 export function computeEditionRunningAverage(
   initialAverage: number | null | undefined,
@@ -76,8 +76,7 @@ export function computeEditionRunningAverage(
 ) {
   let totalScore = 0;
   let boardCount = 0;
-  const initial = Number(initialAverage);
-  let running = Number.isFinite(initial) && initial > 0 ? initial : 0;
+  let dayAveragesSum = 0;
   let daysProcessed = 0;
 
   const sorted = [...rows].sort((a, b) => (Number(a.dayNumber) || 0) - (Number(b.dayNumber) || 0));
@@ -88,19 +87,17 @@ export function computeEditionRunningAverage(
     boardCount += agg.boardCount;
     if (agg.boardCount > 0) {
       const dayAvg = agg.score / agg.boardCount;
-      if (running > 0) {
-        running = roundAverage((running + dayAvg) / 2);
-      } else {
-        running = roundAverage(dayAvg);
-      }
+      dayAveragesSum += dayAvg;
       daysProcessed += 1;
     }
   }
 
+  const finalAvg = daysProcessed > 0 ? roundAverage(dayAveragesSum / daysProcessed) : 0;
+
   return {
     totalScore,
     boardCount,
-    average: running > 0 ? running : 0,
+    average: finalAvg,
     daysProcessed,
   };
 }
