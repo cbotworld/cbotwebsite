@@ -469,6 +469,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   }, [selectedEditionId, viewingDraftSlot, selectedEdition?.status]);
 
   const handleTournamentSlotChange = async (slot: TournamentSlot) => {
+    calendarSeedRef.current = null;
     setTournamentSlot(slot);
     const targetEdition = slot === 'A' ? slotAEdition : slotBEdition;
     if (!targetEdition && slot === 'B') {
@@ -650,8 +651,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       setTotalDays(numDays);
 
       const loadedMap = normalizeDayDates(selectedEdition.dayDates) ?? {};
+      const expectedStart = toCalendarDate(selectedEdition.tournamentStartDate);
       const firstDate =
-        loadedMap[1] || toCalendarDate(selectedEdition.tournamentStartDate) || '';
+        (viewingDraftSlot && expectedStart ? expectedStart : (loadedMap[1] || expectedStart)) || '';
       const editionChanged = calendarSeedRef.current?.editionId !== selectedEditionId;
       const dirty =
         !editionChanged &&
@@ -659,7 +661,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         startDateRef.current !== calendarSeedRef.current!.start;
       if (dirty) return;
 
-      const nextStart = firstDate || startDateRef.current || defaultDay1Calendar();
+      const nextStart = firstDate || (viewingDraftSlot ? defaultDay1Calendar() : startDateRef.current) || defaultDay1Calendar();
       setStartDate(nextStart);
       setDayDatesMap(generateDefaultDayDates(nextStart, numDays, loadedMap));
       calendarSeedRef.current = { editionId: selectedEditionId, start: nextStart };
@@ -705,6 +707,72 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
   const selectedEditionTeams = filterMainTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
   const selectedEditionSpocTeams = filterSpocTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
+
+  const selectedEditionScoresUsers = React.useMemo(() => {
+    const byId = new Map(usersList.map((u) => [u.id, u]));
+    if (viewingDraftSlot) {
+      // Draft / Next Edition: show only enrolled players for this edition
+      return enrolledParticipants.map((p: any) => {
+        const usr = byId.get(p.userId);
+        const assignedTeam = selectedEditionTeams.find(
+          (t) =>
+            t.members?.some((m: any) => (m.user?.id || m.userId) === p.userId) ||
+            t.spocMembers?.some((m: any) => (m.user?.id || m.userId) === p.userId)
+        );
+        return {
+          id: p.userId,
+          name: usr?.name || (p as any).user?.name || usr?.username || 'Player',
+          username: usr?.username || (p as any).user?.username || '',
+          target: usr?.target ?? null,
+          teamName: assignedTeam?.name || undefined,
+          grade: (p as any).grade || usr?.grade || (usr as any)?.category || null,
+          category: (p as any).category || (usr as any)?.category || null,
+        };
+      });
+    }
+
+    // Live / Current Edition: show roster / teams players for this edition
+    const participants = selectedEdition?.participants || [];
+    const enrolledUserIds = new Set(participants.map((p: any) => p.userId));
+
+    // Players from teams in this edition
+    const teamUserIds = new Set<string>();
+    selectedEditionTeams.forEach((t: any) => {
+      (t.members || []).forEach((m: any) => teamUserIds.add(m.user?.id || m.userId));
+      (t.spocMembers || []).forEach((m: any) => teamUserIds.add(m.user?.id || m.userId));
+    });
+
+    const activeUserIds = new Set([...teamUserIds, ...enrolledUserIds]);
+    if (activeUserIds.size === 0) {
+      return usersList.map((u) => ({
+        id: u.id,
+        name: u.name || u.username || 'Player',
+        username: u.username || '',
+        target: u.target ?? null,
+        teamName: undefined,
+        grade: u.grade || null,
+        category: (u as any).category || null,
+      }));
+    }
+
+    return Array.from(activeUserIds).map((uId) => {
+      const usr = byId.get(uId);
+      const assignedTeam = selectedEditionTeams.find(
+        (t) =>
+          t.members?.some((m: any) => (m.user?.id || m.userId) === uId) ||
+          t.spocMembers?.some((m: any) => (m.user?.id || m.userId) === uId)
+      );
+      return {
+        id: uId,
+        name: usr?.name || usr?.username || 'Player',
+        username: usr?.username || '',
+        target: usr?.target ?? null,
+        teamName: assignedTeam?.name || undefined,
+        grade: usr?.grade || (usr as any)?.category || null,
+        category: (usr as any)?.category || null,
+      };
+    });
+  }, [viewingDraftSlot, enrolledParticipants, selectedEdition, selectedEditionTeams, usersList]);
 
   const activeEditions = editions.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'REGISTRATION_OPEN');
   const pendingReports = scoreReports.filter((r) => r.status === 'PENDING');
@@ -1695,6 +1763,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
       <TabsContent value="stages" forceMount className="mt-4">
       <TournamentStageDesigner
+        key={selectedEditionId}
         editionId={selectedEditionId}
         editionTitle={selectedEdition?.title || selectedEdition?.name || 'Edition'}
         spocTeams={selectedEditionSpocTeams.map((t: any) => ({
@@ -1702,7 +1771,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           name: t.name,
           tag: t.tag,
         }))}
-        teams={(selectedEditionTeams.length ? selectedEditionTeams : filterMainTeams(teamsList)).map((t: any) => ({
+        teams={selectedEditionTeams.map((t: any) => ({
           id: t.id,
           name: t.name,
           tag: t.tag,
@@ -1866,8 +1935,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
       <TabsContent value="scores" className="mt-4">
         <OrganizerScoresPanel
-          users={usersList}
-          teams={teamsList}
+          key={selectedEditionId}
+          users={selectedEditionScoresUsers}
+          teams={selectedEditionTeams}
           editionTitle={selectedEdition?.title}
           editionId={selectedEditionId}
         />
@@ -2057,10 +2127,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
       <TabsContent value="grading" className="mt-4">
         <OrganizerGradingPanel
+          key={selectedEditionId}
           editionId={selectedEditionId || null}
           editionTitle={selectedEdition?.title || selectedEdition?.name}
-          users={usersList}
-          enrolledUserIds={enrolledParticipants.map((p: { userId: string }) => p.userId)}
+          users={selectedEditionScoresUsers}
+          enrolledUserIds={enrolledParticipants.map((p: any) => p.userId)}
           participants={enrolledParticipants}
         />
       </TabsContent>

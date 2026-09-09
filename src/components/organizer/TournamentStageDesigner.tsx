@@ -169,7 +169,7 @@ function TeamSlotSelect({
 function teamLabel(teams: TeamLite[], id?: string | null, fallback?: string) {
   if (!id) return fallback || 'TBD';
   const found = teams.find((t) => t.id === id);
-  return found ? `${found.name}${found.tag ? ` (${found.tag})` : ''}` : fallback || 'TBD';
+  return found ? `${found.name}${found.tag ? ` (${found.tag})` : ''}` : 'TBD';
 }
 
 function EditablePairingRow({
@@ -330,7 +330,7 @@ export default function TournamentStageDesigner({
     const res = await getEditionStageSnapshot(editionId);
     if (res.success) {
       const lastDone = lastCompletedDay(dayDates);
-      const nextConfig = res.config || defaultTournamentStages(res.teams.length || teams.length || 8);
+      const nextConfig = res.config || defaultTournamentStages(res.teams.length || teams.length || 0);
       nextConfig.stages = layoutStageDays(nextConfig.stages, lastDone);
       setConfig(nextConfig);
       if (nextConfig.scheduleMode) setScheduleMode(nextConfig.scheduleMode);
@@ -655,7 +655,11 @@ export default function TournamentStageDesigner({
       );
       return;
     }
-    applyRrPairings(slotRrPairings(suggestRoundRobinPairings(teams)));
+    if (teams.length >= 2) {
+      applyRrPairings(slotRrPairings(suggestRoundRobinPairings(teams)));
+    } else {
+      setRrPairings([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.kind, active?.id, teams.length]);
 
@@ -887,7 +891,10 @@ export default function TournamentStageDesigner({
 
   const dbRrCount = matches.filter((m) => m.stage === 'ROUND_ROBIN').length;
   const teamCount = teams.length || 0;
-  const rrCount = Math.max(dbRrCount, rrPairings.length, (teamCount * (teamCount - 1)) / 2);
+  const rrCount =
+    teamCount >= 2
+      ? (teamCount * (teamCount - 1)) / 2
+      : rrPairings.filter((p) => p.team1Id && p.team2Id).length || dbRrCount;
 
   return (
     <>

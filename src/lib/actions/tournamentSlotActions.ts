@@ -104,10 +104,24 @@ async function cloneEditionBlueprint(sourceId: string, targetId: string) {
     where: { key: stageConfigKey(sourceId) },
   });
   if (sourceStage?.value) {
+    let cleanConfig = sourceStage.value;
+    try {
+      const parsed = JSON.parse(sourceStage.value);
+      if (parsed?.stages && Array.isArray(parsed.stages)) {
+        parsed.stages = parsed.stages.map((st: any) => ({
+          ...st,
+          matchPairings: [],
+          groups: (st.groups || []).map((g: any) => ({ ...g, teamIds: [] })),
+        }));
+        cleanConfig = JSON.stringify(parsed);
+      }
+    } catch {
+      // Keep fallback
+    }
     await prisma.systemSetting.upsert({
       where: { key: stageConfigKey(targetId) },
-      update: { value: sourceStage.value },
-      create: { key: stageConfigKey(targetId), value: sourceStage.value },
+      update: { value: cleanConfig },
+      create: { key: stageConfigKey(targetId), value: cleanConfig },
     });
   }
 }

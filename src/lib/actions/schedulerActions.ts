@@ -364,7 +364,29 @@ async function loadStageConfig(editionId: string, teamCount = 8): Promise<Tourna
   });
   if (!setting?.value) return defaultTournamentStages(teamCount);
   try {
-    return normalizeStageConfig(JSON.parse(setting.value), teamCount);
+    const parsed = JSON.parse(setting.value);
+    const editionTeams = await prisma.team.findMany({
+      where: { editionId },
+      select: { id: true },
+    });
+    const validTeamIds = new Set(editionTeams.map((t) => t.id));
+
+    if (parsed?.stages && Array.isArray(parsed.stages)) {
+      parsed.stages = parsed.stages.map((st: any) => ({
+        ...st,
+        matchPairings: (st.matchPairings || []).filter(
+          (p: any) =>
+            (p.team1Id && validTeamIds.has(p.team1Id)) ||
+            (p.team2Id && validTeamIds.has(p.team2Id))
+        ),
+        groups: (st.groups || []).map((g: any) => ({
+          ...g,
+          teamIds: (g.teamIds || []).filter((id: string) => validTeamIds.has(id)),
+        })),
+      }));
+    }
+
+    return normalizeStageConfig(parsed, teamCount);
   } catch {
     return defaultTournamentStages(teamCount);
   }

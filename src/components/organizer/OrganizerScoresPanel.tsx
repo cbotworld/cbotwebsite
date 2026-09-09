@@ -364,17 +364,23 @@ export default function OrganizerScoresPanel({
     );
   }, []);
 
-  // Assigned players who belong to a valid team, sorted Team-Wise, then Grade-Wise (G1, G2, G3...)
+  // Assigned and enrolled players, sorted Team-Wise (teams first, then Not Assigned), then Grade-Wise (G1, G2, G3...)
   const assignedUsers = React.useMemo(() => {
     return users
-      .filter((u) => {
-        const teamName = u.teamName || userTeamMap.get(u.id);
-        return !isUnassigned(teamName);
+      .map((u) => {
+        const rawTeam = (u.teamName || userTeamMap.get(u.id) || '').trim();
+        const teamName = !rawTeam || isUnassigned(rawTeam) ? 'Not Assigned' : rawTeam;
+        return { ...u, resolvedTeamName: teamName };
       })
       .sort((a, b) => {
-        const teamA = (a.teamName || userTeamMap.get(a.id) || '').trim();
-        const teamB = (b.teamName || userTeamMap.get(b.id) || '').trim();
-        // 1. Primary: Sort by Team Name (Team-wise grouping)
+        const teamA = a.resolvedTeamName;
+        const teamB = b.resolvedTeamName;
+        const unassignedA = teamA === 'Not Assigned';
+        const unassignedB = teamB === 'Not Assigned';
+        if (unassignedA && !unassignedB) return 1;
+        if (!unassignedA && unassignedB) return -1;
+
+        // 1. Primary: Sort by Team Name
         const teamDiff = teamA.localeCompare(teamB, undefined, { sensitivity: 'base', numeric: true });
         if (teamDiff !== 0) return teamDiff;
 
@@ -395,11 +401,11 @@ export default function OrganizerScoresPanel({
   const uniqueTeams = React.useMemo(() => {
     const set = new Set<string>();
     assignedUsers.forEach((u) => {
-      const t = (u.teamName || userTeamMap.get(u.id) || '').trim();
-      if (t) set.add(t);
+      const t = u.resolvedTeamName;
+      if (t && t !== 'Not Assigned') set.add(t);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
-  }, [assignedUsers, userTeamMap]);
+  }, [assignedUsers]);
 
   const uniqueGrades = React.useMemo(() => {
     const set = new Set<string>();
@@ -412,7 +418,7 @@ export default function OrganizerScoresPanel({
 
   const filteredGridUsers = React.useMemo(() => {
     return assignedUsers.filter((u) => {
-      const t = (u.teamName || userTeamMap.get(u.id) || '').trim();
+      const t = u.resolvedTeamName;
       const g = getGrade(u);
       if (gridTeamFilter && gridTeamFilter !== 'ALL' && t !== gridTeamFilter) return false;
       if (gridGradeFilter && gridGradeFilter !== 'ALL' && g !== gridGradeFilter) return false;
@@ -425,7 +431,7 @@ export default function OrganizerScoresPanel({
         g.toLowerCase().includes(q)
       );
     });
-  }, [assignedUsers, userTeamMap, getGrade, gridTeamFilter, gridGradeFilter, gridSearchQuery]);
+  }, [assignedUsers, getGrade, gridTeamFilter, gridGradeFilter, gridSearchQuery]);
 
   const totalDays = React.useMemo(() => {
     const maxDayNum = days.length > 0 ? Math.max(...days.map((d) => d.dayNumber), 10) : 10;
