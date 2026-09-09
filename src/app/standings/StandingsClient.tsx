@@ -4,8 +4,9 @@ import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator } from 'lucide-react';
+import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X } from 'lucide-react';
 
 type FocusCol = 'event' | 'slams' | 'avg' | 'total';
 
@@ -62,6 +63,19 @@ export default function StandingsClient({ payload }: { payload: any }) {
   const [open, setOpen] = React.useState<{ row: any; focus: FocusCol } | null>(null);
   const [selectedPlayer, setSelectedPlayer] = React.useState<any | null>(null);
 
+  const [playerSearch, setPlayerSearch] = React.useState('');
+
+  const filteredPlayers = React.useMemo(() => {
+    const q = playerSearch.trim().toLowerCase();
+    if (!q) return players;
+    return players.filter((p: any) => {
+      const name = (p.name || '').toLowerCase();
+      const team = (p.teamName || '').toLowerCase();
+      const grade = (p.grade || '').toLowerCase();
+      return name.includes(q) || team.includes(q) || grade.includes(q);
+    });
+  }, [players, playerSearch]);
+
   const days = open?.row?.days || [];
   const targetBonusDays = open && (open.focus === 'avg' || open.focus === 'total') ? playerBonusCards(days, 'target') : [];
   const slamBonusDays = open && (open.focus === 'slams' || open.focus === 'total') ? playerBonusCards(days, 'slams') : [];
@@ -99,16 +113,58 @@ export default function StandingsClient({ payload }: { payload: any }) {
       {tab === 'players' ? (
         <Card className="border-border/80 bg-card/70 backdrop-blur-sm shadow-xl">
           <CardHeader className="pb-3 border-b border-border/50">
-            <CardTitle className="text-lg font-black flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" /> Player Ranking
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Ranked by player average, lowest first (calculated as progressive (current average + day average) / 2 including walkovers from Day 1). Players with the same average share the same ranking.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-black flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-amber-500" /> Player Ranking
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Ranked by player average, lowest first. Players with the same average share the same ranking.
+                </p>
+              </div>
+
+              {/* Player Search Input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  type="text"
+                  placeholder="Search player, team, grade..."
+                  value={playerSearch}
+                  onChange={(e) => setPlayerSearch(e.target.value)}
+                  className="pl-9 pr-8 h-9 text-xs font-semibold bg-background/90 border-border shadow-xs focus-visible:ring-amber-500"
+                />
+                {playerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayerSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            {playerSearch && (
+              <div className="text-[11px] text-muted-foreground font-medium pt-1">
+                Showing <strong className="text-amber-400 font-bold">{filteredPlayers.length}</strong> of {players.length} players for &ldquo;{playerSearch}&rdquo;
+              </div>
+            )}
           </CardHeader>
           <CardContent className="pt-3">
             {players.length === 0 ? (
               <p className="text-sm text-muted-foreground">No players on the edition roster yet.</p>
+            ) : filteredPlayers.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">No players found matching &ldquo;{playerSearch}&rdquo;</p>
+                <button
+                  type="button"
+                  onClick={() => setPlayerSearch('')}
+                  className="text-xs text-amber-400 font-bold underline hover:text-amber-300"
+                >
+                  Clear search
+                </button>
+              </div>
             ) : (
               <Table>
                 <TableHeader>
@@ -123,7 +179,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {players.map((row: any) => (
+                  {filteredPlayers.map((row: any) => (
                     <TableRow
                       key={row.userId}
                       className="cursor-pointer hover:bg-muted/40 transition-colors"
