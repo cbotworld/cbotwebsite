@@ -319,9 +319,13 @@ export default function TournamentStageDesigner({
   const active = stages[activeIndex] || stages[0];
   const activeStageTeams = active?.kind === 'SPOC_EXHIBITION' ? spocTeams : teams;
   const daysNeeded = React.useMemo(() => Math.max(1, stageSpanDays(stages)), [stages]);
+  const lastDaysNeededRef = React.useRef(daysNeeded);
 
   React.useEffect(() => {
-    onDaysNeededChange?.(daysNeeded);
+    if (lastDaysNeededRef.current !== daysNeeded) {
+      lastDaysNeededRef.current = daysNeeded;
+      onDaysNeededChange?.(daysNeeded);
+    }
   }, [daysNeeded, onDaysNeededChange]);
 
   const loadSnapshot = React.useCallback(async () => {
@@ -330,9 +334,9 @@ export default function TournamentStageDesigner({
     const res = await getEditionStageSnapshot(editionId);
     if (res.success) {
       const lastDone = lastCompletedDay(dayDates);
-      const teamCount = res.teams?.length ?? teams.length ?? 0;
+      const teamCount = res.teams?.length ?? 0;
       const nextConfig = res.config || defaultTournamentStages(teamCount);
-      const validTeamIds = new Set((res.teams || teams).map((t) => t.id));
+      const validTeamIds = new Set((res.teams || []).map((t) => t.id));
       nextConfig.stages = (nextConfig.stages || []).map((stage) => {
         if (validTeamIds.size === 0) {
           return {
@@ -365,7 +369,7 @@ export default function TournamentStageDesigner({
       setMessage({ type: 'err', text: res.error || 'Could not load stage design.' });
     }
     setLoading(false);
-  }, [editionId, teams]);
+  }, [editionId]);
 
   React.useEffect(() => {
     loadSnapshot();
@@ -1016,7 +1020,17 @@ export default function TournamentStageDesigner({
                       {locked ? (
                         <span className="text-[9px] font-bold text-muted-foreground pr-1">Locked</span>
                       ) : stages.length > 1 ? (
-                        <button type="button" className="h-6 w-6 inline-flex items-center justify-center text-muted-foreground hover:text-rose-400" onClick={() => removeStage(idx)} aria-label={`Remove ${stage.name}`}>
+                        <button
+                          type="button"
+                          className="h-6 w-6 inline-flex items-center justify-center text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            removeStage(idx);
+                          }}
+                          aria-label={`Remove ${stage.name}`}
+                          title={`Remove ${stage.name}`}
+                        >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       ) : null}

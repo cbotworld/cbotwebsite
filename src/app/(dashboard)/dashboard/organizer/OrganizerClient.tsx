@@ -708,6 +708,15 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const selectedEditionTeams = filterMainTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
   const selectedEditionSpocTeams = filterSpocTeams(teamsForEdition(selectedEditionId, isLiveSlotA));
 
+  const memoizedStageTeams = React.useMemo(
+    () => selectedEditionTeams.map((t: any) => ({ id: t.id, name: t.name, tag: t.tag })),
+    [selectedEditionTeams]
+  );
+  const memoizedStageSpocTeams = React.useMemo(
+    () => selectedEditionSpocTeams.map((t: any) => ({ id: t.id, name: t.name, tag: t.tag })),
+    [selectedEditionSpocTeams]
+  );
+
   const selectedEditionScoresUsers = React.useMemo(() => {
     const byId = new Map(usersList.map((u) => [u.id, u]));
     if (viewingDraftSlot) {
@@ -1766,16 +1775,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         key={selectedEditionId}
         editionId={selectedEditionId}
         editionTitle={selectedEdition?.title || selectedEdition?.name || 'Edition'}
-        spocTeams={selectedEditionSpocTeams.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          tag: t.tag,
-        }))}
-        teams={selectedEditionTeams.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          tag: t.tag,
-        }))}
+        spocTeams={memoizedStageSpocTeams}
+        teams={memoizedStageTeams}
         eventsPerDay={roundCount}
         dayDates={dayDatesMap}
         totalDays={totalDays}
