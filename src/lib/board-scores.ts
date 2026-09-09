@@ -37,7 +37,13 @@ export function normalizeBoards(
         slams: Number.isFinite(slams) && slams >= 0 ? slams : 0,
       });
     }
-    if (boards.length) return boards;
+    if (boards.length > 1) return boards;
+    if (boards.length === 1) {
+      if (boards[0].score > 12) {
+        return summaryToBoards(boards[0].score, defaultBoardCount, boards[0].slams);
+      }
+      return boards;
+    }
   }
   if (fallbackScore == null || !Number.isFinite(Number(fallbackScore))) return [];
   return summaryToBoards(Number(fallbackScore), defaultBoardCount, Number(fallbackSlams) || 0);

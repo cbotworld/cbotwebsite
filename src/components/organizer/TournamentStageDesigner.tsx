@@ -1039,6 +1039,11 @@ export default function TournamentStageDesigner({
                 );
               })}
               <div className="flex items-center gap-1">
+                {!stages.some((s) => s.kind === 'ROUND_ROBIN') ? (
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-[11px] font-bold border-amber-500/40 text-amber-300 hover:bg-amber-500/10" onClick={() => addStage('ROUND_ROBIN')}>
+                    <Plus className="h-3.5 w-3.5" /> Add round robin
+                  </Button>
+                ) : null}
                 {!stages.some((s) => s.kind === 'LEAGUE') || stages.filter((s) => s.kind === 'LEAGUE').length < 3 ? (
                   <Button type="button" variant="outline" size="sm" className="h-8 text-[11px] font-bold" onClick={() => addStage('LEAGUE')}>
                     <Plus className="h-3.5 w-3.5" /> Add league

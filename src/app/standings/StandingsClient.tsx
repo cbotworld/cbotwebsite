@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ShieldAlert, Info, Flame, Trophy, Activity, Users } from 'lucide-react';
+import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator } from 'lucide-react';
 
 type FocusCol = 'event' | 'slams' | 'avg' | 'total';
 
@@ -517,9 +517,46 @@ export default function StandingsClient({ payload }: { payload: any }) {
               </div>
             </div>
 
+            {/* Tournament Average Formula & Calculation Card */}
+            {selectedPlayer.dayScores && selectedPlayer.dayScores.length > 0 && (() => {
+              const dayItems = selectedPlayer.dayScores.map((ds: any) => {
+                const bCount = ds.boardCount || 4;
+                const dAvg = ds.dayAverage != null ? Number(ds.dayAverage) : Math.round((ds.score / bCount) * 100) / 100;
+                return { ...ds, bCount, dAvg };
+              });
+              const sumDayAverages = dayItems.reduce((acc: number, curr: any) => acc + curr.dAvg, 0);
+              const totalMatchesCount = dayItems.length;
+              const computedAvg = totalMatchesCount > 0 ? (Math.round((sumDayAverages / totalMatchesCount) * 100) / 100).toFixed(2) : '0.00';
+
+              return (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                  <div className="flex items-center justify-between font-black text-amber-300">
+                    <span className="flex items-center gap-1.5">
+                      <Calculator className="h-4 w-4 text-amber-400" />
+                      Tournament Average Calculation Breakdown
+                    </span>
+                    <Badge variant="carrom" className="text-xs font-black">
+                      Avg: {computedAvg}
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-mono leading-relaxed bg-background/80 p-2.5 rounded-lg border border-border/60 space-y-1">
+                    <div>
+                      <span className="text-amber-400 font-bold">Formula:</span> (Sum of Daily Match Averages) ÷ (Total Matches)
+                    </div>
+                    <div className="text-foreground/90">
+                      <span className="text-amber-400 font-bold">Sum of Match Averages:</span> {dayItems.map((d: any) => d.dAvg.toFixed(2)).join(' + ')} = <span className="text-amber-400 font-bold">{sumDayAverages.toFixed(2)}</span>
+                    </div>
+                    <div className="text-foreground/90">
+                      <span className="text-amber-400 font-bold">Calculation:</span> {sumDayAverages.toFixed(2)} ÷ {totalMatchesCount} matches = <span className="text-amber-400 font-black text-xs">{computedAvg}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               <div className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                Day-by-Day Scores & Walkover Calculations
+                Day-by-Day Scores & Calculations
               </div>
 
               {(!selectedPlayer.dayScores || selectedPlayer.dayScores.length === 0) ? (
@@ -529,6 +566,8 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   {selectedPlayer.dayScores.map((ds: any) => {
                     const isWo = Boolean(ds.isWalkover);
                     const b = ds.breakdown;
+                    const bCount = ds.boardCount || 4;
+                    const dAvg = ds.dayAverage != null ? Number(ds.dayAverage) : Math.round((ds.score / bCount) * 100) / 100;
 
                     return (
                       <div
@@ -563,6 +602,16 @@ export default function StandingsClient({ payload }: { payload: any }) {
                                 <Flame className="h-3 w-3 fill-amber-400 text-amber-500" /> {ds.slams}
                               </span>
                             )}
+                          </div>
+                        </div>
+
+                        {/* Match Average Calculation Line */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/40 text-[11px]">
+                          <div className="text-muted-foreground font-medium">
+                            Score: <strong className="text-foreground">{ds.score} pts</strong> across <strong className="text-foreground">{bCount} boards</strong>
+                          </div>
+                          <div className="font-mono font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                            Day Avg = {ds.score} ÷ {bCount} = {dAvg.toFixed(2)}
                           </div>
                         </div>
 

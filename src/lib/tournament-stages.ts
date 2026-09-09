@@ -754,6 +754,7 @@ export function pathIdForStages(stages: TournamentStage[]): string | null {
 
 /** Where a newly added stage should sit so a 2nd qualifier lands after the first, not before it. */
 export function insertIndexForNewStage(stages: TournamentStage[], kind: StageKind): number {
+  if (kind === 'ROUND_ROBIN') return 0;
   if (kind === 'QUALIFIER') {
     let lastQualifierAt = -1;
     for (let i = 0; i < stages.length; i += 1) {

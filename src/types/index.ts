@@ -385,6 +385,8 @@ export interface PlayerRankingRow {
     dayNumber: number;
     score: number;
     slams: number;
+    boardCount?: number;
+    dayAverage?: number;
     isWalkover?: boolean;
     eventName?: string;
     breakdown?: any;

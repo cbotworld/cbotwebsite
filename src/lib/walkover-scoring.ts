@@ -18,6 +18,7 @@
 
 import { parseSavedLineups, resolveRoundPlayerIds, type LineupRound, type RosterPlayer } from '@/lib/combi-results';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
+import { summaryToBoards } from '@/lib/board-scores';
 
 export type WalkoverCalcParams = {
   /** Scores of teammates playing with Player A in the same event */
@@ -257,7 +258,7 @@ export function resolveDayWalkoversAndScores(opts: {
             dayNumber,
             score: breakdown.finalScore,
             slams: 0,
-            boards: [{ score: breakdown.finalScore, slams: 0 }],
+            boards: summaryToBoards(breakdown.finalScore, 4, 0),
             isWalkover: true,
             eventName: rName,
             playerGrade: grade,
@@ -303,7 +304,7 @@ export function resolveDayWalkoversAndScores(opts: {
             dayNumber,
             score: breakdown.finalScore,
             slams: 0,
-            boards: [{ score: breakdown.finalScore, slams: 0 }],
+            boards: summaryToBoards(breakdown.finalScore, 4, 0),
             isWalkover: true,
             eventName: rName,
             playerGrade: grade,

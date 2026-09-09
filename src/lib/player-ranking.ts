@@ -13,6 +13,7 @@ import {
   normalizeBoards,
   previewTargetBonus,
   roundAverage,
+  summaryToBoards,
 } from '@/lib/board-scores';
 import { averageForDay, logsForUser } from '@/lib/player-average';
 import { isCombiSubmissionLocked, type DayDatesInput } from '@/lib/combi-cutoff';
@@ -89,6 +90,8 @@ export function rankPlayers(opts: {
       dayNumber: number;
       score: number;
       slams: number;
+      boardCount?: number;
+      dayAverage?: number;
       isWalkover?: boolean;
       eventName?: string;
       breakdown?: any;
@@ -113,38 +116,45 @@ export function rankPlayers(opts: {
         if (row.isWalkover) {
           walkovers += 1;
         }
-        dayScores.push({
-          dayNumber: day,
-          score: row.score,
-          slams: row.slams || 0,
-          isWalkover: row.isWalkover,
-          eventName: row.eventName,
-          breakdown: row.breakdown,
-        });
-        const boards = normalizeBoards(row.boards, row.score, row.slams);
+        const boards = normalizeBoards(row.boards, row.score, row.slams, 4);
         const agg = aggregateBoards(boards);
         totalScore += agg.score;
         boardCount += agg.boardCount;
         slams += row.slams || agg.slams || 0;
-        if (agg.boardCount > 0) {
-          const dayAvg = agg.score / agg.boardCount;
-          totalDayAvgSum += dayAvg;
-          daysProcessed += 1;
-        }
+        const dayAvg = agg.boardCount > 0 ? roundAverage(agg.score / agg.boardCount) : 0;
+        totalDayAvgSum += dayAvg;
+        daysProcessed += 1;
+
+        dayScores.push({
+          dayNumber: day,
+          score: agg.score,
+          slams: row.slams || agg.slams || 0,
+          boardCount: agg.boardCount,
+          dayAverage: dayAvg,
+          isWalkover: Boolean(row.isWalkover),
+          eventName: row.eventName,
+          breakdown: row.breakdown,
+        });
       } else {
         // Walkover: match was scheduled for this player's team on this day, but no score was submitted
         walkovers += 1;
         const playerBase = daysProcessed > 0 ? totalDayAvgSum / daysProcessed : seed > 0 ? seed : 0;
         const maxRef = Math.max(highestAverage, playerBase);
-        const walkoverDayAvg = (maxRef > 0 ? maxRef : 25) + 1;
-        dayScores.push({
-          dayNumber: day,
-          score: walkoverDayAvg,
-          slams: 0,
-          isWalkover: true,
-        });
+        const walkoverScore = Math.round((maxRef > 0 ? maxRef : 25) + 1);
+        const walkoverBoards = summaryToBoards(walkoverScore, 4, 0);
+        const walkoverAgg = aggregateBoards(walkoverBoards);
+        const walkoverDayAvg = walkoverAgg.boardCount > 0 ? roundAverage(walkoverAgg.score / walkoverAgg.boardCount) : walkoverScore;
         totalDayAvgSum += walkoverDayAvg;
         daysProcessed += 1;
+
+        dayScores.push({
+          dayNumber: day,
+          score: walkoverScore,
+          slams: 0,
+          boardCount: walkoverAgg.boardCount,
+          dayAverage: walkoverDayAvg,
+          isWalkover: true,
+        });
       }
     }
 
