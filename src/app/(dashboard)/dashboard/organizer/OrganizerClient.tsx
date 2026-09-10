@@ -18,7 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell, GraduationCap, Award, Download } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell, GraduationCap, Award, Download, Image as ImageIcon } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { PushNotificationTab } from '@/components/organizer/PushNotificationTab';
 import OrganizerGradingPanel from '@/components/organizer/OrganizerGradingPanel';
 import EnrolledPlayersPanel from '@/components/organizer/EnrolledPlayersPanel';
@@ -1624,6 +1625,41 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     URL.revokeObjectURL(url);
   };
 
+  const [exportingTeamsJpeg, setExportingTeamsJpeg] = React.useState(false);
+  const teamsPosterRef = React.useRef<HTMLDivElement>(null);
+
+  const handleDownloadTeamsJpeg = async () => {
+    if (!teamsPosterRef.current || selectedEditionTeams.length === 0) {
+      alert('No teams found to export as image.');
+      return;
+    }
+    setExportingTeamsJpeg(true);
+    try {
+      await new Promise((r) => setTimeout(r, 150));
+      const element = teamsPosterRef.current;
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#090d16',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const a = document.createElement('a');
+      a.href = imgData;
+      const cleanTitle = (selectedEdition?.title || selectedEdition?.name || 'Teams_Roster').replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `CBOT_Teams_Roster_${cleanTitle}_${new Date().toISOString().split('T')[0]}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to export teams JPEG:', err);
+      alert('Could not export JPEG image.');
+    } finally {
+      setExportingTeamsJpeg(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       
@@ -2084,6 +2120,21 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTeamsJpeg}
+              disabled={selectedEditionTeams.length === 0 || exportingTeamsJpeg}
+              className="text-xs font-bold border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+              title="Download all teams and their player rosters as a high-definition JPEG visual"
+            >
+              {exportingTeamsJpeg ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin text-emerald-400" />
+              ) : (
+                <ImageIcon className="h-3.5 w-3.5 mr-1 text-emerald-400" />
+              )}
+              Download JPEG
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -3881,6 +3932,559 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         </div>
       </Dialog>
 
+      {/* Hidden High-Definition Export Poster for clean Teams JPEG generation */}
+      {selectedEditionTeams.length > 0 && (
+        <TeamsExportPoster
+          editionTitle={selectedEdition?.title || selectedEdition?.name}
+          teams={selectedEditionTeams}
+          usersList={usersList}
+          playerGradeMap={playerGradeMap}
+          playerSpocMap={playerSpocMap}
+          playerGradingAverageMap={playerGradingAverageMap}
+          posterRef={teamsPosterRef}
+        />
+      )}
+
+    </div>
+  );
+}
+
+function TeamsExportPoster({
+  editionTitle,
+  teams,
+  usersList,
+  playerGradeMap,
+  playerSpocMap,
+  playerGradingAverageMap,
+  posterRef,
+}: {
+  editionTitle?: string;
+  teams: any[];
+  usersList: any[];
+  playerGradeMap: Record<string, string>;
+  playerSpocMap: Record<string, boolean>;
+  playerGradingAverageMap: Record<string, number | null>;
+  posterRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const byId = React.useMemo(() => new Map(usersList.map((u: any) => [u.id, u])), [usersList]);
+
+  // Sort members in each team: Captain/SPOC first, then by Grade G1..Gn
+  const processedTeams = React.useMemo(() => {
+    return teams.map((t) => {
+      const members = Array.isArray(t.members) ? [...t.members] : [];
+      const captainId = t.captainId || t.captain?.id;
+
+      members.sort((a, b) => {
+        const uIdA = a.userId || a.user?.id || a.id;
+        const uIdB = b.userId || b.user?.id || b.id;
+        const isCaptA = uIdA && uIdA === captainId;
+        const isCaptB = uIdB && uIdB === captainId;
+        if (isCaptA && !isCaptB) return -1;
+        if (!isCaptA && isCaptB) return 1;
+
+        const isSpocA = uIdA && !!playerSpocMap[uIdA];
+        const isSpocB = uIdB && !!playerSpocMap[uIdB];
+        if (isSpocA && !isSpocB) return -1;
+        if (!isSpocA && isSpocB) return 1;
+
+        const gradeA = (uIdA && playerGradeMap[uIdA]) || a.grade || a.category || '';
+        const gradeB = (uIdB && playerGradeMap[uIdB]) || b.grade || b.category || '';
+        const matchA = String(gradeA).match(/(\d+)/);
+        const matchB = String(gradeB).match(/(\d+)/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 9999;
+        const numB = matchB ? parseInt(matchB[1], 10) : 9999;
+        if (numA !== numB) return numA - numB;
+
+        const nameA = a.user?.name || a.name || '';
+        const nameB = b.user?.name || b.name || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      return {
+        ...t,
+        sortedMembers: members,
+      };
+    });
+  }, [teams, playerGradeMap, playerSpocMap]);
+
+  const maxMembers = Math.max(1, ...processedTeams.map((t) => t.sortedMembers.length));
+  const colWidth = 280;
+  const totalCols = processedTeams.length;
+  const minWidth = Math.max(1200, totalCols * colWidth + 100);
+  const totalPlayers = processedTeams.reduce((sum, t) => sum + t.sortedMembers.length, 0);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: '-99999px',
+        top: 0,
+        zIndex: -1,
+        pointerEvents: 'none',
+        overflow: 'visible',
+      }}
+      aria-hidden="true"
+    >
+      <div
+        ref={posterRef}
+        style={{
+          width: `${minWidth}px`,
+          backgroundColor: '#090d16',
+          color: '#ffffff',
+          padding: '36px 40px',
+          boxSizing: 'border-box',
+          fontFamily:
+            'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+        }}
+      >
+        {/* Header Banner */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '28px',
+            background: 'linear-gradient(90deg, #1e1b4b 0%, #2e1065 50%, #451a03 100%)',
+            padding: '24px 32px',
+            borderRadius: '16px',
+            border: '2px solid rgba(168, 85, 247, 0.4)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: '13px',
+                fontWeight: '900',
+                letterSpacing: '0.2em',
+                color: '#f59e0b',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+              }}
+            >
+              CBOT TOURNAMENT • OFFICIAL TEAM ROSTERS
+            </div>
+            <div
+              style={{
+                fontSize: '32px',
+                fontWeight: '900',
+                color: '#ffffff',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {editionTitle || 'Tournament Teams'}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                background: 'rgba(124, 58, 237, 0.35)',
+                border: '1.5px solid rgba(168, 85, 247, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Teams
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {totalCols}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(16, 185, 129, 0.3)',
+                border: '1.5px solid rgba(52, 211, 153, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Roster Players
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {totalPlayers}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(217, 119, 6, 0.3)',
+                border: '1.5px solid rgba(251, 191, 36, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#fde68a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Max per Team
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {maxMembers}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Teams Matrix Grid Table */}
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: '10px',
+            tableLayout: 'fixed',
+          }}
+        >
+          <thead>
+            <tr>
+              <th
+                style={{
+                  width: '54px',
+                  padding: '14px 4px',
+                  textAlign: 'center',
+                  color: '#94a3b8',
+                  fontSize: '15px',
+                  fontWeight: '900',
+                  background: 'transparent',
+                }}
+              >
+                #
+              </th>
+              {processedTeams.map((team) => {
+                const captain = usersList.find(
+                  (u: any) => u.id === team.captainId || (team.captain?.id && u.id === team.captain.id)
+                );
+                const isCaptSpoc = captain ? !!playerSpocMap[captain.id] : false;
+
+                return (
+                  <th
+                    key={team.id}
+                    style={{
+                      width: `${colWidth}px`,
+                      background: 'linear-gradient(180deg, #1e1b4b 0%, #111827 100%)',
+                      border: '2px solid #f59e0b',
+                      borderRadius: '14px',
+                      padding: '16px 12px',
+                      textAlign: 'center',
+                      verticalAlign: 'top',
+                    }}
+                  >
+                    {/* Team Poster / Avatar */}
+                    {team.logo ? (
+                      <img
+                        src={team.logo}
+                        alt={team.name}
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          margin: '0 auto 10px',
+                          border: '2.5px solid #f59e0b',
+                          display: 'block',
+                        }}
+                        crossOrigin="anonymous"
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: 'rgba(245, 158, 11, 0.25)',
+                          border: '2px solid rgba(245, 158, 11, 0.5)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 10px',
+                          fontSize: '18px',
+                          fontWeight: '900',
+                          color: '#fbbf24',
+                        }}
+                      >
+                        {(team.tag || 'CB').slice(0, 2)}
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: '900',
+                        color: '#fbbf24',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        lineHeight: '1.25',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {team.name}
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        color: '#a78bfa',
+                        marginTop: '4px',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      TAG: {team.tag || '—'}
+                    </div>
+
+                    {/* Captain info */}
+                    {captain ? (
+                      <div
+                        style={{
+                          display: 'inline-block',
+                          fontSize: '11.5px',
+                          fontWeight: '900',
+                          color: '#fef08a',
+                          background: '#854d0e',
+                          border: '1.5px solid #eab308',
+                          borderRadius: '8px',
+                          padding: '3px 10px',
+                          marginTop: '8px',
+                          maxWidth: '100%',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        👑 {isCaptSpoc ? 'SPOC: ' : 'CAPT: '}{captain.name || captain.username}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
+                        No Captain
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        color: '#6ee7b7',
+                        marginTop: '6px',
+                      }}
+                    >
+                      {team.sortedMembers.length} Players
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: maxMembers }, (_, rowIndex) => (
+              <tr key={rowIndex}>
+                <td
+                  style={{
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    color: '#94a3b8',
+                    fontSize: '16px',
+                    fontWeight: '900',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {rowIndex + 1}
+                </td>
+                {processedTeams.map((team) => {
+                  const m = team.sortedMembers[rowIndex];
+                  const uId = m ? m.userId || m.user?.id || m.id : null;
+                  const u = uId ? byId.get(uId) || m.user : null;
+                  const captainId = team.captainId || team.captain?.id;
+                  const isCaptain = uId && (uId === captainId || (team.captain && uId === team.captain.id));
+                  const isSpoc = uId ? !!playerSpocMap[uId] : false;
+                  const grade = uId ? playerGradeMap[uId] || u?.grade || (u as any)?.category : null;
+                  const target = u?.target ?? null;
+                  const gAvg = uId
+                    ? playerGradingAverageMap[uId] ?? (u?.average != null && Number(u.average) > 0 ? Number(u.average) : null)
+                    : null;
+
+                  if (m) {
+                    return (
+                      <td
+                        key={team.id}
+                        style={{
+                          background: '#111827',
+                          border: isCaptain ? '2px solid #eab308' : '2px solid #374151',
+                          borderRadius: '12px',
+                          padding: '12px 14px',
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '6px',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '16.5px',
+                              fontWeight: '900',
+                              color: '#ffffff',
+                              lineHeight: '1.35',
+                              wordBreak: 'break-word',
+                              letterSpacing: '0.01em',
+                            }}
+                          >
+                            {u?.name || m.user?.name || m.name || 'Player'}
+                          </div>
+                          {isCaptain ? (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '900',
+                                color: '#fef08a',
+                                background: '#854d0e',
+                                border: '1px solid #eab308',
+                                borderRadius: '4px',
+                                padding: '2px 7px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {isSpoc ? '👑 SPOC' : '👑 CAPT'}
+                            </span>
+                          ) : isSpoc ? (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '900',
+                                color: '#e0e7ff',
+                                background: '#4c1d95',
+                                border: '1px solid #8b5cf6',
+                                borderRadius: '4px',
+                                padding: '2px 7px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                              }}
+                            >
+                              ⭐ SPOC
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {u?.username || m.user?.username ? (
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              color: '#94a3b8',
+                              marginBottom: '8px',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            @{u?.username || m.user?.username}
+                          </div>
+                        ) : null}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {grade ? (
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: '900',
+                                color: '#e0e7ff',
+                                background: '#4338ca',
+                                border: '1.5px solid #818cf8',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {grade}
+                            </span>
+                          ) : null}
+
+                          {gAvg !== null ? (
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: '900',
+                                color: '#fef08a',
+                                background: '#854d0e',
+                                border: '1.5px solid #eab308',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              G.Avg {Number(gAvg).toFixed(1)}
+                            </span>
+                          ) : null}
+
+                          {target !== null && Number(target) > 0 ? (
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: '900',
+                                color: '#fed7aa',
+                                background: '#9a3412',
+                                border: '1.5px solid #f97316',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              Tgt {target}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                    );
+                  }
+
+                  return (
+                    <td
+                      key={team.id}
+                      style={{
+                        background: '#0a0e17',
+                        border: '2px dashed #1e293b',
+                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>—</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Footer */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderTop: '2px solid #1e293b',
+            paddingTop: '16px',
+            marginTop: '24px',
+            fontSize: '13px',
+            fontWeight: '600',
+            color: '#94a3b8',
+          }}
+        >
+          <span>CBOT World • Official Tournament Team Rosters</span>
+          <span>Generated: {new Date().toLocaleString('en-GB')}</span>
+        </div>
+      </div>
     </div>
   );
 }

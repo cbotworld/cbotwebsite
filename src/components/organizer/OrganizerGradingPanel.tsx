@@ -1446,18 +1446,17 @@ function GradingExportPoster({
   stats: { assigned: number; capacity: number; unassignedPool: number };
   posterRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const colWidth = 230;
+  const colWidth = 280;
   const totalCols = grid.columns.length;
-  const minWidth = Math.max(1050, totalCols * colWidth + 80);
+  const minWidth = Math.max(1200, totalCols * colWidth + 100);
 
   return (
     <div
       style={{
         position: 'fixed',
-        left: 0,
+        left: '-99999px',
         top: 0,
-        zIndex: -9999,
-        opacity: 0.01,
+        zIndex: -1,
         pointerEvents: 'none',
         overflow: 'visible',
       }}
@@ -1467,12 +1466,14 @@ function GradingExportPoster({
         ref={posterRef}
         style={{
           width: `${minWidth}px`,
-          backgroundColor: '#07090e',
-          color: '#f8fafc',
-          padding: '28px 32px',
+          backgroundColor: '#090d16',
+          color: '#ffffff',
+          padding: '36px 40px',
           boxSizing: 'border-box',
           fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
         }}
       >
         {/* Header Banner */}
@@ -1481,34 +1482,89 @@ function GradingExportPoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '20px',
-            background: 'linear-gradient(90deg, rgba(88,28,135,0.35) 0%, rgba(217,119,6,0.18) 100%)',
-            padding: '16px 20px',
-            borderRadius: '12px',
-            border: '1px solid rgba(139, 92, 246, 0.35)',
+            marginBottom: '28px',
+            background: 'linear-gradient(90deg, #2e1065 0%, #1e1b4b 50%, #451a03 100%)',
+            padding: '24px 32px',
+            borderRadius: '16px',
+            border: '2px solid rgba(168, 85, 247, 0.4)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           }}
         >
           <div>
-            <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.15em', color: '#fbbf24', textTransform: 'uppercase' }}>
-              CBOT TOURNAMENT • PLAYER GRADING MATRIX
+            <div
+              style={{
+                fontSize: '13px',
+                fontWeight: '900',
+                letterSpacing: '0.2em',
+                color: '#f59e0b',
+                textTransform: 'uppercase',
+                marginBottom: '4px',
+              }}
+            >
+              CBOT TOURNAMENT • OFFICIAL PLAYER GRADING MATRIX
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', marginTop: '3px', letterSpacing: '-0.02em' }}>
+            <div
+              style={{
+                fontSize: '32px',
+                fontWeight: '900',
+                color: '#ffffff',
+                letterSpacing: '-0.02em',
+              }}
+            >
               {editionTitle || 'Player Grading'}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ background: 'rgba(124, 58, 237, 0.25)', border: '1px solid rgba(139, 92, 246, 0.45)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '9px', fontWeight: '700', color: '#a78bfa', textTransform: 'uppercase' }}>Grades</div>
-              <div style={{ fontSize: '15px', fontWeight: '900', color: '#ede9fe' }}>{totalCols}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                background: 'rgba(124, 58, 237, 0.35)',
+                border: '1.5px solid rgba(168, 85, 247, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Grades
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {totalCols}
+              </div>
             </div>
-            <div style={{ background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '9px', fontWeight: '700', color: '#6ee7b7', textTransform: 'uppercase' }}>Filled Cells</div>
-              <div style={{ fontSize: '15px', fontWeight: '900', color: '#ecfdf5' }}>{stats.assigned} / {stats.capacity}</div>
+
+            <div
+              style={{
+                background: 'rgba(16, 185, 129, 0.3)',
+                border: '1.5px solid rgba(52, 211, 153, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Filled Cells
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {stats.assigned} / {stats.capacity}
+              </div>
             </div>
-            <div style={{ background: 'rgba(217, 119, 6, 0.2)', border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '9px', fontWeight: '700', color: '#fcd34d', textTransform: 'uppercase' }}>Unassigned</div>
-              <div style={{ fontSize: '15px', fontWeight: '900', color: '#fffbeb' }}>{stats.unassignedPool}</div>
+
+            <div
+              style={{
+                background: 'rgba(217, 119, 6, 0.3)',
+                border: '1.5px solid rgba(251, 191, 36, 0.6)',
+                borderRadius: '12px',
+                padding: '10px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '11px', fontWeight: '800', color: '#fde68a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Unassigned
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '900', color: '#ffffff', marginTop: '2px' }}>
+                {stats.unassignedPool}
+              </div>
             </div>
           </div>
         </div>
@@ -1518,7 +1574,7 @@ function GradingExportPoster({
           style={{
             width: '100%',
             borderCollapse: 'separate',
-            borderSpacing: '8px',
+            borderSpacing: '10px',
             tableLayout: 'fixed',
           }}
         >
@@ -1526,12 +1582,12 @@ function GradingExportPoster({
             <tr>
               <th
                 style={{
-                  width: '44px',
-                  padding: '10px 4px',
+                  width: '54px',
+                  padding: '14px 4px',
                   textAlign: 'center',
-                  color: '#64748b',
-                  fontSize: '11px',
-                  fontWeight: '800',
+                  color: '#94a3b8',
+                  fontSize: '15px',
+                  fontWeight: '900',
                   background: 'transparent',
                 }}
               >
@@ -1547,9 +1603,10 @@ function GradingExportPoster({
                   .map((p) => getGradeAverageForUser(p, participantMap))
                   .filter((a): a is number => a !== null);
 
-                const colAvg = colAverages.length > 0
-                  ? (colAverages.reduce((sum, a) => sum + a, 0) / colAverages.length).toFixed(1)
-                  : null;
+                const colAvg =
+                  colAverages.length > 0
+                    ? (colAverages.reduce((sum, a) => sum + a, 0) / colAverages.length).toFixed(1)
+                    : null;
 
                 const targetSummary = formatColumnTargetSummary(col, grid.rowCount);
 
@@ -1558,15 +1615,23 @@ function GradingExportPoster({
                     key={col.id}
                     style={{
                       width: `${colWidth}px`,
-                      background: 'linear-gradient(180deg, #1e1b4b 0%, #0f172a 100%)',
-                      border: '1px solid #4338ca',
-                      borderRadius: '10px',
-                      padding: '12px 10px',
+                      background: 'linear-gradient(180deg, #1e1b4b 0%, #111827 100%)',
+                      border: '2px solid #6366f1',
+                      borderRadius: '14px',
+                      padding: '16px 12px',
                       textAlign: 'center',
                       verticalAlign: 'top',
                     }}
                   >
-                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div
+                      style={{
+                        fontSize: '20px',
+                        fontWeight: '900',
+                        color: '#fbbf24',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
                       {col.label}
                     </div>
 
@@ -1574,34 +1639,34 @@ function GradingExportPoster({
                       <div
                         style={{
                           display: 'inline-block',
-                          fontSize: '11px',
-                          fontWeight: '800',
+                          fontSize: '13px',
+                          fontWeight: '900',
                           color: '#fef08a',
-                          background: 'rgba(161, 98, 7, 0.4)',
-                          border: '1px solid rgba(234, 179, 8, 0.5)',
-                          borderRadius: '6px',
-                          padding: '3px 10px',
-                          marginTop: '6px',
+                          background: '#854d0e',
+                          border: '1.5px solid #eab308',
+                          borderRadius: '8px',
+                          padding: '4px 12px',
+                          marginTop: '8px',
                           fontFamily: 'monospace',
                         }}
                       >
                         G.Avg: {colAvg}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '10px', color: '#64748b', marginTop: '6px' }}>No Avg</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '8px' }}>No Avg</div>
                     )}
 
                     {targetSummary ? (
                       <div
                         style={{
-                          fontSize: '10.5px',
-                          fontWeight: '700',
-                          color: '#c4b5fd',
-                          background: 'rgba(91, 33, 182, 0.25)',
-                          border: '1px solid rgba(139, 92, 246, 0.35)',
-                          borderRadius: '6px',
-                          padding: '3px 8px',
-                          marginTop: '6px',
+                          fontSize: '12px',
+                          fontWeight: '800',
+                          color: '#e0e7ff',
+                          background: '#4338ca',
+                          border: '1.5px solid #818cf8',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          marginTop: '8px',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -1622,8 +1687,8 @@ function GradingExportPoster({
                   style={{
                     textAlign: 'center',
                     verticalAlign: 'middle',
-                    color: '#64748b',
-                    fontSize: '12px',
+                    color: '#94a3b8',
+                    fontSize: '16px',
                     fontWeight: '900',
                     fontFamily: 'monospace',
                   }}
@@ -1643,62 +1708,69 @@ function GradingExportPoster({
                       <td
                         key={col.id}
                         style={{
-                          background: '#0d1527',
-                          border: '1px solid #1e2d4a',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
+                          background: '#111827',
+                          border: '2px solid #374151',
+                          borderRadius: '12px',
+                          padding: '14px 14px',
                           verticalAlign: 'top',
                         }}
                       >
                         <div
                           style={{
-                            fontSize: '12.5px',
-                            fontWeight: '800',
+                            fontSize: '16.5px',
+                            fontWeight: '900',
                             color: '#ffffff',
-                            lineHeight: '1.3',
+                            lineHeight: '1.35',
                             marginBottom: '4px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            wordBreak: 'break-word',
+                            letterSpacing: '0.01em',
                           }}
                         >
                           {playerLabel(player)}
                         </div>
                         {player.username ? (
-                          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '6px' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              color: '#94a3b8',
+                              marginBottom: '8px',
+                              fontFamily: 'monospace',
+                            }}
+                          >
                             @{player.username}
                           </div>
                         ) : null}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           {avg !== null ? (
                             <span
                               style={{
-                                fontSize: '10px',
-                                fontWeight: '800',
-                                color: '#fde047',
-                                background: 'rgba(161, 98, 7, 0.35)',
-                                border: '1px solid rgba(234, 179, 8, 0.45)',
-                                borderRadius: '4px',
-                                padding: '2px 6px',
+                                fontSize: '12px',
+                                fontWeight: '900',
+                                color: '#fef08a',
+                                background: '#854d0e',
+                                border: '1.5px solid #eab308',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
                                 fontFamily: 'monospace',
                               }}
                             >
                               G.Avg {avg.toFixed(1)}
                             </span>
                           ) : (
-                            <span style={{ fontSize: '9.5px', color: '#64748b' }}>No G.Avg</span>
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>No G.Avg</span>
                           )}
 
                           {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
                             <span
                               style={{
-                                fontSize: '10px',
-                                fontWeight: '800',
-                                color: '#c4b5fd',
-                                background: 'rgba(91, 33, 182, 0.35)',
-                                border: '1px solid rgba(139, 92, 246, 0.45)',
-                                borderRadius: '4px',
-                                padding: '2px 6px',
+                                fontSize: '12px',
+                                fontWeight: '900',
+                                color: '#e0e7ff',
+                                background: '#4c1d95',
+                                border: '1.5px solid #8b5cf6',
+                                borderRadius: '6px',
+                                padding: '3px 8px',
                                 fontFamily: 'monospace',
                               }}
                             >
@@ -1714,15 +1786,15 @@ function GradingExportPoster({
                     <td
                       key={col.id}
                       style={{
-                        background: '#070b14',
-                        border: '1px dashed #1e293b',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
+                        background: '#0a0e17',
+                        border: '2px dashed #1e293b',
+                        borderRadius: '12px',
+                        padding: '14px 12px',
                         textAlign: 'center',
                         verticalAlign: 'middle',
                       }}
                     >
-                      <span style={{ fontSize: '11px', color: '#475569', fontWeight: '600' }}>
+                      <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
                         {cellTarget !== null ? `→ Target ${cellTarget}` : '—'}
                       </span>
                     </td>
@@ -1739,11 +1811,12 @@ function GradingExportPoster({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderTop: '1px solid #1e293b',
-            paddingTop: '14px',
-            marginTop: '18px',
-            fontSize: '11px',
-            color: '#64748b',
+            borderTop: '2px solid #1e293b',
+            paddingTop: '16px',
+            marginTop: '24px',
+            fontSize: '13px',
+            fontWeight: '600',
+            color: '#94a3b8',
           }}
         >
           <span>CBOT World • Official Player Grading Sheet</span>
