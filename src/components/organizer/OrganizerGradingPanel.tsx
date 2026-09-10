@@ -1625,49 +1625,29 @@ function GradingExportPoster({
                     {colAvg !== null ? (
                       <div
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '26px',
-                          lineHeight: '1',
-                          fontSize: '13px',
+                          fontSize: '13.5px',
                           fontWeight: '900',
-                          color: '#fef08a',
-                          background: '#854d0e',
-                          border: '1.5px solid #eab308',
-                          borderRadius: '8px',
-                          padding: '0 12px',
-                          marginTop: '8px',
+                          color: '#fbbf24',
+                          marginTop: '6px',
                           fontFamily: 'monospace',
-                          boxSizing: 'border-box',
                         }}
                       >
                         G.Avg: {colAvg}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No Avg</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>No Avg</div>
                     )}
 
                     {targetSummary ? (
                       <div
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '26px',
-                          lineHeight: '1',
-                          fontSize: '12px',
+                          fontSize: '12.5px',
                           fontWeight: '800',
-                          color: '#e0e7ff',
-                          background: '#4338ca',
-                          border: '1.5px solid #818cf8',
-                          borderRadius: '8px',
-                          padding: '0 10px',
-                          marginTop: '8px',
+                          color: '#a78bfa',
+                          marginTop: '4px',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          boxSizing: 'border-box',
                         }}
                       >
                         Target: {targetSummary}
@@ -1745,64 +1725,26 @@ function GradingExportPoster({
                               gap: '6px',
                               flexWrap: 'wrap',
                               marginTop: '2px',
+                              fontSize: '12.5px',
+                              fontWeight: '900',
                             }}
                           >
                             {avg !== null ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '12px',
-                                  fontWeight: '900',
-                                  color: '#fef08a',
-                                  background: '#854d0e',
-                                  border: '1.5px solid #eab308',
-                                  borderRadius: '6px',
-                                  padding: '0 8px',
-                                  fontFamily: 'monospace',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
+                              <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>
                                 G.Avg {avg.toFixed(1)}
                               </span>
                             ) : (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '11px',
-                                  color: '#64748b',
-                                }}
-                              >
+                              <span style={{ color: '#64748b', fontSize: '11px' }}>
                                 No G.Avg
                               </span>
                             )}
 
+                            {avg !== null && targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
+                              <span style={{ color: '#475569' }}>•</span>
+                            ) : null}
+
                             {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '12px',
-                                  fontWeight: '900',
-                                  color: '#fed7aa',
-                                  background: '#9a3412',
-                                  border: '1.5px solid #f97316',
-                                  borderRadius: '6px',
-                                  padding: '0 8px',
-                                  fontFamily: 'monospace',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
+                              <span style={{ color: '#c4b5fd', fontFamily: 'monospace' }}>
                                 Target {targetToDisplay}
                               </span>
                             ) : null}

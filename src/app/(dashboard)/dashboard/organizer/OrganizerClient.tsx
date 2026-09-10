@@ -4224,30 +4224,20 @@ function TeamsExportPoster({
                     {captain ? (
                       <div
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: '26px',
-                          lineHeight: '1',
-                          fontSize: '11.5px',
+                          fontSize: '12px',
                           fontWeight: '900',
-                          color: '#fef08a',
-                          background: '#854d0e',
-                          border: '1.5px solid #eab308',
-                          borderRadius: '8px',
-                          padding: '0 10px',
-                          marginTop: '8px',
+                          color: '#fbbf24',
+                          marginTop: '6px',
                           maxWidth: '100%',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          boxSizing: 'border-box',
                         }}
                       >
                         👑 {isCaptSpoc ? 'SPOC: ' : 'CAPT: '}{captain.name || captain.username}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
                         No Captain
                       </div>
                     )}
@@ -4257,7 +4247,7 @@ function TeamsExportPoster({
                         fontSize: '11px',
                         fontWeight: '800',
                         color: '#6ee7b7',
-                        marginTop: '6px',
+                        marginTop: '4px',
                       }}
                     >
                       {team.sortedMembers.length} Players
@@ -4331,21 +4321,11 @@ function TeamsExportPoster({
                             {isCaptain ? (
                               <span
                                 style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '20px',
-                                  lineHeight: '1',
-                                  fontSize: '10px',
+                                  fontSize: '10.5px',
                                   fontWeight: '900',
-                                  color: '#fef08a',
-                                  background: '#854d0e',
-                                  border: '1px solid #eab308',
-                                  borderRadius: '4px',
-                                  padding: '0 7px',
+                                  color: '#fbbf24',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
-                                  boxSizing: 'border-box',
                                 }}
                               >
                                 {isSpoc ? '👑 SPOC' : '👑 CAPT'}
@@ -4353,21 +4333,11 @@ function TeamsExportPoster({
                             ) : isSpoc ? (
                               <span
                                 style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '20px',
-                                  lineHeight: '1',
-                                  fontSize: '10px',
+                                  fontSize: '10.5px',
                                   fontWeight: '900',
-                                  color: '#e0e7ff',
-                                  background: '#4c1d95',
-                                  border: '1px solid #8b5cf6',
-                                  borderRadius: '4px',
-                                  padding: '0 7px',
+                                  color: '#a78bfa',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
-                                  boxSizing: 'border-box',
                                 }}
                               >
                                 ⭐ SPOC
@@ -4396,73 +4366,32 @@ function TeamsExportPoster({
                               gap: '6px',
                               flexWrap: 'wrap',
                               marginTop: '2px',
+                              fontSize: '12.5px',
+                              fontWeight: '900',
                             }}
                           >
                             {grade ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '12px',
-                                  fontWeight: '900',
-                                  color: '#e0e7ff',
-                                  background: '#4338ca',
-                                  border: '1.5px solid #818cf8',
-                                  borderRadius: '6px',
-                                  padding: '0 8px',
-                                  fontFamily: 'monospace',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
+                              <span style={{ color: '#818cf8', fontFamily: 'monospace' }}>
                                 {grade}
                               </span>
                             ) : null}
 
+                            {grade && (gAvg !== null || (target !== null && Number(target) > 0)) ? (
+                              <span style={{ color: '#475569' }}>•</span>
+                            ) : null}
+
                             {gAvg !== null ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '12px',
-                                  fontWeight: '900',
-                                  color: '#fef08a',
-                                  background: '#854d0e',
-                                  border: '1.5px solid #eab308',
-                                  borderRadius: '6px',
-                                  padding: '0 8px',
-                                  fontFamily: 'monospace',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
+                              <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>
                                 G.Avg {Number(gAvg).toFixed(1)}
                               </span>
                             ) : null}
 
+                            {gAvg !== null && target !== null && Number(target) > 0 ? (
+                              <span style={{ color: '#475569' }}>•</span>
+                            ) : null}
+
                             {target !== null && Number(target) > 0 ? (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '24px',
-                                  lineHeight: '1',
-                                  fontSize: '12px',
-                                  fontWeight: '900',
-                                  color: '#fed7aa',
-                                  background: '#9a3412',
-                                  border: '1.5px solid #f97316',
-                                  borderRadius: '6px',
-                                  padding: '0 8px',
-                                  fontFamily: 'monospace',
-                                  boxSizing: 'border-box',
-                                }}
-                              >
+                              <span style={{ color: '#fb923c', fontFamily: 'monospace' }}>
                                 Tgt {target}
                               </span>
                             ) : null}
