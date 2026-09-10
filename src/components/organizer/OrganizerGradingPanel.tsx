@@ -1448,7 +1448,7 @@ function GradingExportPoster({
 }) {
   const colWidth = 280;
   const totalCols = grid.columns.length;
-  const minWidth = Math.max(1200, totalCols * colWidth + 100);
+  const minWidth = Math.max(1200, totalCols * colWidth + (totalCols + 1) * 10 + 80);
 
   return (
     <div
@@ -1580,19 +1580,6 @@ function GradingExportPoster({
         >
           <thead>
             <tr>
-              <th
-                style={{
-                  width: '54px',
-                  padding: '14px 4px',
-                  textAlign: 'center',
-                  color: '#94a3b8',
-                  fontSize: '15px',
-                  fontWeight: '900',
-                  background: 'transparent',
-                }}
-              >
-                #
-              </th>
               {grid.columns.map((col) => {
                 const colAssignedPlayers = Array.from({ length: grid.rowCount }, (_, rIdx) => {
                   const uId = grid.cells[cellKey(col.id, rIdx)];
@@ -1683,18 +1670,6 @@ function GradingExportPoster({
           <tbody>
             {Array.from({ length: grid.rowCount }, (_, rowIndex) => (
               <tr key={rowIndex}>
-                <td
-                  style={{
-                    textAlign: 'center',
-                    verticalAlign: 'middle',
-                    color: '#94a3b8',
-                    fontSize: '16px',
-                    fontWeight: '900',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {rowIndex + 1}
-                </td>
                 {grid.columns.map((col) => {
                   const key = cellKey(col.id, rowIndex);
                   const userId = grid.cells[key] || null;
@@ -1711,72 +1686,92 @@ function GradingExportPoster({
                           background: '#111827',
                           border: '2px solid #374151',
                           borderRadius: '12px',
-                          padding: '14px 14px',
-                          verticalAlign: 'top',
+                          padding: '12px 14px',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
                         }}
                       >
                         <div
                           style={{
-                            fontSize: '16.5px',
-                            fontWeight: '900',
-                            color: '#ffffff',
-                            lineHeight: '1.35',
-                            marginBottom: '4px',
-                            wordBreak: 'break-word',
-                            letterSpacing: '0.01em',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            textAlign: 'center',
+                            minHeight: '76px',
                           }}
                         >
-                          {playerLabel(player)}
-                        </div>
-                        {player.username ? (
                           <div
                             style={{
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              color: '#94a3b8',
-                              marginBottom: '8px',
-                              fontFamily: 'monospace',
+                              fontSize: '16.5px',
+                              fontWeight: '900',
+                              color: '#ffffff',
+                              lineHeight: '1.3',
+                              wordBreak: 'break-word',
+                              letterSpacing: '0.01em',
                             }}
                           >
-                            @{player.username}
+                            {playerLabel(player)}
                           </div>
-                        ) : null}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          {avg !== null ? (
-                            <span
+                          {player.username ? (
+                            <div
                               style={{
                                 fontSize: '12px',
-                                fontWeight: '900',
-                                color: '#fef08a',
-                                background: '#854d0e',
-                                border: '1.5px solid #eab308',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
+                                fontWeight: '600',
+                                color: '#94a3b8',
                                 fontFamily: 'monospace',
                               }}
                             >
-                              G.Avg {avg.toFixed(1)}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>No G.Avg</span>
-                          )}
-
-                          {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
-                            <span
-                              style={{
-                                fontSize: '12px',
-                                fontWeight: '900',
-                                color: '#e0e7ff',
-                                background: '#4c1d95',
-                                border: '1.5px solid #8b5cf6',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              Target {targetToDisplay}
-                            </span>
+                              @{player.username}
+                            </div>
                           ) : null}
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              flexWrap: 'wrap',
+                              marginTop: '2px',
+                            }}
+                          >
+                            {avg !== null ? (
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  color: '#fef08a',
+                                  background: '#854d0e',
+                                  border: '1.5px solid #eab308',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                G.Avg {avg.toFixed(1)}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>No G.Avg</span>
+                            )}
+
+                            {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  color: '#fed7aa',
+                                  background: '#9a3412',
+                                  border: '1.5px solid #f97316',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                Target {targetToDisplay}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </td>
                     );
@@ -1789,14 +1784,23 @@ function GradingExportPoster({
                         background: '#0a0e17',
                         border: '2px dashed #1e293b',
                         borderRadius: '12px',
-                        padding: '14px 12px',
+                        padding: '12px 14px',
                         textAlign: 'center',
                         verticalAlign: 'middle',
                       }}
                     >
-                      <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
-                        {cellTarget !== null ? `→ Target ${cellTarget}` : '—'}
-                      </span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '76px',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                          {cellTarget !== null ? `→ Target ${cellTarget}` : '—'}
+                        </span>
+                      </div>
                     </td>
                   );
                 })}
