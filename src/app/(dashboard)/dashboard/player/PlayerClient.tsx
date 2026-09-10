@@ -556,7 +556,7 @@ export default function PlayerClient({
       )}
 
       {/* ── ALL MATCHES & GO LIVE LIST ────────────────────────────────────────── */}
-      {currentTeam?.id && (
+      {activeTournamentSlot === 'A' && currentTeam?.id && (
         <div className="relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-rose-500/10 shadow-lg shadow-amber-500/10">
           <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
@@ -569,7 +569,9 @@ export default function PlayerClient({
                   <Video className="h-5 w-5 text-amber-400" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">{`${shortName} ${editionLabel}`}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-400/70">
+                    {currentEditionInfo?.number ? `CBOT ${currentEditionInfo.number} EDITION` : `${shortName} ${editionLabel}`}
+                  </div>
                   <div className="text-base font-black text-foreground leading-tight">
                     {currentTeam.name} — Match schedule
                   </div>
