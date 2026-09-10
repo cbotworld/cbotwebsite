@@ -17,8 +17,10 @@ import {
 } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { averageForDay, logsForUser } from '@/lib/player-average';
-import { hasSubmittedPriorDays, previewAvgBonus } from '@/lib/day-scoring';
+import { hasSubmittedPriorDays, previewAvgBonus, previewTargetBonus } from '@/lib/day-scoring';
 import { combiRoundLabel, slotsForCombiFormat } from '@/lib/combi-round-label';
+import { gradingSettingKey } from '@/lib/grading';
+import { extractGradeAndTargetMaps } from '@/lib/actions/playerScoreActions';
 
 export const dynamic = 'force-dynamic';
 
@@ -240,18 +242,39 @@ export async function GET(request: NextRequest) {
 
     const canEdit = canEditCombis(user.role, team.captainId, user.id);
     const memberIds = Array.from(memberMap.keys());
-    const scoreRows = canEdit && memberIds.length && edition?.id
-      ? await prisma.playerDayScore.findMany({
-          where: { editionId: edition.id, userId: { in: memberIds } },
-          select: { userId: true, dayNumber: true, score: true, slams: true, boards: true },
-        })
-      : [];
-    const avgLogs = canEdit && memberIds.length && edition?.id
-      ? await prisma.playerAverageLog.findMany({
-          where: { editionId: edition.id, userId: { in: memberIds } },
-          select: { userId: true, average: true, effectiveFrom: true },
-        })
-      : [];
+    const [scoreRows, avgLogs, targetLogs, gradingSetting, editionParticipants] = canEdit && memberIds.length && edition?.id
+      ? await Promise.all([
+          prisma.playerDayScore.findMany({
+            where: { editionId: edition.id, userId: { in: memberIds } },
+            select: { userId: true, dayNumber: true, score: true, slams: true, boards: true },
+          }),
+          prisma.playerAverageLog.findMany({
+            where: { editionId: edition.id, userId: { in: memberIds } },
+            select: { userId: true, average: true, effectiveFrom: true },
+          }),
+          prisma.playerTargetLog.findMany({
+            where: { editionId: edition.id, userId: { in: memberIds } },
+            orderBy: { effectiveFrom: 'desc' },
+            select: { userId: true, target: true },
+          }),
+          prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
+          prisma.editionParticipant.findMany({
+            where: { editionId: edition.id, userId: { in: memberIds } },
+            select: { userId: true, category: true },
+          }),
+        ])
+      : [[], [], [], null, []];
+
+    const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+    for (const [userId, member] of memberMap.entries()) {
+      if (userTargetMap.has(userId)) {
+        member.target = userTargetMap.get(userId)!;
+      }
+      if (userGradeMap.has(userId)) {
+        (member as any).grade = userGradeMap.get(userId)!;
+      }
+    }
+
     const daysSubmitted = new Map<string, number[]>();
     const scoreByUserDay = new Map<string, { score: number; slams: number; boards: unknown }>();
     for (const row of scoreRows) {
@@ -270,6 +293,7 @@ export async function GET(request: NextRequest) {
         slams: number | null;
         boards: unknown[];
         average: number;
+        target: number;
         hasAvgBonus: boolean | null;
         missingPrior: boolean;
       }> = {};
@@ -277,13 +301,15 @@ export async function GET(request: NextRequest) {
         for (const dayNumber of dayNumbers) {
           const calendarDate = combiCalendarDate(dayNumber, dayDates);
           const average = averageForDay(logsForUser(avgLogs, m.id), calendarDate, m.average || 0);
+          const target = userTargetMap.get(m.id) ?? (m.target !== undefined && m.target !== null ? Number(m.target) : 0);
           const row = scoreByUserDay.get(`${m.id}:${dayNumber}`);
           dayStats[String(dayNumber)] = {
             score: row?.score ?? null,
             slams: row?.slams ?? null,
             boards: Array.isArray(row?.boards) ? row.boards : [],
             average,
-            hasAvgBonus: previewAvgBonus(row?.score ?? null, average),
+            target,
+            hasAvgBonus: previewTargetBonus(row?.score ?? null, target),
             missingPrior: false,
           };
         }

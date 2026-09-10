@@ -48,7 +48,10 @@ export async function GET(request: NextRequest) {
       teammates = teamScores.players || [];
       teamScoreWindowOpen = Boolean(teamScores.windowOpen);
     }
-    const editionStats = await getEditionProfileStatsForUser(user.id);
+    const editionStats = await getEditionProfileStatsForUser(
+      user.id,
+      requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
+    );
     return NextResponse.json(
       {
         ...mine,

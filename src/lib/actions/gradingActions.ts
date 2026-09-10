@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { revalidatePath } from 'next/cache';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { resolveCurrentEdition } from '@/lib/current-edition';
 import { recordPlayerTargetChange } from '@/lib/actions/playerScoreActions';
 import {
   assignedUserIdsFromGrid,
@@ -86,16 +87,21 @@ export async function saveEditionGrading(
     });
 
     const changedById = (auth.session.user as { id?: string }).id || '';
+    const liveEdition = await resolveCurrentEdition();
+    const isLiveEdition = liveEdition?.id === editionId;
     const targetUpdates = computePlayerTargetUpdates(cleaned);
     let targetsUpdated = 0;
 
     for (const { userId, target } of targetUpdates) {
-      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, target: true } });
-      if (!user) continue;
-      if (Number(user.target) === target) continue;
-      await prisma.user.update({ where: { id: userId }, data: { target } });
       if (changedById) {
-        await recordPlayerTargetChange(userId, target, changedById);
+        await recordPlayerTargetChange(userId, target, changedById, false, editionId);
+      }
+
+      if (isLiveEdition) {
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, target: true } });
+        if (user && Number(user.target) !== target) {
+          await prisma.user.update({ where: { id: userId }, data: { target } });
+        }
       }
       targetsUpdated += 1;
     }

@@ -575,7 +575,7 @@ export async function getOrganiserScoreDesk(editionId?: string) {
     };
   });
   const [gradingSetting, editionParticipants, targetLogs, editionTeams] = await Promise.all([
-    prisma.systemSetting.findUnique({ where: { key: `edition_${edition.id}_grading` } }),
+    prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
     prisma.editionParticipant.findMany({ where: { editionId: edition.id }, select: { userId: true, category: true } }),
     prisma.playerTargetLog.findMany({ where: { editionId: edition.id }, select: { userId: true, target: true } }),
     prisma.team.findMany({
@@ -666,13 +666,21 @@ export async function getMyDayScoresForUser(
   const live = await resolveCurrentEdition();
   const isAdvancePlay = edition.id !== live?.id;
 
-  const [stagesConfig, participant] = await Promise.all([
+  const [stagesConfig, participant, gradingSetting, editionParticipants, targetLogs, user] = await Promise.all([
     loadStageConfig(edition.id),
     prisma.editionParticipant.findFirst({
       where: { editionId: edition.id, userId },
       include: { team: { select: { id: true, name: true, tag: true } } },
     }),
+    prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
+    prisma.editionParticipant.findMany({ where: { editionId: edition.id, userId }, select: { userId: true, category: true } }),
+    prisma.playerTargetLog.findMany({ where: { editionId: edition.id, userId }, orderBy: { effectiveFrom: 'desc' }, select: { userId: true, target: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
   ]);
+
+  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+  const resolvedTarget = userTargetMap.get(userId) ?? user?.target ?? 0;
+  const resolvedGrade = userGradeMap.get(userId) ?? participant?.category ?? null;
 
   const stages = stagesConfig.stages;
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
@@ -681,7 +689,6 @@ export async function getMyDayScoresForUser(
     orderBy: { dayNumber: 'asc' },
   });
   const hasGoneLive = await playerHasGoneLive(userId, edition.id);
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } });
   const submittedDays = scores.map((s) => s.dayNumber);
 
   const days: Array<{
@@ -772,7 +779,8 @@ export async function getMyDayScoresForUser(
     published: isAdvancePlay ? submittedDays.includes(eligibleDay) : isDayScorePublished(eligibleDay, edition.dayDates),
     publishedDays: publishedFlags,
     cutoffIso: scoreCutoffIso(eligibleDay, edition.dayDates),
-    target: user?.target || 0,
+    target: resolvedTarget,
+    grade: resolvedGrade,
     average: user?.average || 0,
   };
 }
@@ -822,12 +830,31 @@ export async function getTeamDayScoresForActor(
     list.push(row.dayNumber);
     daysByUser.set(row.userId, list);
   }
-  const avgLogs = memberIds.length
-    ? await prisma.playerAverageLog.findMany({
-        where: { editionId: edition.id, userId: { in: memberIds } },
-        select: { userId: true, average: true, effectiveFrom: true },
-      })
-    : [];
+  const [avgLogs, targetLogs, gradingSetting, editionParticipants] = await Promise.all([
+    memberIds.length
+      ? prisma.playerAverageLog.findMany({
+          where: { editionId: edition.id, userId: { in: memberIds } },
+          select: { userId: true, average: true, effectiveFrom: true },
+        })
+      : [],
+    memberIds.length
+      ? prisma.playerTargetLog.findMany({
+          where: { editionId: edition.id, userId: { in: memberIds } },
+          orderBy: { effectiveFrom: 'desc' },
+          select: { userId: true, target: true },
+        })
+      : [],
+    prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
+    memberIds.length
+      ? prisma.editionParticipant.findMany({
+          where: { editionId: edition.id, userId: { in: memberIds } },
+          select: { userId: true, category: true },
+        })
+      : [],
+  ]);
+
+  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+
   const calendarDate = combiCalendarDate(dayNumber, edition.dayDates);
   const captainWindowOpen = isCaptainScoreEditOpen(dayNumber, edition.dayDates) || isOrganiserActor;
   return {
@@ -846,17 +873,20 @@ export async function getTeamDayScoresForActor(
         calendarDate,
         u.average || 0,
       );
+      const resolvedTarget = userTargetMap.get(u.id) ?? u.target ?? 0;
+      const resolvedGrade = userGradeMap.get(u.id) ?? null;
       return {
         userId: u.id,
         name: u.name || u.username,
         average: u.average,
         averageInEffect,
-        target: u.target || 0,
+        target: resolvedTarget,
+        grade: resolvedGrade,
         score,
         slams,
         boards: Array.isArray(row?.boards) ? row.boards : [],
-        hasTargetBonus: previewTargetBonus(score, u.target),
-        hasAvgBonus: previewTargetBonus(score, u.target),
+        hasTargetBonus: previewTargetBonus(score, resolvedTarget),
+        hasAvgBonus: previewTargetBonus(score, resolvedTarget),
         missingPrior: false,
       };
     }),
@@ -874,8 +904,18 @@ export async function recordPlayerAverageChange(
   newAverage: number,
   changedById: string,
   applyToday = false,
+  targetEditionId?: string,
 ) {
-  const edition = await loadLatestEdition();
+  let edition: any = null;
+  if (targetEditionId) {
+    edition = await loadEditionById(targetEditionId);
+  } else {
+    const live = await resolveCurrentEdition();
+    if (live) edition = await loadEditionById(live.id);
+  }
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
   if (!edition) return;
   const next = Number(newAverage);
   if (!Number.isFinite(next)) return;
@@ -919,8 +959,18 @@ export async function recordPlayerTargetChange(
   newTarget: number,
   changedById: string,
   applyToday = false,
+  targetEditionId?: string,
 ) {
-  const edition = await loadLatestEdition();
+  let edition: any = null;
+  if (targetEditionId) {
+    edition = await loadEditionById(targetEditionId);
+  } else {
+    const live = await resolveCurrentEdition();
+    if (live) edition = await loadEditionById(live.id);
+  }
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
   if (!edition) return;
   const next = Math.round(Number(newTarget));
   if (!Number.isFinite(next)) return;
@@ -1011,7 +1061,7 @@ function buildRosterTeams(teams: any[]) {
   });
 }
 
-function extractGradeAndTargetMaps(
+export function extractGradeAndTargetMaps(
   gradingSetting: any,
   editionParticipants: any[],
   targetLogs: any[],
@@ -1051,6 +1101,8 @@ function extractGradeAndTargetMaps(
       }
       if (!userTargetMap.has(p.userId) && latestTargetByUserId.has(p.userId)) {
         userTargetMap.set(p.userId, latestTargetByUserId.get(p.userId)!);
+      } else if (!userTargetMap.has(p.userId) && p.target !== null && p.target !== undefined && Number(p.target) >= 0) {
+        userTargetMap.set(p.userId, Number(p.target));
       }
     }
   }
@@ -1162,6 +1214,12 @@ async function loadPublicScoreboard() {
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const rosterTeams = buildRosterTeams(teams);
   const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
+  for (const team of rosterTeams) {
+    for (const member of team.members) {
+      if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
+      if (userTargetMap.has(member.id)) member.target = userTargetMap.get(member.id)!;
+    }
+  }
   const pairings = pairingsFromStages(stages);
   const allEffectiveScores = resolveAllEffectiveScores(maxDay, rosterTeams, pairings, scores, userGradeMap, userTargetMap, edition.dayDates);
 
@@ -1300,6 +1358,12 @@ async function loadPublicStandings(editionId?: string, options?: { skipSnapshotR
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const standingTeams = buildRosterTeams(teams);
   const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+  for (const team of standingTeams) {
+    for (const member of team.members) {
+      if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
+      if (userTargetMap.has(member.id)) member.target = userTargetMap.get(member.id)!;
+    }
+  }
   const pairings = pairingsFromStages(stages);
   const allEffectiveScores = resolveAllEffectiveScores(maxDay, standingTeams, pairings, scores, userGradeMap, userTargetMap, edition.dayDates);
 
@@ -1398,8 +1462,17 @@ export async function getAverageReviewPrompt(editionId?: string) {
   return stageJustFinishedForAverageReview(config.stages, lastCompletedDay(edition.dayDates || {}));
 }
 
-export async function getEditionProfileStatsForUser(userId: string) {
-  const edition = await loadLatestEdition();
+export async function getEditionProfileStatsForUser(userId: string, requestedEditionId?: string) {
+  let edition: any = null;
+  if (requestedEditionId) {
+    edition = await loadEditionById(requestedEditionId);
+  } else {
+    const live = await resolveCurrentEdition();
+    if (live) edition = await loadEditionById(live.id);
+  }
+  if (!edition) {
+    edition = await loadLatestEdition();
+  }
   if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0 };
   const [user, allScores, logs, targetLogs, config, teams, gradingSetting, editionParticipants] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
@@ -1417,12 +1490,18 @@ export async function getEditionProfileStatsForUser(userId: string) {
       where: { editionId: edition.id },
       include: { members: { include: { user: { select: { id: true, name: true, average: true, target: true } } } } },
     }),
-    prisma.systemSetting.findUnique({ where: { key: `edition_${edition.id}_grading` } }),
+    prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
     prisma.editionParticipant.findMany({ where: { editionId: edition.id }, select: { userId: true, category: true } }),
   ]);
 
   const standingTeams = buildRosterTeams(teams);
-  const { userGradeMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+  for (const team of standingTeams) {
+    for (const member of team.members) {
+      if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
+      if (userTargetMap.has(member.id)) member.target = userTargetMap.get(member.id)!;
+    }
+  }
 
   const wins = countEventWinsForPlayer(
     userId,
@@ -1434,12 +1513,13 @@ export async function getEditionProfileStatsForUser(userId: string) {
     userGradeMap,
   );
   const userScores = allScores.filter((s) => s.userId === userId);
+  const resolvedTarget = userTargetMap.get(userId) ?? user?.target ?? 0;
   const stats = editionProfileStats({
     userId,
     scores: userScores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
     logs: logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
     fallbackAverage: user?.average || 0,
-    fallbackTarget: user?.target || 0,
+    fallbackTarget: resolvedTarget,
     dayDates: edition.dayDates,
     eventWins: wins,
   });
@@ -1466,16 +1546,16 @@ export async function getEditionProfileStatsForUser(userId: string) {
     };
   });
 
-  if (targetHistory.length === 0 && user?.target) {
+  if (targetHistory.length === 0 && resolvedTarget) {
     targetHistory.push({
       dayNumber: 1,
       effectiveFrom: map?.[1] ?? toCalendarDate(edition.tournamentStartDate) ?? '',
-      target: user.target,
+      target: resolvedTarget,
       changedAt: new Date(edition.tournamentStartDate || Date.now()).toISOString(),
     });
   }
 
-  const standings = await getPublicStandings();
+  const standings = await getPublicStandings(edition.id);
   const playerRank = (standings.players as any[]).find((p: any) => p.userId === userId);
   const calculatedAverage = playerRank && playerRank.boardAverage != null ? Number(playerRank.boardAverage) : (user?.average || 0);
 

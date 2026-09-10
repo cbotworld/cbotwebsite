@@ -4,6 +4,7 @@ import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 type RecordArgs = {
   userId: string;
   dayNumber: number;
+  editionId?: string | null;
   teamId?: string | null;
   opponentName?: string | null;
   youtubeBroadcastId: string;
@@ -53,7 +54,9 @@ async function ensureDayMatch(opts: {
 export async function recordMobileLiveStream(args: RecordArgs) {
   if (!args.userId || !args.youtubeBroadcastId || args.dayNumber < 1) return null;
 
-  const edition = await resolveCurrentEditionRecord();
+  const edition = args.editionId
+    ? await prisma.edition.findUnique({ where: { id: args.editionId } })
+    : await resolveCurrentEditionRecord();
   if (!edition) return null;
 
   let teamId = args.teamId || null;

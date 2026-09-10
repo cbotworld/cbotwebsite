@@ -32,6 +32,7 @@ export type MatchDetails = {
   label: string;
   title: string;
   timeRange: string;
+  editionId?: string | null;
   editionTitle: string;
   editionNumber: number;
   editionDescription?: string;
@@ -534,6 +535,7 @@ export async function fetchPlayerSchedule(opts?: {
     label: day.label || `Day ${day.dayNumber}`,
     title: day.title || '',
     timeRange: day.timeRange || '',
+    editionId: day.editionId || data.edition?.id || null,
     editionTitle: day.editionTitle || data.team?.name || 'CBOT Live Edition',
     editionNumber: day.editionNumber ?? data.editionNumber ?? 0,
     editionDescription: day.editionDescription || '',

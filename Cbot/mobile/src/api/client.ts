@@ -61,6 +61,8 @@ export type BroadcastPayload = {
   opponentTag?: string;
   stage?: string;
   editionTitle?: string;
+  editionSlot?: 'A' | 'B';
+  editionId?: string;
   timeRange?: string;
   endIso?: string;
   playMode?: 'match' | 'practice' | 'tiebreak';

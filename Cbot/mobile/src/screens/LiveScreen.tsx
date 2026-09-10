@@ -120,6 +120,8 @@ export function LiveScreen({ route, navigation }: Props) {
   const opponentTag = route.params?.opponentTag || "";
   const stage = route.params?.stage || "";
   const editionTitle = route.params?.editionTitle || "";
+  const editionSlot = route.params?.editionSlot;
+  const editionId = route.params?.editionId;
   const timeRange = route.params?.timeRange || "";
   const endIso = route.params?.endIso || "";
   const playMode = route.params?.playMode || "match";
@@ -496,6 +498,8 @@ export function LiveScreen({ route, navigation }: Props) {
         opponentTag,
         stage,
         editionTitle,
+        editionSlot,
+        editionId,
         timeRange,
         endIso,
         playMode,
@@ -516,6 +520,8 @@ export function LiveScreen({ route, navigation }: Props) {
   }, [
     busy,
     day,
+    editionId,
+    editionSlot,
     editionTitle,
     endIso,
     name,

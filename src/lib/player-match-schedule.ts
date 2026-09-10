@@ -371,6 +371,7 @@ export async function getPlayerMatchSchedule(
         opponentTag: oppFace.tag,
         opponentLogo: oppFace.logo,
         tableNumber: 1,
+        editionId: edition?.id || null,
         editionTitle: edition?.title || fallbackEditionTitle,
         editionNumber: edition?.number ?? 0,
         editionDescription: edition?.themeDescription || edition?.theme || edition?.rules || '',
@@ -396,6 +397,9 @@ export async function getPlayerMatchSchedule(
       username: user.username,
       role: user.role,
     },
+    edition: edition
+      ? { id: edition.id, title: edition.title, number: edition.number }
+      : null,
     team: team
       ? { id: team.id, name: team.name, tag: team.tag, logo: team.logo }
       : null,

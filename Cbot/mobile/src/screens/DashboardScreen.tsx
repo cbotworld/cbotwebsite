@@ -216,6 +216,8 @@ export function DashboardScreen({ navigation }: Props) {
       opponentTag: mode === 'practice' ? 'PRAC' : (match.opponentTag || 'TBD'),
       stage: match.stageName || match.title,
       editionTitle: match.editionTitle,
+      editionSlot,
+      editionId: match.editionId || undefined,
       timeRange: match.timeRange,
       endIso: mode === 'match' ? match.endIso || undefined : undefined,
       playMode: mode,

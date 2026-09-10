@@ -7,6 +7,8 @@ import { TEAM_TYPE_SPOC, spocTeamMembersFromTeam } from '@/lib/spoc-teams';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 import { getMyRegistrationEnrollment } from '@/lib/actions/tournamentSlotActions';
+import { gradingSettingKey } from '@/lib/grading';
+import { extractGradeAndTargetMaps } from '@/lib/actions/playerScoreActions';
 
 export const revalidate = 0;
 
@@ -171,9 +173,35 @@ export default async function PlayerPage() {
       })
     : [];
 
+  let activeTarget = player?.target ?? 0;
+  let activeGrade = editionParticipant?.category || null;
+
+  if (activeEdition?.id && player?.id) {
+    const [gradingSetting, targetLog] = await Promise.all([
+      prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(activeEdition.id) } }),
+      prisma.playerTargetLog.findFirst({
+        where: { editionId: activeEdition.id, userId: player.id },
+        orderBy: { effectiveFrom: 'desc' },
+        select: { target: true },
+      }),
+    ]);
+    const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(
+      gradingSetting,
+      editionParticipant ? [editionParticipant] : [],
+      targetLog ? [targetLog] : [],
+      [],
+    );
+    if (userTargetMap.has(player.id)) {
+      activeTarget = userTargetMap.get(player.id)!;
+    }
+    if (userGradeMap.has(player.id)) {
+      activeGrade = userGradeMap.get(player.id)!;
+    }
+  }
+
   return (
     <PlayerClient
-      initialPlayer={player || { ...sessionUser, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0 }}
+      initialPlayer={player ? { ...player, target: activeTarget } : { ...sessionUser, wins: 0, losses: 0, rating: 1200, queenStrikes: 0, boardsWon: 0, target: activeTarget }}
       initialTeam={team}
       initialTeammates={teammates}
       initialMatches={matches as any}
@@ -182,7 +210,7 @@ export default async function PlayerPage() {
       initialSpocTeam={spocTeam}
       initialSpocMembers={spocMembers}
       hasSpocCaptainDesk={hasSpocCaptainDesk}
-      initialEditionGrade={editionParticipant?.category || null}
+      initialEditionGrade={activeGrade}
       registrationEnrollment={registrationEnrollment}
       currentEditionInfo={activeEdition ? {
         id: activeEdition.id,

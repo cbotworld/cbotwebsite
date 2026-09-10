@@ -40,11 +40,22 @@ export async function POST(request: NextRequest) {
       playMode === 'practice' ||
       /practice|tie[\s._-]*break/i.test(day);
 
+    const slotRaw = asText(body.editionSlot || body.slot).toUpperCase();
+    const activeSlot = slotRaw === 'B' ? ('B' as const) : slotRaw === 'A' ? ('A' as const) : undefined;
+    const requestedEditionId = asText(body.editionId) || undefined;
+
     const user = await userFromBearer(request);
     let teamId: string | null = null;
+    let editionId: string | undefined = requestedEditionId;
     if (user) {
-      const schedule = await getPlayerMatchSchedule(user.id);
+      const schedule = await getPlayerMatchSchedule(user.id, {
+        editionSlot: activeSlot,
+        editionId: requestedEditionId,
+      });
       teamId = schedule?.team?.id || null;
+      if (!editionId && schedule?.edition?.id) {
+        editionId = schedule.edition.id;
+      }
       const dayNum = parseInt(day.replace(/\D/g, ''), 10);
       const days = (schedule?.days || []).filter(Boolean) as any[];
       const row =
@@ -119,6 +130,7 @@ export async function POST(request: NextRequest) {
           await recordMobileLiveStream({
             userId: user.id,
             dayNumber: dayNum,
+            editionId: editionId || null,
             teamId,
             opponentName,
             playMode: isBonusPlay
