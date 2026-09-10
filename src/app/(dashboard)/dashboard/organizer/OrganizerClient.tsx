@@ -4306,7 +4306,7 @@ function TeamsExportPoster({
                           >
                             <span
                               style={{
-                                fontSize: '18px',
+                                fontSize: '20px',
                                 fontWeight: '900',
                                 color: '#ffffff',
                                 lineHeight: '1.3',
@@ -4319,7 +4319,7 @@ function TeamsExportPoster({
                             {isCaptain ? (
                               <span
                                 style={{
-                                  fontSize: '12px',
+                                  fontSize: '13px',
                                   fontWeight: '900',
                                   color: '#fde047',
                                   whiteSpace: 'nowrap',
@@ -4331,7 +4331,7 @@ function TeamsExportPoster({
                             ) : isSpoc ? (
                               <span
                                 style={{
-                                  fontSize: '12px',
+                                  fontSize: '13px',
                                   fontWeight: '900',
                                   color: '#c4b5fd',
                                   whiteSpace: 'nowrap',
@@ -4343,19 +4343,6 @@ function TeamsExportPoster({
                             ) : null}
                           </div>
 
-                          {u?.username || m.user?.username ? (
-                            <div
-                              style={{
-                                fontSize: '13.5px',
-                                fontWeight: '700',
-                                color: '#94a3b8',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              @{u?.username || m.user?.username}
-                            </div>
-                          ) : null}
-
                           <div
                             style={{
                               display: 'flex',
@@ -4363,9 +4350,10 @@ function TeamsExportPoster({
                               justifyContent: 'center',
                               gap: '8px',
                               flexWrap: 'wrap',
-                              marginTop: '2px',
-                              fontSize: '14px',
+                              marginTop: '4px',
+                              fontSize: '16.5px',
                               fontWeight: '900',
+                              lineHeight: '1.3',
                             }}
                           >
                             {grade ? (

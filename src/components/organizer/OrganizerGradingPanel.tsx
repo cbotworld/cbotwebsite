@@ -1695,7 +1695,7 @@ function GradingExportPoster({
                         >
                           <div
                             style={{
-                              fontSize: '18px',
+                              fontSize: '20px',
                               fontWeight: '900',
                               color: '#ffffff',
                               lineHeight: '1.3',
@@ -1705,18 +1705,6 @@ function GradingExportPoster({
                           >
                             {playerLabel(player)}
                           </div>
-                          {player.username ? (
-                            <div
-                              style={{
-                                fontSize: '13.5px',
-                                fontWeight: '700',
-                                color: '#94a3b8',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              @{player.username}
-                            </div>
-                          ) : null}
                           <div
                             style={{
                               display: 'flex',
@@ -1724,9 +1712,10 @@ function GradingExportPoster({
                               justifyContent: 'center',
                               gap: '8px',
                               flexWrap: 'wrap',
-                              marginTop: '2px',
-                              fontSize: '14px',
+                              marginTop: '4px',
+                              fontSize: '16.5px',
                               fontWeight: '900',
+                              lineHeight: '1.3',
                             }}
                           >
                             {avg !== null ? (
@@ -1734,7 +1723,7 @@ function GradingExportPoster({
                                 G.Avg {avg.toFixed(1)}
                               </span>
                             ) : (
-                              <span style={{ color: '#64748b', fontSize: '12px' }}>
+                              <span style={{ color: '#64748b', fontSize: '13.5px' }}>
                                 No G.Avg
                               </span>
                             )}
