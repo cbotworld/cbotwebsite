@@ -268,7 +268,7 @@ export function LiveScreen({ route, navigation }: Props) {
       }
     });
     return () => {
-      void unlockAppOrientation();
+      void lockAppOrientation("portrait");
     };
   }, [requestCameraPermission, requestMicPermission]);
 
@@ -589,6 +589,7 @@ export function LiveScreen({ route, navigation }: Props) {
         } finally {
           setBusy(false);
         }
+        void lockAppOrientation("portrait");
         allowLeaveRef.current = true;
         navigation.dispatch(event.data.action);
       })();
@@ -648,7 +649,10 @@ export function LiveScreen({ route, navigation }: Props) {
           <Text style={styles.endedDay}>{day}</Text>
           <Pressable
             style={styles.endedBtn}
-            onPress={() => navigation.navigate(getSession()?.token ? "Main" : "Login")}
+            onPress={() => {
+              void lockAppOrientation("portrait");
+              navigation.navigate(getSession()?.token ? "Main" : "Login");
+            }}
           >
             <Text style={styles.endedBtnText}>BACK TO DASHBOARD</Text>
           </Pressable>
@@ -674,6 +678,7 @@ export function LiveScreen({ route, navigation }: Props) {
   }
   const showStop = stream.isStreaming || Boolean(session);
   const goHome = () => {
+    void lockAppOrientation("portrait");
     if (session) {
       void handleStop();
     } else {

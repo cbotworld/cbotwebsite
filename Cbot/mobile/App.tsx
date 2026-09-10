@@ -19,7 +19,7 @@ import { LiveScreen } from "./src/screens/LiveScreen";
 import { UpdateAppModal } from "./src/components/UpdateAppModal";
 import { ReportIssueModal } from "./src/components/ReportIssueModal";
 import { MainTabParamList, RootStackParamList } from "./src/navigation/types";
-import { unlockAppOrientation } from "./src/utils/optionalScreenOrientation";
+import { lockAppOrientation } from "./src/utils/optionalScreenOrientation";
 import { fetchAppVersion, restoreSession } from "./src/api/website";
 import { registerForPushNotificationsAsync } from "./src/utils/notifications";
 
@@ -201,7 +201,7 @@ export default function App() {
   } | null>(null);
 
   useEffect(() => {
-    void unlockAppOrientation();
+    void lockAppOrientation("portrait");
     void (async () => {
       await restoreSession();
       setReady(true);
@@ -256,11 +256,12 @@ export default function App() {
             headerStyle: { backgroundColor: "#2b0408" },
             headerTintColor: "#f8fafc",
             contentStyle: { backgroundColor: "#1c0205" },
+            orientation: "portrait",
           }}
         >
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false, orientation: "portrait" }} />
+          <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false, orientation: "portrait" }} />
+          <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false, orientation: "portrait" }} />
           <Stack.Screen
             name="Live"
             component={LiveScreen}
