@@ -168,7 +168,7 @@ export function LiveScreen({ route, navigation }: Props) {
     }).start();
 
     // Inactivity dim timer runs only when live streaming or session active
-    if (sessionRef.current || streamStartRef.current) {
+    if (sessionRef.current || stream.isStreaming) {
       dimTimerRef.current = setTimeout(() => {
         setIsDimmed(true);
         Animated.timing(dimAnim, {
@@ -1008,7 +1008,11 @@ const styles = StyleSheet.create({
 
   // Countdown Overlay
   countdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 40,
@@ -1063,7 +1067,11 @@ const styles = StyleSheet.create({
 
   // Auto-Dim (OLED Battery Saver) Overlay
   dimOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "#000",
     zIndex: 35,
   },

@@ -258,6 +258,22 @@ export function ProfileScreen({ navigation }: Props) {
     }
   };
 
+  const onPracticeGoLive = () => {
+    const playerName = user?.name || session?.user?.name || user?.username || 'Player';
+    navigation.navigate('Live', {
+      name: playerName,
+      day: 'Practice',
+      teamName: team?.name || 'Solo Practice',
+      opponentName: 'Practice',
+      teamTag: team?.tag || 'PRAC',
+      opponentTag: 'PRAC',
+      stage: 'Practice Session',
+      editionTitle: 'CBOT Practice',
+      timeRange: 'Free Practice',
+      playMode: 'practice',
+    });
+  };
+
   const user = profile?.user;
   const team = profile?.team;
   const initials = (user?.name || 'P').replace(/\s+/g, '').slice(0, 2).toUpperCase() || 'P';
@@ -304,6 +320,24 @@ export function ProfileScreen({ navigation }: Props) {
                 <Text style={[styles.lockedLabel, { marginTop: 8 }]}>USERNAME</Text>
                 <Text style={styles.lockedValue}>@{user?.username || '—'}</Text>
               </View>
+            </View>
+
+            {/* Practice Live Card - Available to all players anytime */}
+            <View style={styles.practiceCard}>
+              <View style={styles.practiceHeader}>
+                <View style={styles.livePulseDot} />
+                <Text style={styles.practiceKicker}>PRACTICE LIVE STREAM</Text>
+              </View>
+              <Text style={styles.practiceTitle}>Go Live for Practice</Text>
+              <Text style={styles.practiceDesc}>
+                Stream practice matches, test your camera angles, and verify your live connection anytime — even if you are not yet assigned to a team or tournament edition.
+              </Text>
+              <Pressable
+                style={styles.practiceBtn}
+                onPress={onPracticeGoLive}
+              >
+                <Text style={styles.practiceBtnText}>🔴  GO LIVE (PRACTICE)</Text>
+              </Pressable>
             </View>
 
             {profile?.editionStats ? (
@@ -637,6 +671,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: '#f59e0b', fontWeight: '900', fontSize: 20 },
+  practiceCard: {
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.35)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  practiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  livePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  practiceKicker: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#f87171',
+    letterSpacing: 1.2,
+  },
+  practiceTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  practiceDesc: {
+    fontSize: 12.5,
+    color: '#94a3b8',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  practiceBtn: {
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  practiceBtnText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 14,
+    letterSpacing: 1.2,
+  },
   teamCard: {
     flexDirection: 'row',
     alignItems: 'center',

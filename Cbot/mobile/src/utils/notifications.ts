@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { config } from '../config';
 import { getSession } from '../api/website';
+import { saveReceivedNotification } from './notificationStorage';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -13,6 +14,31 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+let listenersInitialized = false;
+
+export function initNotificationListeners() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+
+  // Foreground notification received listener
+  Notifications.addNotificationReceivedListener((notification) => {
+    const title = notification.request.content.title || 'CBOT Notification';
+    const body = notification.request.content.body || '';
+    const data = notification.request.content.data as Record<string, any> | undefined;
+    const id = notification.request.identifier;
+    void saveReceivedNotification({ id, title, body, data });
+  });
+
+  // User tapped / responded to notification
+  Notifications.addNotificationResponseReceivedListener((response) => {
+    const title = response.notification.request.content.title || 'CBOT Notification';
+    const body = response.notification.request.content.body || '';
+    const data = response.notification.request.content.data as Record<string, any> | undefined;
+    const id = response.notification.request.identifier;
+    void saveReceivedNotification({ id, title, body, data });
+  });
+}
 
 /**
  * Register for Push Notifications with Expo Push Service and send token to CBOT backend.

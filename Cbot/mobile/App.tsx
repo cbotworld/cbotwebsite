@@ -18,10 +18,12 @@ import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { LiveScreen } from "./src/screens/LiveScreen";
 import { UpdateAppModal } from "./src/components/UpdateAppModal";
 import { ReportIssueModal } from "./src/components/ReportIssueModal";
+import { NotificationsModal } from "./src/components/NotificationsModal";
 import { MainTabParamList, RootStackParamList } from "./src/navigation/types";
 import { lockAppOrientation } from "./src/utils/optionalScreenOrientation";
 import { fetchAppVersion, restoreSession } from "./src/api/website";
-import { registerForPushNotificationsAsync } from "./src/utils/notifications";
+import { registerForPushNotificationsAsync, initNotificationListeners } from "./src/utils/notifications";
+import { getUnreadCount, addNotificationChangeListener } from "./src/utils/notificationStorage";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -82,33 +84,90 @@ function CustomHeaderTitle({ title }: { title: string }) {
 
 function MainTabs() {
   const [reportVisible, setReportVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { bottom } = useSafeAreaInsets();
 
-  const ReportButton = () => (
-    <Pressable
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: pressed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.18)',
-        borderColor: '#ef4444',
-        borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        marginRight: 14,
-      })}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      onPress={() => setReportVisible(true)}
-    >
-      <Ionicons name="flag" size={14} color="#f87171" />
-      <Text style={{ color: '#f87171', fontWeight: '900', fontSize: 11, letterSpacing: 1 }}>REPORT</Text>
-    </Pressable>
+  useEffect(() => {
+    void getUnreadCount().then(setUnreadCount);
+    const unsubscribe = addNotificationChangeListener(() => {
+      void getUnreadCount().then(setUnreadCount);
+    });
+    return unsubscribe;
+  }, []);
+
+  const HeaderRight = () => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 14 }}>
+      {/* Bell Icon for Push Notifications */}
+      <Pressable
+        style={({ pressed }) => ({
+          width: 33,
+          height: 33,
+          borderRadius: 10,
+          backgroundColor: pressed ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.12)',
+          borderColor: unreadCount > 0 ? '#f59e0b' : 'rgba(245, 158, 11, 0.35)',
+          borderWidth: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        })}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={() => setNotificationsVisible(true)}
+      >
+        <Ionicons
+          name={unreadCount > 0 ? "notifications" : "notifications-outline"}
+          size={16}
+          color="#f59e0b"
+        />
+        {unreadCount > 0 ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              backgroundColor: '#ef4444',
+              borderRadius: 8,
+              minWidth: 16,
+              height: 16,
+              paddingHorizontal: 3,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: '#1c0205',
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 9, fontWeight: '900' }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
+
+      {/* Report Button */}
+      <Pressable
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 5,
+          backgroundColor: pressed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(239, 68, 68, 0.18)',
+          borderColor: '#ef4444',
+          borderWidth: 1,
+          borderRadius: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 5.5,
+        })}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={() => setReportVisible(true)}
+      >
+        <Ionicons name="flag" size={13} color="#f87171" />
+        <Text style={{ color: '#f87171', fontWeight: '900', fontSize: 11, letterSpacing: 0.8 }}>REPORT</Text>
+      </Pressable>
+    </View>
   );
 
   return (
     <>
       <ReportIssueModal visible={reportVisible} onClose={() => setReportVisible(false)} />
+      <NotificationsModal visible={notificationsVisible} onClose={() => setNotificationsVisible(false)} />
       <Tab.Navigator
         screenOptions={{
           headerShown: true,
@@ -116,7 +175,7 @@ function MainTabs() {
           headerTitle: ({ children }) => <CustomHeaderTitle title={typeof children === 'string' ? children : 'CBOT'} />,
           headerTitleAlign: 'left',
           headerShadowVisible: false,
-          headerRight: () => <ReportButton />,
+          headerRight: () => <HeaderRight />,
           tabBarHideOnKeyboard: true,
           tabBarActiveTintColor: "#f59e0b",
           tabBarInactiveTintColor: "#a37075",
@@ -205,6 +264,7 @@ export default function App() {
     void (async () => {
       await restoreSession();
       setReady(true);
+      initNotificationListeners();
       void registerForPushNotificationsAsync();
     })();
   }, []);
