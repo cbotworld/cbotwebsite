@@ -291,6 +291,7 @@ function isClientOutdated(curVer: string, curBld: string, latVer?: string | null
   useEffect(() => {
     if (!ready) return;
     if (Constants.appOwnership === "expo") return;
+    if (Platform.OS === "ios") return;
 
     const currentVersion =
       Constants.nativeAppVersion || Constants.expoConfig?.version || "1.3";

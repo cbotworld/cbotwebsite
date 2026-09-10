@@ -26,6 +26,23 @@ export async function GET(request: NextRequest) {
 
     const isIos = platform === 'ios';
 
+    // iOS update popups are completely disabled as requested
+    if (isIos) {
+      return NextResponse.json(
+        {
+          success: true,
+          platform: 'ios',
+          storeUrl: 'https://apps.apple.com/app/id6742533036',
+          latestVersion: null,
+          latestBuild: null,
+          currentVersion: currentVersion || null,
+          currentBuild: currentBuild || null,
+          updateAvailable: false,
+        },
+        { headers: mobileCorsHeaders },
+      );
+    }
+
     // Environment variables → Database SystemSetting → Hardcoded Fallback
     const envVersion = isIos
       ? process.env.LATEST_IOS_VERSION
