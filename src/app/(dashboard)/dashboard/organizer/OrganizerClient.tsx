@@ -4010,7 +4010,7 @@ function TeamsExportPoster({
   const maxMembers = Math.max(1, ...processedTeams.map((t) => t.sortedMembers.length));
   const colWidth = 280;
   const totalCols = processedTeams.length;
-  const minWidth = Math.max(1200, totalCols * colWidth + 100);
+  const minWidth = Math.max(1200, totalCols * colWidth + (totalCols + 1) * 10 + 80);
   const totalPlayers = processedTeams.reduce((sum, t) => sum + t.sortedMembers.length, 0);
 
   return (
@@ -4143,19 +4143,6 @@ function TeamsExportPoster({
         >
           <thead>
             <tr>
-              <th
-                style={{
-                  width: '54px',
-                  padding: '14px 4px',
-                  textAlign: 'center',
-                  color: '#94a3b8',
-                  fontSize: '15px',
-                  fontWeight: '900',
-                  background: 'transparent',
-                }}
-              >
-                #
-              </th>
               {processedTeams.map((team) => {
                 const captain = usersList.find(
                   (u: any) => u.id === team.captainId || (team.captain?.id && u.id === team.captain.id)
@@ -4283,18 +4270,6 @@ function TeamsExportPoster({
           <tbody>
             {Array.from({ length: maxMembers }, (_, rowIndex) => (
               <tr key={rowIndex}>
-                <td
-                  style={{
-                    textAlign: 'center',
-                    verticalAlign: 'middle',
-                    color: '#94a3b8',
-                    fontSize: '16px',
-                    fontWeight: '900',
-                    fontFamily: 'monospace',
-                  }}
-                >
-                  {rowIndex + 1}
-                </td>
                 {processedTeams.map((team) => {
                   const m = team.sortedMembers[rowIndex];
                   const uId = m ? m.userId || m.user?.id || m.id : null;
@@ -4317,130 +4292,151 @@ function TeamsExportPoster({
                           border: isCaptain ? '2px solid #eab308' : '2px solid #374151',
                           borderRadius: '12px',
                           padding: '12px 14px',
-                          verticalAlign: 'top',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
                         }}
                       >
                         <div
                           style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '6px',
-                            marginBottom: '4px',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            textAlign: 'center',
+                            minHeight: '76px',
                           }}
                         >
                           <div
                             style={{
-                              fontSize: '16.5px',
-                              fontWeight: '900',
-                              color: '#ffffff',
-                              lineHeight: '1.35',
-                              wordBreak: 'break-word',
-                              letterSpacing: '0.01em',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              flexWrap: 'wrap',
                             }}
                           >
-                            {u?.name || m.user?.name || m.name || 'Player'}
+                            <span
+                              style={{
+                                fontSize: '16.5px',
+                                fontWeight: '900',
+                                color: '#ffffff',
+                                lineHeight: '1.3',
+                                wordBreak: 'break-word',
+                                letterSpacing: '0.01em',
+                              }}
+                            >
+                              {u?.name || m.user?.name || m.name || 'Player'}
+                            </span>
+                            {isCaptain ? (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  color: '#fef08a',
+                                  background: '#854d0e',
+                                  border: '1px solid #eab308',
+                                  borderRadius: '4px',
+                                  padding: '2px 7px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {isSpoc ? '👑 SPOC' : '👑 CAPT'}
+                              </span>
+                            ) : isSpoc ? (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '900',
+                                  color: '#e0e7ff',
+                                  background: '#4c1d95',
+                                  border: '1px solid #8b5cf6',
+                                  borderRadius: '4px',
+                                  padding: '2px 7px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                ⭐ SPOC
+                              </span>
+                            ) : null}
                           </div>
-                          {isCaptain ? (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: '900',
-                                color: '#fef08a',
-                                background: '#854d0e',
-                                border: '1px solid #eab308',
-                                borderRadius: '4px',
-                                padding: '2px 7px',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {isSpoc ? '👑 SPOC' : '👑 CAPT'}
-                            </span>
-                          ) : isSpoc ? (
-                            <span
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: '900',
-                                color: '#e0e7ff',
-                                background: '#4c1d95',
-                                border: '1px solid #8b5cf6',
-                                borderRadius: '4px',
-                                padding: '2px 7px',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                              }}
-                            >
-                              ⭐ SPOC
-                            </span>
-                          ) : null}
-                        </div>
 
-                        {u?.username || m.user?.username ? (
+                          {u?.username || m.user?.username ? (
+                            <div
+                              style={{
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                color: '#94a3b8',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              @{u?.username || m.user?.username}
+                            </div>
+                          ) : null}
+
                           <div
                             style={{
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              color: '#94a3b8',
-                              marginBottom: '8px',
-                              fontFamily: 'monospace',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              flexWrap: 'wrap',
+                              marginTop: '2px',
                             }}
                           >
-                            @{u?.username || m.user?.username}
+                            {grade ? (
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  color: '#e0e7ff',
+                                  background: '#4338ca',
+                                  border: '1.5px solid #818cf8',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {grade}
+                              </span>
+                            ) : null}
+
+                            {gAvg !== null ? (
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  color: '#fef08a',
+                                  background: '#854d0e',
+                                  border: '1.5px solid #eab308',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                G.Avg {Number(gAvg).toFixed(1)}
+                              </span>
+                            ) : null}
+
+                            {target !== null && Number(target) > 0 ? (
+                              <span
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '900',
+                                  color: '#fed7aa',
+                                  background: '#9a3412',
+                                  border: '1.5px solid #f97316',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                Tgt {target}
+                              </span>
+                            ) : null}
                           </div>
-                        ) : null}
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          {grade ? (
-                            <span
-                              style={{
-                                fontSize: '12px',
-                                fontWeight: '900',
-                                color: '#e0e7ff',
-                                background: '#4338ca',
-                                border: '1.5px solid #818cf8',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              {grade}
-                            </span>
-                          ) : null}
-
-                          {gAvg !== null ? (
-                            <span
-                              style={{
-                                fontSize: '12px',
-                                fontWeight: '900',
-                                color: '#fef08a',
-                                background: '#854d0e',
-                                border: '1.5px solid #eab308',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              G.Avg {Number(gAvg).toFixed(1)}
-                            </span>
-                          ) : null}
-
-                          {target !== null && Number(target) > 0 ? (
-                            <span
-                              style={{
-                                fontSize: '12px',
-                                fontWeight: '900',
-                                color: '#fed7aa',
-                                background: '#9a3412',
-                                border: '1.5px solid #f97316',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              Tgt {target}
-                            </span>
-                          ) : null}
                         </div>
                       </td>
                     );
@@ -4458,7 +4454,16 @@ function TeamsExportPoster({
                         verticalAlign: 'middle',
                       }}
                     >
-                      <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>—</span>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '76px',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>—</span>
+                      </div>
                     </td>
                   );
                 })}
