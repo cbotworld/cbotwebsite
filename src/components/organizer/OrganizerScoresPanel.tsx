@@ -847,7 +847,7 @@ export default function OrganizerScoresPanel({
                   numSlams = parseInt(slamMatch[1], 10) || 0;
                 }
 
-                if (isNaN(numScore) || numScore < 0) {
+                if (isNaN(numScore) || (numSlams === 0 && numScore < 0)) {
                   parsed.push({
                     userId: matchedUser.id,
                     dayNumber,
@@ -1054,7 +1054,7 @@ export default function OrganizerScoresPanel({
               const numBoards = Math.max(1, Math.min(10, parseInt(rawBoardsStr, 10) || 1));
               const numSlams = Math.max(0, parseInt(rawSlamsStr, 10) || 0);
 
-              if (isNaN(numScore) || numScore < 0) {
+              if (isNaN(numScore) || (numSlams === 0 && numScore < 0)) {
                 parsed.push({
                   userId: matchedUser.id,
                   dayNumber: rowDay,

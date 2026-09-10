@@ -55,10 +55,12 @@ export function parseBoardDrafts(boards: BoardDraft[]) {
   for (const b of boards) {
     const score = parseInt(b.score, 10);
     const slams = parseInt(b.slams || '0', 10);
-    if (!Number.isFinite(score) || score < 0) continue;
+    const validSlam = Number.isFinite(slams) && slams > 0 ? 1 : 0;
+    if (!Number.isFinite(score)) continue;
+    if (validSlam === 0 && score < 0) continue;
     filled.push({
       score,
-      slams: Number.isFinite(slams) && slams >= 0 ? slams : 0,
+      slams: validSlam,
     });
   }
   const total = filled.reduce((s, b) => s + b.score, 0);
@@ -213,9 +215,9 @@ export function BoardScoreModal({
 
             <View style={styles.boardsContainer}>
               {boards.map((board, idx) => {
+                const isSlam = board.slams === '1';
                 const boardScoreNum = parseInt(board.score, 10);
-                const isFilled = Number.isFinite(boardScoreNum) && boardScoreNum >= 0;
-                const slamValue = parseInt(board.slams || '0', 10);
+                const isFilled = Number.isFinite(boardScoreNum) && (isSlam || boardScoreNum >= 0);
 
                 return (
                   <View
@@ -252,7 +254,7 @@ export function BoardScoreModal({
                             style={styles.scoreStepperBtn}
                             onPress={() => {
                               const currentVal = parseInt(board.score, 10) || 0;
-                              const nextVal = Math.max(0, currentVal - 1);
+                              const nextVal = isSlam ? currentVal - 1 : Math.max(0, currentVal - 1);
                               update(idx, { score: String(nextVal) });
                             }}
                             accessibilityRole="button"
@@ -263,13 +265,27 @@ export function BoardScoreModal({
 
                           <View style={styles.inputWrap}>
                             <TextInput
-                              style={styles.scoreInput}
-                              keyboardType="number-pad"
+                              style={[
+                                styles.scoreInput,
+                                isSlam && boardScoreNum < 0 && { color: '#f87171' },
+                              ]}
+                              keyboardType={isSlam ? "numbers-and-punctuation" : "number-pad"}
                               value={board.score}
-                              onChangeText={(t) => update(idx, { score: t.replace(/[^\d]/g, '') })}
+                              onChangeText={(t) => {
+                                if (board.slams === '1') {
+                                  let sanitized = t.replace(/[^\d-]/g, '');
+                                  if (sanitized.includes('-')) {
+                                    const isNeg = sanitized.startsWith('-');
+                                    sanitized = (isNeg ? '-' : '') + sanitized.replace(/-/g, '');
+                                  }
+                                  update(idx, { score: sanitized });
+                                } else {
+                                  update(idx, { score: t.replace(/[^\d]/g, '') });
+                                }
+                              }}
                               placeholder="0"
                               placeholderTextColor="#475569"
-                              maxLength={4}
+                              maxLength={5}
                               selectTextOnFocus
                             />
                           </View>
@@ -314,7 +330,13 @@ export function BoardScoreModal({
                               styles.slamChip,
                               board.slams !== '1' && styles.slamChipActive,
                             ]}
-                            onPress={() => update(idx, { slams: '0' })}
+                            onPress={() => {
+                              const curScore = parseInt(board.score, 10) || 0;
+                              update(idx, {
+                                slams: '0',
+                                ...(curScore < 0 ? { score: '0' } : {}),
+                              });
+                            }}
                           >
                             <Text
                               style={[

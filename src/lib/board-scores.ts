@@ -31,10 +31,12 @@ export function normalizeBoards(
     for (const item of raw.slice(0, MAX_DAY_BOARDS)) {
       const score = typeof item?.score === 'number' ? item.score : parseInt(String(item?.score ?? ''), 10);
       const slams = typeof item?.slams === 'number' ? item.slams : parseInt(String(item?.slams ?? 0), 10);
-      if (!Number.isFinite(score) || score < 0 || !Number.isInteger(score)) continue;
+      const validSlam = Number.isFinite(slams) && slams > 0 ? 1 : 0;
+      if (!Number.isFinite(score) || !Number.isInteger(score)) continue;
+      if (validSlam === 0 && score < 0) continue;
       boards.push({
         score,
-        slams: Number.isFinite(slams) && slams >= 0 ? slams : 0,
+        slams: validSlam,
       });
     }
     if (boards.length > 1) return boards;
@@ -144,11 +146,14 @@ export function validateBoardsPayload(raw: unknown): { ok: true; boards: DayBoar
     const item = raw[i] || {};
     const score = typeof item.score === 'number' ? item.score : parseInt(String(item.score ?? ''), 10);
     const slams = typeof item.slams === 'number' ? item.slams : parseInt(String(item.slams ?? 0), 10);
-    if (!Number.isFinite(score) || score < 0 || !Number.isInteger(score)) {
-      return { ok: false, error: `Board ${i + 1} score must be a whole number of 0 or more.` };
+    if (!Number.isFinite(score) || !Number.isInteger(score)) {
+      return { ok: false, error: `Board ${i + 1} score must be a valid whole number.` };
     }
     if (slams !== 0 && slams !== 1) {
       return { ok: false, error: `Board ${i + 1} slam must be Yes (1) or No (0).` };
+    }
+    if (slams === 0 && score < 0) {
+      return { ok: false, error: `Board ${i + 1} score cannot be negative unless a slam is scored on that board.` };
     }
     boards.push({ score, slams });
   }
@@ -163,11 +168,14 @@ export function resolveScoreInput(score: unknown, slams: unknown, boards?: unkno
   }
   const parsedScore = typeof score === 'number' ? score : parseInt(String(score ?? ''), 10);
   const parsedSlams = typeof slams === 'number' ? slams : parseInt(String(slams ?? ''), 10);
-  if (!Number.isFinite(parsedScore) || parsedScore < 0 || !Number.isInteger(parsedScore)) {
-    return { ok: false as const, error: 'Score must be a whole number of 0 or more.' };
+  if (!Number.isFinite(parsedScore) || !Number.isInteger(parsedScore)) {
+    return { ok: false as const, error: 'Score must be a valid whole number.' };
   }
   if (!Number.isFinite(parsedSlams) || parsedSlams < 0 || !Number.isInteger(parsedSlams) || parsedSlams > 50) {
     return { ok: false as const, error: 'Slams must be a whole number between 0 and 50.' };
+  }
+  if (parsedSlams === 0 && parsedScore < 0) {
+    return { ok: false as const, error: 'Score cannot be negative unless a slam is scored.' };
   }
   return {
     ok: true as const,
@@ -186,8 +194,20 @@ export function draftToPayload(drafts: BoardDraft[]) {
 
 export function summaryToBoards(totalScore: number, boardCount: number, slams: number): DayBoardScore[] {
   const count = Math.max(1, Math.min(MAX_DAY_BOARDS, Math.floor(boardCount) || 1));
-  const score = Math.max(0, Math.floor(totalScore) || 0);
-  const totalSlams = Math.max(0, Math.floor(slams) || 0);
+  const score = Math.floor(totalScore) || 0;
+  const totalSlams = Math.max(0, Math.min(count, Math.floor(slams) || 0));
+
+  if (score < 0 && totalSlams > 0) {
+    const baseNegative = Math.floor(score / totalSlams);
+    const remainder = Math.abs(score % totalSlams);
+    const boards: DayBoardScore[] = [];
+    for (let i = 0; i < count; i++) {
+      const isSlam = i < totalSlams ? 1 : 0;
+      const boardScore = isSlam ? baseNegative - (i < remainder ? 1 : 0) : 0;
+      boards.push({ score: boardScore, slams: isSlam });
+    }
+    return boards;
+  }
 
   const baseScore = Math.floor(score / count);
   const remainder = score % count;

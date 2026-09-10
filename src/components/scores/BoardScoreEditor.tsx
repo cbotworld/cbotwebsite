@@ -51,9 +51,10 @@ export function BoardScoreEditor({
       onChange([emptyBoardDraft()]);
       return;
     }
-    const scoreNum = Math.max(0, parseInt(s, 10) || 0);
-    const countNum = Math.max(1, Math.min(MAX_DAY_BOARDS, parseInt(nextCountStr, 10) || 1));
     const slamsNum = Math.max(0, parseInt(nextSlamsStr, 10) || 0);
+    const parsedS = parseInt(s, 10) || 0;
+    const scoreNum = slamsNum > 0 ? parsedS : Math.max(0, parsedS);
+    const countNum = Math.max(1, Math.min(MAX_DAY_BOARDS, parseInt(nextCountStr, 10) || 1));
     onChange(summaryToDraft(scoreNum, countNum, slamsNum));
   };
 
@@ -104,7 +105,8 @@ export function BoardScoreEditor({
                   disabled={disabled}
                   onClick={() => {
                     const cur = parseInt(currentTotalScore, 10) || 0;
-                    const next = Math.max(0, cur - 1);
+                    const slamsNum = parseInt(currentSlams, 10) || 0;
+                    const next = slamsNum > 0 ? cur - 1 : Math.max(0, cur - 1);
                     handleSummaryChange(String(next), currentBoardCount, currentSlams);
                   }}
                   className="h-9 w-9 text-base font-black shrink-0 border-amber-500/30 hover:bg-amber-500/20"
@@ -113,7 +115,6 @@ export function BoardScoreEditor({
                 </Button>
                 <Input
                   type="number"
-                  min={0}
                   disabled={disabled}
                   value={currentTotalScore}
                   onChange={(e) => handleSummaryChange(e.target.value, currentBoardCount, currentSlams)}
@@ -291,7 +292,8 @@ export function BoardScoreEditor({
                       disabled={disabled}
                       onClick={() => {
                         const currentVal = parseInt(board.score, 10) || 0;
-                        const nextVal = Math.max(0, currentVal - 1);
+                        const isSlam = board.slams === '1';
+                        const nextVal = isSlam ? currentVal - 1 : Math.max(0, currentVal - 1);
                         const next = [...boards];
                         next[idx] = { ...board, score: String(nextVal) };
                         onChange(next);
@@ -302,7 +304,6 @@ export function BoardScoreEditor({
                     </Button>
                     <Input
                       type="number"
-                      min={0}
                       disabled={disabled}
                       value={board.score}
                       onChange={(e) => {
@@ -360,7 +361,12 @@ export function BoardScoreEditor({
                       disabled={disabled}
                       onClick={() => {
                         const next = [...boards];
-                        next[idx] = { ...board, slams: '0' };
+                        const curScore = parseInt(board.score, 10) || 0;
+                        next[idx] = {
+                          ...board,
+                          slams: '0',
+                          score: curScore < 0 ? '0' : board.score,
+                        };
                         onChange(next);
                       }}
                       className={`flex-1 h-full rounded-lg text-xs font-black transition-all uppercase ${
