@@ -631,7 +631,6 @@ export default function OrganizerGradingPanel({
     leftovers: PlayerLite[];
   } | null>(null);
   const [exportingJpeg, setExportingJpeg] = React.useState(false);
-  const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   const participantMap = React.useMemo(() => {
     return new Map<string, EnrolledParticipantLite>((participants || []).map((p) => [p.userId, p]));
@@ -1040,20 +1039,23 @@ export default function OrganizerGradingPanel({
     URL.revokeObjectURL(url);
   };
 
+  const posterRef = React.useRef<HTMLDivElement>(null);
+
   const handleDownloadGradingJpeg = async () => {
-    if (!gridContainerRef.current) {
+    if (!posterRef.current || !grid || grid.columns.length === 0) {
       alert('Grading grid is not ready for image export.');
       return;
     }
     setExportingJpeg(true);
     try {
-      const element = gridContainerRef.current;
+      // Small pause to ensure layout has painted
+      await new Promise((r) => setTimeout(r, 150));
+      const element = posterRef.current;
       const canvas = await html2canvas(element, {
-        backgroundColor: '#0a0d14',
+        backgroundColor: '#07090e',
         scale: 2,
         useCORS: true,
         logging: false,
-        windowWidth: element.scrollWidth + 40,
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -1199,7 +1201,7 @@ export default function OrganizerGradingPanel({
             Loading grading sheet…
           </div>
         ) : (
-          <div ref={gridContainerRef} className="overflow-x-auto bg-[#0a0d14] p-1">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="bg-gradient-to-r from-violet-600/20 to-amber-500/10">
@@ -1413,6 +1415,341 @@ export default function OrganizerGradingPanel({
           </div>
         )}
       </Dialog>
+
+      {/* Hidden High-Definition Export Poster for clean JPEG generation */}
+      {grid && (
+        <GradingExportPoster
+          editionTitle={editionTitle}
+          grid={grid}
+          gradableUsers={gradableUsers}
+          participantMap={participantMap}
+          stats={stats}
+          posterRef={posterRef}
+        />
+      )}
     </Card>
+  );
+}
+
+function GradingExportPoster({
+  editionTitle,
+  grid,
+  gradableUsers,
+  participantMap,
+  stats,
+  posterRef,
+}: {
+  editionTitle?: string;
+  grid: GradingGrid;
+  gradableUsers: PlayerLite[];
+  participantMap: Map<string, EnrolledParticipantLite>;
+  stats: { assigned: number; capacity: number; unassignedPool: number };
+  posterRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const colWidth = 230;
+  const totalCols = grid.columns.length;
+  const minWidth = Math.max(1050, totalCols * colWidth + 80);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        zIndex: -9999,
+        opacity: 0.01,
+        pointerEvents: 'none',
+        overflow: 'visible',
+      }}
+      aria-hidden="true"
+    >
+      <div
+        ref={posterRef}
+        style={{
+          width: `${minWidth}px`,
+          backgroundColor: '#07090e',
+          color: '#f8fafc',
+          padding: '28px 32px',
+          boxSizing: 'border-box',
+          fontFamily:
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        }}
+      >
+        {/* Header Banner */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px',
+            background: 'linear-gradient(90deg, rgba(88,28,135,0.35) 0%, rgba(217,119,6,0.18) 100%)',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.15em', color: '#fbbf24', textTransform: 'uppercase' }}>
+              CBOT TOURNAMENT • PLAYER GRADING MATRIX
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: '900', color: '#ffffff', marginTop: '3px', letterSpacing: '-0.02em' }}>
+              {editionTitle || 'Player Grading'}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ background: 'rgba(124, 58, 237, 0.25)', border: '1px solid rgba(139, 92, 246, 0.45)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '9px', fontWeight: '700', color: '#a78bfa', textTransform: 'uppercase' }}>Grades</div>
+              <div style={{ fontSize: '15px', fontWeight: '900', color: '#ede9fe' }}>{totalCols}</div>
+            </div>
+            <div style={{ background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '9px', fontWeight: '700', color: '#6ee7b7', textTransform: 'uppercase' }}>Filled Cells</div>
+              <div style={{ fontSize: '15px', fontWeight: '900', color: '#ecfdf5' }}>{stats.assigned} / {stats.capacity}</div>
+            </div>
+            <div style={{ background: 'rgba(217, 119, 6, 0.2)', border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: '8px', padding: '6px 14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '9px', fontWeight: '700', color: '#fcd34d', textTransform: 'uppercase' }}>Unassigned</div>
+              <div style={{ fontSize: '15px', fontWeight: '900', color: '#fffbeb' }}>{stats.unassignedPool}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Grid Table */}
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: '8px',
+            tableLayout: 'fixed',
+          }}
+        >
+          <thead>
+            <tr>
+              <th
+                style={{
+                  width: '44px',
+                  padding: '10px 4px',
+                  textAlign: 'center',
+                  color: '#64748b',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  background: 'transparent',
+                }}
+              >
+                #
+              </th>
+              {grid.columns.map((col) => {
+                const colAssignedPlayers = Array.from({ length: grid.rowCount }, (_, rIdx) => {
+                  const uId = grid.cells[cellKey(col.id, rIdx)];
+                  return uId ? gradableUsers.find((u) => u.id === uId) : null;
+                }).filter(Boolean) as PlayerLite[];
+
+                const colAverages = colAssignedPlayers
+                  .map((p) => getGradeAverageForUser(p, participantMap))
+                  .filter((a): a is number => a !== null);
+
+                const colAvg = colAverages.length > 0
+                  ? (colAverages.reduce((sum, a) => sum + a, 0) / colAverages.length).toFixed(1)
+                  : null;
+
+                const targetSummary = formatColumnTargetSummary(col, grid.rowCount);
+
+                return (
+                  <th
+                    key={col.id}
+                    style={{
+                      width: `${colWidth}px`,
+                      background: 'linear-gradient(180deg, #1e1b4b 0%, #0f172a 100%)',
+                      border: '1px solid #4338ca',
+                      borderRadius: '10px',
+                      padding: '12px 10px',
+                      textAlign: 'center',
+                      verticalAlign: 'top',
+                    }}
+                  >
+                    <div style={{ fontSize: '15px', fontWeight: '900', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {col.label}
+                    </div>
+
+                    {colAvg !== null ? (
+                      <div
+                        style={{
+                          display: 'inline-block',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          color: '#fef08a',
+                          background: 'rgba(161, 98, 7, 0.4)',
+                          border: '1px solid rgba(234, 179, 8, 0.5)',
+                          borderRadius: '6px',
+                          padding: '3px 10px',
+                          marginTop: '6px',
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        G.Avg: {colAvg}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '10px', color: '#64748b', marginTop: '6px' }}>No Avg</div>
+                    )}
+
+                    {targetSummary ? (
+                      <div
+                        style={{
+                          fontSize: '10.5px',
+                          fontWeight: '700',
+                          color: '#c4b5fd',
+                          background: 'rgba(91, 33, 182, 0.25)',
+                          border: '1px solid rgba(139, 92, 246, 0.35)',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          marginTop: '6px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        Target: {targetSummary}
+                      </div>
+                    ) : null}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: grid.rowCount }, (_, rowIndex) => (
+              <tr key={rowIndex}>
+                <td
+                  style={{
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
+                    color: '#64748b',
+                    fontSize: '12px',
+                    fontWeight: '900',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {rowIndex + 1}
+                </td>
+                {grid.columns.map((col) => {
+                  const key = cellKey(col.id, rowIndex);
+                  const userId = grid.cells[key] || null;
+                  const player = userId ? gradableUsers.find((u) => u.id === userId) : null;
+                  const cellTarget = resolveTargetForCell(col, rowIndex);
+                  const targetToDisplay = cellTarget !== null ? cellTarget : player?.target ?? null;
+                  const avg = player ? getGradeAverageForUser(player, participantMap) : null;
+
+                  if (player) {
+                    return (
+                      <td
+                        key={col.id}
+                        style={{
+                          background: '#0d1527',
+                          border: '1px solid #1e2d4a',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          verticalAlign: 'top',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '12.5px',
+                            fontWeight: '800',
+                            color: '#ffffff',
+                            lineHeight: '1.3',
+                            marginBottom: '4px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {playerLabel(player)}
+                        </div>
+                        {player.username ? (
+                          <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '6px' }}>
+                            @{player.username}
+                          </div>
+                        ) : null}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {avg !== null ? (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                color: '#fde047',
+                                background: 'rgba(161, 98, 7, 0.35)',
+                                border: '1px solid rgba(234, 179, 8, 0.45)',
+                                borderRadius: '4px',
+                                padding: '2px 6px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              G.Avg {avg.toFixed(1)}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '9.5px', color: '#64748b' }}>No G.Avg</span>
+                          )}
+
+                          {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                color: '#c4b5fd',
+                                background: 'rgba(91, 33, 182, 0.35)',
+                                border: '1px solid rgba(139, 92, 246, 0.45)',
+                                borderRadius: '4px',
+                                padding: '2px 6px',
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              Target {targetToDisplay}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                    );
+                  }
+
+                  return (
+                    <td
+                      key={col.id}
+                      style={{
+                        background: '#070b14',
+                        border: '1px dashed #1e293b',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <span style={{ fontSize: '11px', color: '#475569', fontWeight: '600' }}>
+                        {cellTarget !== null ? `→ Target ${cellTarget}` : '—'}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Footer */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderTop: '1px solid #1e293b',
+            paddingTop: '14px',
+            marginTop: '18px',
+            fontSize: '11px',
+            color: '#64748b',
+          }}
+        >
+          <span>CBOT World • Official Player Grading Sheet</span>
+          <span>Generated: {new Date().toLocaleString('en-GB')}</span>
+        </div>
+      </div>
+    </div>
   );
 }
