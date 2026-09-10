@@ -41,15 +41,15 @@ export async function GET(request: NextRequest) {
       ? (process.env.IOS_STORE_URL || 'https://apps.apple.com/app/id6742533036')
       : (process.env.ANDROID_STORE_URL || 'https://play.google.com/store/apps/details?id=com.cbotworld');
 
-    let targetVersion = envVersion || dbVersion || '1.3';
-    let targetBuild = envBuild || dbBuild || '30';
+    let targetVersion = envVersion || dbVersion || '';
+    let targetBuild = envBuild || dbBuild || '';
 
-    // Android extra fallback: Try Play Store scraping if env/db not higher
-    if (!isIos) {
+    // Android fallback: Only try Play Store scraping if neither env nor db version was configured
+    if (!isIos && !targetVersion) {
       try {
         const play = await getPlayStoreAndroidVersion();
         if (play.storeUrl) storeUrl = play.storeUrl;
-        if (play.latestVersion && compareAppVersions(play.latestVersion, targetVersion) > 0) {
+        if (play.latestVersion) {
           targetVersion = play.latestVersion;
         }
       } catch {
@@ -57,9 +57,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (!targetVersion) targetVersion = '1.3';
+    if (!targetBuild) targetBuild = '30';
+
     const numericTargetBuild = parseInt(targetBuild, 10);
     const numericCurrentBuild = parseInt(currentBuild, 10);
-    const forceUpdateEnabled = (await getSettingValue('cbot_enable_update_popup')) === 'true';
+    const forceUpdateEnabled =
+      process.env.ENABLE_UPDATE_POPUP === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_UPDATE_POPUP === 'true' ||
+      (await getSettingValue('cbot_enable_update_popup')) === 'true';
     let updateAvailable = false;
     if (forceUpdateEnabled) {
       if (currentVersion && targetVersion) {

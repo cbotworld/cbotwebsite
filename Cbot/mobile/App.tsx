@@ -269,6 +269,25 @@ export default function App() {
     })();
   }, []);
 
+function isClientOutdated(curVer: string, curBld: string, latVer?: string | null, latBld?: string | null): boolean {
+  if (!latVer) return false;
+  const parseVer = (v: string) => v.replace(/^v/i, '').split(/[^\d]+/).filter(Boolean).map(n => parseInt(n, 10) || 0);
+  const pa = parseVer(latVer);
+  const pb = parseVer(curVer);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff > 0) return true;
+    if (diff < 0) return false;
+  }
+  const bLatest = parseInt(latBld || '0', 10);
+  const bCurrent = parseInt(curBld || '0', 10);
+  if (!isNaN(bLatest) && !isNaN(bCurrent) && bLatest > 0 && bCurrent > 0) {
+    return bLatest > bCurrent;
+  }
+  return false;
+}
+
   useEffect(() => {
     if (!ready) return;
     if (Constants.appOwnership === "expo") return;
@@ -284,7 +303,11 @@ export default function App() {
       platform: Platform.OS,
     })
       .then((res) => {
-        if (res.updateAvailable && res.latestVersion) {
+        if (
+          res.updateAvailable &&
+          res.latestVersion &&
+          isClientOutdated(currentVersion, currentBuild, res.latestVersion, res.latestBuild)
+        ) {
           const formattedCurrent = res.currentBuild
             ? `v${res.currentVersion || currentVersion} (build ${res.currentBuild})`
             : `v${res.currentVersion || currentVersion}`;
