@@ -4003,7 +4003,7 @@ function TeamsExportPoster({
   }, [teams, playerGradeMap]);
 
   const maxMembers = Math.max(1, ...processedTeams.map((t) => t.sortedMembers.length));
-  const colWidth = 280;
+  const colWidth = 320;
   const totalCols = processedTeams.length;
   const minWidth = Math.max(1200, totalCols * colWidth + (totalCols + 1) * 10 + 80);
   const totalPlayers = processedTeams.reduce((sum, t) => sum + t.sortedMembers.length, 0);
@@ -4152,7 +4152,7 @@ function TeamsExportPoster({
                       background: 'linear-gradient(180deg, #1e1b4b 0%, #111827 100%)',
                       border: '2px solid #f59e0b',
                       borderRadius: '14px',
-                      padding: '16px 12px',
+                      padding: '18px 12px',
                       textAlign: 'center',
                       verticalAlign: 'top',
                     }}
@@ -4163,8 +4163,8 @@ function TeamsExportPoster({
                         src={team.logo}
                         alt={team.name}
                         style={{
-                          width: '56px',
-                          height: '56px',
+                          width: '60px',
+                          height: '60px',
                           borderRadius: '50%',
                           objectFit: 'cover',
                           margin: '0 auto 10px',
@@ -4176,8 +4176,8 @@ function TeamsExportPoster({
                     ) : (
                       <div
                         style={{
-                          width: '56px',
-                          height: '56px',
+                          width: '60px',
+                          height: '60px',
                           borderRadius: '50%',
                           background: 'rgba(245, 158, 11, 0.25)',
                           border: '2px solid rgba(245, 158, 11, 0.5)',
@@ -4185,7 +4185,7 @@ function TeamsExportPoster({
                           alignItems: 'center',
                           justifyContent: 'center',
                           margin: '0 auto 10px',
-                          fontSize: '18px',
+                          fontSize: '20px',
                           fontWeight: '900',
                           color: '#fbbf24',
                         }}
@@ -4196,7 +4196,7 @@ function TeamsExportPoster({
 
                     <div
                       style={{
-                        fontSize: '18px',
+                        fontSize: '21px',
                         fontWeight: '900',
                         color: '#fbbf24',
                         textTransform: 'uppercase',
@@ -4210,7 +4210,7 @@ function TeamsExportPoster({
 
                     <div
                       style={{
-                        fontSize: '12px',
+                        fontSize: '13.5px',
                         fontWeight: '800',
                         color: '#a78bfa',
                         marginTop: '4px',
@@ -4224,27 +4224,25 @@ function TeamsExportPoster({
                     {captain ? (
                       <div
                         style={{
-                          fontSize: '12px',
+                          fontSize: '14px',
                           fontWeight: '900',
-                          color: '#fbbf24',
+                          color: '#fde047',
                           marginTop: '6px',
-                          maxWidth: '100%',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          lineHeight: '1.3',
+                          wordBreak: 'break-word',
                         }}
                       >
                         👑 {isCaptSpoc ? 'SPOC: ' : 'CAPT: '}{captain.name || captain.username}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>
                         No Captain
                       </div>
                     )}
 
                     <div
                       style={{
-                        fontSize: '11px',
+                        fontSize: '12.5px',
                         fontWeight: '800',
                         color: '#6ee7b7',
                         marginTop: '4px',
@@ -4281,7 +4279,7 @@ function TeamsExportPoster({
                           background: '#111827',
                           border: isCaptain ? '2px solid #eab308' : '2px solid #374151',
                           borderRadius: '12px',
-                          padding: '12px 14px',
+                          padding: '14px 14px',
                           textAlign: 'center',
                           verticalAlign: 'middle',
                         }}
@@ -4292,9 +4290,9 @@ function TeamsExportPoster({
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px',
+                            gap: '5px',
                             textAlign: 'center',
-                            minHeight: '76px',
+                            minHeight: '82px',
                           }}
                         >
                           <div
@@ -4308,7 +4306,7 @@ function TeamsExportPoster({
                           >
                             <span
                               style={{
-                                fontSize: '16.5px',
+                                fontSize: '18px',
                                 fontWeight: '900',
                                 color: '#ffffff',
                                 lineHeight: '1.3',
@@ -4321,9 +4319,9 @@ function TeamsExportPoster({
                             {isCaptain ? (
                               <span
                                 style={{
-                                  fontSize: '10.5px',
+                                  fontSize: '12px',
                                   fontWeight: '900',
-                                  color: '#fbbf24',
+                                  color: '#fde047',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
                                 }}
@@ -4333,9 +4331,9 @@ function TeamsExportPoster({
                             ) : isSpoc ? (
                               <span
                                 style={{
-                                  fontSize: '10.5px',
+                                  fontSize: '12px',
                                   fontWeight: '900',
-                                  color: '#a78bfa',
+                                  color: '#c4b5fd',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
                                 }}
@@ -4348,8 +4346,8 @@ function TeamsExportPoster({
                           {u?.username || m.user?.username ? (
                             <div
                               style={{
-                                fontSize: '12px',
-                                fontWeight: '600',
+                                fontSize: '13.5px',
+                                fontWeight: '700',
                                 color: '#94a3b8',
                                 fontFamily: 'monospace',
                               }}
@@ -4363,10 +4361,10 @@ function TeamsExportPoster({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '6px',
+                              gap: '8px',
                               flexWrap: 'wrap',
                               marginTop: '2px',
-                              fontSize: '12.5px',
+                              fontSize: '14px',
                               fontWeight: '900',
                             }}
                           >
@@ -4377,17 +4375,17 @@ function TeamsExportPoster({
                             ) : null}
 
                             {grade && (gAvg !== null || (target !== null && Number(target) > 0)) ? (
-                              <span style={{ color: '#475569' }}>•</span>
+                              <span style={{ color: '#64748b' }}>•</span>
                             ) : null}
 
                             {gAvg !== null ? (
-                              <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>
+                              <span style={{ color: '#fde047', fontFamily: 'monospace' }}>
                                 G.Avg {Number(gAvg).toFixed(1)}
                               </span>
                             ) : null}
 
                             {gAvg !== null && target !== null && Number(target) > 0 ? (
-                              <span style={{ color: '#475569' }}>•</span>
+                              <span style={{ color: '#64748b' }}>•</span>
                             ) : null}
 
                             {target !== null && Number(target) > 0 ? (
@@ -4408,7 +4406,7 @@ function TeamsExportPoster({
                         background: '#0a0e17',
                         border: '2px dashed #1e293b',
                         borderRadius: '12px',
-                        padding: '12px 14px',
+                        padding: '14px 14px',
                         textAlign: 'center',
                         verticalAlign: 'middle',
                       }}
@@ -4418,10 +4416,10 @@ function TeamsExportPoster({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          minHeight: '76px',
+                          minHeight: '82px',
                         }}
                       >
-                        <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>—</span>
+                        <span style={{ fontSize: '14px', color: '#475569', fontWeight: '700' }}>—</span>
                       </div>
                     </td>
                   );

@@ -1446,7 +1446,7 @@ function GradingExportPoster({
   stats: { assigned: number; capacity: number; unassignedPool: number };
   posterRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const colWidth = 280;
+  const colWidth = 320;
   const totalCols = grid.columns.length;
   const minWidth = Math.max(1200, totalCols * colWidth + (totalCols + 1) * 10 + 80);
 
@@ -1605,14 +1605,14 @@ function GradingExportPoster({
                       background: 'linear-gradient(180deg, #1e1b4b 0%, #111827 100%)',
                       border: '2px solid #6366f1',
                       borderRadius: '14px',
-                      padding: '16px 12px',
+                      padding: '18px 12px',
                       textAlign: 'center',
                       verticalAlign: 'top',
                     }}
                   >
                     <div
                       style={{
-                        fontSize: '20px',
+                        fontSize: '24px',
                         fontWeight: '900',
                         color: '#fbbf24',
                         textTransform: 'uppercase',
@@ -1625,9 +1625,9 @@ function GradingExportPoster({
                     {colAvg !== null ? (
                       <div
                         style={{
-                          fontSize: '13.5px',
+                          fontSize: '15px',
                           fontWeight: '900',
-                          color: '#fbbf24',
+                          color: '#fde047',
                           marginTop: '6px',
                           fontFamily: 'monospace',
                         }}
@@ -1635,15 +1635,15 @@ function GradingExportPoster({
                         G.Avg: {colAvg}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px' }}>No Avg</div>
+                      <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '6px' }}>No Avg</div>
                     )}
 
                     {targetSummary ? (
                       <div
                         style={{
-                          fontSize: '12.5px',
+                          fontSize: '13.5px',
                           fontWeight: '800',
-                          color: '#a78bfa',
+                          color: '#c4b5fd',
                           marginTop: '4px',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
@@ -1677,7 +1677,7 @@ function GradingExportPoster({
                           background: '#111827',
                           border: '2px solid #374151',
                           borderRadius: '12px',
-                          padding: '12px 14px',
+                          padding: '14px 14px',
                           textAlign: 'center',
                           verticalAlign: 'middle',
                         }}
@@ -1688,14 +1688,14 @@ function GradingExportPoster({
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '4px',
+                            gap: '5px',
                             textAlign: 'center',
-                            minHeight: '76px',
+                            minHeight: '82px',
                           }}
                         >
                           <div
                             style={{
-                              fontSize: '16.5px',
+                              fontSize: '18px',
                               fontWeight: '900',
                               color: '#ffffff',
                               lineHeight: '1.3',
@@ -1708,8 +1708,8 @@ function GradingExportPoster({
                           {player.username ? (
                             <div
                               style={{
-                                fontSize: '12px',
-                                fontWeight: '600',
+                                fontSize: '13.5px',
+                                fontWeight: '700',
                                 color: '#94a3b8',
                                 fontFamily: 'monospace',
                               }}
@@ -1722,25 +1722,25 @@ function GradingExportPoster({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '6px',
+                              gap: '8px',
                               flexWrap: 'wrap',
                               marginTop: '2px',
-                              fontSize: '12.5px',
+                              fontSize: '14px',
                               fontWeight: '900',
                             }}
                           >
                             {avg !== null ? (
-                              <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>
+                              <span style={{ color: '#fde047', fontFamily: 'monospace' }}>
                                 G.Avg {avg.toFixed(1)}
                               </span>
                             ) : (
-                              <span style={{ color: '#64748b', fontSize: '11px' }}>
+                              <span style={{ color: '#64748b', fontSize: '12px' }}>
                                 No G.Avg
                               </span>
                             )}
 
                             {avg !== null && targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
-                              <span style={{ color: '#475569' }}>•</span>
+                              <span style={{ color: '#64748b' }}>•</span>
                             ) : null}
 
                             {targetToDisplay !== null && Number(targetToDisplay) > 0 ? (
@@ -1761,7 +1761,7 @@ function GradingExportPoster({
                         background: '#0a0e17',
                         border: '2px dashed #1e293b',
                         borderRadius: '12px',
-                        padding: '12px 14px',
+                        padding: '14px 14px',
                         textAlign: 'center',
                         verticalAlign: 'middle',
                       }}
@@ -1771,10 +1771,10 @@ function GradingExportPoster({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          minHeight: '76px',
+                          minHeight: '82px',
                         }}
                       >
-                        <span style={{ fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                        <span style={{ fontSize: '14px', color: '#475569', fontWeight: '700' }}>
                           {cellTarget !== null ? `→ Target ${cellTarget}` : '—'}
                         </span>
                       </div>
