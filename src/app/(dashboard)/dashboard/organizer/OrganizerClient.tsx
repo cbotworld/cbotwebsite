@@ -1542,7 +1542,22 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       const captain = usersList.find(
         (u: any) => u.id === team.captainId || (team.captain?.id && u.id === team.captain.id)
       );
-      const members = team.members || [];
+      const members = Array.isArray(team.members) ? [...team.members] : [];
+      members.sort((a: any, b: any) => {
+        const uIdA = a.userId || a.user?.id || a.id;
+        const uIdB = b.userId || b.user?.id || b.id;
+        const gradeA = (uIdA && playerGradeMap[uIdA]) || a.grade || a.category || '';
+        const gradeB = (uIdB && playerGradeMap[uIdB]) || b.grade || b.category || '';
+        const matchA = String(gradeA).match(/(\d+)/);
+        const matchB = String(gradeB).match(/(\d+)/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 9999;
+        const numB = matchB ? parseInt(matchB[1], 10) : 9999;
+        if (numA !== numB) return numA - numB;
+
+        const nameA = a.user?.name || a.name || '';
+        const nameB = b.user?.name || b.name || '';
+        return nameA.localeCompare(nameB);
+      });
       if (members.length === 0) {
         rows.push([
           team.name,
@@ -3454,11 +3469,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 usersList
                   .filter((usr) => newTeamPlayerIds.includes(usr.id))
                   .sort((a, b) => {
-                    const aSpoc = !!playerSpocMap[a.id];
-                    const bSpoc = !!playerSpocMap[b.id];
-                    if (aSpoc && !bSpoc) return -1;
-                    if (!aSpoc && bSpoc) return 1;
-
                     const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
                     const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
                     const rankA = getGradeRank(gradeA);
@@ -3686,11 +3696,6 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 usersList
                   .filter((usr) => selectedPlayerIds.includes(usr.id))
                   .sort((a, b) => {
-                    const aSpoc = !!playerSpocMap[a.id];
-                    const bSpoc = !!playerSpocMap[b.id];
-                    if (aSpoc && !bSpoc) return -1;
-                    if (!aSpoc && bSpoc) return 1;
-
                     const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
                     const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
                     const rankA = getGradeRank(gradeA);
@@ -3968,24 +3973,14 @@ function TeamsExportPoster({
 }) {
   const byId = React.useMemo(() => new Map(usersList.map((u: any) => [u.id, u])), [usersList]);
 
-  // Sort members in each team: Captain/SPOC first, then by Grade G1..Gn
+  // Sort members in each team: Pure Grade sequence G1..Gn irrespective of SPOC/Captain
   const processedTeams = React.useMemo(() => {
     return teams.map((t) => {
       const members = Array.isArray(t.members) ? [...t.members] : [];
-      const captainId = t.captainId || t.captain?.id;
 
       members.sort((a, b) => {
         const uIdA = a.userId || a.user?.id || a.id;
         const uIdB = b.userId || b.user?.id || b.id;
-        const isCaptA = uIdA && uIdA === captainId;
-        const isCaptB = uIdB && uIdB === captainId;
-        if (isCaptA && !isCaptB) return -1;
-        if (!isCaptA && isCaptB) return 1;
-
-        const isSpocA = uIdA && !!playerSpocMap[uIdA];
-        const isSpocB = uIdB && !!playerSpocMap[uIdB];
-        if (isSpocA && !isSpocB) return -1;
-        if (!isSpocA && isSpocB) return 1;
 
         const gradeA = (uIdA && playerGradeMap[uIdA]) || a.grade || a.category || '';
         const gradeB = (uIdB && playerGradeMap[uIdB]) || b.grade || b.category || '';
@@ -4005,7 +4000,7 @@ function TeamsExportPoster({
         sortedMembers: members,
       };
     });
-  }, [teams, playerGradeMap, playerSpocMap]);
+  }, [teams, playerGradeMap]);
 
   const maxMembers = Math.max(1, ...processedTeams.map((t) => t.sortedMembers.length));
   const colWidth = 280;
