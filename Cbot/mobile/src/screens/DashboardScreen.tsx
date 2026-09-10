@@ -21,6 +21,7 @@ import {
   boardsFromSaved,
   parseBoardDrafts,
 } from '../components/BoardScoreModal';
+import { GoLivePromptModal } from '../components/GoLivePromptModal';
 import { PoweredByFooter } from '../components/PoweredByFooter';
 import { playerScoreUntilNote, SCORE_EDIT_PLAYER_CLOSED } from '../score-edit-policy';
 import {
@@ -202,20 +203,9 @@ export function DashboardScreen({ navigation }: Props) {
     openVideosForMatch(match);
   };
 
-  const onGoLive = (match: MatchDetails, mode: 'match' | 'practice' | 'tiebreak' = 'match') => {
-    if (mode === 'match') {
-      const liveNow = match.status === 'LIVE' || match.dayNumber === currentDay;
-      if (!liveNow && !match.canGoLive) {
-        showWarn(
-          `${match.label} Locked`,
-          match.lockedReason ||
-            (match.prerequisiteDay
-              ? `Go live on Day ${match.prerequisiteDay} and save at least one YouTube video first.`
-              : 'This day is not open yet.'),
-        );
-        return;
-      }
-    }
+  const [promptMatch, setPromptMatch] = useState<MatchDetails | null>(null);
+
+  const startStreamingMatch = (match: MatchDetails, mode: 'match' | 'practice' | 'tiebreak' = 'match') => {
     const suffix = mode === 'practice' ? ' Practice' : mode === 'tiebreak' ? ' Tie Breaker' : '';
     navigation.navigate('Live', {
       name: playerName,
@@ -230,6 +220,26 @@ export function DashboardScreen({ navigation }: Props) {
       endIso: mode === 'match' ? match.endIso || undefined : undefined,
       playMode: mode,
     });
+  };
+
+  const onGoLive = (match: MatchDetails, mode: 'match' | 'practice' | 'tiebreak' = 'match') => {
+    if (mode === 'match') {
+      const liveNow = match.status === 'LIVE' || match.dayNumber === currentDay;
+      if (!liveNow && !match.canGoLive) {
+        showWarn(
+          `${match.label} Locked`,
+          match.lockedReason ||
+            (match.prerequisiteDay
+              ? `Go live on Day ${match.prerequisiteDay} and save at least one YouTube video first.`
+              : 'This day is not open yet.'),
+        );
+        return;
+      }
+      // Show description / instructions modal first
+      setPromptMatch(match);
+    } else {
+      startStreamingMatch(match, mode);
+    }
   };
 
   return (
@@ -556,6 +566,18 @@ export function DashboardScreen({ navigation }: Props) {
         onClose={() => setBoardDay(null)}
         onSave={(boards) => {
           if (boardDay != null) void saveDayScore(boardDay, boards);
+        }}
+      />
+      <GoLivePromptModal
+        visible={promptMatch != null}
+        match={promptMatch}
+        onClose={() => setPromptMatch(null)}
+        onConfirmGoLive={() => {
+          if (promptMatch) {
+            const m = promptMatch;
+            setPromptMatch(null);
+            startStreamingMatch(m, 'match');
+          }
         }}
       />
       {dialog}

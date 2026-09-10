@@ -34,6 +34,9 @@ export type MatchDetails = {
   timeRange: string;
   editionTitle: string;
   editionNumber: number;
+  editionDescription?: string;
+  editionRules?: string;
+  editionTheme?: string;
   teamName: string;
   teamTag?: string;
   teamLogo: string | null;
@@ -533,6 +536,9 @@ export async function fetchPlayerSchedule(opts?: {
     timeRange: day.timeRange || '',
     editionTitle: day.editionTitle || data.team?.name || 'CBOT Live Edition',
     editionNumber: day.editionNumber ?? data.editionNumber ?? 0,
+    editionDescription: day.editionDescription || '',
+    editionRules: day.editionRules || '',
+    editionTheme: day.editionTheme || '',
     teamName: day.teamName,
     teamTag: day.teamTag,
     teamLogo: day.teamLogo || data.team?.logo || null,

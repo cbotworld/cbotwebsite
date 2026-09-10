@@ -373,6 +373,9 @@ export async function getPlayerMatchSchedule(
         tableNumber: 1,
         editionTitle: edition?.title || fallbackEditionTitle,
         editionNumber: edition?.number ?? 0,
+        editionDescription: edition?.themeDescription || edition?.theme || edition?.rules || '',
+        editionRules: edition?.rules || '',
+        editionTheme: edition?.theme || '',
         myEvent,
       };
     });
