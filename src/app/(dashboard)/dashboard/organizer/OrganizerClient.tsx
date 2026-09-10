@@ -4224,25 +4224,30 @@ function TeamsExportPoster({
                     {captain ? (
                       <div
                         style={{
-                          display: 'inline-block',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '26px',
+                          lineHeight: '1',
                           fontSize: '11.5px',
                           fontWeight: '900',
                           color: '#fef08a',
                           background: '#854d0e',
                           border: '1.5px solid #eab308',
                           borderRadius: '8px',
-                          padding: '3px 10px',
+                          padding: '0 10px',
                           marginTop: '8px',
                           maxWidth: '100%',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
+                          boxSizing: 'border-box',
                         }}
                       >
                         👑 {isCaptSpoc ? 'SPOC: ' : 'CAPT: '}{captain.name || captain.username}
                       </div>
                     ) : (
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         No Captain
                       </div>
                     )}
@@ -4326,15 +4331,21 @@ function TeamsExportPoster({
                             {isCaptain ? (
                               <span
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '20px',
+                                  lineHeight: '1',
                                   fontSize: '10px',
                                   fontWeight: '900',
                                   color: '#fef08a',
                                   background: '#854d0e',
                                   border: '1px solid #eab308',
                                   borderRadius: '4px',
-                                  padding: '2px 7px',
+                                  padding: '0 7px',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 {isSpoc ? '👑 SPOC' : '👑 CAPT'}
@@ -4342,15 +4353,21 @@ function TeamsExportPoster({
                             ) : isSpoc ? (
                               <span
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '20px',
+                                  lineHeight: '1',
                                   fontSize: '10px',
                                   fontWeight: '900',
                                   color: '#e0e7ff',
                                   background: '#4c1d95',
                                   border: '1px solid #8b5cf6',
                                   borderRadius: '4px',
-                                  padding: '2px 7px',
+                                  padding: '0 7px',
                                   whiteSpace: 'nowrap',
                                   flexShrink: 0,
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 ⭐ SPOC
@@ -4384,14 +4401,20 @@ function TeamsExportPoster({
                             {grade ? (
                               <span
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '24px',
+                                  lineHeight: '1',
                                   fontSize: '12px',
                                   fontWeight: '900',
                                   color: '#e0e7ff',
                                   background: '#4338ca',
                                   border: '1.5px solid #818cf8',
                                   borderRadius: '6px',
-                                  padding: '3px 8px',
+                                  padding: '0 8px',
                                   fontFamily: 'monospace',
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 {grade}
@@ -4401,14 +4424,20 @@ function TeamsExportPoster({
                             {gAvg !== null ? (
                               <span
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '24px',
+                                  lineHeight: '1',
                                   fontSize: '12px',
                                   fontWeight: '900',
                                   color: '#fef08a',
                                   background: '#854d0e',
                                   border: '1.5px solid #eab308',
                                   borderRadius: '6px',
-                                  padding: '3px 8px',
+                                  padding: '0 8px',
                                   fontFamily: 'monospace',
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 G.Avg {Number(gAvg).toFixed(1)}
@@ -4418,14 +4447,20 @@ function TeamsExportPoster({
                             {target !== null && Number(target) > 0 ? (
                               <span
                                 style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '24px',
+                                  lineHeight: '1',
                                   fontSize: '12px',
                                   fontWeight: '900',
                                   color: '#fed7aa',
                                   background: '#9a3412',
                                   border: '1.5px solid #f97316',
                                   borderRadius: '6px',
-                                  padding: '3px 8px',
+                                  padding: '0 8px',
                                   fontFamily: 'monospace',
+                                  boxSizing: 'border-box',
                                 }}
                               >
                                 Tgt {target}
