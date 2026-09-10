@@ -1053,12 +1053,12 @@ export default function OrganizerGradingPanel({
       const element = posterRef.current;
       const canvas = await html2canvas(element, {
         backgroundColor: '#07090e',
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const a = document.createElement('a');
       a.href = imgData;
       const cleanTitle = (editionTitle || 'Player_Grading').replace(/[^a-zA-Z0-9_-]/g, '_');
