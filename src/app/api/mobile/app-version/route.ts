@@ -57,15 +57,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Compare build numbers first if numeric builds are present
+    // Version comparison:
+    // 1. If user has a newer semver (e.g. 1.3.7 > 1.3.5), updateAvailable is FALSE.
+    // 2. If store has a newer semver (e.g. 1.3.5 > 1.3.4), updateAvailable is TRUE.
+    // 3. If semver is identical (e.g. 1.3.5 == 1.3.5), compare build numbers.
     const numericTargetBuild = parseInt(targetBuild, 10);
     const numericCurrentBuild = parseInt(currentBuild, 10);
 
     let updateAvailable = false;
-    if (!isNaN(numericTargetBuild) && !isNaN(numericCurrentBuild) && numericCurrentBuild > 0) {
+    if (currentVersion && targetVersion) {
+      const versionDiff = compareAppVersions(targetVersion, currentVersion);
+      if (versionDiff > 0) {
+        // Store version is higher
+        updateAvailable = true;
+      } else if (versionDiff === 0) {
+        // Same version - check build number
+        if (!isNaN(numericTargetBuild) && !isNaN(numericCurrentBuild) && numericCurrentBuild > 0) {
+          updateAvailable = numericTargetBuild > numericCurrentBuild;
+        }
+      } else {
+        // User version is higher (e.g. 1.3.7 vs 1.3.5) - definitely NO update needed
+        updateAvailable = false;
+      }
+    } else if (!isNaN(numericTargetBuild) && !isNaN(numericCurrentBuild) && numericCurrentBuild > 0) {
       updateAvailable = numericTargetBuild > numericCurrentBuild;
-    } else if (currentVersion) {
-      updateAvailable = compareAppVersions(targetVersion, currentVersion) > 0;
     }
 
     return NextResponse.json(
