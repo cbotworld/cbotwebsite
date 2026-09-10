@@ -11,7 +11,7 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: mobileCorsHeaders });
 }
 
-function publicProfile(user: any, team: any, calculatedAverage?: number, calculatedWins?: number) {
+function publicProfile(user: any, team: any, calculatedAverage?: number, calculatedWins?: number, calculatedTarget?: number) {
   return {
     user: {
       id: user.id,
@@ -30,7 +30,7 @@ function publicProfile(user: any, team: any, calculatedAverage?: number, calcula
       gender: user.gender || '',
       image: user.image || null,
       average: calculatedAverage !== undefined ? calculatedAverage : (user.average ?? 0),
-      target: user.target ?? 0,
+      target: calculatedTarget !== undefined ? calculatedTarget : (user.target ?? 0),
       rating: user.rating ?? 0,
       wins: calculatedWins !== undefined ? calculatedWins : (user.wins ?? 0),
       losses: 0,
@@ -51,8 +51,8 @@ function publicProfile(user: any, team: any, calculatedAverage?: number, calcula
   };
 }
 
-async function teamForUser(userId: string) {
-  const { team } = await resolveEditionAndTeam(userId);
+async function teamForUser(userId: string, editionId?: string) {
+  const { team } = await resolveEditionAndTeam(userId, { editionId });
   return team;
 }
 
@@ -62,13 +62,14 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
-    const team = await teamForUser(user.id);
+    const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
+    const team = await teamForUser(user.id, requestedEditionId);
     const { getEditionProfileStatsForUser } = await import('@/lib/actions/playerScoreActions');
-    const editionStats = await getEditionProfileStatsForUser(user.id);
+    const editionStats = await getEditionProfileStatsForUser(user.id, requestedEditionId);
     return NextResponse.json(
       {
         success: true,
-        ...publicProfile(user, team, editionStats.average, editionStats.wins),
+        ...publicProfile(user, team, editionStats.average, editionStats.wins, editionStats.target),
         editionStats,
         averageHistory: editionStats.history || [],
         targetHistory: editionStats.targetHistory || [],

@@ -228,7 +228,7 @@ export function resolveDayWalkoversAndScores(opts: {
         if (!scoreMap.has(id)) {
           const userObj = t1.members.find((m) => m.id === id);
           const grade = userGradeMap?.get(id) || userObj?.grade || null;
-          const target = userTargetMap?.get(id) ?? userObj?.target ?? null;
+          const target = userTargetMap?.get(id) ?? null;
           const teammateScores = t1PlayerIds
             .filter((tid) => tid !== id && scoreMap.has(tid))
             .map((tid) => scoreMap.get(tid)!.score);
@@ -274,7 +274,7 @@ export function resolveDayWalkoversAndScores(opts: {
         if (!scoreMap.has(id)) {
           const userObj = t2.members.find((m) => m.id === id);
           const grade = userGradeMap?.get(id) || userObj?.grade || null;
-          const target = userTargetMap?.get(id) ?? userObj?.target ?? null;
+          const target = userTargetMap?.get(id) ?? null;
           const teammateScores = t2PlayerIds
             .filter((tid) => tid !== id && scoreMap.has(tid))
             .map((tid) => scoreMap.get(tid)!.score);

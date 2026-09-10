@@ -38,11 +38,9 @@ function toMember(
   const target =
     gradeInfo?.target !== undefined && gradeInfo?.target !== null && Number(gradeInfo.target) >= 0
       ? Number(gradeInfo.target)
-      : user.target !== undefined && user.target !== null && Number(user.target) >= 0
-        ? Number(user.target)
-        : fallbackTarget !== undefined && fallbackTarget !== null && Number(fallbackTarget) >= 0
-          ? Number(fallbackTarget)
-          : null;
+      : fallbackTarget !== undefined && fallbackTarget !== null && Number(fallbackTarget) >= 0
+        ? Number(fallbackTarget)
+        : null;
 
   return {
     id: user.id,

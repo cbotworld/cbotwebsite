@@ -96,13 +96,6 @@ export async function saveEditionGrading(
       if (changedById) {
         await recordPlayerTargetChange(userId, target, changedById, false, editionId);
       }
-
-      if (isLiveEdition) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, target: true } });
-        if (user && Number(user.target) !== target) {
-          await prisma.user.update({ where: { id: userId }, data: { target } });
-        }
-      }
       targetsUpdated += 1;
     }
 

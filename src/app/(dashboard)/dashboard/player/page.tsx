@@ -173,7 +173,7 @@ export default async function PlayerPage() {
       })
     : [];
 
-  let activeTarget = player?.target ?? 0;
+  let activeTarget = 0;
   let activeGrade = editionParticipant?.category || null;
 
   if (activeEdition?.id && player?.id) {
@@ -191,9 +191,7 @@ export default async function PlayerPage() {
       targetLog ? [targetLog] : [],
       [],
     );
-    if (userTargetMap.has(player.id)) {
-      activeTarget = userTargetMap.get(player.id)!;
-    }
+    activeTarget = userTargetMap.get(player.id) ?? 0;
     if (userGradeMap.has(player.id)) {
       activeGrade = userGradeMap.get(player.id)!;
     }

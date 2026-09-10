@@ -679,7 +679,7 @@ export async function getMyDayScoresForUser(
   ]);
 
   const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
-  const resolvedTarget = userTargetMap.get(userId) ?? user?.target ?? 0;
+  const resolvedTarget = userTargetMap.get(userId) ?? 0;
   const resolvedGrade = userGradeMap.get(userId) ?? participant?.category ?? null;
 
   const stages = stagesConfig.stages;
@@ -873,7 +873,7 @@ export async function getTeamDayScoresForActor(
         calendarDate,
         u.average || 0,
       );
-      const resolvedTarget = userTargetMap.get(u.id) ?? u.target ?? 0;
+      const resolvedTarget = userTargetMap.get(u.id) ?? 0;
       const resolvedGrade = userGradeMap.get(u.id) ?? null;
       return {
         userId: u.id,
@@ -1101,17 +1101,18 @@ export function extractGradeAndTargetMaps(
       }
       if (!userTargetMap.has(p.userId) && latestTargetByUserId.has(p.userId)) {
         userTargetMap.set(p.userId, latestTargetByUserId.get(p.userId)!);
-      } else if (!userTargetMap.has(p.userId) && p.target !== null && p.target !== undefined && Number(p.target) >= 0) {
-        userTargetMap.set(p.userId, Number(p.target));
       }
+    }
+  }
+
+  for (const [userId, target] of latestTargetByUserId.entries()) {
+    if (!userTargetMap.has(userId)) {
+      userTargetMap.set(userId, target);
     }
   }
 
   for (const team of teams) {
     for (const member of team.members) {
-      if (!userTargetMap.has(member.id) && member.target !== null && member.target !== undefined && Number(member.target) >= 0) {
-        userTargetMap.set(member.id, Number(member.target));
-      }
       if (!userGradeMap.has(member.id) && member.grade) {
         userGradeMap.set(member.id, member.grade);
       }
@@ -1409,7 +1410,7 @@ async function loadPublicStandings(editionId?: string, options?: { skipSnapshotR
       teamName: t.name,
       average: m.average,
       grade: userGradeMap.get(m.id) || (m as any).grade || null,
-      target: userTargetMap.get(m.id) ?? m.target ?? null,
+      target: userTargetMap.get(m.id) ?? null,
       matchesWon: eventWinsMap.get(m.id) || 0,
     })));
 
@@ -1473,7 +1474,7 @@ export async function getEditionProfileStatsForUser(userId: string, requestedEdi
   if (!edition) {
     edition = await loadLatestEdition();
   }
-  if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0 };
+  if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0, target: 0 };
   const [user, allScores, logs, targetLogs, config, teams, gradingSetting, editionParticipants] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
     prisma.playerDayScore.findMany({ where: { editionId: edition.id } }),
@@ -1513,7 +1514,7 @@ export async function getEditionProfileStatsForUser(userId: string, requestedEdi
     userGradeMap,
   );
   const userScores = allScores.filter((s) => s.userId === userId);
-  const resolvedTarget = userTargetMap.get(userId) ?? user?.target ?? 0;
+  const resolvedTarget = userTargetMap.get(userId) ?? 0;
   const stats = editionProfileStats({
     userId,
     scores: userScores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
@@ -1561,6 +1562,7 @@ export async function getEditionProfileStatsForUser(userId: string, requestedEdi
 
   return {
     ...stats,
+    target: resolvedTarget,
     average: calculatedAverage,
     history: logsForUser(
       logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
