@@ -487,31 +487,70 @@ export default function PlayerClient({
         </button>
       </div>
 
-      {/* Next Edition Registration Card with UPI Transaction ID editing */}
-      {registrationEnrollment ? (
-        <PlayerEnrollmentCard enrollment={registrationEnrollment} />
-      ) : null}
+      {/* Slot B (Next Edition): Registration card & Advance play info */}
+      {activeTournamentSlot === 'B' && (
+        <div className="space-y-4">
+          {registrationEnrollment ? (
+            <>
+              <PlayerEnrollmentCard enrollment={registrationEnrollment} />
+              <div className="rounded-3xl border border-cyan-500/30 bg-cyan-500/10 p-5 sm:p-6 space-y-2 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] font-bold text-cyan-400 border-cyan-500/30 bg-cyan-500/15">
+                    ✨ Advance Play Active
+                  </Badge>
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                    Confirmed Enrolled
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-foreground">
+                  {registrationEnrollment.edition.title} (#{registrationEnrollment.edition.number}) Advance Play
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  You are registered for the upcoming tournament! You can start playing your matches in advance and enter your daily board scores in the <strong>Day Score</strong> tab below.
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 via-background to-card p-6 sm:p-7 space-y-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] font-bold text-cyan-400 border-cyan-500/30 bg-cyan-500/15">
+                  ✨ Next Edition Advance Play
+                </Badge>
+                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                  Open for Advance Play
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-foreground">
+                Next Tournament Advance Play & Registration
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                Start playing matches in advance for the upcoming edition! Submit your daily board scores in the <strong>Day Score</strong> tab below, or register to secure your official team roster spot.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Current Edition Status: Not enrolled in live cup */}
-      {!currentTeam?.id && (
+      {/* Slot A (Current Edition): Show only when viewing Slot A and not in a team */}
+      {activeTournamentSlot === 'A' && !currentTeam?.id && (
         <div className="rounded-3xl border border-border bg-card/60 p-6 sm:p-7 space-y-2 shadow-sm">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] font-bold text-amber-400 border-amber-500/30 bg-amber-500/10">
               Current Live Tournament {currentEditionInfo?.number ? `#${currentEditionInfo.number}` : ''}
             </Badge>
             <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-              {registrationEnrollment ? 'Enrolled for Next Edition' : 'Not Enrolled'}
+              {registrationEnrollment ? 'Enrolled for Next Edition' : 'Not Enrolled in Live Cup'}
             </span>
           </div>
           <h3 className="text-lg font-black text-foreground">
             {registrationEnrollment
               ? `Live Cup (${currentEditionInfo?.title || 'Edition #201'}) In Progress`
-              : `You are not enrolled in ${currentEditionInfo?.title || 'Current Edition'}`}
+              : `Not Enrolled in Current Edition ${currentEditionInfo?.number ? '#' + currentEditionInfo.number : ''}`}
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
             {registrationEnrollment
-              ? `Matches for ${currentEditionInfo?.title || 'Edition #201'} are currently underway. You are confirmed and enrolled for the upcoming ${registrationEnrollment.edition.title} (#${registrationEnrollment.edition.number})!`
-              : 'You do not have an active team or match schedule in the current live tournament.'}
+              ? `Matches for ${currentEditionInfo?.title || 'Current Edition'} are in progress. You are registered for the upcoming ${registrationEnrollment.edition.title} (#${registrationEnrollment.edition.number})! Click 'NEXT EDITION (ADVANCE PLAY)' above to access your advance play dashboard.`
+              : `You are not assigned to an active team in Current Edition ${currentEditionInfo?.number || 201}. If you want to play the upcoming edition in advance, switch to 'NEXT EDITION (ADVANCE PLAY)' above!`}
           </p>
         </div>
       )}
