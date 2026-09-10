@@ -17,6 +17,7 @@ import { loginPlayer } from '../api/website';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { RootStackParamList } from '../navigation/types';
 import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 
 const logo = require('../../assets/logo.png');
 const PIN_LENGTH = 4;
@@ -197,6 +198,8 @@ export function LoginScreen({ navigation }: Props) {
               <Text style={styles.privacyLinkHighlight}>Privacy Policy</Text>
             </Text>
           </Pressable>
+
+          <PoweredByFooter />
         </ScrollView>
       </KeyboardAvoidingView>
 

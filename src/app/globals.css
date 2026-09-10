@@ -69,6 +69,9 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    width: 100%;
+    overflow-x: hidden;
   }
   * {
     @apply border-border;
@@ -78,6 +81,8 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
     width: 100%;
+    min-height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
   /* Offset anchor scroll for sticky navbar */
   [id] {
@@ -85,12 +90,20 @@
   }
 }
 
-/* Touch momentum scroll for horizontal carousels & day selectors */
+/* Touch momentum scroll for horizontal carousels, tables & day selectors */
 .touch-scroll-x {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
+  touch-action: pan-y pan-x;
   overscroll-behavior-x: contain;
+}
+
+/* Touch momentum scroll for vertical modals and drawer panels */
+.touch-scroll-y {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y pan-x;
+  overscroll-behavior-y: contain;
 }
 
 /* Glassmorphism utilities */

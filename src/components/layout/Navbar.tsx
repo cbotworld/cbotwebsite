@@ -372,7 +372,7 @@ export function Navbar({
 
       {/* Enhanced Mobile Navigation Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-amber-500/30 bg-background/98 backdrop-blur-2xl p-4 space-y-4 animate-in slide-in-from-top-4 shadow-2xl z-50 max-h-[85vh] overflow-y-auto">
+        <div className="md:hidden border-b border-amber-500/30 bg-background/98 backdrop-blur-2xl p-4 space-y-4 animate-in slide-in-from-top-4 shadow-2xl z-50 max-h-[85vh] overflow-y-auto touch-scroll-y overscroll-contain">
           {session?.user && (
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30">
               <Avatar fallback={session.user.name || 'U'} size="md" className="ring-2 ring-amber-500/50" />

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderActionButton } from '../components/HeaderActionButton';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 import { fetchStandings, type StandingsPayload } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 
@@ -504,6 +505,7 @@ export function StandingsScreen(_props: Props) {
               ))}
             </>
           )}
+          <PoweredByFooter />
         </ScrollView>
       )}
 

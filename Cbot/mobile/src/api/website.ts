@@ -481,7 +481,33 @@ export async function saveCombi(
   return data;
 }
 
-export async function fetchPlayerSchedule(opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' }) {
+export type TournamentRef = {
+  id: string;
+  number: number;
+  title: string;
+  slug: string;
+  slot: 'A' | 'B';
+  status: string;
+  totalDays: number;
+  isEnrolled: boolean;
+  teamId?: string | null;
+  teamName?: string | null;
+  teamTag?: string | null;
+  isAdvancePlay?: boolean;
+};
+
+export type TournamentOptions = {
+  currentTournament: TournamentRef | null;
+  nextTournament: TournamentRef | null;
+  activeSlot: 'A' | 'B';
+};
+
+export async function fetchPlayerSchedule(opts?: {
+  teamId?: string;
+  view?: 'MAIN' | 'SPOC';
+  editionSlot?: 'A' | 'B';
+  editionId?: string;
+}) {
   const current = getSession();
   if (!current?.token) {
     throw new Error('Please log in.');
@@ -489,6 +515,8 @@ export async function fetchPlayerSchedule(opts?: { teamId?: string; view?: 'MAIN
   const params = new URLSearchParams();
   if (opts?.teamId) params.set('teamId', opts.teamId);
   if (opts?.view) params.set('view', opts.view);
+  if (opts?.editionSlot) params.set('editionSlot', opts.editionSlot);
+  if (opts?.editionId) params.set('editionId', opts.editionId);
   const qs = params.toString();
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/schedule${qs ? `?${qs}` : ''}`, {
     headers: { Authorization: `Bearer ${current.token}` },
@@ -535,6 +563,7 @@ export async function fetchPlayerSchedule(opts?: { teamId?: string; view?: 'MAIN
     playableUntilDay: typeof data.playableUntilDay === 'number' ? data.playableUntilDay : undefined,
     playerTeams: Array.isArray(data.playerTeams) ? data.playerTeams : current.playerTeams || [],
     captainDesks: Array.isArray(data.captainDesks) ? data.captainDesks : current.captainDesks || [],
+    tournamentOptions: data.tournamentOptions as TournamentOptions | undefined,
   };
 }
 
@@ -576,8 +605,12 @@ export type DayScoreInfo = {
   error?: string;
 };
 
-export async function fetchPlayerScores(): Promise<DayScoreInfo> {
-  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
+export async function fetchPlayerScores(opts?: { slot?: 'A' | 'B'; editionId?: string }): Promise<DayScoreInfo> {
+  const params = new URLSearchParams();
+  if (opts?.slot) params.set('slot', opts.slot);
+  if (opts?.editionId) params.set('editionId', opts.editionId);
+  const qs = params.toString();
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores${qs ? `?${qs}` : ''}`, {
     headers: authHeaders(),
   });
   const data = await readJson(res);
@@ -588,13 +621,21 @@ export async function fetchPlayerScores(): Promise<DayScoreInfo> {
 export async function submitPlayerDayScore(
   dayNumber: number,
   boards: Array<{ score: number; slams: number }>,
+  opts?: { slot?: 'A' | 'B'; editionId?: string },
 ) {
   const total = boards.reduce((s, b) => s + b.score, 0);
   const slams = boards.reduce((s, b) => s + b.slams, 0);
   const res = await fetch(`${config.websiteBaseUrl}/api/mobile/scores`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ dayNumber, score: total, slams, boards }),
+    body: JSON.stringify({
+      dayNumber,
+      score: total,
+      slams,
+      boards,
+      slot: opts?.slot,
+      editionId: opts?.editionId,
+    }),
   });
   const data = await readJson(res);
   if (!data.success) throw new Error(data.error || 'Failed to save score.');

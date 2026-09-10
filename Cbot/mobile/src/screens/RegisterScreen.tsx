@@ -19,6 +19,7 @@ import { RootStackParamList } from '../navigation/types';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { sendEmailOtp, verifyEmailOtp } from '../api/website';
 import { PrivacyPolicyModal } from '../components/PrivacyPolicyModal';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 
 const logo = require('../../assets/logo.png');
 
@@ -275,6 +276,8 @@ export function RegisterScreen({ navigation }: Props) {
               </Pressable>
             </View>
           )}
+
+          <PoweredByFooter />
         </ScrollView>
       </KeyboardAvoidingView>
 

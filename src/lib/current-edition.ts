@@ -179,7 +179,7 @@ export async function resolveEditionBySlotOrId(opts?: {
     if (next) return next;
   }
 
-  return resolveCurrentEdition();
+  return resolveCurrentEditionRecord();
 }
 
 export async function resolvePlayerTournamentOptions(userId: string) {

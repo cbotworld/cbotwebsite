@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter, Crown, ChevronRight, Info } from 'lucide-react';
+import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter, Crown, ChevronRight, Info, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,13 +130,16 @@ function getDetailedMatchCombiData({
   team2Name,
   dbTeams,
   dbScores,
+  revealed = false,
 }: {
   dayNumber: number;
   team1Name: string;
   team2Name: string;
   dbTeams: any[];
   dbScores: any[];
+  revealed?: boolean;
 }) {
+  if (!revealed) return null;
   const t1 = findTeamByKey(team1Name, dbTeams);
   const t2 = findTeamByKey(team2Name, dbTeams);
   if (!t1 || !t2) return null;
@@ -255,16 +258,22 @@ export function ScheduleClient({
     isSpoc?: boolean;
   } | null>(null);
 
+  const isSelectedMatchRevealed = React.useMemo(() => {
+    if (!selectedMatch) return false;
+    return isCombiSubmissionLocked(selectedMatch.dayNumber, dayDatesMap, new Date(nowMs));
+  }, [selectedMatch, dayDatesMap, nowMs]);
+
   const matchDetails = React.useMemo(() => {
-    if (!selectedMatch) return null;
+    if (!selectedMatch || !isSelectedMatchRevealed) return null;
     return getDetailedMatchCombiData({
       dayNumber: selectedMatch.dayNumber,
       team1Name: selectedMatch.t1.name,
       team2Name: selectedMatch.t2.name,
       dbTeams,
       dbScores,
+      revealed: isSelectedMatchRevealed,
     });
-  }, [selectedMatch, dbTeams, dbScores]);
+  }, [selectedMatch, isSelectedMatchRevealed, dbTeams, dbScores]);
 
   const liveDayNum = React.useMemo(
     () => scheduleDays.find((d) => monumentStatus(d, nowMs) === 'live')?.dayNumber ?? null,
@@ -732,10 +741,12 @@ export function ScheduleClient({
                 </span>
               </div>
               <DialogTitle className="text-lg sm:text-xl font-black flex items-center justify-between gap-2">
-                <span>Match Breakdown & Scores</span>
+                <span>{isSelectedMatchRevealed ? 'Match Breakdown & Scores' : 'Match Fixture Details'}</span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Lineup combis, individual player scores, event points, and match outcome breakdown.
+                {isSelectedMatchRevealed
+                  ? 'Lineup combis, individual player scores, event points, and match outcome breakdown.'
+                  : 'Fixture details and team matchup. Lineup combis and match score insights unlock after 9:30 PM IST.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -932,8 +943,61 @@ export function ScheduleClient({
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-                Combi lineups and individual scores will be available after the submission cutoff for Day {selectedMatch.dayNumber}.
+              <div className="space-y-4">
+                {/* Team Matchup Banner (Pre-lock / No scores revealed) */}
+                <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-background p-4 shadow-inner">
+                  <div className="flex items-center justify-between gap-2 sm:gap-4">
+                    {/* Team 1 */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                      <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${selectedMatch.t1.border} shrink-0 flex items-center justify-center`}>
+                        <img src={selectedMatch.t1.logo} alt={selectedMatch.t1.name} className="h-full w-full object-contain" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className={`text-xs sm:text-sm font-black truncate block ${selectedMatch.t1.color}`} title={selectedMatch.t1.name}>
+                          {selectedMatch.t1.name}
+                        </span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t1.tag}</span>
+                      </div>
+                    </div>
+
+                    {/* VS Badge */}
+                    <div className="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-500/30 shrink-0 shadow-inner">
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-400">VS</span>
+                    </div>
+
+                    {/* Team 2 */}
+                    <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-1 min-w-0 text-right">
+                      <div className="min-w-0">
+                        <span className={`text-xs sm:text-sm font-black truncate block ${selectedMatch.t2.color}`} title={selectedMatch.t2.name}>
+                          {selectedMatch.t2.name}
+                        </span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t2.tag}</span>
+                      </div>
+                      <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${selectedMatch.t2.border} shrink-0 flex items-center justify-center`}>
+                        <img src={selectedMatch.t2.logo} alt={selectedMatch.t2.name} className="h-full w-full object-contain" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Locked Insight Notice Banner */}
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-inner">
+                    <Lock className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-black text-amber-300">
+                      Lineups & Match Breakdown Locked
+                    </h4>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                      Team combi lineups, player scores, and match results are hidden for live and upcoming matches until the <strong>9:30 PM IST combi lock</strong> on match day.
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/80 border border-amber-500/30 text-[11px] font-bold text-amber-400 shadow-sm">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Unlocks after 9:30 PM IST ({formatCalendarDate(selectedMatch.calendarDate)})</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>

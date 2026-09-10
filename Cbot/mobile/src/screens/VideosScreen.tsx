@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderActionButton } from '../components/HeaderActionButton';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 import { fetchChannelVideos, type ChannelVideo } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 import { useAppDialog } from '../components/AppDialog';
@@ -268,6 +269,7 @@ export function VideosScreen({ navigation, route }: Props) {
               </View>
             </Pressable>
           ))}
+          <PoweredByFooter />
         </ScrollView>
       )}
       {dialog}

@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell, GraduationCap, Award } from 'lucide-react';
+import { Shield, Trophy, AlertTriangle, Plus, Users, Crown, Check, X, KeyRound, Copy, CheckCircle2, UserPlus, Layers, Edit3, UserCheck, Trash2, Calendar, Clock, Mail, ArrowLeft, AlertCircle, Loader2, GitBranch, Globe, Bell, GraduationCap, Award, Download } from 'lucide-react';
 import { PushNotificationTab } from '@/components/organizer/PushNotificationTab';
 import OrganizerGradingPanel from '@/components/organizer/OrganizerGradingPanel';
 import EnrolledPlayersPanel from '@/components/organizer/EnrolledPlayersPanel';
@@ -1374,6 +1374,99 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownloadTeamsCsv = () => {
+    if (!selectedEditionTeams.length) {
+      alert('No teams found in this edition to download.');
+      return;
+    }
+    const byId = new Map(usersList.map((u: any) => [u.id, u]));
+    const rows: string[][] = [
+      [
+        'Team Name',
+        'Team Tag',
+        'Captain Name',
+        'Captain Username',
+        'Player Name',
+        'Player Username',
+        'Player Role',
+        'Average',
+        'Target',
+        'WhatsApp / Phone',
+        'Email',
+        'City',
+        'State',
+        'Country',
+      ],
+    ];
+
+    selectedEditionTeams.forEach((team: any) => {
+      const captain = usersList.find(
+        (u: any) => u.id === team.captainId || (team.captain?.id && u.id === team.captain.id)
+      );
+      const members = team.members || [];
+      if (members.length === 0) {
+        rows.push([
+          team.name,
+          team.tag || '',
+          captain?.name || captain?.username || 'Unassigned',
+          captain?.username || '',
+          'No players assigned',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+        ]);
+      } else {
+        members.forEach((m: any) => {
+          const uId = m.userId || m.user?.id || m.id;
+          const u = byId.get(uId) || m.user;
+          const isCaptain = uId === team.captainId || (captain && uId === captain.id);
+          rows.push([
+            team.name,
+            team.tag || '',
+            captain?.name || captain?.username || 'Unassigned',
+            captain?.username || '',
+            u?.name || u?.username || 'Player',
+            u?.username || '',
+            isCaptain ? 'CAPTAIN' : 'MEMBER',
+            u?.average != null ? String(u.average) : '',
+            u?.target != null ? String(u.target) : '',
+            u?.whatsApp || '',
+            u?.email || '',
+            u?.city || '',
+            u?.state || '',
+            u?.country || '',
+          ]);
+        });
+      }
+    });
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const editionSlug = (selectedEdition?.title || `Edition_${selectedEdition?.number || 'Current'}`)
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.download = `CBOT_Teams_Roster_${editionSlug}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       
@@ -1834,6 +1927,17 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTeamsCsv}
+              disabled={selectedEditionTeams.length === 0}
+              className="text-xs font-bold border-amber-500/40 text-amber-300 hover:bg-amber-500/10 cursor-pointer"
+              title="Download all teams and their player rosters as a CSV file"
+            >
+              <Download className="h-3.5 w-3.5 mr-1 text-amber-400" />
+              Download CSV
+            </Button>
             <Button
               variant="outline"
               size="sm"

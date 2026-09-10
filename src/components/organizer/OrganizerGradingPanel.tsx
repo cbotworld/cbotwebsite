@@ -18,6 +18,7 @@ import {
   Grid3X3,
   Target,
   Sparkles,
+  Download,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -908,6 +909,81 @@ export default function OrganizerGradingPanel({
     }
   };
 
+  const handleDownloadGradingCsv = () => {
+    if (!grid || !grid.columns.length) {
+      alert('No grading data available to download.');
+      return;
+    }
+    const byId = new Map(gradableUsers.map((u) => [u.id, u]));
+    const rows: string[][] = [
+      [
+        'Grade',
+        'Row',
+        'Tier Target',
+        'Player Name',
+        'Username',
+        'Grade Average',
+        'Profile Target',
+        'Assignment Status',
+      ],
+    ];
+
+    grid.columns.forEach((col) => {
+      for (let rIdx = 0; rIdx < grid.rowCount; rIdx += 1) {
+        const uId = grid.cells[cellKey(col.id, rIdx)];
+        const p = uId ? byId.get(uId) : null;
+        const target = resolveTargetForCell(col, rIdx);
+        const avg = p ? getGradeAverageForUser(p, participantMap) : null;
+        rows.push([
+          col.label || col.id,
+          String(rIdx + 1),
+          target != null ? String(target) : '',
+          p?.name || (uId ? 'Unknown' : 'Unassigned'),
+          p?.username || '',
+          avg != null ? String(avg) : '',
+          p?.target != null ? String(p.target) : '',
+          uId ? 'ASSIGNED' : 'EMPTY',
+        ]);
+      }
+    });
+
+    const assignedIds = new Set(Object.values(grid.cells).filter(Boolean));
+    const unassigned = gradableUsers.filter((u) => !assignedIds.has(u.id));
+    if (unassigned.length > 0) {
+      rows.push([]);
+      rows.push(['--- UNASSIGNED PLAYERS ---']);
+      rows.push(['Player Name', 'Username', 'Average', 'Target']);
+      unassigned.forEach((u) => {
+        const avg = getGradeAverageForUser(u, participantMap);
+        rows.push([
+          u.name || u.username || 'Player',
+          u.username || '',
+          avg != null ? String(avg) : '',
+          u.target != null ? String(u.target) : '',
+        ]);
+      });
+    }
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cleanTitle = (editionTitle || 'Player_Grading').replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.download = `CBOT_Player_Grading_${cleanTitle}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!editionId) {
     return (
       <Card className="border-border">
@@ -985,6 +1061,18 @@ export default function OrganizerGradingPanel({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-bold gap-1.5 border-violet-500/30 text-violet-300 hover:bg-violet-500/10 cursor-pointer"
+              onClick={handleDownloadGradingCsv}
+              disabled={!grid || grid.columns.length === 0}
+              title="Download grading sheet with assigned and unassigned players as CSV"
+            >
+              <Download className="h-3.5 w-3.5 text-violet-400" />
+              Download CSV
+            </Button>
             <Button
               type="button"
               variant="default"

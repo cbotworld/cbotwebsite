@@ -15,6 +15,7 @@ import {
 import { getSchedule, type ScheduleDay } from "../api/client";
 import { RootStackParamList } from "../navigation/types";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
+import { PoweredByFooter } from "../components/PoweredByFooter";
 
 const logo = require("../../assets/logo.png");
 
@@ -139,6 +140,7 @@ export function HomeScreen({ navigation }: Props) {
         </Pressable>
         </View>
       </View>
+      <PoweredByFooter />
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -21,6 +21,7 @@ import {
   boardsFromSaved,
   parseBoardDrafts,
 } from '../components/BoardScoreModal';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 import { playerScoreUntilNote, SCORE_EDIT_PLAYER_CLOSED } from '../score-edit-policy';
 import {
   fetchPlayerSchedule,
@@ -30,6 +31,7 @@ import {
   type DayScoreInfo,
   type MatchDetails,
   type MobileTeam,
+  type TournamentOptions,
 } from '../api/website';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 import { useAppDialog } from '../components/AppDialog';
@@ -121,13 +123,15 @@ export function DashboardScreen({ navigation }: Props) {
   const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => Boolean(getSession()?.token));
   const [playerView, setPlayerView] = useState<'MAIN' | 'SPOC'>('MAIN');
+  const [editionSlot, setEditionSlot] = useState<'A' | 'B'>('A');
+  const [tournamentOptions, setTournamentOptions] = useState<TournamentOptions | null>(null);
   const [playerTeams, setPlayerTeams] = useState<Array<{ id: string; name: string; kind: 'MAIN' | 'SPOC'; isCaptain?: boolean }>>([]);
   const [scoreInfo, setScoreInfo] = useState<DayScoreInfo | null>(null);
   const [savingDay, setSavingDay] = useState<number | null>(null);
   const [boardDay, setBoardDay] = useState<number | null>(null);
   const { dialog, showSuccess, showError, showWarn } = useAppDialog();
 
-  const load = useCallback(async (view: 'MAIN' | 'SPOC' = playerView) => {
+  const load = useCallback(async (view: 'MAIN' | 'SPOC' = playerView, slot: 'A' | 'B' = editionSlot) => {
     if (!getSession()?.token) {
       setLoading(false);
       setMatches([]);
@@ -135,14 +139,15 @@ export function DashboardScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      const res = await fetchPlayerSchedule({ view });
+      const res = await fetchPlayerSchedule({ view, editionSlot: slot });
       setMatches(res.matches);
       setTeam(res.team);
       setPlayerTeams(res.playerTeams || []);
+      setTournamentOptions(res.tournamentOptions || null);
       setCurrentDay(currentMatchDay(res.matches, res.currentDay));
       setWarning(res.warning || (res.matches.length === 0 ? 'No fixtures found for your team.' : null));
       try {
-        const scores = await fetchPlayerScores();
+        const scores = await fetchPlayerScores({ slot });
         setScoreInfo(scores);
       } catch {
         // Schedule should still show if scores fail.
@@ -154,20 +159,20 @@ export function DashboardScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [navigation, playerView]);
+  }, [navigation, playerView, editionSlot]);
 
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load]),
+      void load(playerView, editionSlot);
+    }, [load, playerView, editionSlot]),
   );
 
   const saveDayScore = async (dayNumber: number, boards: Array<{ score: number; slams: number }>) => {
     setSavingDay(dayNumber);
     try {
-      await submitPlayerDayScore(dayNumber, boards);
+      await submitPlayerDayScore(dayNumber, boards, { slot: editionSlot });
       showSuccess('Scores Saved! 🎯', `Day ${dayNumber} scores submitted successfully.`);
-      setScoreInfo(await fetchPlayerScores());
+      setScoreInfo(await fetchPlayerScores({ slot: editionSlot }));
       setBoardDay(null);
     } catch (e) {
       showError('Not Saved', e instanceof Error ? e.message : 'Failed to save scores.');
@@ -230,25 +235,90 @@ export function DashboardScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>PLAYER DASHBOARD</Text>
-          <Text style={styles.headerName}>{playerName === 'Player' && !session?.token ? 'CBOT WORLD' : playerName}</Text>
-          <Text style={styles.headerSub}>
-            {session?.token
-              ? playerView === 'SPOC'
-                ? `${team?.name || 'Spoc team'} · Only organizer-scheduled Spoc exhibition days.`
-                : `${team?.name || 'No team'} · Play from today through the last day in sequence. Opponent may be TBD.`
-              : 'Browse this page now. Log in to view your fixtures and go live.'}
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Text style={styles.headerWelcome} numberOfLines={1}>
+            Welcome, <Text style={styles.headerPlayerName}>{playerName === 'Player' && !session?.token ? 'CBOT WORLD' : playerName}</Text>
           </Text>
         </View>
         {session?.token ? (
-          <HeaderActionButton label="Refresh" onPress={() => void load()} />
+          <HeaderActionButton label="Refresh" onPress={() => void load(playerView, editionSlot)} />
         ) : (
           <HeaderActionButton label="Log in" onPress={() => navigation.getParent()?.navigate('Login')} />
         )}
       </View>
 
       <EliteSponsorsStrip />
+
+      {tournamentOptions?.nextTournament ? (
+        <View style={styles.editionToggleContainer}>
+          <Pressable
+            style={[
+              styles.editionToggleBtn,
+              editionSlot === 'A' && styles.editionToggleBtnActive,
+            ]}
+            onPress={() => {
+              if (editionSlot === 'A') return;
+              setEditionSlot('A');
+              void load(playerView, 'A');
+            }}
+          >
+            <Text
+              style={[
+                styles.editionToggleText,
+                editionSlot === 'A' && styles.editionToggleTextActive,
+              ]}
+            >
+              CURRENT EDITION
+            </Text>
+            <Text
+              style={[
+                styles.editionToggleSub,
+                editionSlot === 'A' && styles.editionToggleSubActive,
+              ]}
+              numberOfLines={1}
+            >
+              {tournamentOptions.currentTournament?.title || 'Current Edition'}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.editionToggleBtn,
+              editionSlot === 'B' && styles.editionToggleBtnActiveB,
+            ]}
+            onPress={() => {
+              if (editionSlot === 'B') return;
+              setEditionSlot('B');
+              void load(playerView, 'B');
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <Text
+                style={[
+                  styles.editionToggleText,
+                  editionSlot === 'B' && styles.editionToggleTextActiveB,
+                ]}
+              >
+                NEXT EDITION
+              </Text>
+              {tournamentOptions.nextTournament?.isEnrolled ? (
+                <View style={styles.enrolledBadge}>
+                  <Text style={styles.enrolledBadgeText}>ENROLLED</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              style={[
+                styles.editionToggleSub,
+                editionSlot === 'B' && styles.editionToggleSubActiveB,
+              ]}
+              numberOfLines={1}
+            >
+              {tournamentOptions.nextTournament.title} (Advance Play)
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.centered}>
@@ -276,7 +346,7 @@ export function DashboardScreen({ navigation }: Props) {
                     onPress={() => {
                       if (view === playerView) return;
                       setPlayerView(view);
-                      void load(view);
+                      void load(view, editionSlot);
                     }}
                   >
                     <Text style={[styles.viewBtnText, on && styles.viewBtnTextOn]}>{label}</Text>
@@ -472,6 +542,7 @@ export function DashboardScreen({ navigation }: Props) {
               </View>
             );
           })}
+          <PoweredByFooter />
         </ScrollView>
       )}
       <BoardScoreModal
@@ -496,17 +567,75 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#020617' },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
     gap: 12,
   },
-  headerTitle: { fontSize: 10, fontWeight: '800', color: '#f59e0b', letterSpacing: 1.5 },
-  headerName: { fontSize: 18, fontWeight: '900', color: '#f8fafc', marginTop: 0 },
-  headerSub: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
+  headerWelcome: { fontSize: 16, fontWeight: '700', color: '#94a3b8' },
+  headerPlayerName: { fontSize: 17, fontWeight: '900', color: '#f8fafc' },
+  editionToggleContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 6,
+    gap: 8,
+  },
+  editionToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#1e293b',
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+  },
+  editionToggleBtnActive: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245,158,11,0.12)',
+  },
+  editionToggleBtnActiveB: {
+    borderColor: '#06b6d4',
+    backgroundColor: 'rgba(6,182,212,0.12)',
+  },
+  editionToggleText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#64748b',
+    letterSpacing: 0.8,
+  },
+  editionToggleTextActive: {
+    color: '#f59e0b',
+  },
+  editionToggleTextActiveB: {
+    color: '#06b6d4',
+  },
+  editionToggleSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+    marginTop: 2,
+  },
+  editionToggleSubActive: {
+    color: '#cbd5e1',
+  },
+  editionToggleSubActiveB: {
+    color: '#cbd5e1',
+  },
+  enrolledBadge: {
+    backgroundColor: 'rgba(16,185,129,0.2)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  enrolledBadgeText: {
+    color: '#10b981',
+    fontSize: 8,
+    fontWeight: '900',
+  },
   list: { flex: 1, paddingHorizontal: 14, paddingTop: 4 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   muted: { color: '#94a3b8' },

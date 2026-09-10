@@ -42,7 +42,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            className="relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto touch-scroll-y overscroll-contain rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xl"
           >
             <button
               onClick={() => onOpenChange(false)}

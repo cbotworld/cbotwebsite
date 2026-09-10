@@ -10,7 +10,7 @@ import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Crown, Edit3, Loader2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Crown, Download, Edit3, Loader2, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 
 type Props = {
   editionId: string;
@@ -316,6 +316,80 @@ export default function SpocExhibitionTeamsPanel({ editionId, teams, allTeams, u
     else alert(res.error || 'Failed to delete team');
   };
 
+  const handleDownloadSpocTeamsCsv = () => {
+    if (!teams.length) {
+      alert('No Spoc exhibition teams found to download.');
+      return;
+    }
+    const byId = new Map(usersList.map((u: any) => [u.id, u]));
+    const rows: string[][] = [
+      [
+        'Spoc Team Name',
+        'Team Tag',
+        'Captain Name',
+        'Captain Username',
+        'Player Name',
+        'Player Username',
+        'Role',
+        'Average',
+        'Target',
+      ],
+    ];
+
+    teams.forEach((team: any) => {
+      const captain = usersList.find((u: any) => u.id === team.captainId || u.id === team.captain?.id);
+      const members = team.spocMembers || [];
+      if (members.length === 0) {
+        rows.push([
+          team.name,
+          team.tag || '',
+          captain?.name || captain?.username || 'Unassigned',
+          captain?.username || '',
+          'No players assigned',
+          '',
+          '',
+          '',
+          '',
+        ]);
+      } else {
+        members.forEach((m: any) => {
+          const uId = m.userId || m.user?.id || m.id;
+          const u = byId.get(uId) || m.user;
+          const isCaptain = uId === team.captainId || (captain && uId === captain.id);
+          rows.push([
+            team.name,
+            team.tag || '',
+            captain?.name || captain?.username || 'Unassigned',
+            captain?.username || '',
+            u?.name || u?.username || 'Player',
+            u?.username || '',
+            isCaptain ? 'CAPTAIN' : 'MEMBER',
+            u?.average != null ? String(u.average) : '',
+            u?.target != null ? String(u.target) : '',
+          ]);
+        });
+      }
+    });
+
+    const csvContent = rows
+      .map((row) =>
+        row
+          .map((val) => `"${String(val ?? '').replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CBOT_Spoc_Teams_Roster_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <Card className="border-violet-500/30 mt-4">
@@ -328,9 +402,22 @@ export default function SpocExhibitionTeamsPanel({ editionId, teams, allTeams, u
               Exhibition-only teams — pick players from any main team. Not part of the main tournament bracket.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={openAdd} className="text-xs font-bold border-violet-500/40 text-violet-300">
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Spoc Team
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadSpocTeamsCsv}
+              disabled={teams.length === 0}
+              className="text-xs font-bold border-violet-500/40 text-violet-300 hover:bg-violet-500/10 cursor-pointer"
+              title="Download all Spoc exhibition teams and rosters as a CSV file"
+            >
+              <Download className="h-3.5 w-3.5 mr-1 text-violet-400" />
+              Download CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={openAdd} className="text-xs font-bold border-violet-500/40 text-violet-300">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Spoc Team
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>

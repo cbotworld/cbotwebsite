@@ -399,10 +399,25 @@ export async function submitTeamDayScoresForActor(opts: {
   return { success: true as const };
 }
 
-export async function submitPlayerDayScore(dayNumber: number, score: unknown, slams: unknown, boards?: unknown) {
+export async function submitPlayerDayScore(
+  dayNumber: number,
+  score: unknown,
+  slams: unknown,
+  boards?: unknown,
+  requestedEditionId?: string,
+  slot?: 'A' | 'B',
+) {
   const { session, error } = await requireSession();
   if (error || !session) return { success: false as const, error };
-  return submitPlayerDayScoreForUser((session.user as any).id as string, dayNumber, score, slams, boards);
+  return submitPlayerDayScoreForUser(
+    (session.user as any).id as string,
+    dayNumber,
+    score,
+    slams,
+    boards,
+    requestedEditionId,
+    slot,
+  );
 }
 
 export async function submitTeamDayScores(
@@ -1364,9 +1379,9 @@ export async function getAverageReviewPrompt(editionId?: string) {
 export async function getEditionProfileStatsForUser(userId: string) {
   const edition = await loadLatestEdition();
   if (!edition) return { wins: 0, slams: 0, averageBonuses: 0, history: [] as any[], targetHistory: [] as any[], average: 0 };
-  const [user, scores, logs, targetLogs, config, teams, gradingSetting, editionParticipants] = await Promise.all([
+  const [user, allScores, logs, targetLogs, config, teams, gradingSetting, editionParticipants] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
-    prisma.playerDayScore.findMany({ where: { editionId: edition.id, userId } }),
+    prisma.playerDayScore.findMany({ where: { editionId: edition.id } }),
     prisma.playerAverageLog.findMany({
       where: { editionId: edition.id, userId },
       orderBy: { effectiveFrom: 'asc' },
@@ -1391,14 +1406,15 @@ export async function getEditionProfileStatsForUser(userId: string) {
     userId,
     standingTeams,
     pairingsFromStages(config.stages),
-    scores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
+    allScores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
     edition.dayDates,
     undefined,
     userGradeMap,
   );
+  const userScores = allScores.filter((s) => s.userId === userId);
   const stats = editionProfileStats({
     userId,
-    scores: scores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
+    scores: userScores.map((s) => ({ userId: s.userId, dayNumber: s.dayNumber, score: s.score, slams: s.slams })),
     logs: logs.map((l) => ({ userId: l.userId, average: l.average, effectiveFrom: l.effectiveFrom })),
     fallbackAverage: user?.average || 0,
     fallbackTarget: user?.target || 0,

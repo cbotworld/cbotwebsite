@@ -22,9 +22,14 @@ export async function GET(request: NextRequest) {
 
     const view = request.nextUrl.searchParams.get('view');
     const teamId = request.nextUrl.searchParams.get('teamId') || undefined;
+    const editionSlotParam = request.nextUrl.searchParams.get('editionSlot')?.toUpperCase();
+    const editionSlot = editionSlotParam === 'B' || editionSlotParam === 'A' ? (editionSlotParam as 'A' | 'B') : undefined;
+    const editionId = request.nextUrl.searchParams.get('editionId') || undefined;
     const payload = await getPlayerMatchSchedule(user.id, {
       teamId,
       view: view === 'SPOC' || view === 'MAIN' ? view : undefined,
+      editionSlot,
+      editionId,
     });
     if (!payload) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 401, headers: corsHeaders });

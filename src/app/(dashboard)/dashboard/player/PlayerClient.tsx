@@ -454,6 +454,39 @@ export default function PlayerClient({
 
 
 
+      {/* ── CURRENT EDITION VS NEXT EDITION TOGGLE ─────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-muted/40 rounded-2xl border border-border/80 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTournamentSlot('A')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            activeTournamentSlot === 'A'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Trophy className="h-3.5 w-3.5" />
+          <span>CURRENT EDITION {currentEditionInfo?.number ? `#${currentEditionInfo.number}` : ''}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTournamentSlot('B')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${
+            activeTournamentSlot === 'B'
+              ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>NEXT EDITION (ADVANCE PLAY)</span>
+          {registrationEnrollment ? (
+            <Badge variant="outline" className="text-[9px] bg-emerald-500/20 text-emerald-300 border-emerald-500/30 px-1.5 py-0">
+              ENROLLED
+            </Badge>
+          ) : null}
+        </button>
+      </div>
+
       {/* Next Edition Registration Card with UPI Transaction ID editing */}
       {registrationEnrollment ? (
         <PlayerEnrollmentCard enrollment={registrationEnrollment} />
@@ -911,6 +944,8 @@ export default function PlayerClient({
                     0,
                     0,
                     draftToPayload(dayBoards),
+                    undefined,
+                    activeTournamentSlot,
                   );
                   setDayScoreMsg(res.success ? 'Saved.' : res.error || 'Failed');
                   if (res.success) setMyDayInfo(await getMyDayScores(undefined, activeTournamentSlot));

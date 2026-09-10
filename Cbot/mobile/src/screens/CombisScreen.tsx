@@ -32,6 +32,7 @@ import {
 } from '../api/website';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 import {
   BoardScoreModal,
   boardsFromSaved,
@@ -544,6 +545,7 @@ export function CombisScreen({ navigation }: Props) {
                       ))}
                     </View>
                   ))}
+                  <PoweredByFooter />
                 </>
               );
             })()}
@@ -593,6 +595,7 @@ export function CombisScreen({ navigation }: Props) {
               </Pressable>
             );
           })}
+          <PoweredByFooter />
         </ScrollView>
       )}
 

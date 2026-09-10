@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
+import { PoweredByFooter } from '../components/PoweredByFooter';
 import {
   changePin,
   deleteAccount,
@@ -423,6 +424,7 @@ export function ProfileScreen({ navigation }: Props) {
               <Text style={styles.deleteBtnText}>DELETE ACCOUNT</Text>
             </Pressable>
             <Text style={styles.deleteHint}>Permanently removes your account, scores, and all data. This cannot be undone.</Text>
+            <PoweredByFooter />
           </ScrollView>
         )}
       </KeyboardAvoidingView>

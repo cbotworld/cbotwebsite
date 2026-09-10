@@ -16,7 +16,7 @@ import { getWebsiteCmsSite } from '@/lib/website-cms-site';
 import { isCombiSubmissionLocked } from '@/lib/combi-cutoff';
 import { isDayScorePublished } from '@/lib/day-scoring';
 import { isSpocExhibitionTeam } from '@/lib/spoc-teams';
-import { resolveCurrentEditionRecord } from '@/lib/current-edition';
+import { resolveCurrentEditionRecord, resolvePlayerTournamentOptions, resolveEditionBySlotOrId } from '@/lib/current-edition';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
 import {
@@ -27,13 +27,21 @@ import {
 } from '@/lib/combi-results';
 export async function getPlayerMatchSchedule(
   userId: string,
-  opts?: { teamId?: string; view?: 'MAIN' | 'SPOC' },
+  opts?: { teamId?: string; view?: 'MAIN' | 'SPOC'; editionSlot?: 'A' | 'B'; editionId?: string },
 ) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
 
-  const edition = await resolveCurrentEditionRecord({
-    patterns: { orderBy: { sequence: 'asc' } },
+  const tournamentOptions = await resolvePlayerTournamentOptions(userId);
+  const activeSlot: 'A' | 'B' =
+    opts?.editionSlot === 'B' || opts?.editionSlot === 'A'
+      ? opts.editionSlot
+      : 'A';
+  const isAdvancePlay = activeSlot === 'B';
+
+  const edition = await resolveEditionBySlotOrId({
+    slot: activeSlot,
+    editionId: opts?.editionId,
   });
 
   const cmsSite = await getWebsiteCmsSite();
@@ -61,7 +69,7 @@ export async function getPlayerMatchSchedule(
         tag: requested.tag,
         logo: requested.logo,
       }
-    : participation?.team || null;
+    : participation?.team || (isAdvancePlay ? { id: 'advance', name: user.name || user.username || 'Advance Play', tag: 'ADV', logo: null } : null);
 
   let stageConfig: { stages?: any[] } | null = null;
   if (edition?.id) {
@@ -372,9 +380,11 @@ export async function getPlayerMatchSchedule(
   const live = days.find((d) => d && d.status === 'live') || null;
   const warning = !team
     ? 'Your account is not assigned to a team yet.'
-    : isSpocView && days.length === 0
-      ? 'No Spoc exhibition match is scheduled for your team yet.'
-      : undefined;
+    : isAdvancePlay && !tournamentOptions.nextTournament?.isEnrolled
+      ? (tournamentOptions.nextTournament ? `Advance play is available for players enrolled in ${tournamentOptions.nextTournament.title}.` : 'No upcoming edition scheduled yet.')
+      : isSpocView && days.length === 0
+        ? 'No Spoc exhibition match is scheduled for your team yet.'
+        : undefined;
 
   return {
     user: {
@@ -394,6 +404,10 @@ export async function getPlayerMatchSchedule(
     playableFromDay: isSpocView ? (fixtureDays[0] || 1) : 1,
     playableUntilDay: isSpocView ? (fixtureDays[fixtureDays.length - 1] || currentDayForView) : totalDays,
     daysWithYoutube: [...daysPlayed].sort((a, b) => a - b),
+    tournamentOptions: {
+      ...tournamentOptions,
+      activeSlot,
+    },
     warning,
     days,
   };
