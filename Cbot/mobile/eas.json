@@ -8,7 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_WEBSITE_URL": "https://www.cbotworld.com",
@@ -19,7 +20,8 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_WEBSITE_URL": "https://www.cbotworld.com",
@@ -28,9 +30,11 @@
       }
     },
     "production": {
+      "node": "20.18.0",
       "android": {
         "buildType": "app-bundle",
-        "credentialsSource": "local"
+        "credentialsSource": "local",
+        "image": "latest"
       },
       "ios": {
         "simulator": false
