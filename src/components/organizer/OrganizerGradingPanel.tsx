@@ -19,7 +19,9 @@ import {
   Target,
   Sparkles,
   Download,
+  Image as ImageIcon,
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -488,7 +490,7 @@ function PlayerCellPicker({
                     <div className="flex items-center gap-1 shrink-0">
                       {avg !== null ? (
                         <span className="font-mono text-[9px] font-extrabold text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/20">
-                          Avg {avg.toFixed(1)}
+                          G.Avg {avg.toFixed(1)}
                         </span>
                       ) : null}
                       {p.target !== null && p.target !== undefined && Number(p.target) >= 0 ? (
@@ -551,11 +553,11 @@ function PlayerCellPicker({
               <div className="flex items-center gap-1.5 flex-wrap mt-1 leading-tight">
                 {gradeAvg !== null ? (
                   <span className="text-[9.5px] font-extrabold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 font-mono">
-                    Avg {gradeAvg.toFixed(1)}
+                    G.Avg {gradeAvg.toFixed(1)}
                   </span>
                 ) : (
                   <span className="text-[9.5px] font-medium text-muted-foreground">
-                    No avg
+                    No G.Avg
                   </span>
                 )}
                 {targetToDisplay !== null ? (
@@ -628,6 +630,8 @@ export default function OrganizerGradingPanel({
     rows: number;
     leftovers: PlayerLite[];
   } | null>(null);
+  const [exportingJpeg, setExportingJpeg] = React.useState(false);
+  const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   const participantMap = React.useMemo(() => {
     return new Map<string, EnrolledParticipantLite>((participants || []).map((p) => [p.userId, p]));
@@ -964,23 +968,57 @@ export default function OrganizerGradingPanel({
       rows.push([col.label || col.id, String(count), t != null ? String(t) : '-']);
     });
 
+    // Detailed Table with explicit Grading Average column
+    rows.push([]);
+    rows.push(['--- ALL PLAYERS BY GRADE (DETAILED TABLE) ---']);
+    rows.push([
+      'Grade',
+      'Row #',
+      'Player Name',
+      'Username',
+      'Grading Average',
+      'Tier Target',
+      'Profile Target',
+      'Status',
+    ]);
+    grid.columns.forEach((col) => {
+      for (let rIdx = 0; rIdx < grid.rowCount; rIdx += 1) {
+        const uId = grid.cells[cellKey(col.id, rIdx)];
+        const p = uId ? byId.get(uId) : null;
+        if (!p && !uId) continue;
+        const target = resolveTargetForCell(col, rIdx);
+        const avg = p ? getGradeAverageForUser(p, participantMap) : null;
+        rows.push([
+          col.label || col.id,
+          String(rIdx + 1),
+          p?.name || (uId ? 'Unknown' : 'Unassigned'),
+          p?.username || '',
+          avg != null ? Number(avg).toFixed(2) : '',
+          target != null ? String(target) : '',
+          p?.target != null ? String(p.target) : '',
+          uId ? 'ASSIGNED' : 'EMPTY',
+        ]);
+      }
+    });
+
     // Unassigned players section
     const assignedIds = new Set(Object.values(grid.cells).filter(Boolean));
     const unassigned = gradableUsers.filter((u) => !assignedIds.has(u.id));
     if (unassigned.length > 0) {
       rows.push([]);
       rows.push(['--- UNASSIGNED PLAYERS ---']);
-      rows.push(['Player Name', 'Username', 'Average', 'Target']);
+      rows.push(['Player Name', 'Username', 'Grading Average', 'Target']);
       unassigned.forEach((u) => {
         const avg = getGradeAverageForUser(u, participantMap);
         rows.push([
           u.name || u.username || 'Player',
           u.username || '',
-          avg != null ? String(avg) : '',
+          avg != null ? Number(avg).toFixed(2) : '',
           u.target != null ? String(u.target) : '',
         ]);
       });
     }
+
 
     const csvContent = rows
       .map((row) =>
@@ -1000,6 +1038,38 @@ export default function OrganizerGradingPanel({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadGradingJpeg = async () => {
+    if (!gridContainerRef.current) {
+      alert('Grading grid is not ready for image export.');
+      return;
+    }
+    setExportingJpeg(true);
+    try {
+      const element = gridContainerRef.current;
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#0a0d14',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: element.scrollWidth + 40,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const a = document.createElement('a');
+      a.href = imgData;
+      const cleanTitle = (editionTitle || 'Player_Grading').replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `CBOT_Player_Grading_${cleanTitle}_${new Date().toISOString().split('T')[0]}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to export grading JPEG:', err);
+      alert('Could not export JPEG image.');
+    } finally {
+      setExportingJpeg(false);
+    }
   };
 
 
@@ -1085,6 +1155,22 @@ export default function OrganizerGradingPanel({
               type="button"
               variant="outline"
               size="sm"
+              className="h-8 text-xs font-bold gap-1.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+              onClick={handleDownloadGradingJpeg}
+              disabled={!grid || grid.columns.length === 0 || exportingJpeg}
+              title="Download grading grid visual as JPEG"
+            >
+              {exportingJpeg ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+              ) : (
+                <ImageIcon className="h-3.5 w-3.5 text-emerald-400" />
+              )}
+              Download JPEG
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               className="h-8 text-xs font-bold gap-1.5 border-violet-500/30 text-violet-300 hover:bg-violet-500/10 cursor-pointer"
               onClick={handleDownloadGradingCsv}
               disabled={!grid || grid.columns.length === 0}
@@ -1113,7 +1199,7 @@ export default function OrganizerGradingPanel({
             Loading grading sheet…
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={gridContainerRef} className="overflow-x-auto bg-[#0a0d14] p-1">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="bg-gradient-to-r from-violet-600/20 to-amber-500/10">
@@ -1146,7 +1232,7 @@ export default function OrganizerGradingPanel({
                         />
                         {colAvg !== null ? (
                           <div className="text-[10px] font-black text-amber-400 font-mono my-1 bg-amber-500/10 py-0.5 rounded border border-amber-500/20">
-                            Grade Avg: {colAvg}
+                            G.Avg: {colAvg}
                           </div>
                         ) : null}
                         <ColumnTargetControl
@@ -1274,7 +1360,7 @@ export default function OrganizerGradingPanel({
                           {autoGradeModal.placedCount + idx + 1}. {playerLabel(p)}
                         </span>
                         <span className="font-mono text-xs text-violet-400 font-bold">
-                          {avg !== null ? `Avg ${avg.toFixed(2)}` : 'No Avg'}
+                          {avg !== null ? `G.Avg ${avg.toFixed(2)}` : 'No G.Avg'}
                         </span>
                       </div>
                     );

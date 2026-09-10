@@ -156,13 +156,17 @@ function SpocTeamFormFields({
           <option value="">{playerIds.length === 0 ? 'Select players first…' : 'Select captain…'}</option>
           {playerIds.map((id) => {
             const u = usersList.find((x) => x.id === id);
+            const grade = u?.grade || (u as any)?.category || '';
+            const gradeLabel = grade ? ` — [${grade}]` : '';
             return (
               <option key={id} value={id}>
-                {u?.name || u?.username || id}
+                👑 {u?.name || u?.username || id}{gradeLabel}
               </option>
             );
           })}
         </select>
+
+
       </div>
     </div>
   );

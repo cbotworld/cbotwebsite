@@ -409,38 +409,89 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     return map;
   }, [teamsList, selectedEditionId]);
 
-  // Sort roster selector checklist: Checked/Selected players first on TOP, then unassigned, then assigned
+  // Helper to extract grade rank (e.g., G1 -> 1, G2 -> 2, Grade 3 -> 3, Tier 4 -> 4)
+  const getGradeRank = React.useCallback((gradeStr?: string | null): number => {
+    if (!gradeStr) return 999999;
+    const match = String(gradeStr).match(/(\d+)/);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+    return 99999;
+  }, []);
+
+  // Sort roster selector checklist: Checked/Selected players first on TOP, then unassigned, then assigned, sorted in G1..Gn sequence
   const sortedUsersForNewTeam = React.useMemo(() => {
     return [...usersList].sort((a, b) => {
+      // 1. Checked / Selected players first on TOP
       const aSelected = newTeamPlayerIds.includes(a.id);
       const bSelected = newTeamPlayerIds.includes(b.id);
       if (aSelected && !bSelected) return -1;
       if (!aSelected && bSelected) return 1;
 
+      // 2. Unassigned before Assigned to other teams
       const aAssigned = !!assignedTeamMap[a.id];
       const bAssigned = !!assignedTeamMap[b.id];
       if (!aAssigned && bAssigned) return -1;
       if (aAssigned && !bAssigned) return 1;
 
+      // 3. Grade sequence: G1 -> G2 -> G3 -> ... -> Gn
+      const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
+      const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
+      const rankA = getGradeRank(gradeA);
+      const rankB = getGradeRank(gradeB);
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      if (gradeA && gradeB && gradeA !== gradeB) {
+        return gradeA.localeCompare(gradeB);
+      }
+
+      // 4. SPOC first within same grade
+      const aSpoc = !!playerSpocMap[a.id];
+      const bSpoc = !!playerSpocMap[b.id];
+      if (aSpoc && !bSpoc) return -1;
+      if (!aSpoc && bSpoc) return 1;
+
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [usersList, newTeamPlayerIds, assignedTeamMap]);
+  }, [usersList, newTeamPlayerIds, assignedTeamMap, playerGradeMap, playerSpocMap, getGradeRank]);
 
   const sortedUsersForEditTeam = React.useMemo(() => {
     return [...usersList].sort((a, b) => {
+      // 1. Checked / Selected players first on TOP
       const aSelected = selectedPlayerIds.includes(a.id);
       const bSelected = selectedPlayerIds.includes(b.id);
       if (aSelected && !bSelected) return -1;
       if (!aSelected && bSelected) return 1;
 
+      // 2. Unassigned before Assigned to other teams
       const aAssigned = assignedTeamMap[a.id] && assignedTeamMap[a.id].teamId !== editingTeamId;
       const bAssigned = assignedTeamMap[b.id] && assignedTeamMap[b.id].teamId !== editingTeamId;
       if (!aAssigned && bAssigned) return -1;
       if (aAssigned && !bAssigned) return 1;
 
+      // 3. Grade sequence: G1 -> G2 -> G3 -> ... -> Gn
+      const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
+      const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
+      const rankA = getGradeRank(gradeA);
+      const rankB = getGradeRank(gradeB);
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      if (gradeA && gradeB && gradeA !== gradeB) {
+        return gradeA.localeCompare(gradeB);
+      }
+
+      // 4. SPOC first within same grade
+      const aSpoc = !!playerSpocMap[a.id];
+      const bSpoc = !!playerSpocMap[b.id];
+      if (aSpoc && !bSpoc) return -1;
+      if (!aSpoc && bSpoc) return 1;
+
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [usersList, selectedPlayerIds, editingTeamId, assignedTeamMap]);
+  }, [usersList, selectedPlayerIds, editingTeamId, assignedTeamMap, playerGradeMap, playerSpocMap, getGradeRank]);
+
 
   // Automatically select the designated SPOC as team captain when players are added to roster
   React.useEffect(() => {
@@ -1443,6 +1494,10 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       return;
     }
     const byId = new Map(usersList.map((u: any) => [u.id, u]));
+    const participantMap = new Map(
+      (selectedEdition?.participants || []).map((p: any) => [p.userId || p.user?.id || p.id, p])
+    );
+
     const rows: string[][] = [
       [
         'Team Name',
@@ -1453,6 +1508,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         'Player Username',
         'Player Role',
         'Grade',
+        'Grading Average',
         'Average',
         'Target',
         'WhatsApp / Phone',
@@ -1485,14 +1541,20 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           '',
           '',
           '',
+          '',
         ]);
       } else {
         members.forEach((m: any) => {
           const uId = m.userId || m.user?.id || m.id;
           const u = byId.get(uId) || m.user;
+          const part = participantMap.get(uId) || m;
           const isCaptain = uId === team.captainId || (captain && uId === captain.id);
-          const isSpoc = !!playerSpocMap[uId] || Boolean(m.isSpoc);
-          const grade = playerGradeMap[uId] || u?.grade || (u as any)?.category || m?.category || m?.grade || '';
+          const isSpoc = !!playerSpocMap[uId] || Boolean(m.isSpoc) || Boolean(part?.isSpoc);
+          const grade = playerGradeMap[uId] || u?.grade || (u as any)?.category || part?.category || part?.grade || m?.category || m?.grade || '';
+
+          const gradingAvg = part?.gradeAverage != null && Number(part.gradeAverage) > 0
+            ? Number(part.gradeAverage).toFixed(2)
+            : (u?.average != null && Number(u.average) > 0 ? Number(u.average).toFixed(2) : '');
 
           let role = 'MEMBER';
           if (isCaptain && isSpoc) role = 'CAPTAIN & SPOC';
@@ -1508,6 +1570,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             u?.username || '',
             role,
             grade ? String(grade) : '',
+            gradingAvg,
             u?.average != null ? String(u.average) : '',
             u?.target != null ? String(u.target) : '',
             u?.whatsApp || '',
@@ -1519,6 +1582,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         });
       }
     });
+
 
     const csvContent = rows
       .map((row) =>
@@ -3323,15 +3387,29 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     const bSpoc = !!playerSpocMap[b.id];
                     if (aSpoc && !bSpoc) return -1;
                     if (!aSpoc && bSpoc) return 1;
+
+                    const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
+                    const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
+                    const rankA = getGradeRank(gradeA);
+                    const rankB = getGradeRank(gradeB);
+                    if (rankA !== rankB) return rankA - rankB;
+
                     return (a.name || '').localeCompare(b.name || '');
                   })
-                  .map((usr) => (
-                    <option key={usr.id} value={usr.id}>
-                      {playerSpocMap[usr.id] ? `⭐ [SPOC] ${usr.name} (@${usr.username})` : `👑 ${usr.name} (@${usr.username})`}
-                    </option>
-                  ))
+
+                  .map((usr) => {
+                    const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
+                    const gradeLabel = grade ? ` — [${grade}]` : '';
+                    const spocLabel = playerSpocMap[usr.id] ? '⭐ [SPOC] ' : '👑 ';
+                    return (
+                      <option key={usr.id} value={usr.id}>
+                        {spocLabel}{usr.name} (@{usr.username}){gradeLabel}
+                      </option>
+                    );
+                  })
               )}
             </Select>
+
           </div>
 
 
@@ -3539,15 +3617,29 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     const bSpoc = !!playerSpocMap[b.id];
                     if (aSpoc && !bSpoc) return -1;
                     if (!aSpoc && bSpoc) return 1;
+
+                    const gradeA = playerGradeMap[a.id] || a.grade || (a as any)?.category || '';
+                    const gradeB = playerGradeMap[b.id] || b.grade || (b as any)?.category || '';
+                    const rankA = getGradeRank(gradeA);
+                    const rankB = getGradeRank(gradeB);
+                    if (rankA !== rankB) return rankA - rankB;
+
                     return (a.name || '').localeCompare(b.name || '');
                   })
-                  .map((usr) => (
-                    <option key={usr.id} value={usr.id}>
-                      {playerSpocMap[usr.id] ? `⭐ [SPOC] ${usr.name} (@${usr.username})` : `👑 ${usr.name} (@${usr.username})`}
-                    </option>
-                  ))
+
+                  .map((usr) => {
+                    const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
+                    const gradeLabel = grade ? ` — [${grade}]` : '';
+                    const spocLabel = playerSpocMap[usr.id] ? '⭐ [SPOC] ' : '👑 ';
+                    return (
+                      <option key={usr.id} value={usr.id}>
+                        {spocLabel}{usr.name} (@{usr.username}){gradeLabel}
+                      </option>
+                    );
+                  })
               )}
             </Select>
+
           </div>
 
 
