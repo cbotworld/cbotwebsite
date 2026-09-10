@@ -45,17 +45,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
   },
   text: {
-    color: '#64748b',
-    fontSize: 11,
+    color: '#94a3b8',
+    fontSize: 11.5,
     fontWeight: '700',
     letterSpacing: 0.4,
     textTransform: 'lowercase',
   },
   logo: {
-    width: 116,
-    height: 22,
+    width: 136,
+    height: 26,
   },
 });
