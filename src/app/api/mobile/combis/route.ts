@@ -265,7 +265,7 @@ export async function GET(request: NextRequest) {
         ])
       : [[], [], [], null, []];
 
-    const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+    const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
     for (const [userId, member] of memberMap.entries()) {
       if (userTargetMap.has(userId)) {
         member.target = userTargetMap.get(userId)!;

@@ -185,7 +185,7 @@ export default async function PlayerPage() {
         select: { target: true },
       }),
     ]);
-    const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(
+    const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(
       gradingSetting,
       editionParticipant ? [editionParticipant] : [],
       targetLog ? [targetLog] : [],

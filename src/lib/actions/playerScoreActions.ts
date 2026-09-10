@@ -588,7 +588,7 @@ export async function getOrganiserScoreDesk(editionId?: string) {
     }),
   ]);
   const rosterTeams = buildRosterTeams(editionTeams);
-  const { userGradeMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
+  const { userGradeMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
   const userGradeRecord = Object.fromEntries(userGradeMap.entries());
 
   return {
@@ -678,7 +678,7 @@ export async function getMyDayScoresForUser(
     prisma.user.findUnique({ where: { id: userId }, select: { average: true, target: true } }),
   ]);
 
-  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+  const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
   const resolvedTarget = userTargetMap.get(userId) ?? 0;
   const resolvedGrade = userGradeMap.get(userId) ?? participant?.category ?? null;
 
@@ -853,7 +853,7 @@ export async function getTeamDayScoresForActor(
       : [],
   ]);
 
-  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
+  const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, []);
 
   const calendarDate = combiCalendarDate(dayNumber, edition.dayDates);
   const captainWindowOpen = isCaptainScoreEditOpen(dayNumber, edition.dayDates) || isOrganiserActor;
@@ -1061,7 +1061,7 @@ function buildRosterTeams(teams: any[]) {
   });
 }
 
-export function extractGradeAndTargetMaps(
+export async function extractGradeAndTargetMaps(
   gradingSetting: any,
   editionParticipants: any[],
   targetLogs: any[],
@@ -1214,7 +1214,7 @@ async function loadPublicScoreboard() {
 
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const rosterTeams = buildRosterTeams(teams);
-  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
+  const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
   for (const team of rosterTeams) {
     for (const member of team.members) {
       if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
@@ -1358,7 +1358,7 @@ async function loadPublicStandings(editionId?: string, options?: { skipSnapshotR
 
   const maxDay = calendarDaysInEdition(stages, edition.totalDays);
   const standingTeams = buildRosterTeams(teams);
-  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+  const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
   for (const team of standingTeams) {
     for (const member of team.members) {
       if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
@@ -1496,7 +1496,7 @@ export async function getEditionProfileStatsForUser(userId: string, requestedEdi
   ]);
 
   const standingTeams = buildRosterTeams(teams);
-  const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
+  const { userGradeMap, userTargetMap } = await extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
   for (const team of standingTeams) {
     for (const member of team.members) {
       if (userGradeMap.has(member.id)) member.grade = userGradeMap.get(member.id)!;
