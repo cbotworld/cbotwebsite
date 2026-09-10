@@ -147,10 +147,20 @@ export async function buildEditionArchiveWorkbook(editionId: string) {
     career_target: p.user?.target ?? '',
   }));
 
-  const gradingRows: Record<string, unknown>[] = [];
   const gridRows: Record<string, unknown>[] = [];
+  for (let rowIndex = 0; rowIndex < gradingGrid.rowCount; rowIndex += 1) {
+    const rowObj: Record<string, unknown> = { row_number: rowIndex + 1 };
+    gradingGrid.columns.forEach((col) => {
+      const userId = gradingGrid.cells[cellKey(col.id, rowIndex)];
+      const user = userId ? userById.get(userId) : null;
+      rowObj[col.label || col.id] = user ? `${user.name || user.username} (@${user.username})` : '';
+    });
+    gridRows.push(rowObj);
+  }
 
+  const gradingRows: Record<string, unknown>[] = [];
   gradingGrid.columns.forEach((col) => {
+
     for (let rowIndex = 0; rowIndex < gradingGrid.rowCount; rowIndex += 1) {
       const userId = gradingGrid.cells[cellKey(col.id, rowIndex)];
       if (!userId) continue;
@@ -170,17 +180,9 @@ export async function buildEditionArchiveWorkbook(editionId: string) {
         career_average: user?.average ?? '',
         career_target: user?.target ?? '',
       });
-      gridRows.push({
-        column_id: col.id,
-        column_label: col.label,
-        row: rowIndex + 1,
-        user_id: userId,
-        player_name: user?.name || '',
-        username: user?.username || '',
-        target: target ?? '',
-      });
     }
   });
+
 
   edition.participants.forEach((p) => {
     if (!p.category && p.gradeAverage == null) return;
@@ -287,11 +289,28 @@ export async function buildEditionArchiveWorkbook(editionId: string) {
     team_type: t.teamType,
     captain: t.captain?.name || t.captain?.username || '',
     roster: t.members
-      .map((m) => m.user?.name || m.user?.username)
+      .map((m) => `${m.user?.name || m.user?.username}${m.category ? ` [${m.category}]` : ''}`)
       .filter(Boolean)
       .join(', '),
     saved_lineups: t.savedLineups || '',
   }));
+
+  const teamPlayerRows: Record<string, unknown>[] = [];
+  edition.teams.forEach((t) => {
+    t.members.forEach((m) => {
+      const isCaptain = m.userId === t.captainId;
+      teamPlayerRows.push({
+        team_name: t.name,
+        team_tag: t.tag,
+        team_type: t.teamType,
+        captain: t.captain?.name || t.captain?.username || '',
+        player_name: m.user?.name || m.user?.username || '',
+        username: m.user?.username || '',
+        role: isCaptain && m.isSpoc ? 'CAPTAIN & SPOC' : isCaptain ? 'CAPTAIN' : m.isSpoc ? 'SPOC' : 'MEMBER',
+        grade: m.category || '',
+      });
+    });
+  });
 
   const patternRows = edition.patterns.map((p) => ({
     sequence: p.sequence,
@@ -311,7 +330,9 @@ export async function buildEditionArchiveWorkbook(editionId: string) {
   appendSheet(wb, 'Matches', matchRows);
   appendSheet(wb, 'Combis', combiRows);
   appendSheet(wb, 'Teams', teamRows);
+  appendSheet(wb, 'Team Rosters', teamPlayerRows);
   appendSheet(wb, 'Patterns', patternRows);
+
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   const fileName = `CBOT-Edition-${edition.number}-${toCalendarDate(new Date()) || 'export'}.xlsx`;

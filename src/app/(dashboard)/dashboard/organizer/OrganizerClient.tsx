@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MOCK_TOURNAMENTS, MOCK_MATCHES, MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS } from '@/lib/mock-data';
-import { addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction, autoAssignPlayersToTeams } from '@/lib/actions/tournamentActions';
+import { addOrUpdateEditionTeam, updateEdition, updateTeamRosterAndCaptain, deleteTeam, sendPlayerCredentialsEmailAction, autoAssignPlayersToTeams, assignSpocsAsTeamCaptains } from '@/lib/actions/tournamentActions';
 import { sendFinalDailyLineupSummaryAction } from '@/lib/actions/lineupActions';
 import { verifyScoreReport } from '@/lib/actions/matchActions';
 import { finalizeEditionRankings } from '@/lib/actions/rankingActions';
@@ -145,79 +145,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   const [editCaptainId, setEditCaptainId] = React.useState('');
   const [selectedPlayerIds, setSelectedPlayerIds] = React.useState<string[]>([]);
 
-  // Map players already assigned to teams in the selected edition (only if team actually has roster members)
-  const assignedTeamMap = React.useMemo(() => {
-    const map: Record<string, { teamId: string; teamName: string }> = {};
-    teamsList.forEach((team) => {
-      if (!isMainTournamentTeam(team)) return;
-      if (team.members && Array.isArray(team.members) && team.members.length > 0) {
-        team.members.forEach((m: any) => {
-          const uId = m.userId || (m.user && m.user.id) || m.id;
-          if (uId) {
-            map[uId] = { teamId: team.id, teamName: team.name };
-          }
-        });
-        if (team.captainId) {
-          map[team.captainId] = { teamId: team.id, teamName: team.name };
-        }
-      }
-    });
-    return map;
-  }, [teamsList]);
 
-  // Sort roster selector checklist: Checked/Selected players first on TOP, then unassigned, then assigned
-  const sortedUsersForNewTeam = React.useMemo(() => {
-    return [...usersList].sort((a, b) => {
-      const aSelected = newTeamPlayerIds.includes(a.id);
-      const bSelected = newTeamPlayerIds.includes(b.id);
-      if (aSelected && !bSelected) return -1;
-      if (!aSelected && bSelected) return 1;
-
-      const aAssigned = !!assignedTeamMap[a.id];
-      const bAssigned = !!assignedTeamMap[b.id];
-      if (!aAssigned && bAssigned) return -1;
-      if (aAssigned && !bAssigned) return 1;
-
-      return (a.name || '').localeCompare(b.name || '');
-    });
-  }, [usersList, newTeamPlayerIds, assignedTeamMap]);
-
-  const sortedUsersForEditTeam = React.useMemo(() => {
-    return [...usersList].sort((a, b) => {
-      const aSelected = selectedPlayerIds.includes(a.id);
-      const bSelected = selectedPlayerIds.includes(b.id);
-      if (aSelected && !bSelected) return -1;
-      if (!aSelected && bSelected) return 1;
-
-      const aAssigned = assignedTeamMap[a.id] && assignedTeamMap[a.id].teamId !== editingTeamId;
-      const bAssigned = assignedTeamMap[b.id] && assignedTeamMap[b.id].teamId !== editingTeamId;
-      if (!aAssigned && bAssigned) return -1;
-      if (aAssigned && !bAssigned) return 1;
-
-      return (a.name || '').localeCompare(b.name || '');
-    });
-  }, [usersList, selectedPlayerIds, editingTeamId, assignedTeamMap]);
-
-  // Rule 2: Automatically restrict Captain selection to added roster players
-  React.useEffect(() => {
-    if (selectedPlayerIds.length > 0) {
-      if (!selectedPlayerIds.includes(editCaptainId)) {
-        setEditCaptainId(selectedPlayerIds[0]);
-      }
-    } else {
-      setEditCaptainId('');
-    }
-  }, [selectedPlayerIds]);
-
-  React.useEffect(() => {
-    if (newTeamPlayerIds.length > 0) {
-      if (!newTeamPlayerIds.includes(newTeamCaptainId)) {
-        setNewTeamCaptainId(newTeamPlayerIds[0]);
-      }
-    } else {
-      setNewTeamCaptainId('');
-    }
-  }, [newTeamPlayerIds]);
 
   // Credential Generator State
   // Credential Generator & Profile Edit State
@@ -429,6 +357,119 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       String(selectedEdition.status || '').toUpperCase() === 'IN_PROGRESS';
     return !isLiveCup;
   }, [selectedEdition, hasTournamentPayload]);
+
+  // Map user IDs to their grade / category for the currently selected edition
+  const playerGradeMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    const participants = selectedEdition?.participants || [];
+    participants.forEach((p: any) => {
+      const uId = p.userId || p.user?.id || p.id;
+      const g = p.category || p.grade;
+      if (uId && g) {
+        map[uId] = String(g);
+      }
+    });
+    return map;
+  }, [selectedEdition]);
+
+  // Map user IDs to whether they are designated as a SPOC in the currently selected edition
+  const playerSpocMap = React.useMemo(() => {
+    const map: Record<string, boolean> = {};
+    const participants = selectedEdition?.participants || [];
+    participants.forEach((p: any) => {
+      const uId = p.userId || p.user?.id || p.id;
+      if (uId && p.isSpoc) {
+        map[uId] = true;
+      }
+    });
+    return map;
+  }, [selectedEdition]);
+
+  // Map players already assigned to teams in the selected edition (only if team actually has roster members)
+  const assignedTeamMap = React.useMemo(() => {
+    const map: Record<string, { teamId: string; teamName: string }> = {};
+    if (!selectedEditionId) return map;
+
+    teamsList.forEach((team) => {
+      // Scope strictly to the currently selected edition so teams from other editions (e.g. #201 vs #202) don't collide
+      if (team.editionId && team.editionId !== selectedEditionId) return;
+      if (!isMainTournamentTeam(team)) return;
+      if (team.members && Array.isArray(team.members) && team.members.length > 0) {
+        team.members.forEach((m: any) => {
+          const uId = m.userId || (m.user && m.user.id) || m.id;
+          if (uId) {
+            map[uId] = { teamId: team.id, teamName: team.name };
+          }
+        });
+        if (team.captainId) {
+          map[team.captainId] = { teamId: team.id, teamName: team.name };
+        }
+      }
+    });
+    return map;
+  }, [teamsList, selectedEditionId]);
+
+  // Sort roster selector checklist: Checked/Selected players first on TOP, then unassigned, then assigned
+  const sortedUsersForNewTeam = React.useMemo(() => {
+    return [...usersList].sort((a, b) => {
+      const aSelected = newTeamPlayerIds.includes(a.id);
+      const bSelected = newTeamPlayerIds.includes(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+
+      const aAssigned = !!assignedTeamMap[a.id];
+      const bAssigned = !!assignedTeamMap[b.id];
+      if (!aAssigned && bAssigned) return -1;
+      if (aAssigned && !bAssigned) return 1;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [usersList, newTeamPlayerIds, assignedTeamMap]);
+
+  const sortedUsersForEditTeam = React.useMemo(() => {
+    return [...usersList].sort((a, b) => {
+      const aSelected = selectedPlayerIds.includes(a.id);
+      const bSelected = selectedPlayerIds.includes(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+
+      const aAssigned = assignedTeamMap[a.id] && assignedTeamMap[a.id].teamId !== editingTeamId;
+      const bAssigned = assignedTeamMap[b.id] && assignedTeamMap[b.id].teamId !== editingTeamId;
+      if (!aAssigned && bAssigned) return -1;
+      if (aAssigned && !bAssigned) return 1;
+
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [usersList, selectedPlayerIds, editingTeamId, assignedTeamMap]);
+
+  // Automatically select the designated SPOC as team captain when players are added to roster
+  React.useEffect(() => {
+    if (selectedPlayerIds.length > 0) {
+      const spocPlayerId = selectedPlayerIds.find((id) => playerSpocMap[id]);
+      if (!selectedPlayerIds.includes(editCaptainId)) {
+        setEditCaptainId(spocPlayerId || selectedPlayerIds[0]);
+      } else if (!playerSpocMap[editCaptainId] && spocPlayerId) {
+        setEditCaptainId(spocPlayerId);
+      }
+    } else {
+      setEditCaptainId('');
+    }
+  }, [selectedPlayerIds, playerSpocMap]);
+
+  React.useEffect(() => {
+    if (newTeamPlayerIds.length > 0) {
+      const spocPlayerId = newTeamPlayerIds.find((id) => playerSpocMap[id]);
+      if (!newTeamPlayerIds.includes(newTeamCaptainId)) {
+        setNewTeamCaptainId(spocPlayerId || newTeamPlayerIds[0]);
+      } else if (!playerSpocMap[newTeamCaptainId] && spocPlayerId) {
+        setNewTeamCaptainId(spocPlayerId);
+      }
+    } else {
+      setNewTeamCaptainId('');
+    }
+  }, [newTeamPlayerIds, playerSpocMap]);
+
+
 
   const mergeSlotEditions = React.useCallback((slotA: any, slotB: any) => {
     setEditions((prev) => {
@@ -866,6 +907,28 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     }
     setAutoAssigning(false);
   };
+
+  const [assigningSpocsAsCaptains, setAssigningSpocsAsCaptains] = React.useState(false);
+
+  const handleAssignSpocsAsCaptains = async () => {
+    const editionId = selectedEditionId || slotAEdition?.id || '';
+    if (!editionId || assigningSpocsAsCaptains) return;
+    setAssigningSpocsAsCaptains(true);
+    setTeamsNotice(null);
+
+    const res = await assignSpocsAsTeamCaptains(editionId);
+    if (res.success) {
+      setTeamsNotice({
+        kind: 'ok',
+        text: res.message || 'Designated SPOCs as team captains for all teams.',
+      });
+      router.refresh();
+    } else {
+      setTeamsNotice({ kind: 'error', text: res.error || 'Failed to assign SPOCs as captains.' });
+    }
+    setAssigningSpocsAsCaptains(false);
+  };
+
 
   const handleOpenEditTeamModal = (team: any) => {
     setEditingTeamId(team.id);
@@ -1389,6 +1452,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
         'Player Name',
         'Player Username',
         'Player Role',
+        'Grade',
         'Average',
         'Target',
         'WhatsApp / Phone',
@@ -1420,12 +1484,21 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
           '',
           '',
           '',
+          '',
         ]);
       } else {
         members.forEach((m: any) => {
           const uId = m.userId || m.user?.id || m.id;
           const u = byId.get(uId) || m.user;
           const isCaptain = uId === team.captainId || (captain && uId === captain.id);
+          const isSpoc = !!playerSpocMap[uId] || Boolean(m.isSpoc);
+          const grade = playerGradeMap[uId] || u?.grade || (u as any)?.category || m?.category || m?.grade || '';
+
+          let role = 'MEMBER';
+          if (isCaptain && isSpoc) role = 'CAPTAIN & SPOC';
+          else if (isCaptain) role = 'CAPTAIN';
+          else if (isSpoc) role = 'SPOC';
+
           rows.push([
             team.name,
             team.tag || '',
@@ -1433,7 +1506,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             captain?.username || '',
             u?.name || u?.username || 'Player',
             u?.username || '',
-            isCaptain ? 'CAPTAIN' : 'MEMBER',
+            role,
+            grade ? String(grade) : '',
             u?.average != null ? String(u.average) : '',
             u?.target != null ? String(u.target) : '',
             u?.whatsApp || '',
@@ -1454,8 +1528,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
       )
       .join('\r\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement('a');
     a.href = url;
     const editionSlug = (selectedEdition?.title || `Edition_${selectedEdition?.number || 'Current'}`)
@@ -1941,6 +2016,21 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
             <Button
               variant="outline"
               size="sm"
+              onClick={() => void handleAssignSpocsAsCaptains()}
+              disabled={assigningSpocsAsCaptains || selectedEditionTeams.length === 0}
+              className="text-xs font-bold border-violet-500/40 text-violet-300 hover:bg-violet-500/10"
+              title="Designate the SPOC in each team roster as the team's official Captain"
+            >
+              {assigningSpocsAsCaptains ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <Crown className="h-3.5 w-3.5 mr-1 text-amber-400" />
+              )}
+              {assigningSpocsAsCaptains ? 'Setting...' : 'Set SPOCs as Captains'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => void handleAutoAssignPlayers(false)}
               disabled={autoAssigning || selectedEditionTeams.length === 0}
               className="text-xs font-bold border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
@@ -1988,6 +2078,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     u.id === team.captainId ||
                     (team.captain?.id && u.id === team.captain.id)
                 );
+                const isCaptainSpoc = captain ? !!playerSpocMap[captain.id] : false;
                 const memberCount = team.members ? team.members.length : 0;
                 return (
                   <TableRow key={team.id}>
@@ -2006,6 +2097,11 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                       {captain ? (
                         <span className="text-amber-400 font-bold flex items-center gap-1">
                           <Crown className="h-3 w-3" /> {captain.name || captain.username}
+                          {isCaptainSpoc && (
+                            <Badge variant="outline" className="text-[9px] font-black uppercase bg-violet-500/15 text-violet-300 border-violet-500/35 px-1 py-0 ml-1">
+                              SPOC
+                            </Badge>
+                          )}
                         </span>
                       ) : (
                         <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>
@@ -2015,6 +2111,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                     <TableCell>
                       <Badge variant="success" className="text-[10px]">ACTIVE</Badge>
                     </TableCell>
+
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
@@ -3110,9 +3207,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   if (!rosterSearchQuery.trim()) return true;
                   const q = rosterSearchQuery.toLowerCase().trim();
                   const qClean = q.startsWith('@') ? q.substring(1) : q;
+                  const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
+                  const isSpoc = !!playerSpocMap[usr.id];
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
+                    (grade && String(grade).toLowerCase().includes(q)) ||
+                    (isSpoc && 'spoc'.includes(q)) ||
                     (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
                     (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
@@ -3121,6 +3222,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const isSelected = newTeamPlayerIds.includes(usr.id);
                 const assignedToOtherTeam = !!assignedTeamMap[usr.id];
                 const otherTeamName = assignedToOtherTeam ? assignedTeamMap[usr.id].teamName : '';
+                const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
+                const isSpoc = !!playerSpocMap[usr.id];
 
                 return (
                   <label
@@ -3133,7 +3236,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                         : 'hover:bg-muted/60 border border-transparent cursor-pointer'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2 flex-wrap sm:flex-nowrap">
                       <input
                         type="checkbox"
                         disabled={assignedToOtherTeam}
@@ -3146,12 +3249,32 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                             setNewTeamPlayerIds(newTeamPlayerIds.filter((id) => id !== usr.id));
                           }
                         }}
-                        className="accent-amber-500 h-4 w-4 rounded cursor-pointer disabled:cursor-not-allowed"
+                        className="accent-amber-500 h-4 w-4 rounded cursor-pointer disabled:cursor-not-allowed shrink-0"
                       />
-                      <span className="text-foreground font-semibold">{usr.name}</span>
-                      <span className="text-muted-foreground font-mono text-[11px]">(@{usr.username})</span>
+                      <span className="text-foreground font-semibold truncate">{usr.name}</span>
+                      <span className="text-muted-foreground font-mono text-[11px] shrink-0">(@{usr.username})</span>
+                      {isSpoc && (
+                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-300 border-amber-500/35 px-1.5 py-0 shrink-0">
+                          SPOC
+                        </Badge>
+                      )}
+                      {userGrade && (
+                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider bg-violet-500/15 text-violet-300 border-violet-500/35 px-1.5 py-0 shrink-0">
+                          {userGrade}
+                        </Badge>
+                      )}
+                      {usr.average ? (
+                        <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                          Avg: {Number(usr.average).toFixed(2)}
+                        </span>
+                      ) : null}
+                      {usr.target ? (
+                        <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
+                          Tgt: {usr.target}
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {assignedToOtherTeam && (
                         <Badge variant="outline" className="text-[9px] text-amber-500/70 border-amber-500/30">
                           In {otherTeamName}
@@ -3159,7 +3282,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                       )}
                       {(() => {
                         const isCaptain = teamsList.some(
-                          (t) => t.captainId === usr.id && t.members && t.members.length > 0
+                          (t) => (t.editionId === selectedEditionId || !t.editionId) && t.captainId === usr.id && t.members && t.members.length > 0
                         );
                         return (
                           <Badge variant={isCaptain ? 'warning' : 'outline'} className="text-[9px]">
@@ -3176,8 +3299,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
           {/* Step 2: Assign Team Captain (From Selected Roster) */}
           <div className="pt-1">
-            <label className="text-xs font-black text-amber-500 flex items-center gap-1.5 mb-1">
-              👑 2. Assign Team Captain (From Selected Roster)
+            <label className="text-xs font-black text-amber-500 flex items-center justify-between gap-1.5 mb-1">
+              <span className="flex items-center gap-1.5">
+                👑 2. Assign Team Captain (From Selected Roster)
+              </span>
+              <span className="text-[10px] text-muted-foreground font-normal">
+                SPOCs are automatically selected as Captain
+              </span>
             </label>
             <Select
               value={newTeamCaptainId}
@@ -3190,14 +3318,22 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               ) : (
                 usersList
                   .filter((usr) => newTeamPlayerIds.includes(usr.id))
+                  .sort((a, b) => {
+                    const aSpoc = !!playerSpocMap[a.id];
+                    const bSpoc = !!playerSpocMap[b.id];
+                    if (aSpoc && !bSpoc) return -1;
+                    if (!aSpoc && bSpoc) return 1;
+                    return (a.name || '').localeCompare(b.name || '');
+                  })
                   .map((usr) => (
                     <option key={usr.id} value={usr.id}>
-                      👑 {usr.name} (@{usr.username})
+                      {playerSpocMap[usr.id] ? `⭐ [SPOC] ${usr.name} (@${usr.username})` : `👑 ${usr.name} (@${usr.username})`}
                     </option>
                   ))
               )}
             </Select>
           </div>
+
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setAddTeamModalOpen(false)}>
@@ -3287,9 +3423,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   if (!rosterSearchQuery.trim()) return true;
                   const q = rosterSearchQuery.toLowerCase().trim();
                   const qClean = q.startsWith('@') ? q.substring(1) : q;
+                  const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
+                  const isSpoc = !!playerSpocMap[usr.id];
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
+                    (grade && String(grade).toLowerCase().includes(q)) ||
+                    (isSpoc && 'spoc'.includes(q)) ||
                     (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
                     (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
@@ -3298,6 +3438,8 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const isSelected = selectedPlayerIds.includes(usr.id);
                 const assignedToOtherTeam = assignedTeamMap[usr.id] && assignedTeamMap[usr.id].teamId !== editingTeamId;
                 const otherTeamName = assignedToOtherTeam ? assignedTeamMap[usr.id].teamName : '';
+                const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
+                const isSpoc = !!playerSpocMap[usr.id];
 
                 return (
                   <label
@@ -3310,7 +3452,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                         : 'hover:bg-muted/60 border border-transparent cursor-pointer'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2 flex-wrap sm:flex-nowrap">
                       <input
                         type="checkbox"
                         disabled={assignedToOtherTeam}
@@ -3323,22 +3465,32 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                             setSelectedPlayerIds(selectedPlayerIds.filter((id) => id !== usr.id));
                           }
                         }}
-                        className="accent-amber-500 h-4 w-4 rounded cursor-pointer disabled:cursor-not-allowed"
+                        className="accent-amber-500 h-4 w-4 rounded cursor-pointer disabled:cursor-not-allowed shrink-0"
                       />
-                      <span className="text-foreground font-semibold">{usr.name}</span>
-                      <span className="text-muted-foreground font-mono text-[11px]">(@{usr.username})</span>
+                      <span className="text-foreground font-semibold truncate">{usr.name}</span>
+                      <span className="text-muted-foreground font-mono text-[11px] shrink-0">(@{usr.username})</span>
+                      {isSpoc && (
+                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-300 border-amber-500/35 px-1.5 py-0 shrink-0">
+                          SPOC
+                        </Badge>
+                      )}
+                      {userGrade && (
+                        <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider bg-violet-500/15 text-violet-300 border-violet-500/35 px-1.5 py-0 shrink-0">
+                          {userGrade}
+                        </Badge>
+                      )}
                       {usr.average ? (
-                        <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
                           Avg: {Number(usr.average).toFixed(2)}
                         </span>
                       ) : null}
                       {usr.target ? (
-                        <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
                           Tgt: {usr.target}
                         </span>
                       ) : null}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {assignedToOtherTeam && (
                         <Badge variant="outline" className="text-[9px] text-amber-500/70 border-amber-500/30">
                           In {otherTeamName}
@@ -3346,7 +3498,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                       )}
                       {(() => {
                         const isCaptain = teamsList.some(
-                          (t) => t.captainId === usr.id && t.members && t.members.length > 0
+                          (t) => (t.editionId === selectedEditionId || !t.editionId) && t.captainId === usr.id && t.members && t.members.length > 0
                         );
                         return (
                           <Badge variant={isCaptain ? 'warning' : 'outline'} className="text-[9px]">
@@ -3363,8 +3515,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
 
           {/* Step 2: Assign Team Captain (From Selected Roster) */}
           <div className="pt-1">
-            <label className="text-xs font-black text-amber-500 flex items-center gap-1.5 mb-1">
-              👑 2. Assign Team Captain (From Selected Roster)
+            <label className="text-xs font-black text-amber-500 flex items-center justify-between gap-1.5 mb-1">
+              <span className="flex items-center gap-1.5">
+                👑 2. Assign Team Captain (From Selected Roster)
+              </span>
+              <span className="text-[10px] text-muted-foreground font-normal">
+                SPOCs are automatically selected as Captain
+              </span>
             </label>
             <Select
               value={editCaptainId}
@@ -3377,14 +3534,22 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
               ) : (
                 usersList
                   .filter((usr) => selectedPlayerIds.includes(usr.id))
+                  .sort((a, b) => {
+                    const aSpoc = !!playerSpocMap[a.id];
+                    const bSpoc = !!playerSpocMap[b.id];
+                    if (aSpoc && !bSpoc) return -1;
+                    if (!aSpoc && bSpoc) return 1;
+                    return (a.name || '').localeCompare(b.name || '');
+                  })
                   .map((usr) => (
                     <option key={usr.id} value={usr.id}>
-                      👑 {usr.name} (@{usr.username})
+                      {playerSpocMap[usr.id] ? `⭐ [SPOC] ${usr.name} (@${usr.username})` : `👑 ${usr.name} (@${usr.username})`}
                     </option>
                   ))
               )}
             </Select>
           </div>
+
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => setEditTeamModalOpen(false)}>

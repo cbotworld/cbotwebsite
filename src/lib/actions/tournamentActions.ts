@@ -1168,9 +1168,33 @@ export async function autoAssignPlayersToTeams(
       if (missing.length > 0) {
         await tx.editionParticipant.createMany({ data: missing });
       }
+
+      // Automatically set the assigned SPOC as the team captain for every team
+      for (const team of teamStates) {
+        const spocUserId = team.members.find((uId) => candidateMap.get(uId)?.isSpoc);
+        if (spocUserId) {
+          await tx.team.update({
+            where: { id: team.id },
+            data: { captainId: spocUserId },
+          });
+        }
+      }
     });
 
+    // Synchronize captain roles across users
+    for (const team of teamStates) {
+      const spocUserId = team.members.find((uId) => candidateMap.get(uId)?.isSpoc);
+      const existingCaptainId = teams.find((t) => t.id === team.id)?.captainId || null;
+      if (spocUserId) {
+        await syncCaptainRole({
+          newCaptainId: spocUserId,
+          previousCaptainId: existingCaptainId,
+        });
+      }
+    }
+
     revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/captain');
     revalidatePath('/teams');
     revalidatePath('/teams-and-players');
     revalidatePath('/', 'layout');
@@ -1189,6 +1213,81 @@ export async function autoAssignPlayersToTeams(
     return { success: false, error: error?.message || 'Failed to auto-assign players.' };
   }
 }
+
+export async function assignSpocsAsTeamCaptains(editionId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || ((session.user as any)?.role !== 'ORGANIZER' && (session.user as any)?.role !== 'SUPER_ADMIN')) {
+    return { success: false, error: 'Unauthorized: Organizer access required.' };
+  }
+
+  try {
+    const allTeams = await prisma.team.findMany({
+      where: { editionId },
+      include: {
+        members: {
+          select: { userId: true, isSpoc: true },
+        },
+      },
+    });
+
+    const mainTeams = filterMainTeams(allTeams);
+    if (!mainTeams.length) {
+      return { success: false, error: 'No teams found for this edition.' };
+    }
+
+    // Also get all enrolled SPOC participants for this edition
+    const spocParticipants = await prisma.editionParticipant.findMany({
+      where: { editionId, isSpoc: true },
+      select: { userId: true, teamId: true },
+    });
+
+    const spocByTeam = new Map<string, string>();
+    for (const ep of spocParticipants) {
+      if (ep.teamId && !spocByTeam.has(ep.teamId)) {
+        spocByTeam.set(ep.teamId, ep.userId);
+      }
+    }
+
+    let updatedCount = 0;
+    for (const team of mainTeams) {
+      let spocId = spocByTeam.get(team.id);
+      if (!spocId) {
+        const found = team.members?.find((p) => p.isSpoc);
+        if (found) spocId = found.userId;
+      }
+
+      if (spocId && spocId !== team.captainId) {
+        await prisma.team.update({
+          where: { id: team.id },
+          data: { captainId: spocId },
+        });
+        await syncCaptainRole({
+          newCaptainId: spocId,
+          previousCaptainId: team.captainId || null,
+        });
+        updatedCount++;
+      }
+    }
+
+    revalidatePath('/dashboard/organizer');
+    revalidatePath('/dashboard/captain');
+    revalidatePath('/teams');
+    revalidatePath('/teams-and-players');
+    revalidatePath('/', 'layout');
+
+    return {
+      success: true,
+      updatedCount,
+      message: updatedCount > 0
+        ? `Successfully designated SPOCs as team captains for ${updatedCount} team(s).`
+        : 'All teams with SPOCs already have their SPOC set as Captain.',
+    };
+  } catch (error: any) {
+    console.error('[assignSpocsAsTeamCaptains]', error);
+    return { success: false, error: error?.message || 'Failed to assign SPOCs as captains.' };
+  }
+}
+
 
 export async function deleteTeam(teamId: string) {
   const session = await getServerSession(authOptions);

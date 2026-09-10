@@ -915,38 +915,56 @@ export default function OrganizerGradingPanel({
       return;
     }
     const byId = new Map(gradableUsers.map((u) => [u.id, u]));
-    const rows: string[][] = [
-      [
-        'Grade',
-        'Row',
-        'Tier Target',
-        'Player Name',
-        'Username',
-        'Grade Average',
-        'Profile Target',
-        'Assignment Status',
-      ],
+
+    // Header Row: Row #, followed by each Grade as a Column header
+    const headerRow: string[] = ['Row #', ...grid.columns.map((col) => col.label || col.id)];
+
+    // Target Row: Target values for each Grade Column (if configured)
+    const targetRow: string[] = [
+      'Target',
+      ...grid.columns.map((col) => {
+        const t = resolveTargetForCell(col, 0);
+        return t != null ? String(t) : '';
+      }),
     ];
 
-    grid.columns.forEach((col) => {
-      for (let rIdx = 0; rIdx < grid.rowCount; rIdx += 1) {
+    const rows: string[][] = [headerRow, targetRow];
+
+    // Data Rows: 1..rowCount containing players for each grade column
+    for (let rIdx = 0; rIdx < grid.rowCount; rIdx += 1) {
+      const rowData: string[] = [String(rIdx + 1)];
+
+      grid.columns.forEach((col) => {
         const uId = grid.cells[cellKey(col.id, rIdx)];
         const p = uId ? byId.get(uId) : null;
-        const target = resolveTargetForCell(col, rIdx);
-        const avg = p ? getGradeAverageForUser(p, participantMap) : null;
-        rows.push([
-          col.label || col.id,
-          String(rIdx + 1),
-          target != null ? String(target) : '',
-          p?.name || (uId ? 'Unknown' : 'Unassigned'),
-          p?.username || '',
-          avg != null ? String(avg) : '',
-          p?.target != null ? String(p.target) : '',
-          uId ? 'ASSIGNED' : 'EMPTY',
-        ]);
+        if (p) {
+          const avg = getGradeAverageForUser(p, participantMap);
+          const avgStr = avg != null ? ` (Avg: ${Number(avg).toFixed(2)})` : '';
+          rowData.push(`${p.name || p.username} (@${p.username})${avgStr}`);
+        } else if (uId) {
+          rowData.push(`Unknown (${uId})`);
+        } else {
+          rowData.push('');
+        }
+      });
+
+      rows.push(rowData);
+    }
+
+    // Summary counts by grade
+    rows.push([]);
+    rows.push(['--- GRADE SUMMARY ---']);
+    rows.push(['Grade', 'Assigned Players', 'Configured Target']);
+    grid.columns.forEach((col) => {
+      let count = 0;
+      for (let rIdx = 0; rIdx < grid.rowCount; rIdx += 1) {
+        if (grid.cells[cellKey(col.id, rIdx)]) count++;
       }
+      const t = resolveTargetForCell(col, 0);
+      rows.push([col.label || col.id, String(count), t != null ? String(t) : '-']);
     });
 
+    // Unassigned players section
     const assignedIds = new Set(Object.values(grid.cells).filter(Boolean));
     const unassigned = gradableUsers.filter((u) => !assignedIds.has(u.id));
     if (unassigned.length > 0) {
@@ -972,7 +990,7 @@ export default function OrganizerGradingPanel({
       )
       .join('\r\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -983,6 +1001,8 @@ export default function OrganizerGradingPanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+
 
   if (!editionId) {
     return (
