@@ -372,6 +372,24 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     return map;
   }, [selectedEdition]);
 
+  // Map user IDs to their tournament grading average (G.Avg) for the currently selected edition
+  const playerGradingAverageMap = React.useMemo(() => {
+    const map: Record<string, number | null> = {};
+    const participants = selectedEdition?.participants || [];
+    participants.forEach((p: any) => {
+      const uId = p.userId || p.user?.id || p.id;
+      if (!uId) return;
+      if (p.gradeAverage !== undefined && p.gradeAverage !== null && Number(p.gradeAverage) > 0) {
+        map[uId] = Number(p.gradeAverage);
+      } else if (p.user?.average !== undefined && p.user?.average !== null && Number(p.user.average) > 0) {
+        map[uId] = Number(p.user.average);
+      } else if (p.average !== undefined && p.average !== null && Number(p.average) > 0) {
+        map[uId] = Number(p.average);
+      }
+    });
+    return map;
+  }, [selectedEdition]);
+
   // Map user IDs to whether they are designated as a SPOC in the currently selected edition
   const playerSpocMap = React.useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -3273,12 +3291,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   const qClean = q.startsWith('@') ? q.substring(1) : q;
                   const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
                   const isSpoc = !!playerSpocMap[usr.id];
+                  const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
                     (grade && String(grade).toLowerCase().includes(q)) ||
                     (isSpoc && 'spoc'.includes(q)) ||
-                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+                    (userGradingAvg !== null && String(userGradingAvg).includes(q)) ||
                     (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
                 })
@@ -3288,6 +3307,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const otherTeamName = assignedToOtherTeam ? assignedTeamMap[usr.id].teamName : '';
                 const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
                 const isSpoc = !!playerSpocMap[usr.id];
+                const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
 
                 return (
                   <label
@@ -3327,9 +3347,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                           {userGrade}
                         </Badge>
                       )}
-                      {usr.average ? (
+                      {userGradingAvg !== null ? (
                         <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
-                          Avg: {Number(usr.average).toFixed(2)}
+                          G.Avg: {Number(userGradingAvg).toFixed(2)}
                         </span>
                       ) : null}
                       {usr.target ? (
@@ -3503,12 +3523,13 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   const qClean = q.startsWith('@') ? q.substring(1) : q;
                   const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
                   const isSpoc = !!playerSpocMap[usr.id];
+                  const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
                     (grade && String(grade).toLowerCase().includes(q)) ||
                     (isSpoc && 'spoc'.includes(q)) ||
-                    (usr.average !== undefined && usr.average !== null && String(usr.average).includes(q)) ||
+                    (userGradingAvg !== null && String(userGradingAvg).includes(q)) ||
                     (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
                   );
                 })
@@ -3518,6 +3539,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const otherTeamName = assignedToOtherTeam ? assignedTeamMap[usr.id].teamName : '';
                 const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
                 const isSpoc = !!playerSpocMap[usr.id];
+                const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
 
                 return (
                   <label
@@ -3557,9 +3579,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                           {userGrade}
                         </Badge>
                       )}
-                      {usr.average ? (
+                      {userGradingAvg !== null ? (
                         <span className="text-emerald-400 font-mono font-bold text-[10px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
-                          Avg: {Number(usr.average).toFixed(2)}
+                          G.Avg: {Number(userGradingAvg).toFixed(2)}
                         </span>
                       ) : null}
                       {usr.target ? (
