@@ -35,7 +35,7 @@ import {
 } from '@/lib/board-scores';
 import { averageChangeEffectiveFrom, averageForDay, logsForUser } from '@/lib/player-average';
 import { PUBLIC_PLAYER_SCORES_PATH, PUBLIC_STANDINGS_PATH } from '@/lib/website-cms';
-import { combiCalendarDate, normalizeDayDates, toCalendarDate } from '@/lib/combi-cutoff';
+import { combiCalendarDate, isCombiSubmissionLocked, normalizeDayDates, toCalendarDate, type DayDatesInput } from '@/lib/combi-cutoff';
 import { buildStageStandingBlocks, pairingsFromStages, placementRanking } from '@/lib/team-standings';
 import { computeEventWinsMap, countEventWinsForPlayer, editionProfileStats, rankPlayers } from '@/lib/player-ranking';
 import { resolveCurrentEdition } from '@/lib/current-edition';
@@ -1076,6 +1076,8 @@ function resolveAllEffectiveScores(
   existingScores: any[],
   userGradeMap: Map<string, string>,
   userTargetMap: Map<string, number>,
+  dayDates?: DayDatesInput,
+  now = new Date(),
 ) {
   const allEffectiveScores: Array<{
     userId: string;
@@ -1091,15 +1093,35 @@ function resolveAllEffectiveScores(
   }> = [];
 
   for (let d = 1; d <= maxDay; d++) {
-    const { effectiveScores } = resolveDayWalkoversAndScores({
-      dayNumber: d,
-      teams,
-      pairings,
-      existingScores,
-      userGradeMap,
-      userTargetMap,
-    });
-    allEffectiveScores.push(...effectiveScores);
+    const isLocked = isCombiSubmissionLocked(d, dayDates, now);
+
+    // If day is still active and not locked (before 9:30pm IST), only include actual submitted scores (no walkovers)
+    if (!isLocked) {
+      const dayScores = existingScores.filter((s) => s.dayNumber === d);
+      for (const s of dayScores) {
+        allEffectiveScores.push({
+          userId: s.userId,
+          dayNumber: d,
+          score: s.score,
+          slams: s.slams,
+          boards: s.boards,
+          isWalkover: false,
+          playerGrade: userGradeMap.get(s.userId) || null,
+          playerTarget: userTargetMap.get(s.userId) ?? null,
+        });
+      }
+    } else {
+      // Day is locked / ended (after 9:30pm IST): compute official walkovers
+      const { effectiveScores } = resolveDayWalkoversAndScores({
+        dayNumber: d,
+        teams,
+        pairings,
+        existingScores,
+        userGradeMap,
+        userTargetMap,
+      });
+      allEffectiveScores.push(...effectiveScores);
+    }
   }
 
   return allEffectiveScores;
@@ -1141,13 +1163,13 @@ async function loadPublicScoreboard() {
   const rosterTeams = buildRosterTeams(teams);
   const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, rosterTeams);
   const pairings = pairingsFromStages(stages);
-  const allEffectiveScores = resolveAllEffectiveScores(maxDay, rosterTeams, pairings, scores, userGradeMap, userTargetMap);
+  const allEffectiveScores = resolveAllEffectiveScores(maxDay, rosterTeams, pairings, scores, userGradeMap, userTargetMap, edition.dayDates);
 
   const days: Array<{ dayNumber: number; published: boolean; calendarDate: string }> = [];
   for (let d = 1; d <= maxDay; d += 1) {
     days.push({
       dayNumber: d,
-      published: true,
+      published: isCombiSubmissionLocked(d, edition.dayDates),
       calendarDate: combiCalendarDate(d, edition.dayDates),
     });
   }
@@ -1279,7 +1301,7 @@ async function loadPublicStandings(editionId?: string, options?: { skipSnapshotR
   const standingTeams = buildRosterTeams(teams);
   const { userGradeMap, userTargetMap } = extractGradeAndTargetMaps(gradingSetting, editionParticipants, targetLogs, standingTeams);
   const pairings = pairingsFromStages(stages);
-  const allEffectiveScores = resolveAllEffectiveScores(maxDay, standingTeams, pairings, scores, userGradeMap, userTargetMap);
+  const allEffectiveScores = resolveAllEffectiveScores(maxDay, standingTeams, pairings, scores, userGradeMap, userTargetMap, edition.dayDates);
 
   const scoreRows: PlayerDayScoreRow[] = allEffectiveScores.map((s) => ({
     userId: s.userId,
