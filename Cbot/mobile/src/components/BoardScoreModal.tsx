@@ -74,7 +74,7 @@ export function targetBonus(total: number | null, target?: number | null) {
   if (total == null || !Number.isFinite(total)) return null;
   const tgt = Number(target);
   if (!Number.isFinite(tgt) || tgt <= 0) return null;
-  return total < tgt;
+  return total <= tgt;
 }
 
 export function BoardScoreModal({
@@ -302,6 +302,31 @@ export function BoardScoreModal({
                           >
                             <Text style={styles.scoreStepperText}>+</Text>
                           </Pressable>
+
+                          {isSlam ? (
+                            <Pressable
+                              style={[
+                                styles.negToggleBtn,
+                                boardScoreNum < 0 && styles.negToggleBtnActive,
+                              ]}
+                              onPress={() => {
+                                const cur = parseInt(board.score, 10);
+                                if (Number.isFinite(cur)) {
+                                  update(idx, { score: String(-cur) });
+                                } else if (board.score.startsWith('-')) {
+                                  update(idx, { score: board.score.replace('-', '') });
+                                } else {
+                                  update(idx, { score: '-' + board.score });
+                                }
+                              }}
+                              accessibilityRole="button"
+                              accessibilityLabel="Toggle positive/negative score"
+                            >
+                              <Text style={[styles.negToggleText, boardScoreNum < 0 && styles.negToggleTextActive]}>
+                                ±
+                              </Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       </View>
 
@@ -828,6 +853,28 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 18,
     fontWeight: '900',
+  },
+  negToggleBtn: {
+    width: 36,
+    height: 48,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  negToggleBtnActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: '#ef4444',
+  },
+  negToggleText: {
+    color: '#94a3b8',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  negToggleTextActive: {
+    color: '#f87171',
   },
   slamChipsRow: {
     flexDirection: 'row',

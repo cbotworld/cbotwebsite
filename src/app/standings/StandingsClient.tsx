@@ -64,6 +64,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
   const players = Array.isArray(data.players) ? data.players : [];
   const placement = Array.isArray(data.placement) ? data.placement : [];
   const [open, setOpen] = React.useState<{ row: any; focus: FocusCol } | null>(null);
+  const [selectedDayNumber, setSelectedDayNumber] = React.useState<number | null>(null);
   const [selectedPlayer, setSelectedPlayer] = React.useState<any | null>(null);
 
   const [playerSearch, setPlayerSearch] = React.useState('');
@@ -80,8 +81,27 @@ export default function StandingsClient({ payload }: { payload: any }) {
   }, [players, playerSearch]);
 
   const days = open?.row?.days || [];
+
+  // Default to selecting the most recent day (highest dayNumber)
+  React.useEffect(() => {
+    if (open?.row?.days && open.row.days.length > 0) {
+      const dayNums = open.row.days.map((d: any) => d.dayNumber).filter((n: any) => typeof n === 'number');
+      if (dayNums.length > 0) {
+        setSelectedDayNumber(Math.max(...dayNums));
+      } else {
+        setSelectedDayNumber(open.row.days[open.row.days.length - 1]?.dayNumber ?? null);
+      }
+    } else {
+      setSelectedDayNumber(null);
+    }
+  }, [open]);
+
+  const activeDay = days.find((d: any) => d.dayNumber === selectedDayNumber) || (days.length > 0 ? days[days.length - 1] : null);
   const targetBonusDays = open && (open.focus === 'avg' || open.focus === 'total') ? playerBonusCards(days, 'target') : [];
   const slamBonusDays = open && (open.focus === 'slams' || open.focus === 'total') ? playerBonusCards(days, 'slams') : [];
+
+  const activeTargetBonusDay = activeDay ? targetBonusDays.find((t) => t.day.dayNumber === activeDay.dayNumber) : null;
+  const activeSlamBonusDay = activeDay ? slamBonusDays.find((s) => s.day.dayNumber === activeDay.dayNumber) : null;
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
@@ -550,6 +570,30 @@ export default function StandingsClient({ payload }: { payload: any }) {
           <p className="text-sm text-muted-foreground">No completed days in this stage yet. Breakdown appears after 9:00pm IST (scores) and 9:30pm IST (event points).</p>
         ) : (
           <div className="space-y-4">
+            {/* Day Selector Pills if multiple days */}
+            {days.length > 1 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto touch-scroll-x desktop-slim-scrollbar pb-1 pt-0.5">
+                <span className="text-[11px] font-bold text-muted-foreground mr-1 shrink-0">Select Day:</span>
+                {days.map((d: any) => {
+                  const isSelected = activeDay?.dayNumber === d.dayNumber;
+                  return (
+                    <button
+                      key={d.dayNumber}
+                      type="button"
+                      onClick={() => setSelectedDayNumber(d.dayNumber)}
+                      className={`px-3 py-1 rounded-lg text-xs font-black border whitespace-nowrap transition-all ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/20 scale-[1.02]'
+                          : 'border-border bg-card/60 text-muted-foreground hover:text-foreground hover:border-amber-500/40'
+                      }`}
+                    >
+                      Day {d.dayNumber}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -564,148 +608,184 @@ export default function StandingsClient({ payload }: { payload: any }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {days.map((d: any) => (
-                  <TableRow key={d.dayNumber}>
-                    <TableCell className="font-black">Day {d.dayNumber}</TableCell>
-                    <TableCell>{d.opponentName || '—'}</TableCell>
-                    <TableCell className={open?.focus === 'total' ? 'font-black text-amber-400' : 'font-black'}>{d.total}</TableCell>
-                    <TableCell className="font-bold">{d.matchResult || '—'}</TableCell>
-                    <TableCell className="font-mono font-bold text-foreground">{d.teamScore ?? '—'}</TableCell>
-                    <TableCell className={open?.focus === 'event' ? 'font-black text-amber-400' : ''}>{d.eventPts}</TableCell>
-                    <TableCell className={open?.focus === 'slams' ? 'font-black text-amber-400' : ''}>{d.slamBonus}</TableCell>
-                    <TableCell className={open?.focus === 'avg' ? 'font-black text-amber-400' : ''}>{d.avgBonus}</TableCell>
-                  </TableRow>
-                ))}
+                {days.map((d: any) => {
+                  const isSelected = activeDay?.dayNumber === d.dayNumber;
+                  return (
+                    <TableRow
+                      key={d.dayNumber}
+                      onClick={() => setSelectedDayNumber(d.dayNumber)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-amber-500/15 hover:bg-amber-500/20 font-bold border-l-2 border-l-amber-400'
+                          : 'hover:bg-muted/40'
+                      }`}
+                    >
+                      <TableCell className="font-black">
+                        <div className="flex items-center gap-1.5">
+                          <span>Day {d.dayNumber}</span>
+                          {isSelected && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0 animate-pulse" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{d.opponentName || '—'}</TableCell>
+                      <TableCell className={open?.focus === 'total' ? 'font-black text-amber-400' : 'font-black'}>{d.total}</TableCell>
+                      <TableCell className="font-bold">{d.matchResult || '—'}</TableCell>
+                      <TableCell className="font-mono font-bold text-foreground">{d.teamScore ?? '—'}</TableCell>
+                      <TableCell className={open?.focus === 'event' ? 'font-black text-amber-400' : ''}>{d.eventPts}</TableCell>
+                      <TableCell className={open?.focus === 'slams' ? 'font-black text-amber-400' : ''}>{d.slamBonus}</TableCell>
+                      <TableCell className={open?.focus === 'avg' ? 'font-black text-amber-400' : ''}>{d.avgBonus}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
-            {days.map((d: any) =>
-              (open?.focus === 'event' || open?.focus === 'total') && d.events?.length ? (
-                <div key={`ev-${d.dayNumber}`} className="rounded-xl border border-border p-3 space-y-2">
-                  <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
-                    Day {d.dayNumber} combis {d.opponentName ? `vs ${d.opponentName}` : ''}
-                  </div>
-                  {d.events.map((ev: any, i: number) => {
-                    const isWin = String(ev.result || '').includes('Win');
-                    const isLoss = String(ev.result || '').includes('Loss');
-                    const isWO = String(ev.result || '').includes('WO') || ev.reason === 'walkover' || ev.reason === 'double-walkover';
-                    return (
-                      <div key={`${d.dayNumber}-${i}`} className="text-xs grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/60 pt-2.5">
-                        <div className="flex flex-col gap-0.5">
-                          <div className="font-bold flex items-center gap-1.5 flex-wrap">
-                            <span>{ev.name}</span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
-                                isWin
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : isLoss
-                                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                                  : isWO
-                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                  : 'bg-muted text-muted-foreground border border-border'
-                              }`}
-                            >
-                              {ev.result} · {ev.myPts}–{ev.oppPts}
-                            </span>
+
+            {/* Selected Day Breakdown Details */}
+            {activeDay && (
+              <div className="space-y-3 pt-1">
+                {/* Combis for active day */}
+                {(open?.focus === 'event' || open?.focus === 'total') && activeDay.events?.length ? (
+                  <div className="rounded-xl border border-border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
+                        Day {activeDay.dayNumber} combis {activeDay.opponentName ? `vs ${activeDay.opponentName}` : ''}
+                      </div>
+                      <span className="text-[10px] font-mono text-muted-foreground font-bold">
+                        Event Pts: <strong className="text-emerald-400 font-extrabold">+{activeDay.eventPts}</strong>
+                      </span>
+                    </div>
+                    {activeDay.events.map((ev: any, i: number) => {
+                      const isWin = String(ev.result || '').includes('Win');
+                      const isLoss = String(ev.result || '').includes('Loss');
+                      const isWO = String(ev.result || '').includes('WO') || ev.reason === 'walkover' || ev.reason === 'double-walkover';
+                      return (
+                        <div key={`${activeDay.dayNumber}-${i}`} className="text-xs grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-border/60 pt-2.5">
+                          <div className="flex flex-col gap-0.5">
+                            <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                              <span>{ev.name}</span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                  isWin
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : isLoss
+                                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                    : isWO
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    : 'bg-muted text-muted-foreground border border-border'
+                                }`}
+                              >
+                                {ev.result} · {ev.myPts}–{ev.oppPts}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-sky-400">YOU</span>
+                            <span className="text-muted-foreground"> · </span>
+                            {ev.myPlayerList && ev.myPlayerList.length > 0 ? (
+                              ev.myPlayerList.map((p: any, idx: number) => (
+                                <span key={p.id || idx}>
+                                  {idx > 0 && ', '}
+                                  <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                    {p.name}
+                                    {p.score != null ? ` (${p.score})` : ''}
+                                    {p.isWalkover && (
+                                      <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                        Walkover
+                                      </span>
+                                    )}
+                                  </span>
+                                </span>
+                              ))
+                            ) : (
+                              <span>{ev.myPlayers || '—'}</span>
+                            )}
+                            {ev.myScore != null && (
+                              <span className="font-mono text-muted-foreground font-bold ml-1">
+                                = {ev.myScore}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <span className="font-bold text-rose-400">OPP</span>
+                            <span className="text-muted-foreground"> · </span>
+                            {ev.oppPlayerList && ev.oppPlayerList.length > 0 ? (
+                              ev.oppPlayerList.map((p: any, idx: number) => (
+                                <span key={p.id || idx}>
+                                  {idx > 0 && ', '}
+                                  <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
+                                    {p.name}
+                                    {p.score != null ? ` (${p.score})` : ''}
+                                    {p.isWalkover && (
+                                      <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
+                                        Walkover
+                                      </span>
+                                    )}
+                                  </span>
+                                </span>
+                              ))
+                            ) : (
+                              <span>{ev.oppPlayers || '—'}</span>
+                            )}
+                            {ev.oppScore != null && (
+                              <span className="font-mono text-muted-foreground font-bold ml-1">
+                                = {ev.oppScore}
+                              </span>
+                            )}
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-sky-400">YOU</span>
-                          <span className="text-muted-foreground"> · </span>
-                          {ev.myPlayerList && ev.myPlayerList.length > 0 ? (
-                            ev.myPlayerList.map((p: any, idx: number) => (
-                              <span key={p.id || idx}>
-                                {idx > 0 && ', '}
-                                <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
-                                  {p.name}
-                                  {p.score != null ? ` (${p.score})` : ''}
-                                  {p.isWalkover && (
-                                    <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
-                                      Walkover
-                                    </span>
-                                  )}
-                                </span>
-                              </span>
-                            ))
-                          ) : (
-                            <span>{ev.myPlayers || '—'}</span>
-                          )}
-                          {ev.myScore != null && (
-                            <span className="font-mono text-muted-foreground font-bold ml-1">
-                              = {ev.myScore}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <span className="font-bold text-rose-400">OPP</span>
-                          <span className="text-muted-foreground"> · </span>
-                          {ev.oppPlayerList && ev.oppPlayerList.length > 0 ? (
-                            ev.oppPlayerList.map((p: any, idx: number) => (
-                              <span key={p.id || idx}>
-                                {idx > 0 && ', '}
-                                <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'font-medium'}>
-                                  {p.name}
-                                  {p.score != null ? ` (${p.score})` : ''}
-                                  {p.isWalkover && (
-                                    <span className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] bg-amber-500/20 text-amber-300 font-black border border-amber-500/40">
-                                      Walkover
-                                    </span>
-                                  )}
-                                </span>
-                              </span>
-                            ))
-                          ) : (
-                            <span>{ev.oppPlayers || '—'}</span>
-                          )}
-                          {ev.oppScore != null && (
-                            <span className="font-mono text-muted-foreground font-bold ml-1">
-                              = {ev.oppScore}
-                            </span>
-                          )}
+                {/* Target bonus for active day */}
+                {(open?.focus === 'avg' || open?.focus === 'total') && (
+                  activeTargetBonusDay && activeTargetBonusDay.players.length > 0 ? (
+                    <div className="rounded-xl border border-border p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
+                          Day {activeDay.dayNumber} target bonus · +{activeDay.avgBonus}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : null,
-            )}
-            {(open?.focus === 'avg' || open?.focus === 'total') && (
-              targetBonusDays.length === 0 ? (
-                open?.focus === 'avg' ? (
-                  <p className="text-sm text-muted-foreground">No player scored under target on a published day yet.</p>
-                ) : null
-              ) : (
-                targetBonusDays.map(({ day, players }) => (
-                  <div key={`tgt-${day.dayNumber}`} className="rounded-xl border border-border p-3 space-y-2">
-                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
-                      Day {day.dayNumber} target bonus {day.opponentName ? `vs ${day.opponentName}` : ''} · +{day.avgBonus}
+                      {activeTargetBonusDay.players.map((p: any) => (
+                        <div key={`${activeDay.dayNumber}-${p.userId}`} className="text-xs flex flex-wrap justify-between gap-2 border-t border-border/60 pt-2">
+                          <span className="font-bold">{p.name}</span>
+                          <span className="font-mono text-muted-foreground">
+                            {p.score} (target {p.target ?? '—'}) · +1
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                    {players.map((p: any) => (
-                      <div key={`${day.dayNumber}-${p.userId}`} className="text-xs flex flex-wrap justify-between gap-2 border-t border-border/60 pt-2">
-                        <span className="font-bold">{p.name}</span>
-                        <span className="font-mono text-muted-foreground">
-                          {p.score} (target {p.target ?? '—'}) · +1
-                        </span>
+                  ) : open?.focus === 'avg' ? (
+                    <p className="text-xs text-muted-foreground">No player scored under target for Day {activeDay.dayNumber}.</p>
+                  ) : null
+                )}
+
+                {/* Slams for active day */}
+                {(open?.focus === 'slams' || open?.focus === 'total') && (
+                  activeSlamBonusDay && activeSlamBonusDay.players.length > 0 ? (
+                    <div className="rounded-xl border border-border p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
+                          Day {activeDay.dayNumber} slams · +{activeDay.slamBonus}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                ))
-              )
-            )}
-            {slamBonusDays.map(({ day, players }) => (
-              <div key={`slm-${day.dayNumber}`} className="rounded-xl border border-border p-3 space-y-2">
-                <div className="text-[10px] font-black uppercase tracking-wide text-amber-500">
-                  Day {day.dayNumber} slams {day.opponentName ? `vs ${day.opponentName}` : ''} · +{day.slamBonus}
-                </div>
-                {players.map((p: any) => (
-                  <div key={`${day.dayNumber}-${p.userId}`} className="text-xs flex flex-wrap justify-between gap-2 border-t border-border/60 pt-2">
-                    <span className="font-bold">{p.name}</span>
-                    <span className="font-mono text-muted-foreground">{p.slams} slam{p.slams === 1 ? '' : 's'} · +{p.slams}</span>
-                  </div>
-                ))}
+                      {activeSlamBonusDay.players.map((p: any) => (
+                        <div key={`${activeDay.dayNumber}-${p.userId}`} className="text-xs flex flex-wrap justify-between gap-2 border-t border-border/60 pt-2">
+                          <span className="font-bold">{p.name}</span>
+                          <span className="font-mono text-muted-foreground">{p.slams} slam{p.slams === 1 ? '' : 's'} · +{p.slams}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : open?.focus === 'slams' ? (
+                    <p className="text-xs text-muted-foreground">No slams scored for Day {activeDay.dayNumber}.</p>
+                  ) : null
+                )}
               </div>
-            ))}
+            )}
           </div>
         )}
       </Dialog>

@@ -5,10 +5,35 @@ import * as XLSX from 'xlsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Trophy, Activity, Users, Flame, Download, Info, ChevronDown, ChevronUp, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Trophy, Activity, Users, Flame, Download, Info, ChevronDown, ChevronUp, AlertCircle, ShieldAlert, Crown } from 'lucide-react';
 
 type ScoreDay = { dayNumber: number; published: boolean; calendarDate: string };
-type ScoreTeam = { id: string; name: string; tag: string; players: Array<{ id: string; name: string }> };
+export type ScorePlayer = { id: string; name: string; grade?: string | null; isCaptain?: boolean };
+export type ScoreTeam = { id: string; name: string; tag: string; captainId?: string | null; players: ScorePlayer[] };
+
+function parseGradeOrder(grade?: string | null): number {
+  if (!grade) return 9999;
+  const match = String(grade).trim().match(/^g?(\d+)$/i);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 9000;
+}
+
+function sortPlayersByGrade(
+  players: ScorePlayer[],
+  byUser: Map<string, ScoreRow>,
+): ScorePlayer[] {
+  return [...players].sort((a, b) => {
+    const gradeA = byUser.get(a.id)?.playerGrade || a.grade || '';
+    const gradeB = byUser.get(b.id)?.playerGrade || b.grade || '';
+    const orderA = parseGradeOrder(gradeA);
+    const orderB = parseGradeOrder(gradeB);
+    if (orderA !== orderB) return orderA - orderB;
+    if (gradeA !== gradeB) return gradeA.localeCompare(gradeB);
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
 
 export type WalkoverBreakdown = {
   eventLossScore: number;
@@ -71,7 +96,7 @@ function buildExcelRows(
     let teamTotalPts = 0;
     let teamTotalSlams = 0;
     let submittedCount = 0;
-    const players = team.players || [];
+    const players = sortPlayersByGrade(team.players || [], byUser);
 
     players.forEach((player) => {
       const row = byUser.get(player.id);
@@ -160,7 +185,7 @@ export default function PlayerScoresClient({
 }: {
   editionTitle: string;
   days?: Array<{ dayNumber: number; published: boolean; calendarDate: string }>;
-  teams?: Array<{ id: string; name: string; tag: string; players: Array<{ id: string; name: string }> }>;
+  teams?: ScoreTeam[];
   scores?: Array<ScoreRow>;
 }) {
   const dayList = Array.isArray(days) ? days : [];
@@ -296,6 +321,8 @@ export default function PlayerScoresClient({
               }
             });
 
+            const sortedPlayers = sortPlayersByGrade(team.players || [], byUser);
+
             return (
               <Card key={team.id} className="border-border/80 bg-card/70 backdrop-blur-sm shadow-xl hover:border-amber-500/40 transition-all">
                 <CardHeader className="pb-3 border-b border-border/50 flex flex-row items-center justify-between">
@@ -318,10 +345,10 @@ export default function PlayerScoresClient({
                 </CardHeader>
 
                 <CardContent className="pt-3 space-y-2.5">
-                  {(team.players || []).length === 0 ? (
+                  {sortedPlayers.length === 0 ? (
                     <div className="text-xs text-muted-foreground italic py-2">No players assigned to this team.</div>
                   ) : (
-                    (team.players || []).map((player) => {
+                    sortedPlayers.map((player) => {
                       const row = byUser.get(player.id);
                       const isExpanded = Boolean(expandedWoUsers[player.id]);
                       const isWo = Boolean(row?.isWalkover);
@@ -337,16 +364,21 @@ export default function PlayerScoresClient({
                           }`}
                         >
                           <div className="flex items-center justify-between p-2.5">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
                                 className={`h-2 w-2 rounded-full shrink-0 ${
                                   isWo ? 'bg-rose-500' : 'bg-amber-500/70'
                                 }`}
                               />
-                              <div>
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                                 <span className="font-bold text-sm text-foreground">{player.name}</span>
+                                {player.isCaptain && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded shadow-xs">
+                                    <Crown className="h-2.5 w-2.5 fill-amber-400 text-amber-400" /> Captain
+                                  </span>
+                                )}
                                 {row?.playerGrade && (
-                                  <span className="ml-2 text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                                     {row.playerGrade}
                                   </span>
                                 )}

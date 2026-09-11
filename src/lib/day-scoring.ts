@@ -50,7 +50,7 @@ export function isCaptainScoreEditOpen(
 
 export function previewAvgBonus(score: number | null | undefined, average: number): boolean | null {
   if (score == null || !Number.isFinite(Number(score))) return null;
-  return Number(score) < (Number(average) || 0);
+  return Number(score) <= (Number(average) || 0);
 }
 
 export { previewTargetBonus, MAX_DAY_BOARDS } from '@/lib/board-scores';

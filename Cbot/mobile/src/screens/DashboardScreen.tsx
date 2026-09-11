@@ -86,7 +86,7 @@ function MatchDayScoreBox({
             {stats.boardCount === 1 ? '' : 's'}
           </Text>
         ) : (
-          <Text style={styles.scoreHint}>No score yet. Enter scores and save.</Text>
+          <Text style={styles.scoreHint}>No score yet. Enter board scores directly (no stream required).</Text>
         )}
         <Pressable style={[styles.scoreSave, saving && { opacity: 0.55 }]} onPress={onOpenBoards} disabled={saving}>
           <Text style={styles.scoreSaveText}>
@@ -109,7 +109,12 @@ function MatchDayScoreBox({
 
   return (
     <View style={styles.scoreBox}>
-      <Text style={styles.scoreTitle}>DAY {dayNumber} SCORES</Text>
+      <View style={styles.scoreHeaderRow}>
+        <Text style={styles.scoreTitle}>DAY {dayNumber} SCORES</Text>
+        <View style={styles.scoreStreamBadge}>
+          <Text style={styles.scoreStreamBadgeText}>STREAM OPTIONAL</Text>
+        </View>
+      </View>
       {body}
     </View>
   );
@@ -210,6 +215,7 @@ export function DashboardScreen({ navigation }: Props) {
     navigation.navigate('Live', {
       name: playerName,
       day: `${match.label}${suffix}`,
+      dayNumber: match.dayNumber,
       teamName: match.teamName,
       opponentName: mode === 'practice' ? 'Practice' : (match.opponentName || 'TBD'),
       teamTag: match.teamTag,
@@ -581,6 +587,13 @@ export function DashboardScreen({ navigation }: Props) {
             startStreamingMatch(m, 'match');
           }
         }}
+        onEnterScoresWithoutStreaming={() => {
+          if (promptMatch) {
+            const day = promptMatch.dayNumber;
+            setPromptMatch(null);
+            setBoardDay(day);
+          }
+        }}
       />
       {dialog}
     </SafeAreaView>
@@ -774,6 +787,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     gap: 8,
+  },
+  scoreHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scoreStreamBadge: {
+    backgroundColor: 'rgba(20, 184, 166, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(20, 184, 166, 0.3)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  scoreStreamBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#2dd4bf',
+    letterSpacing: 0.5,
   },
   scoreTitle: { fontSize: 10, fontWeight: '900', color: '#f59e0b', letterSpacing: 1.2 },
   scoreInputs: { flexDirection: 'row', gap: 8 },

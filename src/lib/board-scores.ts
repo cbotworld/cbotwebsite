@@ -131,7 +131,7 @@ export function previewTargetBonus(score: number | null | undefined, target: num
   if (score == null || !Number.isFinite(Number(score))) return null;
   const tgt = Number(target);
   if (!Number.isFinite(tgt) || tgt <= 0) return null;
-  return Number(score) < tgt;
+  return Number(score) <= tgt;
 }
 
 export function validateBoardsPayload(raw: unknown): { ok: true; boards: DayBoardScore[]; score: number; slams: number } | { ok: false; error: string } {

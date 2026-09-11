@@ -23,6 +23,7 @@ import {
 } from '@/lib/organizer-schedule';
 import { coherentMatchSides } from '@/lib/team-identity';
 import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
+import { resolveDayWalkoversAndScores } from '@/lib/walkover-scoring';
 
 const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; border: string; bg: string }> = {
   'PLYWOOD PIONEERS': {
@@ -115,11 +116,105 @@ function teamRoster(team: any) {
   return Array.from(byId.values());
 }
 
-function scoreMapForDay(scores: Array<{ userId: string; dayNumber: number; score: number; slams?: number }>, dayNum: number) {
+function formatTeamsForWalkover(dbTeams: any[], userGradeMap: Record<string, string>) {
+  return (dbTeams || []).map((t: any) => {
+    const byId = new Map<string, { id: string; name?: string | null; grade?: string | null; target?: number | null }>();
+    if (t.captain?.id) {
+      byId.set(t.captain.id, {
+        id: t.captain.id,
+        name: t.captain.name || t.captain.username,
+        grade: userGradeMap[t.captain.id] || null,
+        target: typeof t.captain.target === 'number' ? t.captain.target : null,
+      });
+    }
+    for (const row of t.members || []) {
+      const user = row.user || row;
+      if (!user?.id) continue;
+      byId.set(user.id, {
+        id: user.id,
+        name: user.name || user.username,
+        grade: userGradeMap[user.id] || null,
+        target: typeof user.target === 'number' ? user.target : null,
+      });
+    }
+    return {
+      id: t.id,
+      name: t.name,
+      savedLineups: t.savedLineups,
+      members: Array.from(byId.values()),
+    };
+  });
+}
+
+function buildUserTargetMap(dbTeams: any[]) {
+  const targetMap = new Map<string, number>();
+  for (const t of dbTeams || []) {
+    if (t.captain?.id && typeof t.captain.target === 'number') {
+      targetMap.set(t.captain.id, t.captain.target);
+    }
+    for (const row of t.members || []) {
+      const user = row.user || row;
+      if (user?.id && typeof user.target === 'number') {
+        targetMap.set(user.id, user.target);
+      }
+    }
+  }
+  return targetMap;
+}
+
+function resolveEffectiveScoreMapForDay({
+  dayNumber,
+  dbTeams,
+  dbScores,
+  stages = [],
+  userGradeMap = {},
+}: {
+  dayNumber: number;
+  dbTeams: any[];
+  dbScores: any[];
+  stages?: any[];
+  userGradeMap?: Record<string, string>;
+}) {
+  const formattedTeams = formatTeamsForWalkover(dbTeams, userGradeMap);
+  const pairings = resolveOrganizerPairings(stages, dbTeams);
+  const teamIdByName = new Map<string, string>();
+  for (const t of dbTeams || []) {
+    if (t.name && t.id) {
+      teamIdByName.set(String(t.name).trim().toUpperCase(), String(t.id));
+    }
+  }
+
+  const normalizedPairings = pairings.map((p) => {
+    const t1Id = p.team1Id || teamIdByName.get((p.team1Name || '').trim().toUpperCase()) || '';
+    const t2Id = p.team2Id || teamIdByName.get((p.team2Name || '').trim().toUpperCase()) || '';
+    return {
+      dayNumber: p.dayNumber,
+      team1Id: t1Id,
+      team2Id: t2Id,
+    };
+  });
+
+  const gradeMap = new Map<string, string>(Object.entries(userGradeMap || {}));
+  const targetMap = buildUserTargetMap(dbTeams);
+
+  const { effectiveScores } = resolveDayWalkoversAndScores({
+    dayNumber,
+    teams: formattedTeams,
+    pairings: normalizedPairings,
+    existingScores: dbScores || [],
+    userGradeMap: gradeMap,
+    userTargetMap: targetMap,
+  });
+
   const map: Record<string, { score: number; slams: number; isWalkover?: boolean }> = {};
-  for (const row of scores || []) {
-    if (row.dayNumber !== dayNum) continue;
-    map[row.userId] = { score: row.score, slams: row.slams || 0, isWalkover: Boolean((row as any).isWalkover) };
+  for (const row of effectiveScores) {
+    if (row.dayNumber === dayNumber) {
+      map[row.userId] = {
+        score: row.score,
+        slams: row.slams || 0,
+        isWalkover: Boolean(row.isWalkover),
+      };
+    }
   }
   return map;
 }
@@ -130,6 +225,8 @@ function getDetailedMatchCombiData({
   team2Name,
   dbTeams,
   dbScores,
+  stages = [],
+  userGradeMap = {},
   revealed = false,
 }: {
   dayNumber: number;
@@ -137,6 +234,8 @@ function getDetailedMatchCombiData({
   team2Name: string;
   dbTeams: any[];
   dbScores: any[];
+  stages?: any[];
+  userGradeMap?: Record<string, string>;
   revealed?: boolean;
 }) {
   if (!revealed) return null;
@@ -152,7 +251,13 @@ function getDetailedMatchCombiData({
   const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber });
   const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber });
 
-  const scoreMap = scoreMapForDay(dbScores, dayNumber);
+  const scoreMap = resolveEffectiveScoreMapForDay({
+    dayNumber,
+    dbTeams,
+    dbScores,
+    stages,
+    userGradeMap,
+  });
   const matchResult = scoreMatchDay(combi1.rounds, combi2.rounds, roster1, roster2, scoreMap);
 
   const events = matchResult.events.map((ev, idx) => {
@@ -163,7 +268,7 @@ function getDetailedMatchCombiData({
       const pId = String(id || '');
       const name = rosterMap1.get(pId) || (r1?.players && r1.players[0]) || 'Player';
       const scoreObj = scoreMap[pId];
-      const isWO = !scoreObj || Boolean(scoreObj.isWalkover);
+      const isWO = Boolean(scoreObj?.isWalkover);
       return {
         id: pId,
         name,
@@ -177,7 +282,7 @@ function getDetailedMatchCombiData({
       const pId = String(id || '');
       const name = rosterMap2.get(pId) || (r2?.players && r2.players[0]) || 'Player';
       const scoreObj = scoreMap[pId];
-      const isWO = !scoreObj || Boolean(scoreObj.isWalkover);
+      const isWO = Boolean(scoreObj?.isWalkover);
       return {
         id: pId,
         name,
@@ -246,6 +351,7 @@ export function ScheduleClient({
   const [stages, setStages] = React.useState<Array<{ order?: number; kind?: string; name?: string; startDay?: number; durationDays?: number }>>([]);
   const [dbTeams, setDbTeams] = React.useState<any[]>([]);
   const [dbScores, setDbScores] = React.useState<any[]>([]);
+  const [userGradeMap, setUserGradeMap] = React.useState<Record<string, string>>({});
   const [dayDatesMap, setDayDatesMap] = React.useState<Record<number, string>>({});
   const [selectedMatch, setSelectedMatch] = React.useState<{
     dayNumber: number;
@@ -271,9 +377,11 @@ export function ScheduleClient({
       team2Name: selectedMatch.t2.name,
       dbTeams,
       dbScores,
+      stages,
+      userGradeMap,
       revealed: isSelectedMatchRevealed,
     });
-  }, [selectedMatch, isSelectedMatchRevealed, dbTeams, dbScores]);
+  }, [selectedMatch, isSelectedMatchRevealed, dbTeams, dbScores, stages, userGradeMap]);
 
   const liveDayNum = React.useMemo(
     () => scheduleDays.find((d) => monumentStatus(d, nowMs) === 'live')?.dayNumber ?? null,
@@ -297,6 +405,7 @@ export function ScheduleClient({
         setStages(nextStages);
         setDbTeams(res.teams || []);
         setDbScores(res.scores || []);
+        setUserGradeMap((res as any).userGradeMap || {});
         setDayDatesMap(dayDates);
         setScheduleDays(
           buildOrganizerScheduleDays({
@@ -336,15 +445,22 @@ export function ScheduleClient({
       if (!t1 || !t2) return null;
       const combi1 = resolveEffectiveTeamCombi({ team: t1, dayNumber: dayNum });
       const combi2 = resolveEffectiveTeamCombi({ team: t2, dayNumber: dayNum });
+      const scoreMap = resolveEffectiveScoreMapForDay({
+        dayNumber: dayNum,
+        dbTeams,
+        dbScores,
+        stages,
+        userGradeMap,
+      });
       return scoreMatchDay(
         combi1.rounds,
         combi2.rounds,
         teamRoster(t1),
         teamRoster(t2),
-        scoreMapForDay(dbScores, dayNum)
+        scoreMap
       );
     },
-    [dayDatesMap, nowMs, dbTeams, dbScores]
+    [dayDatesMap, nowMs, dbTeams, dbScores, stages, userGradeMap]
   );
 
   const filteredDays = scheduleDays.filter((d) => {
@@ -631,10 +747,13 @@ export function ScheduleClient({
                               </div>
                             )}
                           </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : isT1Winner ? 'text-emerald-400 font-extrabold' : t1.color}`} title={t1.name}>
-                                {t1.name}
+                          <div className="min-w-0 flex flex-col items-start">
+                            <span className={`text-[11px] sm:text-sm font-black truncate block w-full text-left ${isSpoc ? 'text-violet-200' : isT1Winner ? 'text-emerald-400 font-extrabold' : t1.color}`} title={t1.name}>
+                              {t1.name}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                                {t1.tag}
                               </span>
                               {isT1Winner && (
                                 <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
@@ -642,9 +761,6 @@ export function ScheduleClient({
                                 </span>
                               )}
                             </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
-                              {t1.tag}
-                            </span>
                           </div>
                         </div>
 
@@ -679,19 +795,19 @@ export function ScheduleClient({
                         {/* Team 2 */}
                         <div className={`flex items-center justify-end gap-2 sm:gap-3 flex-1 min-w-0 text-right transition-opacity ${isT1Winner ? 'opacity-55' : 'opacity-100'}`}>
                           <div className="min-w-0 flex flex-col items-end">
-                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <span className={`text-[11px] sm:text-sm font-black truncate block w-full text-right ${isSpoc ? 'text-violet-200' : isT2Winner ? 'text-emerald-400 font-extrabold' : t2.color}`} title={t2.name}>
+                              {t2.name}
+                            </span>
+                            <div className="flex items-center justify-end gap-1.5 mt-0.5 flex-wrap">
                               {isT2Winner && (
                                 <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
                                   <Crown className="h-2.5 w-2.5 text-emerald-400 inline" /> Winner
                                 </span>
                               )}
-                              <span className={`text-[11px] sm:text-sm font-black truncate block ${isSpoc ? 'text-violet-200' : isT2Winner ? 'text-emerald-400 font-extrabold' : t2.color}`} title={t2.name}>
-                                {t2.name}
+                              <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
+                                {t2.tag}
                               </span>
                             </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase opacity-80">
-                              {t2.tag}
-                            </span>
                           </div>
                           <div className={`relative ${isSpoc ? 'h-16 w-14 sm:h-32 sm:w-24' : 'h-11 w-11 min-[400px]:h-13 min-[400px]:w-13 sm:h-16 sm:w-16'} rounded-xl overflow-hidden bg-slate-950/90 p-0.5 border-2 ${isT2Winner ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-emerald-500/20 shadow-lg' : t2.border} shrink-0 shadow-lg flex items-center justify-center`}>
                             <img
@@ -761,18 +877,18 @@ export function ScheduleClient({
                       <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${matchDetails.matchResult.matchWinner === 1 ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/20' : selectedMatch.t1.border} shrink-0 flex items-center justify-center`}>
                         <img src={selectedMatch.t1.logo} alt={selectedMatch.t1.name} className="h-full w-full object-contain" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs sm:text-sm font-black truncate text-foreground" title={selectedMatch.t1.name}>
-                            {selectedMatch.t1.name}
-                          </span>
+                      <div className="min-w-0 flex flex-col items-start">
+                        <span className="text-xs sm:text-sm font-black truncate text-foreground block w-full text-left" title={selectedMatch.t1.name}>
+                          {selectedMatch.t1.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t1.tag}</span>
                           {matchDetails.matchResult.matchWinner === 1 && (
                             <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
                               <Crown className="h-2.5 w-2.5 text-emerald-400" /> Winner
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t1.tag}</span>
                       </div>
                     </div>
 
@@ -792,18 +908,18 @@ export function ScheduleClient({
 
                     {/* Team 2 */}
                     <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-1 min-w-0 text-right">
-                      <div className="min-w-0">
-                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <div className="min-w-0 flex flex-col items-end">
+                        <span className="text-xs sm:text-sm font-black truncate text-foreground block w-full text-right" title={selectedMatch.t2.name}>
+                          {selectedMatch.t2.name}
+                        </span>
+                        <div className="flex items-center justify-end gap-1.5 mt-0.5 flex-wrap">
                           {matchDetails.matchResult.matchWinner === 2 && (
                             <span className="inline-flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-black uppercase text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs">
                               <Crown className="h-2.5 w-2.5 text-emerald-400" /> Winner
                             </span>
                           )}
-                          <span className="text-xs sm:text-sm font-black truncate text-foreground" title={selectedMatch.t2.name}>
-                            {selectedMatch.t2.name}
-                          </span>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t2.tag}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{selectedMatch.t2.tag}</span>
                       </div>
                       <div className={`h-11 w-11 sm:h-14 sm:w-14 rounded-xl overflow-hidden bg-slate-950 p-1 border-2 ${matchDetails.matchResult.matchWinner === 2 ? 'border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/20' : selectedMatch.t2.border} shrink-0 flex items-center justify-center`}>
                         <img src={selectedMatch.t2.logo} alt={selectedMatch.t2.name} className="h-full w-full object-contain" />
@@ -887,9 +1003,16 @@ export function ScheduleClient({
                                       {p.name}
                                     </span>
                                     {p.isWalkover ? (
-                                      <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
-                                        Walkover
-                                      </Badge>
+                                      <div className="flex items-center gap-1.5">
+                                        {p.score != null && (
+                                          <span className="font-mono text-amber-400/90 font-bold">
+                                            Score: {p.score}
+                                          </span>
+                                        )}
+                                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
+                                          Walkover
+                                        </Badge>
+                                      </div>
                                     ) : (
                                       <span className="font-mono text-muted-foreground font-bold">
                                         {p.score != null ? `Score: ${p.score}` : '—'}
@@ -918,9 +1041,16 @@ export function ScheduleClient({
                                       {p.name}
                                     </span>
                                     {p.isWalkover ? (
-                                      <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
-                                        Walkover
-                                      </Badge>
+                                      <div className="flex items-center gap-1.5">
+                                        {p.score != null && (
+                                          <span className="font-mono text-amber-400/90 font-bold">
+                                            Score: {p.score}
+                                          </span>
+                                        )}
+                                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0 bg-amber-500/20 text-amber-300 border-amber-500/40">
+                                          Walkover
+                                        </Badge>
+                                      </div>
                                     ) : (
                                       <span className="font-mono text-muted-foreground font-bold">
                                         {p.score != null ? `Score: ${p.score}` : '—'}

@@ -57,7 +57,7 @@ function mapTeamScorePlayers(players: any[]) {
 }
 
 function rowFilledBoards(row: { boards?: BoardDraft[]; score: string; slams: string }) {
-  const fromDrafts = draftToPayload(row.boards || []).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+  const fromDrafts = draftToPayload(row.boards || []).filter((b) => Number.isFinite(b.score) && (b.slams > 0 || b.score >= 0));
   if (fromDrafts.length) return fromDrafts;
   const score = parseInt(row.score, 10);
   if (!Number.isFinite(score) || row.score === '') return [];
@@ -999,7 +999,7 @@ export default function CaptainClient({
                       disabled={!teamScoreOpen || row.missingPrior}
                       target={row.target}
                       onChange={(next) => {
-                        const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && b.score >= 0);
+                        const filled = draftToPayload(next).filter((b) => Number.isFinite(b.score) && (b.slams > 0 || b.score >= 0));
                         const agg = aggregateBoards(filled);
                         const updated = [...teamScoreRows];
                         updated[idx] = {

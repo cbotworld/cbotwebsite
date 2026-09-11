@@ -20,7 +20,17 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBroadcast, endBroadcast, goLive, type BroadcastSession } from "../api/client";
-import { getSession } from "../api/website";
+import {
+  fetchPlayerScores,
+  getSession,
+  submitPlayerDayScore,
+  type DayScoreInfo,
+} from "../api/website";
+import {
+  BoardScoreModal,
+  boardsFromSaved,
+} from "../components/BoardScoreModal";
+import { playerScoreUntilNote } from "../score-edit-policy";
 import { config } from "../config";
 import { startLiveKeepAlive, stopLiveKeepAlive } from "../../modules/live-keep-alive";
 import { StreamOverlay } from "../components/StreamOverlay";
@@ -125,6 +135,9 @@ export function LiveScreen({ route, navigation }: Props) {
   const timeRange = route.params?.timeRange || "";
   const endIso = route.params?.endIso || "";
   const playMode = route.params?.playMode || "match";
+  const numericDay =
+    route.params?.dayNumber ||
+    (typeof day === "string" && day.match(/\d+/) ? Number(day.match(/\d+/)![0]) : 1);
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const topInset = Math.max(insets.top, 12);
@@ -144,6 +157,11 @@ export function LiveScreen({ route, navigation }: Props) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
 
+  // Score management state (independent of live streaming)
+  const [showScoreModal, setShowScoreModal] = useState(false);
+  const [scoreInfo, setScoreInfo] = useState<DayScoreInfo | null>(null);
+  const [savingScore, setSavingScore] = useState(false);
+
   const dimAnim = useRef(new Animated.Value(0)).current;
   const dimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,6 +174,43 @@ export function LiveScreen({ route, navigation }: Props) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
   const allowLeaveRef = useRef(false);
+
+  const loadScoreInfo = useCallback(async () => {
+    try {
+      const scores = await fetchPlayerScores({ slot: editionSlot, editionId });
+      setScoreInfo(scores);
+      return scores;
+    } catch {
+      return null;
+    }
+  }, [editionSlot, editionId]);
+
+  useEffect(() => {
+    void loadScoreInfo();
+  }, [loadScoreInfo]);
+
+  const handleOpenScores = useCallback(() => {
+    void loadScoreInfo();
+    setShowScoreModal(true);
+  }, [loadScoreInfo]);
+
+  const handleSaveScore = useCallback(
+    async (boards: Array<{ score: number; slams: number }>) => {
+      setSavingScore(true);
+      try {
+        await submitPlayerDayScore(numericDay, boards, { slot: editionSlot, editionId });
+        setStatus("Scores submitted successfully! 🎯", "info");
+        setShowScoreModal(false);
+        void loadScoreInfo();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to save scores";
+        setStatus(msg, "error");
+      } finally {
+        setSavingScore(false);
+      }
+    },
+    [numericDay, editionSlot, editionId, loadScoreInfo],
+  );
 
   const resetDimTimer = useCallback(() => {
     if (dimTimerRef.current) {
@@ -654,6 +709,12 @@ export function LiveScreen({ route, navigation }: Props) {
           </Text>
           <Text style={styles.endedDay}>{day}</Text>
           <Pressable
+            style={styles.endedScoreBtn}
+            onPress={handleOpenScores}
+          >
+            <Text style={styles.endedScoreBtnText}>📝  SUBMIT / UPDATE SCORES</Text>
+          </Pressable>
+          <Pressable
             style={styles.endedBtn}
             onPress={() => {
               void lockAppOrientation("portrait");
@@ -663,6 +724,19 @@ export function LiveScreen({ route, navigation }: Props) {
             <Text style={styles.endedBtnText}>BACK TO DASHBOARD</Text>
           </Pressable>
         </View>
+        <BoardScoreModal
+          visible={showScoreModal}
+          dayNumber={numericDay}
+          playerName={name}
+          target={scoreInfo?.target}
+          initialBoards={boardsFromSaved((scoreInfo?.scores || []).find((s) => s.dayNumber === numericDay))}
+          busy={savingScore}
+          editNote={playerScoreUntilNote(numericDay)}
+          onClose={() => setShowScoreModal(false)}
+          onSave={(boards) => {
+            void handleSaveScore(boards);
+          }}
+        />
       </View>
     );
   }
@@ -753,6 +827,17 @@ export function LiveScreen({ route, navigation }: Props) {
         {statusText ? (
           <View style={[styles.statusPillWrap, { top: stream.isStreaming ? topInset + 90 : topInset + 44 }]}>
             <StatusPill text={statusText} type={statusType} />
+            {statusType === "error" && !stream.isStreaming ? (
+              <Pressable
+                style={styles.errorScoreBanner}
+                onPress={handleOpenScores}
+              >
+                <Ionicons name="create-outline" size={15} color="#5eead4" />
+                <Text style={styles.errorScoreBannerText}>
+                  Stream blocked? Tap to enter Day {numericDay} scores directly
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -800,18 +885,27 @@ export function LiveScreen({ route, navigation }: Props) {
         {/* Bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
           {!showStop ? (
-            <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
-              {busy ? (
-                <View style={styles.busyRow}>
-                  <ActivityIndicator color="#fff" />
-                  <Text style={styles.recordButtonText}>
-                    {countdown !== null ? `  Going Live (${countdown}s)…` : "  Setting up…"}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
-              )}
-            </Pressable>
+            <View style={styles.idleActionCol}>
+              <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
+                {busy ? (
+                  <View style={styles.busyRow}>
+                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.recordButtonText}>
+                      {countdown !== null ? `  Going Live (${countdown}s)…` : "  Setting up…"}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.directScoreButton}
+                onPress={handleOpenScores}
+              >
+                <Ionicons name="create-outline" size={14} color="#5eead4" />
+                <Text style={styles.directScoreButtonText}>ENTER SCORES (NO STREAM)</Text>
+              </Pressable>
+            </View>
           ) : (
             <Pressable style={[styles.recordButton, styles.stopButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleStop()}>
               {busy ? (
@@ -858,6 +952,21 @@ export function LiveScreen({ route, navigation }: Props) {
             </View>
           </View>
         ) : null}
+
+        {/* Scoring Modal directly accessible from Live screen */}
+        <BoardScoreModal
+          visible={showScoreModal}
+          dayNumber={numericDay}
+          playerName={name}
+          target={scoreInfo?.target}
+          initialBoards={boardsFromSaved((scoreInfo?.scores || []).find((s) => s.dayNumber === numericDay))}
+          busy={savingScore}
+          editNote={playerScoreUntilNote(numericDay)}
+          onClose={() => setShowScoreModal(false)}
+          onSave={(boards) => {
+            void handleSaveScore(boards);
+          }}
+        />
       </View>
     </View>
   );
@@ -912,6 +1021,28 @@ const styles = StyleSheet.create({
     maxWidth: "85%",
   },
   statusPillText: { color: "#fff", fontWeight: "700", fontSize: 12, textAlign: "center" },
+  errorScoreBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(15, 118, 110, 0.95)",
+    borderWidth: 1,
+    borderColor: "#14b8a6",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 6,
+    shadowColor: "#14b8a6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  errorScoreBannerText: {
+    color: "#5eead4",
+    fontWeight: "800",
+    fontSize: 12,
+  },
 
   // Buttons
   backButton: {
@@ -955,6 +1086,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  idleActionCol: {
+    alignItems: "center",
+    gap: 8,
+  },
+  directScoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(15, 23, 42, 0.85)",
+    borderWidth: 1,
+    borderColor: "#14b8a6",
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  directScoreButtonText: {
+    color: "#5eead4",
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 0.8,
+  },
   busyRow: { flexDirection: "row", alignItems: "center" },
   recordButton: {
     minWidth: 220,
@@ -991,8 +1143,20 @@ const styles = StyleSheet.create({
   endedTitle: { color: "#f8fafc", fontSize: 26, fontWeight: "900" },
   endedSub: { color: "#94a3b8", fontSize: 14, textAlign: "center", lineHeight: 20 },
   endedDay: { color: "#f59e0b", fontWeight: "800", fontSize: 13, letterSpacing: 1 },
-  endedBtn: {
+  endedScoreBtn: {
     marginTop: 10,
+    backgroundColor: "#0f766e",
+    borderWidth: 1,
+    borderColor: "#14b8a6",
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    alignItems: "center",
+    width: "100%",
+  },
+  endedScoreBtnText: { color: "#5eead4", fontWeight: "900", letterSpacing: 1 },
+  endedBtn: {
+    marginTop: 4,
     backgroundColor: "#f59e0b",
     borderRadius: 14,
     paddingVertical: 14,
@@ -1084,8 +1248,8 @@ const styles = StyleSheet.create({
   dimPressable: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 48,
+    justifyContent: "center",
+    padding: 24,
   },
   dimBadge: {
     flexDirection: "row",

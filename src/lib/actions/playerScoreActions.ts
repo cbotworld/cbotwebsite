@@ -1240,15 +1240,22 @@ async function loadPublicScoreboard() {
     edition: { id: edition.id, title: edition.title, number: edition.number },
     maxDay,
     days,
-    teams: rosterTeams.map((t) => ({
-      id: t.id,
-      name: t.name,
-      tag: t.tag,
-      players: t.members.map((m) => ({
-        id: m.id,
-        name: m.name || 'Player',
-      })),
-    })),
+    teams: rosterTeams.map((t) => {
+      const rawTeam = teams.find((raw) => raw.id === t.id);
+      const capId = rawTeam?.captain?.id;
+      return {
+        id: t.id,
+        name: t.name,
+        tag: t.tag,
+        captainId: capId || null,
+        players: t.members.map((m) => ({
+          id: m.id,
+          name: m.name || 'Player',
+          grade: m.grade || null,
+          isCaptain: Boolean(capId && m.id === capId),
+        })),
+      };
+    }),
     scores: allEffectiveScores,
   };
 }

@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Live: {
     name: string;
     day: string;
+    dayNumber?: number;
     teamName?: string;
     opponentName?: string;
     teamTag?: string;
