@@ -893,7 +893,8 @@ export default function TournamentStageDesigner({
     const day1 = startDate || dayDates[1];
     if (!day1 && stages.length > 0) return { success: false as const, error: 'Pick a start date first.' };
     if (!day1 && stages.length === 0) return { success: true as const };
-    const res = await saveEditionCalendar(editionId, day1, daysNeeded || totalDays);
+    const scheduleSpan = stages.length > 0 ? stageSpanDays(stages) : (totalDays || 10);
+    const res = await saveEditionCalendar(editionId, day1, scheduleSpan);
     if (res.success && res.dayDates) onCalendarSaved?.(res.dayDates);
     return res;
   };

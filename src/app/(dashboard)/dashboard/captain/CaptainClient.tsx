@@ -226,7 +226,7 @@ export default function CaptainClient({
   const [publishedBoard, setPublishedBoard] = React.useState<any>(null);
 
   const dayDatesMap: Record<number, string> = React.useMemo(() => {
-    const totalDays = initialActiveEdition?.totalDays || 15;
+    const totalDays = initialActiveEdition?.totalDays || 10;
     const stored = normalizeDayDates(initialActiveEdition?.dayDates);
     const map = buildDayDatesMap(totalDays, stored?.[1]);
     Object.entries(stored ?? {}).forEach(([key, date]) => {
@@ -236,7 +236,7 @@ export default function CaptainClient({
     return map;
   }, [initialActiveEdition]);
 
-  const totalEventDays = initialActiveEdition?.totalDays || 15;
+  const totalEventDays = initialActiveEdition?.totalDays || 10;
   const combiDayNumbers: number[] = isSpocTeam
     ? (spocMatchDays.length ? spocMatchDays.map((d) => d.dayNumber) : [])
     : Array.from({ length: totalEventDays }, (_, i) => i + 1);

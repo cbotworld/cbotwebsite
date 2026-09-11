@@ -288,6 +288,10 @@ export async function submitPlayerDayScoreForUser(
   const live = await resolveCurrentEdition();
   const isAdvancePlay = edition.id !== live?.id;
 
+  if (isAdvancePlay && stages.length === 0) {
+    return { success: false as const, error: 'Tournament stages have not been scheduled yet for this edition.' };
+  }
+
   if (isAdvancePlay) {
     // For advance tournament play: enforce strict sequence (Day 1, Day 2...)
     const priorScores = await prisma.playerDayScore.findMany({

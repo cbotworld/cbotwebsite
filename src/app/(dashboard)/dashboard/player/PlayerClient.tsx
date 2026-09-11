@@ -511,21 +511,31 @@ export default function PlayerClient({
               </div>
             </>
           ) : (
-            <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 via-background to-card p-6 sm:p-7 space-y-3 shadow-sm">
+            <div className="rounded-3xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 via-background to-card p-6 sm:p-7 space-y-4 shadow-sm">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px] font-bold text-cyan-400 border-cyan-500/30 bg-cyan-500/15">
                   ✨ Next Edition Advance Play
                 </Badge>
-                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                  Open for Advance Play
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                  Enrollment Required
                 </span>
               </div>
-              <h3 className="text-lg font-black text-foreground">
-                Next Tournament Advance Play & Registration
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
-                Start playing matches in advance for the upcoming edition! Submit your daily board scores in the <strong>Day Score</strong> tab below, or register to secure your official team roster spot.
-              </p>
+              <div>
+                <h3 className="text-lg font-black text-foreground">
+                  Enroll to Access Next Edition Match Schedule & Advance Play
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl mt-1">
+                  Advance play, daily match fixtures, live stream broadcasting, and day score submissions are available exclusively to officially enrolled players.
+                </p>
+              </div>
+              <div>
+                <a
+                  href="/register"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  <Sparkles className="h-4 w-4" /> Enroll in Next Edition
+                </a>
+              </div>
             </div>
           )}
         </div>

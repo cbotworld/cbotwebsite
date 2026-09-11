@@ -406,7 +406,7 @@ export async function saveEditionCalendar(editionId: string, day1: string, total
     });
     if (!existing) return { success: false, error: 'Edition not found.' };
 
-    const scheduleDays = Math.max(1, totalDays || existing.totalDays || 15);
+    const scheduleDays = totalDays ? Math.max(1, totalDays) : Math.max(1, existing.totalDays || 10);
     const previous = normalizeDayDates(existing.dayDates) ?? {};
     const filled = buildDayDatesMap(scheduleDays, start);
 

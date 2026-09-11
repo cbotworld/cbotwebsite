@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { stageConfigKey } from '@/lib/tournament-stages';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,23 +34,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401, headers: corsHeaders });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const matchId = body.matchId ? String(body.matchId).trim() : null;
-    const requestedEditionId = body.editionId ? String(body.editionId).trim() : null;
-    const requestedSlot = body.slot ? String(body.slot).trim().toUpperCase() : null;
-    const dayNumber = Number(body.dayNumber) || 1;
-
-    if (!matchId && !requestedEditionId && !requestedSlot) {
-      return NextResponse.json({ success: false, error: 'matchId or editionId/dayNumber is required' }, { status: 400, headers: corsHeaders });
-    }
-
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 401, headers: corsHeaders });
     }
 
-    if (matchId) {
-      // Check if there is already an active stream for this match
+    const body = await request.json().catch(() => ({}));
+    const { matchId } = body;
+    const requestedSlot = (body.slot || request.nextUrl.searchParams.get('slot') || '').trim().toUpperCase();
+    const requestedEditionId = (body.editionId || request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
+    const dayNumber = Number(body.dayNumber) || 1;
+
+    // Direct Match Stream (by matchId)
+    if (matchId && !matchId.startsWith('advance-')) {
+      const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        include: { edition: true, team1: true, team2: true },
+      });
+
+      if (!match) {
+        return NextResponse.json({ success: false, error: 'Match not found' }, { status: 404, headers: corsHeaders });
+      }
+
+      // Check existing active stream
       const existingStream = await prisma.liveStream.findFirst({
         where: {
           matchId,
@@ -75,24 +82,12 @@ export async function POST(request: NextRequest) {
         }, { headers: corsHeaders });
       }
 
-      const match = await prisma.match.findUnique({
-        where: { id: matchId },
-        include: {
-          edition: true,
-          team1: true,
-          team2: true,
-        },
-      });
-
-      if (!match) {
-        return NextResponse.json({ success: false, error: 'Match not found' }, { status: 404, headers: corsHeaders });
-      }
-
+      // Create new pending stream record
       return NextResponse.json({
         success: true,
         stream: {
           id: 'mobile-pending',
-          matchId: match.id,
+          matchId,
           dayNumber,
           youtubeUrl: null,
           youtubeVideoId: null,
@@ -127,10 +122,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Edition not found' }, { status: 404, headers: corsHeaders });
     }
 
+    let hasStages = false;
+    const stageSetting = await prisma.systemSetting.findUnique({
+      where: { key: stageConfigKey(edition.id) },
+    });
+    if (stageSetting?.value) {
+      try {
+        const parsed = JSON.parse(stageSetting.value);
+        hasStages = Array.isArray(parsed?.stages) && parsed.stages.length > 0;
+      } catch {}
+    }
+
+    if (!hasStages) {
+      return NextResponse.json({
+        success: false,
+        error: 'Tournament stages and match schedules have not been configured for this edition yet.',
+      }, { status: 400, headers: corsHeaders });
+    }
+
     const participant = await prisma.editionParticipant.findFirst({
       where: { editionId: edition.id, userId },
       include: { team: true },
     });
+
+    const isEnrolled = Boolean(
+      participant &&
+      (
+        ['ENROLLED', 'QUALIFIED', 'REGISTERED'].includes(String(participant.status || '').toUpperCase()) ||
+        ['PAID', 'VERIFIED', 'FREE', 'WAIVED'].includes(String(participant.paymentStatus || '').toUpperCase())
+      )
+    );
+
+    if (!isEnrolled) {
+      return NextResponse.json({
+        success: false,
+        error: 'Only enrolled players can go live for this edition. Please complete enrollment first.',
+      }, { status: 403, headers: corsHeaders });
+    }
 
     // Check existing active stream for this advance day
     const existingAdvanceStream = await prisma.liveStream.findFirst({

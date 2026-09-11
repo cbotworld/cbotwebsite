@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveTeamFace } from '@/lib/team-identity';
+import { stageConfigKey } from '@/lib/tournament-stages';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,10 +52,49 @@ export async function GET(request: NextRequest) {
     if (requestedSlot === 'B' || (targetEdition && targetEdition.slot === 'B')) {
       const edition = targetEdition || await prisma.edition.findFirst({ where: { slot: 'B' } });
       if (edition) {
+        let hasStages = false;
+        const stageSetting = await prisma.systemSetting.findUnique({
+          where: { key: stageConfigKey(edition.id) },
+        });
+        if (stageSetting?.value) {
+          try {
+            const parsed = JSON.parse(stageSetting.value);
+            hasStages = Array.isArray(parsed?.stages) && parsed.stages.length > 0;
+          } catch {}
+        }
+
+        if (!hasStages) {
+          return NextResponse.json({
+            success: true,
+            matches: [],
+            isAdvancePlay: true,
+            editionTitle: edition.title,
+            message: 'No tournament stages scheduled yet.',
+          }, { headers: corsHeaders });
+        }
         const participant = await prisma.editionParticipant.findFirst({
           where: { editionId: edition.id, userId },
           include: { team: true },
         });
+
+        const isEnrolled = Boolean(
+          participant &&
+          (
+            ['ENROLLED', 'QUALIFIED', 'REGISTERED'].includes(String(participant.status || '').toUpperCase()) ||
+            ['PAID', 'VERIFIED', 'FREE', 'WAIVED'].includes(String(participant.paymentStatus || '').toUpperCase())
+          )
+        );
+
+        if (!isEnrolled) {
+          return NextResponse.json({
+            success: true,
+            matches: [],
+            isAdvancePlay: true,
+            isEnrolled: false,
+            editionTitle: edition.title,
+            message: 'You are not enrolled in this edition yet.',
+          }, { headers: corsHeaders });
+        }
 
         const playerScores = await prisma.playerDayScore.findMany({
           where: { editionId: edition.id, userId },

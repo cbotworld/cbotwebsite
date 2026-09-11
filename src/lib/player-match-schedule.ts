@@ -53,6 +53,14 @@ export async function getPlayerMatchSchedule(
     orderBy: { createdAt: 'desc' },
   });
 
+  const isEnrolledInEdition = Boolean(
+    participation &&
+    (
+      ['ENROLLED', 'QUALIFIED', 'REGISTERED'].includes(String(participation.status || '').toUpperCase()) ||
+      ['PAID', 'VERIFIED', 'FREE', 'WAIVED'].includes(String(participation.paymentStatus || '').toUpperCase())
+    )
+  );
+
   const playerTeams = await listPlayerTeams(userId, edition?.id);
   const captainDesks = await listCaptainDesks(userId, edition?.id);
   const requested =
@@ -249,7 +257,7 @@ export async function getPlayerMatchSchedule(
     'TRIPLES',
   ];
 
-  const days = !team
+  const days = !team || (isAdvancePlay && (!hasStages || !isEnrolledInEdition))
     ? []
     : fixtureDays.map((dayNumber) => {
       const scheduled = daysByNumber.get(dayNumber);
@@ -382,13 +390,16 @@ export async function getPlayerMatchSchedule(
     });
 
   const live = days.find((d) => d && d.status === 'live') || null;
+  const advanceRestricted = isAdvancePlay && (!hasStages || !isEnrolledInEdition);
   const warning = !team
     ? 'Your account is not assigned to a team yet.'
-    : isAdvancePlay && !tournamentOptions.nextTournament?.isEnrolled
-      ? (tournamentOptions.nextTournament ? `Advance play is available for players enrolled in ${tournamentOptions.nextTournament.title}.` : 'No upcoming edition scheduled yet.')
-      : isSpocView && days.length === 0
-        ? 'No Spoc exhibition match is scheduled for your team yet.'
-        : undefined;
+    : isAdvancePlay && !hasStages
+      ? 'Tournament stages and schedule for this edition have not been saved yet.'
+      : isAdvancePlay && !isEnrolledInEdition
+        ? `Advance play and match schedules are available only for players enrolled in ${edition?.title || 'this edition'}. Please complete enrollment to get access.`
+        : isSpocView && days.length === 0
+          ? 'No Spoc exhibition match is scheduled for your team yet.'
+          : undefined;
 
   return {
     user: {
@@ -407,14 +418,15 @@ export async function getPlayerMatchSchedule(
     captainDesks,
     liveDay: live?.dayNumber ?? null,
     liveLabel: live?.label ?? null,
-    currentDay: currentDayForView,
-    playableFromDay: isSpocView ? (fixtureDays[0] || 1) : 1,
-    playableUntilDay: isSpocView ? (fixtureDays[fixtureDays.length - 1] || currentDayForView) : totalDays,
+    currentDay: advanceRestricted ? 0 : currentDayForView,
+    playableFromDay: advanceRestricted ? 0 : isSpocView ? (fixtureDays[0] || 1) : 1,
+    playableUntilDay: advanceRestricted ? 0 : isSpocView ? (fixtureDays[fixtureDays.length - 1] || currentDayForView) : totalDays,
     daysWithYoutube: [...daysPlayed].sort((a, b) => a - b),
     tournamentOptions: {
       ...tournamentOptions,
       activeSlot,
     },
+    isEnrolled: isEnrolledInEdition,
     warning,
     days,
   };

@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import CaptainClient from './CaptainClient';
-import { stageConfigKey } from '@/lib/tournament-stages';
+import { stageConfigKey, stageSpanDays } from '@/lib/tournament-stages';
 import {
   isSpocExhibitionTeam,
   spocEventFormatsFromStage,
@@ -212,6 +212,10 @@ export default async function CaptainPage() {
     registrationEnrollment = null;
   }
 
+  const stageDays = stageConfig?.stages && stageConfig.stages.length > 0
+    ? stageSpanDays(stageConfig.stages)
+    : (activeEdition?.totalDays || 10);
+
   return (
     <CaptainClient
       initialTeam={team}
@@ -223,6 +227,7 @@ export default async function CaptainPage() {
       initialAllUsers={allUsers}
       initialActiveEdition={{
         ...activeEdition,
+        totalDays: stageDays,
         roundsPerDay,
         roundFormats: savedRoundFormats,
         spocRoundFormats,
