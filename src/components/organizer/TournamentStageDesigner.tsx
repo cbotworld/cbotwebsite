@@ -307,7 +307,7 @@ export default function TournamentStageDesigner({
   onDaysNeededChange?: (days: number) => void;
   onCalendarSaved?: (dayDates: Record<number, string>) => void;
 }) {
-  const [config, setConfig] = React.useState<TournamentStageConfig>(() => defaultTournamentStages(teams.length || 8));
+  const [config, setConfig] = React.useState<TournamentStageConfig>(() => ({ scheduleMode: 'DIVIDED', stages: [] }));
   const [matches, setMatches] = React.useState<MatchLite[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
@@ -319,7 +319,7 @@ export default function TournamentStageDesigner({
   const stages = config.stages;
   const active = stages[activeIndex] || stages[0];
   const activeStageTeams = active?.kind === 'SPOC_EXHIBITION' ? spocTeams : teams;
-  const daysNeeded = React.useMemo(() => Math.max(1, stageSpanDays(stages)), [stages]);
+  const daysNeeded = React.useMemo(() => stages.length === 0 ? 0 : Math.max(1, stageSpanDays(stages)), [stages]);
   const lastDaysNeededRef = React.useRef(daysNeeded);
 
   React.useEffect(() => {
@@ -336,7 +336,7 @@ export default function TournamentStageDesigner({
     if (res.success) {
       const lastDone = lastCompletedDay(dayDates);
       const teamCount = res.teams?.length ?? 0;
-      const nextConfig = res.config || defaultTournamentStages(teamCount);
+      const nextConfig = res.config || { scheduleMode: 'DIVIDED', stages: [] };
       const validTeamIds = new Set((res.teams || []).map((t) => t.id));
       nextConfig.stages = (nextConfig.stages || []).map((stage) => {
         if (validTeamIds.size === 0) {
@@ -441,7 +441,7 @@ export default function TournamentStageDesigner({
 
   const removeStage = (idx: number) => {
     const stage = stages[idx];
-    if (!stage || stages.length <= 1) return;
+    if (!stage) return;
     if (isStageLocked(stage)) {
       setMessage({ type: 'err', text: `${stage.name} has completed matches and cannot be removed.` });
       return;
@@ -891,7 +891,8 @@ export default function TournamentStageDesigner({
   const persistCalendar = async () => {
     if (!editionId) return { success: false as const, error: 'No edition selected.' };
     const day1 = startDate || dayDates[1];
-    if (!day1) return { success: false as const, error: 'Pick a start date first.' };
+    if (!day1 && stages.length > 0) return { success: false as const, error: 'Pick a start date first.' };
+    if (!day1 && stages.length === 0) return { success: true as const };
     const res = await saveEditionCalendar(editionId, day1, daysNeeded || totalDays);
     if (res.success && res.dayDates) onCalendarSaved?.(res.dayDates);
     return res;
@@ -921,17 +922,22 @@ export default function TournamentStageDesigner({
     }
     setSaving(true);
     setMessage(null);
-    const calendar = await persistCalendar();
-    if (!calendar.success) {
-      setSaving(false);
-      setMessage({ type: 'err', text: calendar.error || 'Failed to save the start date.' });
-      return;
+    if (stages.length > 0 || startDate || dayDates[1]) {
+      const calendar = await persistCalendar();
+      if (!calendar.success && stages.length > 0) {
+        setSaving(false);
+        setMessage({ type: 'err', text: calendar.error || 'Failed to save the start date.' });
+        return;
+      }
     }
     const res = await saveTournamentStageConfig(editionId, stagedConfig());
     setSaving(false);
     if (res.success) {
       setConfig(res.config);
-      setMessage({ type: 'ok', text: 'Start date and tournament stage design saved.' });
+      setMessage({
+        type: 'ok',
+        text: stages.length === 0 ? 'Tournament design cleared (blank edition saved).' : 'Start date and tournament stage design saved.',
+      });
     } else {
       setMessage({ type: 'err', text: res.error || 'Failed to save stage design.' });
     }
@@ -951,8 +957,9 @@ export default function TournamentStageDesigner({
 
   const dbRrCount = matches.filter((m) => m.stage === 'ROUND_ROBIN').length;
   const teamCount = teams.length || 0;
-  const rrCount =
-    teamCount >= 2
+  const rrCount = !stages.some((s) => s.kind === 'ROUND_ROBIN')
+    ? 0
+    : teamCount >= 2
       ? (teamCount * (teamCount - 1)) / 2
       : rrPairings.filter((p) => p.team1Id && p.team2Id).length || dbRrCount;
 
@@ -976,9 +983,11 @@ export default function TournamentStageDesigner({
             <Badge variant="carrom" className="font-extrabold text-xs px-3 py-1">
               {teams.length || 0} Teams
             </Badge>
-            <Badge variant="success" className="font-extrabold text-xs px-3 py-1">
-              {rrCount} Round Robin Matches
-            </Badge>
+            {stages.some((s) => s.kind === 'ROUND_ROBIN') && (
+              <Badge variant="success" className="font-extrabold text-xs px-3 py-1">
+                {rrCount} Round Robin Matches
+              </Badge>
+            )}
             <Button type="button" variant="carrom" size="sm" className="text-xs font-bold" onClick={handleSave} disabled={saving || loading}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save
@@ -1032,7 +1041,7 @@ export default function TournamentStageDesigner({
                       </button>
                       {locked ? (
                         <span className="text-[9px] font-bold text-muted-foreground pr-1">Locked</span>
-                      ) : stages.length > 1 ? (
+                      ) : (
                         <button
                           type="button"
                           className="h-6 w-6 inline-flex items-center justify-center text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-full"
@@ -1046,7 +1055,7 @@ export default function TournamentStageDesigner({
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </React.Fragment>
                 );
@@ -1119,42 +1128,44 @@ export default function TournamentStageDesigner({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {stages.map((stage, idx) => {
-                const generated = matches.some((m) => stageMatchStages(stage).includes(m.stage || ''));
-                const isActive = idx === activeIndex;
-                const locked = isStageLocked(stage);
-                return (
-                  <button
-                    key={stage.id}
-                    type="button"
-                    onClick={() => setActiveIndex(idx)}
-                    className={`text-left rounded-xl border p-4 transition-all ${
-                      locked
-                        ? 'border-border/60 bg-muted/20'
-                        : isActive
-                          ? 'border-amber-500 bg-amber-500/10'
-                          : 'border-border bg-card hover:border-amber-500/40'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Stage {idx + 1}</span>
-                      {locked ? (
-                        <Badge variant="outline" className="text-[9px] px-2 py-0">Locked</Badge>
-                      ) : generated ? (
-                        <Badge variant="success" className="text-[9px] px-2 py-0">Live</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[9px] px-2 py-0">Draft</Badge>
-                      )}
-                    </div>
-                    <div className="text-sm font-black">{stage.name}</div>
-                    <div className="text-[11px] text-muted-foreground mt-1 font-semibold">
-                      {stage.startDay ? `Days ${stage.startDay}–${stage.startDay + (stage.durationDays || 1) - 1}` : 'Days to be assigned'}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {stages.length > 0 ? (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {stages.map((stage, idx) => {
+                  const generated = matches.some((m) => stageMatchStages(stage).includes(m.stage || ''));
+                  const isActive = idx === activeIndex;
+                  const locked = isStageLocked(stage);
+                  return (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => setActiveIndex(idx)}
+                      className={`text-left rounded-xl border p-4 transition-all ${
+                        locked
+                          ? 'border-border/60 bg-muted/20'
+                          : isActive
+                            ? 'border-amber-500 bg-amber-500/10'
+                            : 'border-border bg-card hover:border-amber-500/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Stage {idx + 1}</span>
+                        {locked ? (
+                          <Badge variant="outline" className="text-[9px] px-2 py-0">Locked</Badge>
+                        ) : generated ? (
+                          <Badge variant="success" className="text-[9px] px-2 py-0">Live</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] px-2 py-0">Draft</Badge>
+                        )}
+                      </div>
+                      <div className="text-sm font-black">{stage.name}</div>
+                      <div className="text-[11px] text-muted-foreground mt-1 font-semibold">
+                        {stage.startDay ? `Days ${stage.startDay}–${stage.startDay + (stage.durationDays || 1) - 1}` : 'Days to be assigned'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
 
             {message && (
               <div
@@ -1168,6 +1179,24 @@ export default function TournamentStageDesigner({
               </div>
             )}
 
+            {!active || stages.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center space-y-4">
+                <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
+                  <GitBranch className="h-6 w-6" />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <h3 className="text-base font-bold text-foreground">No Tournament Stages Added</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    This edition is currently blank with no scheduled matches. Use the buttons above (e.g.{' '}
+                    <strong className="text-amber-400 font-bold">+ Add round robin</strong>,{' '}
+                    <strong className="text-foreground font-bold">+ Add league</strong>,{' '}
+                    <strong className="text-foreground font-bold">+ Add qualifiers</strong>,{' '}
+                    <strong className="text-foreground font-bold">+ Add final</strong>) to design your tournament path and save when ready.
+                  </p>
+                </div>
+              </div>
+            ) : (
+            <>
             <div className="rounded-2xl border border-border bg-muted/20 p-4 sm:p-5 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -1873,6 +1902,8 @@ export default function TournamentStageDesigner({
                 </Table>
               </div>
             </div>
+            )}
+            </>
             )}
           </>
         )}

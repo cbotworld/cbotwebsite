@@ -1476,8 +1476,8 @@ export async function startNewTournament(opts: {
       });
       await tx.systemSetting.upsert({
         where: { key: stageConfigKey(edition.id) },
-        create: { key: stageConfigKey(edition.id), value: JSON.stringify(defaultTournamentStages(8)) },
-        update: { value: JSON.stringify(defaultTournamentStages(8)) },
+        create: { key: stageConfigKey(edition.id), value: JSON.stringify({ scheduleMode: 'DIVIDED', stages: [] }) },
+        update: { value: JSON.stringify({ scheduleMode: 'DIVIDED', stages: [] }) },
       });
     });
 

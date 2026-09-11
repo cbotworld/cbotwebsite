@@ -125,3 +125,39 @@ export async function sendCustomPushNotification(input: {
     message: `Push notification summary: ${statusDetail}`,
   };
 }
+
+export async function previewAutoNotifications(input?: {
+  dayNumber?: number;
+  type?: 'golive' | 'score' | 'combi' | 'results' | 'auto';
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const role = (session.user as any)?.role;
+  if (role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+    throw new Error('Permission denied.');
+  }
+
+  const { dispatchNotifications } = await import('@/lib/notification-scheduler');
+  return dispatchNotifications(input?.type || 'auto', input?.dayNumber, true);
+}
+
+export async function triggerAutoNotifications(input?: {
+  dayNumber?: number;
+  type?: 'golive' | 'score' | 'combi' | 'results' | 'auto';
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const role = (session.user as any)?.role;
+  if (role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+    throw new Error('Permission denied.');
+  }
+
+  const { dispatchNotifications } = await import('@/lib/notification-scheduler');
+  return dispatchNotifications(input?.type || 'auto', input?.dayNumber, false);
+}

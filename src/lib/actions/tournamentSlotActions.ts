@@ -690,49 +690,6 @@ export async function getMyRegistrationEnrollment(overrideUserId?: string) {
       });
     }
 
-    if (!participant) {
-      participant = await prisma.editionParticipant.findFirst({
-        where: {
-          OR: userWhere,
-          AND: [
-            {
-              OR: [
-                { status: { in: ['ENROLLED', 'QUALIFIED', 'REGISTERED'] } },
-                { enrolledAt: { not: null } },
-                { paymentStatus: { in: ['PAID', 'VERIFIED', 'FREE', 'PENDING', 'WAIVED'] } },
-                { paymentTransactionId: { not: null } },
-              ],
-            },
-          ],
-        },
-        orderBy: [
-          { edition: { number: 'desc' } },
-          { enrolledAt: 'desc' },
-        ],
-        select: {
-          id: true,
-          status: true,
-          paymentStatus: true,
-          paymentAmount: true,
-          paymentTransactionId: true,
-          paymentMethod: true,
-          enrolledAt: true,
-          edition: {
-            select: {
-              id: true,
-              title: true,
-              number: true,
-              theme: true,
-              enrollmentFee: true,
-              status: true,
-              slot: true,
-              organizer: { select: { name: true, username: true } },
-            },
-          },
-        },
-      });
-    }
-
     if (!participant?.edition) return { success: true as const, enrollment: null };
 
     let enrollmentNumber: number | null = null;

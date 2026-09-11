@@ -1083,7 +1083,7 @@ export function normalizeStageConfig(
   raw: TournamentStageConfig | null | undefined,
   teamCount = 8
 ): TournamentStageConfig {
-  if (!raw?.stages?.length) return defaultTournamentStages(teamCount);
+  if (!raw || !Array.isArray(raw.stages)) return defaultTournamentStages(teamCount);
   let leagueCount = 0;
   return {
     scheduleMode: raw.scheduleMode || 'DIVIDED',

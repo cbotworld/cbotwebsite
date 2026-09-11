@@ -121,10 +121,10 @@ export async function emptyEditionTournamentData(editionId: string, confirmation
         where: { key: stageConfigKey(editionId) },
         create: {
           key: stageConfigKey(editionId),
-          value: JSON.stringify(defaultTournamentStages(8)),
+          value: JSON.stringify({ scheduleMode: 'DIVIDED', stages: [] }),
         },
         update: {
-          value: JSON.stringify(defaultTournamentStages(8)),
+          value: JSON.stringify({ scheduleMode: 'DIVIDED', stages: [] }),
         },
       });
     });

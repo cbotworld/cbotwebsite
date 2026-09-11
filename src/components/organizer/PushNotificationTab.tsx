@@ -5,7 +5,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bell, Send, RefreshCw, Smartphone, Users, AlertCircle, CheckCircle2, Sparkles, MessageSquare } from 'lucide-react';
-import { getPushNotificationStats, sendCustomPushNotification } from '@/lib/actions/pushNotificationActions';
+import {
+  getPushNotificationStats,
+  sendCustomPushNotification,
+  previewAutoNotifications,
+  triggerAutoNotifications,
+} from '@/lib/actions/pushNotificationActions';
 
 export function PushNotificationTab() {
   const [loadingStats, setLoadingStats] = React.useState(false);
@@ -92,6 +97,60 @@ export function PushNotificationTab() {
     setMessage(tmplMsg);
   };
 
+  // Auto Push Notification State
+  const [autoDay, setAutoDay] = React.useState<number>(1);
+  const [autoType, setAutoType] = React.useState<'auto' | 'golive' | 'score' | 'combi' | 'results'>('auto');
+  const [loadingAuto, setLoadingAuto] = React.useState(false);
+  const [autoPreviewResult, setAutoPreviewResult] = React.useState<any | null>(null);
+
+  const handleAutoPreview = async () => {
+    setLoadingAuto(true);
+    setStatusMsg(null);
+    try {
+      const res = await previewAutoNotifications({
+        dayNumber: autoDay,
+        type: autoType,
+      });
+      setAutoPreviewResult(res);
+      setStatusMsg({
+        type: 'success',
+        text: `🔍 Preview: Generated ${res.notificationsCount} notification(s) for Day ${res.dayNumber} (${res.typeSent}).`,
+      });
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to preview auto notifications.' });
+    } finally {
+      setLoadingAuto(false);
+    }
+  };
+
+  const handleAutoDispatch = async () => {
+    if (!confirm(`Are you sure you want to DISPATCH live push notifications for Day ${autoDay} (${autoType}) to all matching players/captains?`)) {
+      return;
+    }
+    setLoadingAuto(true);
+    setStatusMsg(null);
+    try {
+      const res = await triggerAutoNotifications({
+        dayNumber: autoDay,
+        type: autoType,
+      });
+      setAutoPreviewResult(res);
+      if (res.success) {
+        setStatusMsg({
+          type: 'success',
+          text: `🚀 Dispatched: Sent ${res.results.sent} push notification(s) for Day ${res.dayNumber} (${res.typeSent}).`,
+        });
+        fetchStats();
+      } else {
+        setStatusMsg({ type: 'error', text: res.message || 'Failed to dispatch auto notifications.' });
+      }
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Error triggering auto notifications.' });
+    } finally {
+      setLoadingAuto(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ── Stats Summary Grid ────────────────────────────────────────────── */}
@@ -145,7 +204,150 @@ export function PushNotificationTab() {
         </Card>
       </div>
 
-      {/* ── Main Push Notification Form Card ──────────────────────────────── */}
+      {/* Status Message Banner */}
+      {statusMsg && (
+        <div
+          className={`p-4 rounded-xl text-xs font-bold flex items-center gap-3 ${
+            statusMsg.type === 'success'
+              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+              : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+          }`}
+        >
+          {statusMsg.type === 'success' ? (
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+          ) : (
+            <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
+          )}
+          <span>{statusMsg.text}</span>
+        </div>
+      )}
+
+      {/* ── Auto Push Notification Schedule & Test Card ───────────────────── */}
+      <Card className="border-cyan-500/30 shadow-xl bg-gradient-to-br from-cyan-500/5 via-card to-background">
+        <CardHeader className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-xl font-bold flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-cyan-400" /> Auto Push Notifications System
+            </CardTitle>
+            <CardDescription className="text-xs mt-1">
+              Automated daily match reminders, score cutoff alerts, captain combi warnings, and result celebrations scheduled via Vercel Cron.
+            </CardDescription>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-6 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
+              <div className="font-extrabold text-amber-400">4:00 PM – 7:00 PM IST</div>
+              <div className="font-bold text-foreground">⚔️ Go Live &amp; Match Alert</div>
+              <p className="text-[11px] text-muted-foreground">Alerts players with their real opponent for today&apos;s fixture.</p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-orange-500/20 bg-orange-500/5 space-y-1">
+              <div className="font-extrabold text-orange-400">8:00 PM – 8:30 PM IST</div>
+              <div className="font-bold text-foreground">📝 Score Cutoff Reminder</div>
+              <p className="text-[11px] text-muted-foreground">Reminds unscored players to record their day score before 9:00 PM.</p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-1">
+              <div className="font-extrabold text-rose-400">9:00 PM – 9:25 PM IST</div>
+              <div className="font-bold text-foreground">⚡ Captain Combi Warning</div>
+              <p className="text-[11px] text-muted-foreground">Warns captains of unsubmitted lineups for today&apos;s match before 9:30 PM lock.</p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-1">
+              <div className="font-extrabold text-emerald-400">9:35 PM IST</div>
+              <div className="font-bold text-foreground">🏆 Match Results &amp; Standings</div>
+              <p className="text-[11px] text-muted-foreground">Celebrates actual match victory/defeat and reports updated standings.</p>
+            </div>
+          </div>
+
+          {/* Test & Preview Panel */}
+          <div className="rounded-2xl border border-border p-4 bg-muted/20 space-y-4">
+            <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+              <RefreshCw className="h-3.5 w-3.5" /> Test Dispatch or Preview Auto Push Logic
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="text-[11px] font-bold block mb-1 text-muted-foreground">Tournament Day</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={autoDay}
+                  onChange={(e) => setAutoDay(parseInt(e.target.value, 10) || 1)}
+                  className="h-9 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold block mb-1 text-muted-foreground">Notification Type</label>
+                <select
+                  value={autoType}
+                  onChange={(e) => setAutoType(e.target.value as any)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs font-bold shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="auto">Auto (Current IST Time)</option>
+                  <option value="golive">Go Live &amp; Match Alert (4-7 PM)</option>
+                  <option value="score">Score Cutoff Reminder (8-8:30 PM)</option>
+                  <option value="combi">Captain Combi Warning (9-9:25 PM)</option>
+                  <option value="results">Match Results &amp; Standings (9:35 PM)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoPreview}
+                  disabled={loadingAuto}
+                  className="h-9 font-bold text-xs flex-1"
+                >
+                  {loadingAuto ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                  🔍 Preview Payloads
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="carrom"
+                  size="sm"
+                  onClick={handleAutoDispatch}
+                  disabled={loadingAuto}
+                  className="h-9 font-bold text-xs flex-1"
+                >
+                  {loadingAuto ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                  🚀 Dispatch Live
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview Output Samples */}
+            {autoPreviewResult?.samplePayloads && autoPreviewResult.samplePayloads.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="text-[11px] font-bold text-muted-foreground">
+                  Sample Notification Payloads ({autoPreviewResult.samplePayloads.length} shown of {autoPreviewResult.notificationsCount} total):
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                  {autoPreviewResult.samplePayloads.map((p: any, idx: number) => (
+                    <div key={idx} className="p-3 rounded-xl bg-card border border-border text-xs space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-cyan-400">{p.userName} ({p.teamName})</span>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground">{p.type}</span>
+                      </div>
+                      <div className="font-extrabold text-foreground">{p.title}</div>
+                      <p className="text-[11px] text-muted-foreground">{p.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Main Custom Push Notification Form Card ───────────────────────── */}
       <Card className="border-amber-500/30 shadow-2xl">
         <CardHeader className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -153,7 +355,7 @@ export function PushNotificationTab() {
               <Bell className="h-5 w-5 text-amber-500 animate-bounce" /> Send Custom Push Notification
             </CardTitle>
             <CardDescription className="text-xs mt-1">
-              Broadcast mobile push notifications directly to all registered app users across Android &amp; iOS devices.
+              Broadcast custom push notifications directly to all registered app users across Android &amp; iOS devices.
             </CardDescription>
           </div>
 
@@ -169,24 +371,6 @@ export function PushNotificationTab() {
         </CardHeader>
 
         <CardContent className="pt-6 space-y-6">
-          {/* Status Message Banner */}
-          {statusMsg && (
-            <div
-              className={`p-4 rounded-xl text-xs font-bold flex items-center gap-3 ${
-                statusMsg.type === 'success'
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-              }`}
-            >
-              {statusMsg.type === 'success' ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-              ) : (
-                <AlertCircle className="h-5 w-5 shrink-0 text-rose-400" />
-              )}
-              <span>{statusMsg.text}</span>
-            </div>
-          )}
-
           {/* Quick Presets / Templates */}
           <div>
             <label className="text-xs font-bold block mb-2 text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">

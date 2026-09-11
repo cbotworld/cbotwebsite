@@ -369,13 +369,13 @@ async function loadStageConfig(editionId: string, teamCount = 0): Promise<Tourna
   const actualTeamCount = editionTeams.length;
   const validTeamMap = new Map(editionTeams.map((t) => [t.id, t.name]));
 
-  if (!setting?.value) return defaultTournamentStages(actualTeamCount);
+  if (!setting?.value) {
+    const existingMatches = await prisma.match.count({ where: { editionId } });
+    if (existingMatches > 0) return defaultTournamentStages(actualTeamCount);
+    return { scheduleMode: 'DIVIDED', stages: [] };
+  }
   try {
     const parsed = JSON.parse(setting.value);
-
-    if (actualTeamCount === 0) {
-      return defaultTournamentStages(0);
-    }
 
     if (parsed?.stages && Array.isArray(parsed.stages)) {
       parsed.stages = parsed.stages.map((st: any) => ({
@@ -401,7 +401,7 @@ async function loadStageConfig(editionId: string, teamCount = 0): Promise<Tourna
 
     return normalizeStageConfig(parsed, actualTeamCount);
   } catch {
-    return defaultTournamentStages(actualTeamCount);
+    return { scheduleMode: 'DIVIDED', stages: [] };
   }
 }
 

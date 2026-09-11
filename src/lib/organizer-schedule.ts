@@ -257,7 +257,7 @@ export function pathSummary(stages?: OrganizerScheduleStage[]) {
   const names = (stages || [])
     .map((s) => s.name || kindShort(s.kind, s.name))
     .filter(Boolean);
-  return names.length ? names.join(' → ') : 'Round Robin → League → Qualifiers → Finals';
+  return names.length ? names.join(' → ') : 'No stages configured';
 }
 
 export function liveFixtureTitle(
@@ -355,10 +355,8 @@ export function buildOrganizerScheduleDays(opts?: {
     });
   };
 
-  // Seeded legacy fixtures are only a fallback when this edition has no
-  // stage path of its own. Otherwise Day 8–10 would keep showing Royal Carroms
-  // pairings after the organizer designed a 7-day round robin.
-  if (!stages.length) {
+  // Seeded legacy fixtures are only a fallback when opts.stages was not provided at all
+  if (opts?.stages === undefined && !stages.length) {
     officialMatchDays().forEach((d) => {
       pushDay(d.dayNumber, d.title, d.startIso, d.endIso, d.timeRange, d.matches.map((m) => ({ ...m, isSpocExhibition: false })));
     });
