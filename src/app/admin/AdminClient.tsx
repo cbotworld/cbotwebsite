@@ -12,6 +12,12 @@ import { generateRoundRobinFixtures, calculateLeagueStandings, generatePlayoffFi
 import * as XLSX from 'xlsx';
 import { lockMatchLineup, overrideMatchLineup } from '@/lib/actions/lineupActions';
 import { getAdminLiveStreamsAction, expireLiveStreamAction } from '@/lib/actions/youtubeActions';
+import {
+  getYouTubeChannelsStatusAction,
+  testYouTubeChannelConnectionAction,
+  setYouTubeActiveModeAction,
+  disconnectYouTubeChannelAction,
+} from '@/lib/actions/youtubeChannelActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -49,13 +55,94 @@ export default function AdminPortalPage({
   const [standingsList, setStandingsList] = React.useState<StandingRow[]>([]);
   const [adminStreams, setAdminStreams] = React.useState<any[]>([]);
 
+  // YouTube Multi-Channel Management
+  const [ytChannelStatus, setYtChannelStatus] = React.useState<any>(null);
+  const [ytLoading, setYtLoading] = React.useState(false);
+  const [ytTestingCh1, setYtTestingCh1] = React.useState(false);
+  const [ytTestingCh2, setYtTestingCh2] = React.useState(false);
+  const [ytTestResult1, setYtTestResult1] = React.useState<{ success: boolean; message: string } | null>(null);
+  const [ytTestResult2, setYtTestResult2] = React.useState<{ success: boolean; message: string } | null>(null);
+  const [ytModeSaving, setYtModeSaving] = React.useState(false);
+
+  const loadYtStatus = React.useCallback(async () => {
+    setYtLoading(true);
+    try {
+      const res = await getYouTubeChannelsStatusAction();
+      if (res.success) {
+        setYtChannelStatus(res);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setYtLoading(false);
+    }
+  }, []);
+
   React.useEffect(() => {
     if (activeTab === 'streams') {
       getAdminLiveStreamsAction().then((res) => {
         if (res.success && res.streams) setAdminStreams(res.streams);
       });
+      loadYtStatus();
     }
-  }, [activeTab]);
+  }, [activeTab, loadYtStatus]);
+
+  const handleTestChannel = async (channelIndex: 1 | 2) => {
+    if (channelIndex === 1) {
+      setYtTestingCh1(true);
+      setYtTestResult1(null);
+    } else {
+      setYtTestingCh2(true);
+      setYtTestResult2(null);
+    }
+
+    try {
+      const res = await testYouTubeChannelConnectionAction(channelIndex);
+      const result = res.success
+        ? {
+            success: true,
+            message: `Connected! "${res.channelTitle}" (${res.videoCount || 0} videos, ${res.subscriberCount || 0} subs)`,
+          }
+        : {
+            success: false,
+            message: res.error || 'Connection test failed',
+          };
+
+      if (channelIndex === 1) setYtTestResult1(result);
+      else setYtTestResult2(result);
+
+      if (res.success) loadYtStatus();
+    } catch (err: any) {
+      const result = { success: false, message: err?.message || 'Error executing test' };
+      if (channelIndex === 1) setYtTestResult1(result);
+      else setYtTestResult2(result);
+    } finally {
+      if (channelIndex === 1) setYtTestingCh1(false);
+      else setYtTestingCh2(false);
+    }
+  };
+
+  const handleChangeYtMode = async (newMode: 'AUTO_FAILOVER' | 'CHANNEL_1_ONLY' | 'CHANNEL_2_ONLY') => {
+    setYtModeSaving(true);
+    try {
+      await setYouTubeActiveModeAction(newMode);
+      await loadYtStatus();
+    } finally {
+      setYtModeSaving(false);
+    }
+  };
+
+  const handleDisconnectChannel = async (channelIndex: 1 | 2) => {
+    if (!confirm(`Are you sure you want to disconnect Channel ${channelIndex}?`)) return;
+    try {
+      await disconnectYouTubeChannelAction(channelIndex);
+      if (channelIndex === 1) setYtTestResult1(null);
+      else setYtTestResult2(null);
+      await loadYtStatus();
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleExpireStream = async (streamId: string) => {
     const res = await expireLiveStreamAction(streamId);
@@ -537,6 +624,225 @@ export default function AdminPortalPage({
 
         {/* LIVE STREAMS AUDIT TAB */}
         <TabsContent value="streams" className="space-y-6">
+          {/* YouTube Multi-Channel Pool & Quota Manager */}
+          <Card className="border-amber-500/30 bg-card shadow-lg">
+            <CardHeader className="border-b border-border/60 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-rose-500/10 text-rose-500 font-bold">
+                      <Radio className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-foreground">
+                        YouTube Live Multi-Channel & Quota Manager
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Dual-channel pool with automatic quota & broadcast limit failover for 24/7 uninterrupted match streaming.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Selector */}
+                <div className="flex items-center gap-2 bg-muted/40 p-1.5 rounded-xl border border-border">
+                  <span className="text-xs font-semibold text-muted-foreground px-2">Failover Mode:</span>
+                  <select
+                    value={ytChannelStatus?.mode || 'AUTO_FAILOVER'}
+                    disabled={ytModeSaving || ytLoading}
+                    onChange={(e) => handleChangeYtMode(e.target.value as any)}
+                    className="bg-card text-foreground text-xs font-bold border border-border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value="AUTO_FAILOVER">⚡ Auto Failover (Recommended)</option>
+                    <option value="CHANNEL_1_ONLY">1️⃣ Channel 1 Only</option>
+                    <option value="CHANNEL_2_ONLY">2️⃣ Channel 2 Only</option>
+                  </select>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-6 space-y-6">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3.5 text-xs text-blue-300 flex items-start gap-2.5">
+                <Sparkles className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Seamless Player Experience:</strong> When daily quota or broadcast limits are reached on Channel 1, mobile Go-Live automatically switches to Channel 2. Both channels' match videos & replays appear unified in the mobile app.
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Channel 1 (Primary) */}
+                <div className="border border-border rounded-2xl p-5 bg-background/50 space-y-4 relative">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-foreground">Channel 1 (Primary)</span>
+                      {ytChannelStatus?.channel1?.connected ? (
+                        <Badge variant="success" className="text-[10px] uppercase font-mono">Connected</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-[10px] uppercase font-mono">Not Linked</Badge>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-mono text-muted-foreground">Default Pool #1</span>
+                  </div>
+
+                  <div className="bg-card/70 border border-border/80 rounded-xl p-3.5 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Channel Title:</span>
+                      <span className="font-semibold text-foreground truncate max-w-[220px]">
+                        {ytChannelStatus?.channel1?.title || 'Not Linked'}
+                      </span>
+                    </div>
+                    {ytChannelStatus?.channel1?.channelId && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Channel ID:</span>
+                        <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[220px]">
+                          {ytChannelStatus.channel1.channelId}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Credential Source:</span>
+                      <span className="font-mono text-[11px] text-amber-400">
+                        {ytChannelStatus?.channel1?.source || 'NONE'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {ytTestResult1 && (
+                    <div
+                      className={`text-xs p-3 rounded-xl border ${
+                        ytTestResult1.success
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      }`}
+                    >
+                      {ytTestResult1.success ? '✅ ' : '❌ '}
+                      {ytTestResult1.message}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a href="/api/auth/youtube/authorize?channel=1" className="flex-1 min-w-[140px]">
+                      <Button
+                        size="sm"
+                        className="w-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black shadow"
+                      >
+                        <Zap className="h-3.5 w-3.5 mr-1.5" />
+                        {ytChannelStatus?.channel1?.connected ? 'Re-Authorize Google' : 'Connect Channel 1'}
+                      </Button>
+                    </a>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={ytTestingCh1 || !ytChannelStatus?.channel1?.connected}
+                      onClick={() => handleTestChannel(1)}
+                      className="text-xs font-semibold"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${ytTestingCh1 ? 'animate-spin' : ''}`} />
+                      {ytTestingCh1 ? 'Testing...' : 'Test Connection'}
+                    </Button>
+
+                    {ytChannelStatus?.channel1?.connected && ytChannelStatus?.channel1?.source === 'DATABASE' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDisconnectChannel(1)}
+                        className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                      >
+                        Disconnect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Channel 2 (Backup/Failover) */}
+                <div className="border border-border rounded-2xl p-5 bg-background/50 space-y-4 relative">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-foreground">Channel 2 (Backup / Failover)</span>
+                      {ytChannelStatus?.channel2?.connected ? (
+                        <Badge variant="success" className="text-[10px] uppercase font-mono">Connected</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] uppercase font-mono">Not Linked</Badge>
+                      )}
+                    </div>
+                    <span className="text-[11px] font-mono text-muted-foreground">Failover Pool #2</span>
+                  </div>
+
+                  <div className="bg-card/70 border border-border/80 rounded-xl p-3.5 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Channel Title:</span>
+                      <span className="font-semibold text-foreground truncate max-w-[220px]">
+                        {ytChannelStatus?.channel2?.title || 'Not Linked'}
+                      </span>
+                    </div>
+                    {ytChannelStatus?.channel2?.channelId && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Channel ID:</span>
+                        <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[220px]">
+                          {ytChannelStatus.channel2.channelId}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Credential Source:</span>
+                      <span className="font-mono text-[11px] text-amber-400">
+                        {ytChannelStatus?.channel2?.source || 'NONE'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {ytTestResult2 && (
+                    <div
+                      className={`text-xs p-3 rounded-xl border ${
+                        ytTestResult2.success
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      }`}
+                    >
+                      {ytTestResult2.success ? '✅ ' : '❌ '}
+                      {ytTestResult2.message}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a href="/api/auth/youtube/authorize?channel=2" className="flex-1 min-w-[140px]">
+                      <Button
+                        size="sm"
+                        className="w-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-black shadow"
+                      >
+                        <Zap className="h-3.5 w-3.5 mr-1.5" />
+                        {ytChannelStatus?.channel2?.connected ? 'Re-Authorize Google' : 'Connect Channel 2'}
+                      </Button>
+                    </a>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={ytTestingCh2 || !ytChannelStatus?.channel2?.connected}
+                      onClick={() => handleTestChannel(2)}
+                      className="text-xs font-semibold"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${ytTestingCh2 ? 'animate-spin' : ''}`} />
+                      {ytTestingCh2 ? 'Testing...' : 'Test Connection'}
+                    </Button>
+
+                    {ytChannelStatus?.channel2?.connected && ytChannelStatus?.channel2?.source === 'DATABASE' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDisconnectChannel(2)}
+                        className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                      >
+                        Disconnect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-border">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>

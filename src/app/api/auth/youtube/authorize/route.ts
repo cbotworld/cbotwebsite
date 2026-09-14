@@ -37,7 +37,15 @@ export async function GET(request: Request) {
     `, { status: 403, headers: { 'Content-Type': 'text/html' } });
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID || '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
+  const { searchParams } = new URL(request.url);
+  const channel = searchParams.get('channel') === '2' ? '2' : '1';
+
+  const defaultClientId = '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
+  const clientId =
+    channel === '2'
+      ? process.env.GOOGLE_CLIENT_ID_2 || process.env.GOOGLE_CLIENT_ID || defaultClientId
+      : process.env.GOOGLE_CLIENT_ID || defaultClientId;
+
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://www.cbotworld.com/api/auth/youtube/callback';
 
   const scopes = [
@@ -53,8 +61,9 @@ export async function GET(request: Request) {
   authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('access_type', 'offline');
   authUrl.searchParams.set('prompt', 'consent');
-  // State parameter to bind session user ID
-  authUrl.searchParams.set('state', (session.user as any).id || 'organizer');
+  // State parameter to bind session user ID and target channel index
+  const userId = (session.user as any).id || 'organizer';
+  authUrl.searchParams.set('state', `${userId}:${channel}`);
 
   return NextResponse.redirect(authUrl.toString());
 }

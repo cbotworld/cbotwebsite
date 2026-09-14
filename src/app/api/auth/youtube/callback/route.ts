@@ -69,8 +69,23 @@ export async function GET(request: Request) {
     `, { status: 400, headers: { 'Content-Type': 'text/html' } });
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID || '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
+  const state = searchParams.get('state') || '';
+  const channelNum = state.includes(':') ? (state.split(':')[1] === '2' ? 2 : 1) : 1;
+  const channelLabel = channelNum === 2 ? 'Channel 2 (Backup/Failover)' : 'Channel 1 (Primary)';
+
+  const defaultClientId = '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
+  const defaultClientSecret = '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';
+
+  const clientId =
+    channelNum === 2
+      ? process.env.GOOGLE_CLIENT_ID_2 || process.env.GOOGLE_CLIENT_ID || defaultClientId
+      : process.env.GOOGLE_CLIENT_ID || defaultClientId;
+
+  const clientSecret =
+    channelNum === 2
+      ? process.env.GOOGLE_CLIENT_SECRET_2 || process.env.GOOGLE_CLIENT_SECRET || defaultClientSecret
+      : process.env.GOOGLE_CLIENT_SECRET || defaultClientSecret;
+
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'https://www.cbotworld.com/api/auth/youtube/callback';
 
   try {
@@ -104,13 +119,54 @@ export async function GET(request: Request) {
     }
 
     const refreshToken = tokenData.refresh_token;
+    const accessToken = tokenData.access_token;
 
-    // 2. STORE REFRESH TOKEN DIRECTLY IN DATABASE SERVER-SIDE (NEVER RETURN RAW TOKEN TO BROWSER)
+    // Fetch Channel Metadata from YouTube API
+    let channelTitle = `YouTube Channel ${channelNum}`;
+    let channelId = '';
+
+    if (accessToken) {
+      try {
+        const profileRes = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const profileData = await profileRes.json();
+        const firstItem = profileData.items?.[0];
+        if (firstItem) {
+          channelTitle = firstItem.snippet?.title || channelTitle;
+          channelId = firstItem.id || '';
+        }
+      } catch (profileErr) {
+        console.warn('Failed to fetch channel profile metadata:', profileErr);
+      }
+    }
+
+    // 2. STORE REFRESH TOKEN DIRECTLY IN DATABASE SERVER-SIDE
+    const tokenKey = channelNum === 2 ? 'youtube_refresh_token_2' : 'youtube_refresh_token';
+    const titleKey = channelNum === 2 ? 'youtube_channel_2_title' : 'youtube_channel_1_title';
+    const idKey = channelNum === 2 ? 'youtube_channel_2_id' : 'youtube_channel_1_id';
+
     if (refreshToken) {
       await prisma.systemSetting.upsert({
-        where: { key: 'youtube_refresh_token' },
+        where: { key: tokenKey },
         update: { value: refreshToken },
-        create: { key: 'youtube_refresh_token', value: refreshToken },
+        create: { key: tokenKey, value: refreshToken },
+      });
+    }
+
+    if (channelTitle) {
+      await prisma.systemSetting.upsert({
+        where: { key: titleKey },
+        update: { value: channelTitle },
+        create: { key: titleKey, value: channelTitle },
+      });
+    }
+
+    if (channelId) {
+      await prisma.systemSetting.upsert({
+        where: { key: idKey },
+        update: { value: channelId },
+        create: { key: idKey, value: channelId },
       });
     }
 
@@ -119,22 +175,30 @@ export async function GET(request: Request) {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>CBOT YouTube Channel Authorized</title>
+          <title>CBOT YouTube ${channelLabel} Authorized</title>
           <style>
             body { font-family: system-ui, -apple-system, sans-serif; background: #020617; color: #f8fafc; padding: 40px; text-align: center; }
             .card { max-width: 550px; margin: 0 auto; background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 24px; padding: 36px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
             h1 { color: #f59e0b; margin-bottom: 8px; font-size: 24px; }
             p { color: #cbd5e1; font-size: 14px; line-height: 1.6; }
             .badge { display: inline-block; background: rgba(52, 211, 153, 0.15); border: 1px solid #34d399; color: #34d399; font-weight: bold; padding: 6px 16px; border-radius: 12px; font-size: 13px; margin: 16px 0; }
+            .channel-info { background: #1e293b; border-radius: 12px; padding: 14px; margin: 16px 0; text-align: left; }
+            .channel-info div { margin-bottom: 6px; font-size: 13px; }
             .btn { display: inline-block; background: #f59e0b; color: #020617; font-weight: 900; text-decoration: none; padding: 12px 24px; border-radius: 12px; margin-top: 20px; font-size: 14px; }
           </style>
         </head>
         <body>
           <div class="card">
-            <h1>🎉 CBOT YouTube Channel Authorized</h1>
+            <h1>🎉 CBOT YouTube ${channelLabel} Authorized</h1>
             <div class="badge">SECURE SERVER-SIDE TOKEN STORAGE</div>
-            <p>Your official CBOT YouTube channel is now connected to CBOT World. The OAuth refresh token has been stored directly in your encrypted server database.</p>
-            <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">🔒 Security Guarantee: No tokens or secrets were exposed to the browser, page source, or client scripts.</p>
+            <div class="channel-info">
+              <div><strong>Channel Name:</strong> ${channelTitle}</div>
+              ${channelId ? `<div><strong>Channel ID:</strong> ${channelId}</div>` : ''}
+              <div><strong>Slot:</strong> ${channelLabel}</div>
+              <div><strong>Status:</strong> Connected & Active</div>
+            </div>
+            <p>Your YouTube channel has been linked to CBOT World. Streams will now utilize this channel with automatic quota management.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 10px;">🔒 Security Guarantee: No tokens or secrets were exposed to the browser.</p>
             <a href="/admin" class="btn">Return to Admin Portal</a>
           </div>
         </body>
