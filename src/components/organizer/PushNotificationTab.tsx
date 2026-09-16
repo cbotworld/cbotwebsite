@@ -4,12 +4,13 @@ import * as React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, Send, RefreshCw, Smartphone, Users, AlertCircle, CheckCircle2, Sparkles, MessageSquare } from 'lucide-react';
+import { Bell, Send, RefreshCw, Smartphone, Users, AlertCircle, CheckCircle2, Sparkles, MessageSquare, Clock, Copy, Check } from 'lucide-react';
 import {
   getPushNotificationStats,
   sendCustomPushNotification,
   previewAutoNotifications,
   triggerAutoNotifications,
+  getTodayNotificationSlotsAction,
 } from '@/lib/actions/pushNotificationActions';
 
 export function PushNotificationTab() {
@@ -21,6 +22,23 @@ export function PushNotificationTab() {
     iosCount: number;
     androidCount: number;
   } | null>(null);
+
+  const [slotsData, setSlotsData] = React.useState<{
+    editionTitle?: string;
+    dayNumber?: number;
+    currentTimeIst?: string;
+    slots: Array<{
+      key: string;
+      type: string;
+      name: string;
+      timeWindowIst: string;
+      description: string;
+      status: 'SENT' | 'DUE' | 'UPCOMING' | 'PASSED';
+      dispatchedAt: string | null;
+      sentCount: number;
+    }>;
+  } | null>(null);
+  const [copiedWebhook, setCopiedWebhook] = React.useState(false);
 
   // Form State
   const [title, setTitle] = React.useState('CBOT Announcement 🏆');
@@ -36,8 +54,12 @@ export function PushNotificationTab() {
   const fetchStats = React.useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res = await getPushNotificationStats();
+      const [res, sRes] = await Promise.all([
+        getPushNotificationStats(),
+        getTodayNotificationSlotsAction().catch(() => null),
+      ]);
       setStats(res);
+      if (sRes) setSlotsData(sRes);
     } catch (err: any) {
       console.error('Failed to load push stats:', err);
     } finally {
@@ -227,45 +249,181 @@ export function PushNotificationTab() {
         <CardHeader className="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="text-xl font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-cyan-400" /> Auto Push Notifications System
+              <Sparkles className="h-5 w-5 text-cyan-400" /> Auto Push Notifications Schedule &amp; Slot Tracker
             </CardTitle>
             <CardDescription className="text-xs mt-1">
-              Automated daily match reminders, score cutoff alerts, captain combi warnings, and result celebrations scheduled via Vercel Cron.
+              Automated daily match reminders, score cutoff alerts, captain combi warnings, and result celebrations (Day {slotsData?.dayNumber || autoDay} • Current Time: {slotsData?.currentTimeIst || 'IST'}).
             </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={fetchStats}
+              disabled={loadingStats}
+              className="text-xs font-bold"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loadingStats ? 'animate-spin' : ''}`} /> Refresh Status
+            </Button>
           </div>
         </CardHeader>
 
         <CardContent className="pt-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1">
-              <div className="font-extrabold text-amber-400">4:00 PM – 7:00 PM IST</div>
-              <div className="font-bold text-foreground">⚔️ Go Live &amp; Match Alert</div>
-              <p className="text-[11px] text-muted-foreground">Alerts players with their real opponent for today&apos;s fixture.</p>
+          {/* Live Daily Notification Slots Timeline */}
+          <div className="space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-amber-400" /> Today&apos;s 7 Scheduled Notification Windows (IST)
             </div>
 
-            <div className="p-3 rounded-xl border border-orange-500/20 bg-orange-500/5 space-y-1">
-              <div className="font-extrabold text-orange-400">8:00 PM – 8:30 PM IST</div>
-              <div className="font-bold text-foreground">📝 Score Cutoff Reminder</div>
-              <p className="text-[11px] text-muted-foreground">Reminds unscored players to record their day score before 9:00 PM.</p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {(slotsData?.slots || []).map((slot) => {
+                const isSent = slot.status === 'SENT';
+                const isDue = slot.status === 'DUE';
+                const isPassed = slot.status === 'PASSED';
 
-            <div className="p-3 rounded-xl border border-rose-500/20 bg-rose-500/5 space-y-1">
-              <div className="font-extrabold text-rose-400">9:00 PM – 9:25 PM IST</div>
-              <div className="font-bold text-foreground">⚡ Captain Combi Warning</div>
-              <p className="text-[11px] text-muted-foreground">Warns captains of unsubmitted lineups for today&apos;s match before 9:30 PM lock.</p>
-            </div>
+                return (
+                  <div
+                    key={slot.key}
+                    className={`p-3.5 rounded-xl border transition-all text-xs flex flex-col justify-between gap-2.5 ${
+                      isSent
+                        ? 'border-emerald-500/40 bg-emerald-500/5 shadow-xs'
+                        : isDue
+                        ? 'border-amber-500/50 bg-amber-500/10 shadow-md ring-1 ring-amber-500/30'
+                        : isPassed
+                        ? 'border-border/60 bg-muted/20 opacity-80'
+                        : 'border-border bg-card/60'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="font-mono text-[11px] font-bold text-muted-foreground">
+                          {slot.timeWindowIst}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isSent
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                              : isDue
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+                              : isPassed
+                              ? 'bg-muted text-muted-foreground border border-border'
+                              : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                          }`}
+                        >
+                          {isSent ? '✓ SENT' : isDue ? '⚡ DUE NOW' : isPassed ? 'PASSED' : 'UPCOMING'}
+                        </span>
+                      </div>
 
-            <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-1">
-              <div className="font-extrabold text-emerald-400">9:35 PM IST</div>
-              <div className="font-bold text-foreground">🏆 Match Results &amp; Standings</div>
-              <p className="text-[11px] text-muted-foreground">Celebrates actual match victory/defeat and reports updated standings.</p>
+                      <div className="font-black text-foreground text-sm">{slot.name}</div>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                        {slot.description}
+                      </p>
+
+                      {isSent && slot.dispatchedAt && (
+                        <div className="mt-2 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Sent at {new Date(slot.dispatchedAt).toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: true, hour: '2-digit', minute: '2-digit' })} IST
+                          {slot.sentCount > 0 ? ` (${slot.sentCount} devices)` : ''}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-border/40 flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loadingAuto}
+                        onClick={async () => {
+                          setAutoType(slot.type as any);
+                          setAutoDay(slotsData?.dayNumber || 1);
+                          await handleAutoPreview();
+                        }}
+                        className="h-7 text-[10px] font-bold px-2.5 flex-1"
+                      >
+                        Preview
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant={isDue ? 'carrom' : 'outline'}
+                        size="sm"
+                        disabled={loadingAuto}
+                        onClick={async () => {
+                          if (!confirm(`Dispatch "${slot.name}" now to all targeted players/captains?`)) return;
+                          setLoadingAuto(true);
+                          try {
+                            const res = await triggerAutoNotifications({
+                              dayNumber: slotsData?.dayNumber || 1,
+                              type: slot.type as any,
+                              force: true,
+                            });
+                            setAutoPreviewResult(res);
+                            if (res.success) {
+                              setStatusMsg({
+                                type: 'success',
+                                text: `🚀 Dispatched "${slot.name}": Sent ${res.results.sent} push notification(s).`,
+                              });
+                              fetchStats();
+                            } else {
+                              setStatusMsg({ type: 'error', text: res.message || 'Failed to dispatch.' });
+                            }
+                          } catch (err: any) {
+                            setStatusMsg({ type: 'error', text: err.message || 'Error triggering slot.' });
+                          } finally {
+                            setLoadingAuto(false);
+                          }
+                        }}
+                        className="h-7 text-[10px] font-bold px-2.5 flex-1"
+                      >
+                        <Send className="h-3 w-3 mr-1" /> Send Now
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* External Cron / Webhook URL Card */}
+          <div className="rounded-2xl border border-cyan-500/20 p-4 bg-cyan-500/5 space-y-2">
+            <div className="text-xs font-bold text-cyan-400 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5" /> High-Reliability External Cron Webhook
+              </span>
+              <span className="text-[10px] text-muted-foreground">Self-Healing / Multi-Layer Automation</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Auto-dispatches are scheduled via <strong>GitHub Actions</strong> and <strong>Vercel Crons</strong>. You can also paste this webhook URL into any free cron service (e.g. <code>cron-job.org</code> / <code>EasyCron</code>) to trigger checks every 5–10 minutes:
+            </p>
+            <div className="flex items-center gap-2 bg-background/80 border border-border p-2 rounded-xl text-xs font-mono">
+              <span className="text-muted-foreground select-all truncate flex-1">
+                https://www.cbotworld.com/api/cron/notifications?type=auto&amp;secret=cbot_cron_secret_2026
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    'https://www.cbotworld.com/api/cron/notifications?type=auto&secret=cbot_cron_secret_2026',
+                  );
+                  setCopiedWebhook(true);
+                  setTimeout(() => setCopiedWebhook(false), 2500);
+                }}
+                className="h-7 px-2.5 text-xs font-bold shrink-0 text-cyan-400 hover:text-cyan-300"
+              >
+                {copiedWebhook ? <Check className="h-3.5 w-3.5 mr-1 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                {copiedWebhook ? 'Copied' : 'Copy'}
+              </Button>
             </div>
           </div>
 
           {/* Test & Preview Panel */}
           <div className="rounded-2xl border border-border p-4 bg-muted/20 space-y-4">
             <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-              <RefreshCw className="h-3.5 w-3.5" /> Test Dispatch or Preview Auto Push Logic
+              <RefreshCw className="h-3.5 w-3.5" /> Custom Tournament Day Test / Preview
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
@@ -288,10 +446,10 @@ export function PushNotificationTab() {
                   onChange={(e) => setAutoType(e.target.value as any)}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs font-bold shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="auto">Auto (Current IST Time)</option>
-                  <option value="golive">Go Live &amp; Match Alert (4-7 PM)</option>
-                  <option value="score">Score Cutoff Reminder (8-8:30 PM)</option>
-                  <option value="combi">Captain Combi Warning (9-9:25 PM)</option>
+                  <option value="auto">Auto (Current IST Time Slot)</option>
+                  <option value="golive">Go Live &amp; Match Alert (4:00 PM / 7:00 PM)</option>
+                  <option value="score">Score Cutoff Reminder (8:00 PM / 8:40 PM)</option>
+                  <option value="combi">Captain Combi Warning (9:00 PM / 9:20 PM)</option>
                   <option value="results">Match Results &amp; Standings (9:35 PM)</option>
                 </select>
               </div>

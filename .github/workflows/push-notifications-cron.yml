@@ -1,0 +1,24 @@
+name: CBOT Push Notifications Scheduler
+
+on:
+  schedule:
+    # Run every 10 minutes from 09:30 UTC to 16:40 UTC (3:00 PM to 10:10 PM IST daily)
+    - cron: '*/10 9-16 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  dispatch-notifications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Push Notifications Cron Endpoint
+        run: |
+          echo "Triggering CBOT World Push Notification Scheduler..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "https://www.cbotworld.com/api/cron/notifications?type=auto&secret=cbot_cron_secret_2026")
+          HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1 | cut -d':' -f2)
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response Body: $HTTP_BODY"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Error: Cron endpoint returned status $HTTP_STATUS"
+            exit 1
+          fi

@@ -501,7 +501,10 @@ export default function StandingsClient({ payload }: { payload: any }) {
                           <TableHead className="w-10">#</TableHead>
                           <TableHead>Team</TableHead>
                           <TableHead className="text-center">Total</TableHead>
+                          <TableHead className="text-center">Played</TableHead>
                           <TableHead className="text-center">Won</TableHead>
+                          <TableHead className="text-center">Lost</TableHead>
+                          <TableHead className="text-center">Tied</TableHead>
                           <TableHead className="text-center font-bold text-foreground">Team Score</TableHead>
                           <TableHead className="text-center">Event</TableHead>
                           <TableHead className="text-center">Slams</TableHead>
@@ -527,7 +530,10 @@ export default function StandingsClient({ payload }: { payload: any }) {
                             <TableCell className="text-center font-black">
                               <StatButton value={row.total} onClick={() => setOpen({ row, focus: 'total' })} className="font-black text-amber-400" />
                             </TableCell>
-                            <TableCell className="text-center font-bold">{row.matchesWon}</TableCell>
+                            <TableCell className="text-center font-bold text-muted-foreground">{row.matchesPlayed ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-emerald-400">{row.matchesWon ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-rose-400">{row.matchesLost ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-amber-300">{row.matchesTied ?? 0}</TableCell>
                             <TableCell className="text-center font-mono font-bold text-foreground">
                               {row.teamScore ?? 0}
                             </TableCell>
@@ -562,7 +568,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
               : open?.focus === 'slams'
                 ? 'Slam bonus · +1 per published slam. Players who scored slams are listed by day.'
                 : open?.focus === 'avg'
-                  ? 'Target bonus · +1 when a published day’s score is strictly below that day’s target. Players who earned it are listed by day.'
+                  ? 'Target bonus · +1 when a published day’s score is at or below that day’s target. Players who earned it are listed by day.'
                   : 'Event + slams + target bonus, day by day after the day completes.'}
           </DialogDescription>
         </DialogHeader>

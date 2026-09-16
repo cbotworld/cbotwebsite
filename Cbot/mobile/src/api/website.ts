@@ -375,6 +375,8 @@ export type ChannelVideo = {
   thumbnailUrl?: string | null;
   title: string;
   recordedAt?: string | null;
+  channelIndex?: number;
+  channelTitle?: string;
 };
 
 export async function fetchChannelVideos(opts?: { player?: string; day?: number | 'ALL' | null }): Promise<{

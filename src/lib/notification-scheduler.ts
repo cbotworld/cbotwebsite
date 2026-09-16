@@ -4,6 +4,9 @@ import { currentCombiDayNumber } from '@/lib/combi-cutoff';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
+import { getPublicStandings } from '@/lib/actions/playerScoreActions';
+import { scoreMatchDay } from '@/lib/combi-results';
+import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 
 function ordinalRank(rank: number): string {
   if (rank <= 0) return `${rank}`;
@@ -30,6 +33,175 @@ export interface NotificationDispatchResult {
   }>;
 }
 
+export interface NotificationSlotDefinition {
+  key: string;
+  type: 'golive' | 'score' | 'combi' | 'results';
+  name: string;
+  timeWindowIst: string;
+  startMinutes: number;
+  endMinutes: number;
+  description: string;
+}
+
+export const DAILY_NOTIFICATION_SLOTS: NotificationSlotDefinition[] = [
+  {
+    key: 'golive_4pm',
+    type: 'golive',
+    name: 'Match Start & Go Live Alert',
+    timeWindowIst: '4:00 PM – 6:59 PM',
+    startMinutes: 15 * 60, // 3:00 PM / 4:00 PM
+    endMinutes: 19 * 60 - 1, // 6:59 PM
+    description: 'Alerts players with their opponent for today to broadcast live or record score before 8:00 PM.',
+  },
+  {
+    key: 'golive_7pm',
+    type: 'golive',
+    name: 'Evening Match & Go Live Reminder',
+    timeWindowIst: '7:00 PM – 7:49 PM',
+    startMinutes: 19 * 60, // 7:00 PM
+    endMinutes: 19 * 60 + 49, // 7:49 PM
+    description: 'Final match broadcast reminder for unscored players before cutoff.',
+  },
+  {
+    key: 'score_8pm',
+    type: 'score',
+    name: 'Score Cutoff Warning (1h)',
+    timeWindowIst: '7:50 PM – 8:39 PM',
+    startMinutes: 19 * 60 + 50, // 7:50 PM
+    endMinutes: 20 * 60 + 39, // 8:39 PM
+    description: 'Warns unscored players to record scores before 9:00 PM to avoid walkover.',
+  },
+  {
+    key: 'score_840pm',
+    type: 'score',
+    name: 'Score Cutoff Final Warning (20m)',
+    timeWindowIst: '8:40 PM – 8:54 PM',
+    startMinutes: 20 * 60 + 40, // 8:40 PM
+    endMinutes: 20 * 60 + 54, // 8:54 PM
+    description: 'Urgent 20-minute score warning before the 9:00 PM lock.',
+  },
+  {
+    key: 'combi_9pm',
+    type: 'combi',
+    name: 'Captain Combi Warning (30m)',
+    timeWindowIst: '8:55 PM – 9:19 PM',
+    startMinutes: 20 * 60 + 55, // 8:55 PM
+    endMinutes: 21 * 60 + 19, // 9:19 PM
+    description: 'Alerts team captains to submit today\'s combi lineup before the 9:30 PM lock.',
+  },
+  {
+    key: 'combi_920pm',
+    type: 'combi',
+    name: 'Captain Combi Final Warning (10m)',
+    timeWindowIst: '9:20 PM – 9:30 PM',
+    startMinutes: 21 * 60 + 20, // 9:20 PM
+    endMinutes: 21 * 60 + 30, // 9:30 PM
+    description: 'Final 10-minute emergency warning for captains with missing combis.',
+  },
+  {
+    key: 'results_935pm',
+    type: 'results',
+    name: 'Day Results & Standings Reveal',
+    timeWindowIst: '9:31 PM – 11:59 PM',
+    startMinutes: 21 * 60 + 31, // 9:31 PM
+    endMinutes: 23 * 60 + 59, // 11:59 PM
+    description: 'Dispatches personalized match results, victory celebrations, and live rank updates.',
+  },
+];
+
+export function resolveCurrentNotificationSlot(istMinutes: number): {
+  slot?: NotificationSlotDefinition;
+  type: 'golive' | 'score' | 'combi' | 'results' | 'idle';
+} {
+  const slot = DAILY_NOTIFICATION_SLOTS.find(
+    (s) => istMinutes >= s.startMinutes && istMinutes <= s.endMinutes,
+  );
+  if (slot) {
+    return { slot, type: slot.type };
+  }
+  return { type: 'idle' };
+}
+
+export async function getTodayNotificationSlotsStatus(overrideDay?: number) {
+  const editionRef = await resolveCurrentEdition();
+  if (!editionRef) return { dayNumber: 0, slots: [] };
+
+  const edition = await prisma.edition.findUnique({
+    where: { id: editionRef.id },
+    select: { id: true, title: true, totalDays: true, dayDates: true },
+  });
+  if (!edition) return { dayNumber: 0, slots: [] };
+
+  const now = new Date();
+  const dayNumber =
+    overrideDay !== undefined && overrideDay > 0
+      ? overrideDay
+      : currentCombiDayNumber(edition.totalDays || 15, now, edition.dayDates);
+
+  const istTimeStr = now.toLocaleString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const [hStr, mStr] = istTimeStr.split(':');
+  const currentMinutes = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+
+  // Fetch all slot settings for today
+  const slotKeys = DAILY_NOTIFICATION_SLOTS.map(
+    (s) => `notif_slot_${edition.id}_d${dayNumber}_${s.key}`,
+  );
+  const settings = await prisma.systemSetting.findMany({
+    where: { key: { in: slotKeys } },
+  });
+  const settingMap = new Map(settings.map((st) => [st.key, st]));
+
+  const slots = DAILY_NOTIFICATION_SLOTS.map((s) => {
+    const key = `notif_slot_${edition.id}_d${dayNumber}_${s.key}`;
+    const setting = settingMap.get(key);
+    let dispatchedAt: string | null = null;
+    let sentCount = 0;
+    if (setting) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        dispatchedAt = parsed.dispatchedAt || setting.updatedAt.toISOString();
+        sentCount = parsed.sent || 0;
+      } catch {
+        dispatchedAt = setting.updatedAt.toISOString();
+      }
+    }
+
+    let status: 'SENT' | 'DUE' | 'UPCOMING' | 'PASSED' = 'UPCOMING';
+    if (dispatchedAt) {
+      status = 'SENT';
+    } else if (currentMinutes >= s.startMinutes && currentMinutes <= s.endMinutes) {
+      status = 'DUE';
+    } else if (currentMinutes > s.endMinutes) {
+      status = 'PASSED';
+    } else {
+      status = 'UPCOMING';
+    }
+
+    return {
+      key: s.key,
+      type: s.type,
+      name: s.name,
+      timeWindowIst: s.timeWindowIst,
+      description: s.description,
+      status,
+      dispatchedAt,
+      sentCount,
+    };
+  });
+
+  return {
+    editionTitle: edition.title,
+    dayNumber,
+    currentTimeIst: istTimeStr,
+    slots,
+  };
+}
+
 /**
  * Dispatch Push Notifications based on notification type and active tournament day schedule.
  */
@@ -37,6 +209,7 @@ export async function dispatchNotifications(
   notificationType: 'golive' | 'score' | 'combi' | 'results' | 'auto',
   overrideDay?: number,
   dryRun: boolean = false,
+  force: boolean = false,
 ): Promise<NotificationDispatchResult> {
   // 1. Get live Tournament A edition
   const editionRef = await resolveCurrentEdition();
@@ -98,7 +271,9 @@ export async function dispatchNotifications(
   }
 
   // Auto-detect type if 'auto' is passed based on IST hour/minute
-  let activeType = notificationType;
+  let activeType: 'golive' | 'score' | 'combi' | 'results' | 'auto' | 'idle' = notificationType;
+  let currentSlotKey = '';
+  let slotLabel = '';
   if (activeType === 'auto') {
     const istTimeStr = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Kolkata',
@@ -111,14 +286,57 @@ export async function dispatchNotifications(
     const minutes = parseInt(mStr, 10);
     const totalMinutes = hours * 60 + minutes;
 
-    if (totalMinutes >= 21 * 60 + 35) {
-      activeType = 'results'; // 9:35 PM IST
-    } else if (totalMinutes >= 21 * 60) {
-      activeType = 'combi'; // 9:00 - 9:25 PM IST
-    } else if (totalMinutes >= 20 * 60) {
-      activeType = 'score'; // 8:00 - 8:30 PM IST
-    } else {
-      activeType = 'golive'; // 4:00 - 7:00 PM IST
+    const slotInfo = resolveCurrentNotificationSlot(totalMinutes);
+    activeType = slotInfo.type as any;
+    if (slotInfo.slot) {
+      currentSlotKey = slotInfo.slot.key;
+      slotLabel = slotInfo.slot.name;
+    }
+
+    if (activeType === 'idle') {
+      // Outside active broadcast hours (00:00 - 14:59 IST)
+      return {
+        success: true,
+        typeSent: 'idle',
+        dayNumber,
+        editionTitle: activeEdition.title,
+        notificationsCount: 0,
+        message: `Currently outside active tournament broadcast hours (${istTimeStr} IST). Push notifications trigger between 3:00 PM and 10:00 PM IST.`,
+        results: { sent: 0, failed: 0, invalidTokensRemoved: 0 },
+      };
+    }
+  }
+
+  // Slot Deduplication check: If this slot was already dispatched for today, skip unless forced
+  const slotSettingKey = currentSlotKey
+    ? `notif_slot_${activeEdition.id}_d${dayNumber}_${currentSlotKey}`
+    : undefined;
+
+  if (slotSettingKey && !force && !dryRun) {
+    const existing = await prisma.systemSetting.findUnique({
+      where: { key: slotSettingKey },
+    });
+    if (existing) {
+      let sentTimestamp = existing.updatedAt.toISOString();
+      try {
+        const parsed = JSON.parse(existing.value);
+        if (parsed.dispatchedAt) sentTimestamp = parsed.dispatchedAt;
+      } catch {}
+      const istSent = new Date(sentTimestamp).toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return {
+        success: true,
+        typeSent: activeType,
+        dayNumber,
+        editionTitle: activeEdition.title,
+        notificationsCount: 0,
+        message: `[AutoSkip] Slot "${slotLabel || currentSlotKey}" already dispatched for Day ${dayNumber} at ${istSent} IST.`,
+        results: { sent: 0, failed: 0, invalidTokensRemoved: 0 },
+      };
     }
   }
 
@@ -206,7 +424,7 @@ export async function dispatchNotifications(
     const tokens = tokensByUserId.get(userId) || [];
     if (!tokens.length) return;
 
-    if (samplePayloads.length < 15) {
+    if (samplePayloads.length < 20) {
       samplePayloads.push({
         toUserId: userId,
         userName,
@@ -228,14 +446,14 @@ export async function dispatchNotifications(
   };
 
   // ----------------------------------------------------
-  // TYPE 1: Go Live & Match Reminders (4pm - 7pm IST)
+  // TYPE 1: Go Live & Match Reminders (3:00pm - 7:45pm IST)
   // ----------------------------------------------------
   if (activeType === 'golive') {
     const playerScores = await prisma.playerDayScore.findMany({
       where: { editionId: activeEdition.id, dayNumber },
       select: { userId: true, score: true },
     });
-    const scoredUserIds = new Set(playerScores.map((s) => s.userId));
+    const scoreMap = new Map(playerScores.map((s) => [s.userId, s.score]));
 
     for (const pair of todayPairings) {
       const team1 = activeEdition.teams.find((t) => t.id === pair.team1Id);
@@ -245,42 +463,31 @@ export async function dispatchNotifications(
       const t1Name = pair.team1Name || team1.name;
       const t2Name = pair.team2Name || team2.name;
 
-      // Team 1 players
-      for (const m of team1.members) {
-        const alreadyRecorded = scoredUserIds.has(m.userId);
-        const name = m.user.name || m.user.username || 'Player';
-        const title = alreadyRecorded ? '📹 CBOT Live — Improve Score' : '⚠️ Go Live Required — CBOT';
-        const body = alreadyRecorded
-          ? `Hi ${name}! Day ${dayNumber} score recorded (${t1Name} vs ${t2Name}). You can optionally go live again to improve your score!`
-          : `Hi ${name}! Your Day ${dayNumber} match (${t1Name} vs ${t2Name}) is active. Broadcast your match live or submit score to avoid Walkover!`;
+      const processTeamGoLive = (team: typeof team1, myName: string, oppName: string) => {
+        for (const m of team.members) {
+          const hasScore = scoreMap.has(m.userId);
+          const scoreVal = scoreMap.get(m.userId);
+          const name = m.user.name || m.user.username || 'Player';
+          const title = hasScore ? '📹 CBOT Live — Improve Score' : '⚠️ Go Live Required — CBOT';
+          const body = hasScore
+            ? `Hi ${name}! Day ${dayNumber} score recorded (${scoreVal} pts). You can optionally go live again before 8:00 PM to improve your score!`
+            : `Hi ${name}! Your Day ${dayNumber} match (${myName} vs ${oppName}) is active. Broadcast your match live or submit score before 8:00 PM to avoid Walkover!`;
 
-        pushToUser(m.userId, name, t1Name, title, body, {
-          type: 'golive',
-          dayNumber,
-          screen: 'Live',
-        });
-      }
+          pushToUser(m.userId, name, myName, title, body, {
+            type: 'golive',
+            dayNumber,
+            screen: 'Live',
+          });
+        }
+      };
 
-      // Team 2 players
-      for (const m of team2.members) {
-        const alreadyRecorded = scoredUserIds.has(m.userId);
-        const name = m.user.name || m.user.username || 'Player';
-        const title = alreadyRecorded ? '📹 CBOT Live — Improve Score' : '⚠️ Go Live Required — CBOT';
-        const body = alreadyRecorded
-          ? `Hi ${name}! Day ${dayNumber} score recorded (${t2Name} vs ${t1Name}). You can optionally go live again to improve your score!`
-          : `Hi ${name}! Your Day ${dayNumber} match (${t2Name} vs ${t1Name}) is active. Broadcast your match live or submit score to avoid Walkover!`;
-
-        pushToUser(m.userId, name, t2Name, title, body, {
-          type: 'golive',
-          dayNumber,
-          screen: 'Live',
-        });
-      }
+      processTeamGoLive(team1, t1Name, t2Name);
+      processTeamGoLive(team2, t2Name, t1Name);
     }
   }
 
   // ----------------------------------------------------
-  // TYPE 2: Score Update Reminders (8pm, 8:30pm IST)
+  // TYPE 2: Score Update Reminders (7:50pm - 8:54pm IST)
   // ----------------------------------------------------
   else if (activeType === 'score') {
     const playerScores = await prisma.playerDayScore.findMany({
@@ -305,8 +512,8 @@ export async function dispatchNotifications(
             m.userId,
             name,
             myName,
-            '📝 Score Update Reminder — CBOT',
-            `Hi ${name}! Don't forget to submit your Day ${dayNumber} match score (${myName} vs ${oppName}) before the 9:00 PM cutoff!`,
+            '📝 Score Update Warning — CBOT',
+            `Hi ${name}! You haven't submitted your Day ${dayNumber} score for ${myName} vs ${oppName}. Submit now before the 9:00 PM lock cutoff to avoid a Walkover!`,
             { type: 'score', dayNumber, screen: 'Main' },
           );
         }
@@ -318,7 +525,7 @@ export async function dispatchNotifications(
   }
 
   // ----------------------------------------------------
-  // TYPE 3: Captain Combi Submission Reminders (9:00pm - 9:25pm IST)
+  // TYPE 3: Captain Combi Submission Reminders (8:55pm - 9:30pm IST)
   // ----------------------------------------------------
   else if (activeType === 'combi') {
     for (const pair of todayPairings) {
@@ -329,7 +536,6 @@ export async function dispatchNotifications(
       const t1Name = pair.team1Name || team1.name;
       const t2Name = pair.team2Name || team2.name;
 
-      // Find the match for this pairing
       const match = activeEdition.matches.find(
         (m) =>
           (m.team1Id === team1.id && m.team2Id === team2.id) ||
@@ -337,26 +543,49 @@ export async function dispatchNotifications(
       );
 
       const notifyCaptainIfMissing = async (team: typeof team1, myName: string, oppName: string) => {
-        if (!team.captainId) return;
-
         let submitted = false;
         if (match) {
           const lineup = await prisma.matchLineup.findUnique({
             where: { matchId_teamId: { matchId: match.id, teamId: team.id } },
           });
-          submitted = lineup?.status === 'SUBMITTED';
+          submitted = lineup?.status === 'SUBMITTED' || lineup?.status === 'LOCKED';
+        }
+
+        // Check if team has submitted lineups in savedLineups JSON for today
+        if (!submitted && team.savedLineups) {
+          try {
+            const parsed = JSON.parse(team.savedLineups);
+            if (parsed[`day_${dayNumber}`]?.rounds?.length || parsed[String(dayNumber)]?.rounds?.length) {
+              submitted = true;
+            }
+          } catch {}
         }
 
         if (!submitted) {
-          const captainName = team.captain?.name || team.captain?.username || 'Captain';
-          pushToUser(
-            team.captainId,
-            captainName,
-            myName,
-            '⚡ Combi Submission Warning — CBOT',
-            `Captain ${captainName}! Submit ${myName}'s Day ${dayNumber} combi vs ${oppName} before the 9:30 PM lock cutoff!`,
-            { type: 'combi', dayNumber, screen: 'Main' },
-          );
+          const captainUserIds = new Set<string>();
+          if (team.captainId) captainUserIds.add(team.captainId);
+          for (const m of team.members) {
+            if ((m as any).roleInTeam === 'CAPTAIN' || (m.user as any)?.role === 'CAPTAIN') {
+              captainUserIds.add(m.userId);
+            }
+          }
+          if (!captainUserIds.size && team.members[0]) {
+            captainUserIds.add(team.members[0].userId);
+          }
+
+          for (const capUserId of captainUserIds) {
+            const memberObj = team.members.find((m) => m.userId === capUserId);
+            const capUser = memberObj?.user || team.captain;
+            const captainName = capUser?.name || capUser?.username || 'Captain';
+            pushToUser(
+              capUserId,
+              captainName,
+              myName,
+              '⚡ Combi Submission Warning — CBOT',
+              `Captain ${captainName}! Submit ${myName}'s Day ${dayNumber} combi vs ${oppName} before the 9:30 PM lock cutoff!`,
+              { type: 'combi', dayNumber, screen: 'Main' },
+            );
+          }
         }
       };
 
@@ -366,25 +595,93 @@ export async function dispatchNotifications(
   }
 
   // ----------------------------------------------------
-  // TYPE 4: Match Results & Standings (9:35pm IST)
+  // TYPE 4: Match Results & Real-Time Standings (9:31pm - 11:59pm IST)
   // ----------------------------------------------------
   else if (activeType === 'results') {
-    const teamRanks = new Map<string, number>();
+    // 1. Fetch Official Live Standings from Stage Designer Engine
+    const teamRankMap = new Map<string, { rank: number; rankStr: string; totalPoints: number }>();
     try {
-      const standings = await prisma.leagueStanding.findMany({
-        where: { editionId: activeEdition.id },
-        orderBy: { rank: 'asc' },
-      });
-      for (const s of standings) {
-        teamRanks.set(s.teamId, s.rank);
+      const standingsData = await getPublicStandings(activeEdition.id);
+      if (standingsData.blocks && standingsData.blocks.length > 0) {
+        // Search across all stage blocks and groups
+        for (const block of standingsData.blocks) {
+          for (const grp of block.groups || []) {
+            for (const row of grp.rows || []) {
+              if (row.teamId && row.rank) {
+                if (block.current || !teamRankMap.has(row.teamId)) {
+                  teamRankMap.set(row.teamId, {
+                    rank: row.rank,
+                    rankStr: ordinalRank(row.rank),
+                    totalPoints: row.total,
+                  });
+                }
+              }
+            }
+          }
+        }
       }
-    } catch {}
+      // If knockouts placement exists
+      if (standingsData.placement && standingsData.placement.length > 0) {
+        for (const pl of standingsData.placement) {
+          if (pl.teamId && pl.place) {
+            teamRankMap.set(pl.teamId, {
+              rank: pl.place,
+              rankStr: ordinalRank(pl.place),
+              totalPoints: 0,
+            });
+          }
+        }
+      }
+    } catch (stErr) {
+      console.warn('[NotificationScheduler] Could not load dynamic public standings:', stErr);
+    }
 
+    // Fallback: If any teams are unranked in teamRankMap, calculate points from all recorded scores
+    const unrankedTeams = activeEdition.teams.filter((t) => !teamRankMap.has(t.id));
+    if (unrankedTeams.length > 0) {
+      const allScores = await prisma.playerDayScore.findMany({
+        where: { editionId: activeEdition.id },
+        select: { userId: true, score: true },
+      });
+      const userScoreMap = new Map<string, number>();
+      for (const s of allScores) {
+        userScoreMap.set(s.userId, (userScoreMap.get(s.userId) || 0) + s.score);
+      }
+
+      const teamTotals = activeEdition.teams.map((t) => {
+        let totalScore = 0;
+        for (const m of t.members) {
+          totalScore += userScoreMap.get(m.userId) || 0;
+        }
+        return { teamId: t.id, name: t.name, totalScore };
+      });
+
+      teamTotals.sort((a, b) => b.totalScore - a.totalScore);
+      teamTotals.forEach((tt, idx) => {
+        if (!teamRankMap.has(tt.teamId)) {
+          teamRankMap.set(tt.teamId, {
+            rank: idx + 1,
+            rankStr: ordinalRank(idx + 1),
+            totalPoints: tt.totalScore,
+          });
+        }
+      });
+    }
+
+    // 2. Fetch Day Scores
     const playerScores = await prisma.playerDayScore.findMany({
       where: { editionId: activeEdition.id, dayNumber },
     });
-    const scoreMap = new Map(playerScores.map((s) => [s.userId, s.score]));
+    const dayScoreMap: Record<string, { score: number; slams: number; isWalkover?: boolean }> = {};
+    for (const s of playerScores) {
+      dayScoreMap[s.userId] = {
+        score: s.score,
+        slams: s.slams,
+        isWalkover: Boolean((s as any).isWalkover),
+      };
+    }
 
+    // 3. Process each pairing with official Combi Match Scoring Engine
     for (const pair of todayPairings) {
       const team1 = activeEdition.teams.find((t) => t.id === pair.team1Id);
       const team2 = activeEdition.teams.find((t) => t.id === pair.team2Id);
@@ -393,61 +690,79 @@ export async function dispatchNotifications(
       const t1Name = pair.team1Name || team1.name;
       const t2Name = pair.team2Name || team2.name;
 
-      const team1RankStr = ordinalRank(teamRanks.get(team1.id) || 1);
-      const team2RankStr = ordinalRank(teamRanks.get(team2.id) || 2);
+      // Resolve effective combis (Singles, Doubles, Triples)
+      const combi1 = resolveEffectiveTeamCombi({ team: team1 as any, dayNumber });
+      const combi2 = resolveEffectiveTeamCombi({ team: team2 as any, dayNumber });
 
-      // Check official match winner if completed
-      const match = activeEdition.matches.find(
-        (m) =>
-          (m.team1Id === team1.id && m.team2Id === team2.id) ||
-          (m.team1Id === team2.id && m.team2Id === team1.id),
+      const matchResult = scoreMatchDay(
+        combi1.rounds,
+        combi2.rounds,
+        team1.members as any,
+        team2.members as any,
+        dayScoreMap,
       );
 
-      let team1Won = false;
-      let team2Won = false;
+      const t1Pts = matchResult.team1EventPts;
+      const t2Pts = matchResult.team2EventPts;
+      const winner = matchResult.matchWinner; // 1 = Team 1, 2 = Team 2, 0 = Tie
 
-      if (match?.winnerId) {
-        team1Won = match.winnerId === team1.id;
-        team2Won = match.winnerId === team2.id;
-      } else {
-        const team1ScoreSum = team1.members.reduce((acc, m) => acc + (scoreMap.get(m.userId) || 0), 0);
-        const team2ScoreSum = team2.members.reduce((acc, m) => acc + (scoreMap.get(m.userId) || 0), 0);
-        team1Won = team1ScoreSum >= team2ScoreSum;
-        team2Won = team2ScoreSum > team1ScoreSum;
-      }
+      const t1RankInfo = teamRankMap.get(team1.id);
+      const t2RankInfo = teamRankMap.get(team2.id);
 
       const processPlayerResult = (
         team: typeof team1,
         myName: string,
         oppName: string,
-        opp: typeof team2,
-        wonMatch: boolean,
-        rankStr: string,
+        myPts: number,
+        oppPts: number,
+        wonTeamMatch: boolean,
+        isTieMatch: boolean,
+        rankInfo: { rank: number; rankStr: string } | undefined,
+        isTeam1: boolean,
       ) => {
         for (const m of team.members) {
-          const pScore = scoreMap.get(m.userId) || 0;
-          const oppScores = opp.members.map((om) => scoreMap.get(om.userId) || 0);
-          const avgOppScore = oppScores.length
-            ? oppScores.reduce((a, b) => a + b, 0) / oppScores.length
-            : 0;
-          const playerWon = pScore >= avgOppScore && pScore > 0;
           const name = m.user.name || m.user.username || 'Player';
+          const pScoreInfo = dayScoreMap[m.userId];
+          const pScore = pScoreInfo?.score ?? null;
+
+          // Find specific event(s) played by this player in combi
+          const playerEvents = matchResult.events.filter((ev) =>
+            isTeam1 ? ev.team1PlayerIds.includes(m.userId) : ev.team2PlayerIds.includes(m.userId),
+          );
+
+          let playerWonEvent = false;
+          let eventFormat = 'match';
+          if (playerEvents.length > 0) {
+            const ev = playerEvents[0];
+            eventFormat = ev.format || ev.name || 'match';
+            playerWonEvent = isTeam1 ? ev.winnerTeam === 1 : ev.winnerTeam === 2;
+          } else if (pScore !== null) {
+            playerWonEvent = wonTeamMatch;
+          }
 
           let title = '🎯 Match Results — CBOT';
           let body = '';
 
-          if (playerWon && wonMatch) {
+          const rankPhrase = rankInfo
+            ? ` ${myName} is currently ranked ${rankInfo.rankStr} on the Leaderboard!`
+            : ' Check the Leaderboard for updated team standings!';
+          const firstPlaceTrophy = rankInfo?.rank === 1 ? ' 🏆' : '';
+
+          if (isTieMatch) {
+            title = '🤝 Match Tied! — CBOT';
+            body = `Hard-fought tie ${name}! ${myName} drew with ${oppName} (${myPts}-${oppPts}).${rankPhrase}`;
+          } else if (playerWonEvent && wonTeamMatch) {
             title = '🎉 Double Victory! — CBOT';
-            body = `Double Victory ${name}! You won your match (${pScore}) and ${myName} defeated ${oppName}! ${myName} is now ${rankStr} on the Leaderboard! 🏆`;
-          } else if (playerWon && !wonMatch) {
-            title = '🌟 Great Performance! — CBOT';
-            body = `Great effort ${name}! 🌟 You won your match (${pScore}), but ${myName} fell to ${oppName}. ${myName} is currently ${rankStr} on the Leaderboard!`;
-          } else if (!playerWon && wonMatch) {
+            body = `Double Victory ${name}! You won your ${eventFormat} match and ${myName} defeated ${oppName} (${myPts}-${oppPts})!${rankPhrase}${firstPlaceTrophy}`;
+          } else if (playerWonEvent && !wonTeamMatch) {
+            title = '🌟 Great Effort! — CBOT';
+            body = `Great performance ${name}! 🌟 You won your ${eventFormat} match, but ${myName} fell to ${oppName} (${myPts}-${oppPts}).${rankPhrase}`;
+          } else if (!playerWonEvent && wonTeamMatch) {
             title = '🏆 Team Victory! — CBOT';
-            body = `Team Victory ${name}! 🏆 ${myName} defeated ${oppName}! ${myName} is in ${rankStr} place on the Leaderboard!`;
+            body = `Team Victory ${name}! 🏆 ${myName} defeated ${oppName} (${myPts}-${oppPts})!${rankPhrase}${firstPlaceTrophy}`;
           } else {
-            title = '💪 Keep Pushing! — CBOT';
-            body = `Tough match today ${name}. ${myName} fell to ${oppName}. ${myName} is currently in ${rankStr} place. Bounce back stronger tomorrow!`;
+            title = `💪 Day ${dayNumber} Complete — CBOT`;
+            body = `Day ${dayNumber} complete ${name}. ${myName} fell to ${oppName} (${myPts}-${oppPts}).${rankPhrase} Bounce back stronger tomorrow!`;
           }
 
           pushToUser(m.userId, name, myName, title, body, {
@@ -458,8 +773,8 @@ export async function dispatchNotifications(
         }
       };
 
-      processPlayerResult(team1, t1Name, t2Name, team2, team1Won, team1RankStr);
-      processPlayerResult(team2, t2Name, t1Name, team1, team2Won, team2RankStr);
+      processPlayerResult(team1, t1Name, t2Name, t1Pts, t2Pts, winner === 1, winner === 0, t1RankInfo, true);
+      processPlayerResult(team2, t2Name, t1Name, t2Pts, t1Pts, winner === 2, winner === 0, t2RankInfo, false);
     }
   }
 
@@ -479,6 +794,37 @@ export async function dispatchNotifications(
   // 4. Send all constructed push notifications via Expo
   const sendResults = await sendPushNotifications(payloads);
 
+  // Record that this slot was dispatched today to prevent duplicates on repeated cron/heartbeat checks
+  if (slotSettingKey && !dryRun && sendResults.sent > 0) {
+    try {
+      await prisma.systemSetting.upsert({
+        where: { key: slotSettingKey },
+        create: {
+          key: slotSettingKey,
+          value: JSON.stringify({
+            dispatchedAt: new Date().toISOString(),
+            sent: sendResults.sent,
+            failed: sendResults.failed,
+            type: activeType,
+            dayNumber,
+          }),
+        },
+        update: {
+          value: JSON.stringify({
+            dispatchedAt: new Date().toISOString(),
+            sent: sendResults.sent,
+            failed: sendResults.failed,
+            type: activeType,
+            dayNumber,
+          }),
+          updatedAt: new Date(),
+        },
+      });
+    } catch (saveErr) {
+      console.warn('[NotificationScheduler] Failed to save slot dispatch record:', saveErr);
+    }
+  }
+
   return {
     success: true,
     typeSent: activeType,
@@ -490,3 +836,38 @@ export async function dispatchNotifications(
     samplePayloads,
   };
 }
+
+let lastHeartbeatTimestamp = 0;
+
+/**
+ * Passive self-healing heartbeat.
+ * Called opportunistically on high-traffic server API routes during match evening hours.
+ * Automatically checks if any scheduled slot is due and dispatches it if not yet sent.
+ */
+export async function triggerPassiveNotificationHeartbeat() {
+  const now = Date.now();
+  // Throttle to at most once every 60 seconds per Node process
+  if (now - lastHeartbeatTimestamp < 60_000) return;
+  lastHeartbeatTimestamp = now;
+
+  try {
+    const istTimeStr = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const [hStr, mStr] = istTimeStr.split(':');
+    const currentMinutes = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+
+    // Only run during active tournament evening broadcast hours (3:00 PM to 11:59 PM IST)
+    if (currentMinutes < 15 * 60) return;
+
+    // Run auto-dispatch without force (deduplication skips if slot was already sent)
+    await dispatchNotifications('auto', undefined, false, false);
+  } catch (err) {
+    // Non-blocking catch
+    console.warn('[NotificationHeartbeat] Passive check error:', err);
+  }
+}
+

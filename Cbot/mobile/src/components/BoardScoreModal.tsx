@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { playerScoreUntilNote } from '../score-edit-policy';
-import { useAppDialog } from './AppDialog';
 
 export const MAX_DAY_BOARDS = 10;
 export const DEFAULT_DAY_BOARDS = 3;
@@ -105,6 +104,8 @@ export function BoardScoreModal({
   const [boards, setBoards] = useState<BoardDraft[]>(
     initialBoards.length ? initialBoards : emptyBoards(),
   );
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [warnVisible, setWarnVisible] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -114,7 +115,6 @@ export function BoardScoreModal({
   const stats = useMemo(() => parseBoardDrafts(boards), [boards]);
   const bonus = targetBonus(stats.boardCount ? stats.total : null, target);
   const tgt = Number(target) || 0;
-  const { dialog, showWarn, showConfirm } = useAppDialog();
 
   const update = (idx: number, patch: Partial<BoardDraft>) => {
     setBoards((prev) => prev.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
@@ -132,24 +132,10 @@ export function BoardScoreModal({
 
   const handleConfirmAndSubmit = () => {
     if (!stats.filled.length) {
-      showWarn('Incomplete Scores', 'Please enter at least one board score before submitting.');
+      setWarnVisible(true);
       return;
     }
-
-    const bonusLabel = tgt > 0 ? (bonus === true ? 'Yes (+1 Bonus)' : 'No') : 'N/A';
-    const targetText = tgt > 0 ? `${tgt} pts` : 'No Target';
-
-    showConfirm(
-      'Confirm Score Submission',
-      `Day ${dayNumber} — please confirm:\n\n` +
-        `Total Score: ${stats.total} pts\n` +
-        `Total Slams: ${stats.slams}\n` +
-        `Target Bonus: ${bonusLabel}\n` +
-        `Target: ${targetText}\n` +
-        `Boards: ${stats.boardCount}`,
-      () => onSave(stats.filled),
-      { confirmLabel: 'Confirm & Submit', cancelLabel: 'Cancel' },
-    );
+    setConfirmVisible(true);
   };
 
   const ctaTitle =
@@ -157,13 +143,12 @@ export function BoardScoreModal({
     (playerName ? `CONFIRM & SUBMIT FOR ${playerName.toUpperCase()}` : 'CONFIRM & SUBMIT BY PLAYER');
 
   return (
-    <>
-      <Modal
-        visible={visible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={onClose}
-      >
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#020617" />
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
         <KeyboardAvoidingView
@@ -201,7 +186,7 @@ export function BoardScoreModal({
             {/* Hint / Instructions Bar */}
             <View style={styles.infoBanner}>
               <Text style={styles.infoText}>
-                {editNote || playerScoreUntilNote(dayNumber)} Enter each board’s score and slams below. Total score strictly below target achieves the Target Bonus.
+                {editNote || playerScoreUntilNote(dayNumber)} Enter each board’s score and slams below. Total score at or below target achieves the Target Bonus.
               </Text>
             </View>
 
@@ -523,10 +508,123 @@ export function BoardScoreModal({
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        {/* In-Modal Confirmation Dialog Overlay (iOS & Android safe) */}
+        {confirmVisible ? (
+          <View style={styles.dialogBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !busy && setConfirmVisible(false)}
+            />
+            <View style={styles.dialogCard}>
+              <View style={styles.dialogTopBar} />
+
+              <Text style={styles.dialogIcon}>📋</Text>
+              <Text style={styles.dialogTitle}>Confirm Score Submission</Text>
+              <Text style={styles.dialogSubtitle}>
+                Day {dayNumber}{playerName ? ` · ${playerName}` : ''}
+              </Text>
+
+              <View style={styles.dialogSummaryBox}>
+                <View style={styles.dialogRow}>
+                  <Text style={styles.dialogLabel}>Total Score</Text>
+                  <Text style={styles.dialogValue}>{stats.total} pts</Text>
+                </View>
+                <View style={styles.dialogRow}>
+                  <Text style={styles.dialogLabel}>Total Slams</Text>
+                  <Text style={styles.dialogValue}>{stats.slams}</Text>
+                </View>
+                <View style={styles.dialogRow}>
+                  <Text style={styles.dialogLabel}>Target</Text>
+                  <Text style={styles.dialogValue}>
+                    {tgt > 0 ? `${tgt} pts` : 'No Target'}
+                  </Text>
+                </View>
+                <View style={styles.dialogRow}>
+                  <Text style={styles.dialogLabel}>Target Bonus</Text>
+                  <Text
+                    style={[
+                      styles.dialogValue,
+                      tgt > 0
+                        ? bonus === true
+                          ? styles.dialogBonusYes
+                          : styles.dialogBonusNo
+                        : undefined,
+                    ]}
+                  >
+                    {tgt > 0 ? (bonus === true ? 'YES (+1 Bonus)' : 'NO') : 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.dialogRow}>
+                  <Text style={styles.dialogLabel}>Boards Count</Text>
+                  <Text style={styles.dialogValue}>
+                    {stats.boardCount} {stats.boardCount === 1 ? 'board' : 'boards'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.dialogBtnRow}>
+                <Pressable
+                  style={[styles.dialogBtn, styles.dialogCancelBtn]}
+                  onPress={() => setConfirmVisible(false)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.dialogCancelBtnText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[
+                    styles.dialogBtn,
+                    styles.dialogConfirmBtn,
+                    busy && styles.saveBtnDisabled,
+                  ]}
+                  onPress={() => {
+                    setConfirmVisible(false);
+                    onSave(stats.filled);
+                  }}
+                  disabled={busy}
+                  accessibilityRole="button"
+                >
+                  {busy ? (
+                    <ActivityIndicator color="#020617" size="small" />
+                  ) : (
+                    <Text style={styles.dialogConfirmBtnText}>Confirm & Submit</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {/* In-Modal Warning Overlay */}
+        {warnVisible ? (
+          <View style={styles.dialogBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setWarnVisible(false)}
+            />
+            <View style={styles.dialogCard}>
+              <View style={[styles.dialogTopBar, { backgroundColor: '#f59e0b' }]} />
+              <Text style={styles.dialogIcon}>⚠️</Text>
+              <Text style={[styles.dialogTitle, { color: '#f59e0b' }]}>Incomplete Scores</Text>
+              <Text style={styles.dialogMessage}>
+                Please enter at least one board score before submitting.
+              </Text>
+              <View style={[styles.dialogBtnRow, { justifyContent: 'center' }]}>
+                <Pressable
+                  style={[styles.dialogBtn, styles.dialogConfirmBtn, { minWidth: 120 }]}
+                  onPress={() => setWarnVisible(false)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.dialogConfirmBtnText}>OK</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </SafeAreaView>
-      </Modal>
-      {dialog}
-    </>
+    </Modal>
   );
 }
 
@@ -988,5 +1086,131 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.4,
+  },
+  dialogBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(2, 6, 23, 0.82)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  dialogCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#334155',
+    width: '100%',
+    maxWidth: 380,
+    padding: 20,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  dialogTopBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: '#f59e0b',
+  },
+  dialogIcon: {
+    fontSize: 30,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#f8fafc',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  dialogSubtitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  dialogSummaryBox: {
+    backgroundColor: '#020617',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    padding: 12,
+    marginBottom: 18,
+    gap: 8,
+  },
+  dialogRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dialogLabel: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  dialogValue: {
+    fontSize: 14,
+    color: '#f8fafc',
+    fontWeight: '800',
+  },
+  dialogBonusYes: {
+    color: '#22c55e',
+    fontWeight: '900',
+  },
+  dialogBonusNo: {
+    color: '#ef4444',
+    fontWeight: '900',
+  },
+  dialogMessage: {
+    fontSize: 14,
+    color: '#cbd5e1',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  dialogBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dialogBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dialogCancelBtn: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  dialogCancelBtnText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dialogConfirmBtn: {
+    backgroundColor: '#f59e0b',
+  },
+  dialogConfirmBtnText: {
+    color: '#020617',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
 });

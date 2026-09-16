@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPublicStandings } from '@/lib/actions/playerScoreActions';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
+import { triggerPassiveNotificationHeartbeat } from '@/lib/notification-scheduler';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,9 @@ export async function OPTIONS() {
 }
 
 export async function GET() {
+  // Opportunistic non-blocking notification scheduler check
+  void triggerPassiveNotificationHeartbeat();
+
   try {
     const payload = await getPublicStandings();
     return NextResponse.json(

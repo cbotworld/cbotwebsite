@@ -118,8 +118,8 @@ export async function GET(request: NextRequest) {
         dayNumber: dayNumberFromVideoTitle(v.title),
         playerName: playerFromTitle(v.title),
         playerUsername: null,
-        teamName: 'CBOT WORLD',
-        teamTag: null,
+        teamName: v.channelTitle || (v.channelIndex === 2 ? 'Channel 2 (Backup)' : 'CBOT WORLD'),
+        teamTag: v.channelIndex === 2 ? 'CH 2' : null,
         teamLogo: null,
         status: 'ENDED',
         isLive: false,
@@ -128,6 +128,8 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: v.thumbnailUrl || thumbUrl(v.youtubeVideoId),
         recordedAt: v.publishedAt || null,
         title: v.title,
+        channelIndex: v.channelIndex || 1,
+        channelTitle: v.channelTitle || 'Channel 1',
       });
     }
 
@@ -137,7 +139,7 @@ export async function GET(request: NextRequest) {
       .filter((v) => {
         if (dayFilter && v.dayNumber !== dayFilter) return false;
         if (playerQ) {
-          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title}`.toLowerCase();
+          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title} ${v.channelTitle || ''} ${v.channelIndex === 2 ? 'channel 2 ch 2' : 'channel 1 ch 1'}`.toLowerCase();
           if (!hay.includes(playerQ)) return false;
         }
         return true;

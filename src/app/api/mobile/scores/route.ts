@@ -10,6 +10,7 @@ import {
   submitPlayerDayScoreForUser,
   submitTeamDayScoresForActor,
 } from '@/lib/actions/playerScoreActions';
+import { triggerPassiveNotificationHeartbeat } from '@/lib/notification-scheduler';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest) {
+  void triggerPassiveNotificationHeartbeat();
   try {
     const user = await userFromBearer(request);
     if (!user) {

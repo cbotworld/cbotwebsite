@@ -873,7 +873,7 @@ export default function OrganizerScoresPanel({
                   });
                 } else {
                   const tgt = Number(matchedUser.target) || 0;
-                  const bonusAchieved = tgt > 0 ? numScore < tgt : null;
+                  const bonusAchieved = tgt > 0 ? numScore <= tgt : null;
 
                   let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'NEW';
                   let diffDescription = 'Not submitted on website yet (New entry)';
@@ -1080,7 +1080,7 @@ export default function OrganizerScoresPanel({
                 });
               } else {
                 const tgt = Number(matchedUser.target) || 0;
-                const bonusAchieved = tgt > 0 ? numScore < tgt : null;
+                const bonusAchieved = tgt > 0 ? numScore <= tgt : null;
 
                 let diffType: 'MATCH' | 'DIFF' | 'NEW' | 'WO' = 'NEW';
                 let diffDescription = 'Not submitted on website yet (New entry)';
@@ -1562,7 +1562,7 @@ export default function OrganizerScoresPanel({
                             const trimmed = currentVal.trim();
                             const isWo = /^(wo|walkover|absent|-)$/i.test(trimmed);
                             const numScore = parseInt(trimmed, 10);
-                            const isBonus = targetVal > 0 && !isNaN(numScore) && numScore < targetVal;
+                            const isBonus = targetVal > 0 && !isNaN(numScore) && numScore <= targetVal;
 
                             return (
                               <td

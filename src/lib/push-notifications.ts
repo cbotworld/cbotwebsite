@@ -8,8 +8,10 @@ export interface PushNotificationPayload {
   title: string;
   body: string;
   data?: Record<string, any>;
-  sound?: 'default' | null;
+  sound?: 'default' | null | string;
   badge?: number;
+  channelId?: string;
+  priority?: 'default' | 'normal' | 'high';
 }
 
 /**
@@ -34,11 +36,13 @@ export async function sendPushNotifications(
     validTokenMap.set(n.toToken, n);
     messages.push({
       to: n.toToken,
-      sound: n.sound !== undefined ? n.sound : 'default',
+      sound: n.sound !== undefined ? (n.sound as any) : 'default',
       title: n.title,
       body: n.body,
       data: n.data || {},
       badge: n.badge,
+      channelId: n.channelId || 'cbot-default',
+      priority: n.priority || 'high',
     });
   }
 

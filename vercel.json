@@ -1,8 +1,32 @@
 {
   "crons": [
     {
+      "path": "/api/cron/notifications?type=golive&secret=cbot_cron_secret_2026",
+      "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/cron/notifications?type=golive&secret=cbot_cron_secret_2026",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/notifications?type=golive&secret=cbot_cron_secret_2026",
+      "schedule": "45 13 * * *"
+    },
+    {
+      "path": "/api/cron/notifications?type=score&secret=cbot_cron_secret_2026",
+      "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/cron/notifications?type=score&secret=cbot_cron_secret_2026",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/cron/notifications?type=combi&secret=cbot_cron_secret_2026",
-      "schedule": "30 15 * * *"
+      "schedule": "35 15 * * *"
+    },
+    {
+      "path": "/api/cron/notifications?type=combi&secret=cbot_cron_secret_2026",
+      "schedule": "50 15 * * *"
     },
     {
       "path": "/api/cron/notifications?type=results&secret=cbot_cron_secret_2026",

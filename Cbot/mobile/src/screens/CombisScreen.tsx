@@ -317,7 +317,7 @@ export function CombisScreen({ navigation }: Props) {
       const payload = await load(data.team?.id || deskId);
       if (payload) setScoreDraft(scoreDraftFromMembers(payload.members || [], selected.dayNumber));
       setScorePlayerId(null);
-      showSuccess('Boards Saved! 🎯', "Boards updated. Target bonus is Yes when the day's total is under that player's target.");
+      showSuccess('Boards Saved! 🎯', "Boards updated. Target bonus is Yes when the day's total is equal to or under that player's target (Score ≤ Target).");
     } catch (e) {
       showError('Scores Not Saved', e instanceof Error ? e.message : 'Could not save scores.');
     } finally {
@@ -655,7 +655,7 @@ export function CombisScreen({ navigation }: Props) {
               <View style={styles.scoreCard}>
                 <Text style={styles.roundName}>TEAM SCORES</Text>
                 <Text style={styles.scoreHint}>
-                  {captainScoreUntilNote(selected?.dayNumber || 1)} Target bonus is Yes when the day’s total is under that player’s target.
+                  {captainScoreUntilNote(selected?.dayNumber || 1)} Target bonus is Yes when the day’s total is equal to or under that player’s target (Score ≤ Target).
                 </Text>
                 {scoreDraft.map((row) => {
                   const stats = parseBoardDrafts(row.boards);

@@ -48,17 +48,22 @@ const LIVE_VIDEO_HEIGHT = 720;
 const AUTO_DIM_DELAY_MS = 30000; // 30 seconds inactivity dimming
 
 function toSecureIngestionUrl(address: string): string {
-  return address.replace(/^rtmp:\/\//i, "rtmps://");
+  return address
+    .replace(/^rtmp:\/\//i, "rtmps://")
+    .replace(/a\.rtmp\.youtube\.com/i, "a.rtmps.youtube.com")
+    .replace(/b\.rtmp\.youtube\.com/i, "b.rtmps.youtube.com");
 }
 
 /**
- * HaishinKit 2.0 on iOS has a known TLS socket bug with rtmps:// connections
- * (RTMPConnection.Error error 1 = socketErrorOccurred). YouTube still accepts
- * plain rtmp:// on port 1935, so we downgrade to plain RTMP on iOS only.
- * Android uses RootEncoder which handles rtmps:// correctly.
+ * HaishinKit 2.0 on iOS connects cleanly over unencrypted RTMP (port 1935).
+ * We normalize both the scheme and YouTube domain (a.rtmp.youtube.com) for iOS.
+ * Android uses RootEncoder which handles RTMPS (port 443) seamlessly.
  */
 function toPlainIngestionUrl(address: string): string {
-  return address.replace(/^rtmps:\/\//i, "rtmp://");
+  return address
+    .replace(/^rtmps:\/\//i, "rtmp://")
+    .replace(/a\.rtmps\.youtube\.com/i, "a.rtmp.youtube.com")
+    .replace(/b\.rtmps\.youtube\.com/i, "b.rtmp.youtube.com");
 }
 
 function LiveIndicator({
@@ -156,6 +161,7 @@ export function LiveScreen({ route, navigation }: Props) {
   const [orientationLocked, setOrientationLocked] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<0.6 | 1.0 | 2.0>(1.0);
 
   // Score management state (independent of live streaming)
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -276,6 +282,20 @@ export function LiveScreen({ route, navigation }: Props) {
   streamSwitchRef.current = stream.switchCamera;
   const streamToggleMuteRef = useRef(stream.toggleMute);
   streamToggleMuteRef.current = stream.toggleMute;
+  const streamSetZoomRef = useRef(stream.setZoom);
+  streamSetZoomRef.current = stream.setZoom;
+
+  const handleSelectZoom = useCallback(
+    (z: 0.6 | 1.0 | 2.0) => {
+      setZoomLevel(z);
+      try {
+        streamSetZoomRef.current?.(z);
+      } catch (e) {
+        console.warn("[LiveScreen] setZoom error:", e);
+      }
+    },
+    [],
+  );
 
   const setStatus = useCallback(
     (text: string, type: "info" | "warn" | "error" = "info") => {
@@ -403,7 +423,11 @@ export function LiveScreen({ route, navigation }: Props) {
       if (goLiveCalledRef.current) return;
       goLiveCalledRef.current = true;
       startCountdown(5);
-      setStatus("Going live on YouTube…", "info");
+      setStatus("Starting stream & broadcasting to YouTube…", "info");
+
+      // Give YouTube ingest 2.5s to buffer initial RTMP frames before transitioning broadcast to live
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      if (cancelledRef.current || !sessionRef.current) return;
 
       try {
         await goLive(broadcastId);
@@ -412,7 +436,7 @@ export function LiveScreen({ route, navigation }: Props) {
       } catch (error) {
         clearCountdown();
         const message = error instanceof Error ? error.message : "Go live request failed";
-        setStatus("Streaming — YouTube may take a moment", "warn");
+        setStatus("🔴 Streaming live (YouTube auto-syncing)", "info");
         console.warn("goLive:", message);
       } finally {
         setBusy(false);
@@ -791,6 +815,7 @@ export function LiveScreen({ route, navigation }: Props) {
             videoWidth={LIVE_VIDEO_WIDTH}
             videoHeight={LIVE_VIDEO_HEIGHT}
             frontCamera={isFrontCamera}
+            zoom={zoomLevel}
             onStreamStateChanged={handleStreamStateChanged}
             onConnectionFailed={handleConnectionFailed}
             onConnectionSuccess={handleConnectionSuccess}
@@ -881,6 +906,31 @@ export function LiveScreen({ route, navigation }: Props) {
             </>
           ) : null}
         </View>
+
+        {/* Zoom Controls Overlay (0.6x, 1.0x, 2.0x) */}
+        {session ? (
+          <View style={[styles.zoomContainer, { bottom: bottomInset + 80 }]}>
+            <View style={styles.zoomPillGroup}>
+              {([0.6, 1.0, 2.0] as const).map((z) => {
+                const isSelected = zoomLevel === z;
+                const label = z === 0.6 ? "0.6x" : z === 1.0 ? "1.0x" : "2.0x";
+                return (
+                  <Pressable
+                    key={z}
+                    style={[styles.zoomPill, isSelected && styles.zoomPillActive]}
+                    onPress={() => handleSelectZoom(z)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Set camera zoom to ${label}`}
+                  >
+                    <Text style={[styles.zoomPillText, isSelected && styles.zoomPillTextActive]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         {/* Bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
@@ -1272,5 +1322,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+  zoomContainer: {
+    position: "absolute",
+    alignSelf: "center",
+    zIndex: 25,
+  },
+  zoomPillGroup: {
+    flexDirection: "row",
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    borderRadius: 24,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: "rgba(51, 65, 85, 0.75)",
+    gap: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  zoomPill: {
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 18,
+    minWidth: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomPillActive: {
+    backgroundColor: "#f59e0b",
+    shadowColor: "#f59e0b",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  zoomPillText: {
+    color: "#94a3b8",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+  zoomPillTextActive: {
+    color: "#020617",
+    fontWeight: "900",
   },
 });

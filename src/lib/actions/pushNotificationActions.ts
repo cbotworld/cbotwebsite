@@ -126,6 +126,21 @@ export async function sendCustomPushNotification(input: {
   };
 }
 
+export async function getTodayNotificationSlotsAction(dayNumber?: number) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+
+  const role = (session.user as any)?.role;
+  if (role !== 'ORGANIZER' && role !== 'SUPER_ADMIN') {
+    throw new Error('Permission denied.');
+  }
+
+  const { getTodayNotificationSlotsStatus } = await import('@/lib/notification-scheduler');
+  return getTodayNotificationSlotsStatus(dayNumber);
+}
+
 export async function previewAutoNotifications(input?: {
   dayNumber?: number;
   type?: 'golive' | 'score' | 'combi' | 'results' | 'auto';
@@ -147,6 +162,7 @@ export async function previewAutoNotifications(input?: {
 export async function triggerAutoNotifications(input?: {
   dayNumber?: number;
   type?: 'golive' | 'score' | 'combi' | 'results' | 'auto';
+  force?: boolean;
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -159,5 +175,6 @@ export async function triggerAutoNotifications(input?: {
   }
 
   const { dispatchNotifications } = await import('@/lib/notification-scheduler');
-  return dispatchNotifications(input?.type || 'auto', input?.dayNumber, false);
+  return dispatchNotifications(input?.type || 'auto', input?.dayNumber, false, input?.force ?? true);
 }
+

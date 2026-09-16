@@ -80,7 +80,7 @@ function youtubeError(payload: any, fallback: string): never {
   throw err;
 }
 
-export async function getYouTubeChannelPool(): Promise<YouTubeChannelConfig[]> {
+export async function getAllConfiguredYouTubeChannels(): Promise<YouTubeChannelConfig[]> {
   const settings = await prisma.systemSetting.findMany({
     where: {
       key: {
@@ -95,7 +95,6 @@ export async function getYouTubeChannelPool(): Promise<YouTubeChannelConfig[]> {
           'youtube_channel_2_id',
           'youtube_client_id_2',
           'youtube_client_secret_2',
-          'youtube_active_channel_mode',
         ],
       },
     },
@@ -162,7 +161,17 @@ export async function getYouTubeChannelPool(): Promise<YouTubeChannelConfig[]> {
     });
   }
 
-  const mode = settingsMap.get('youtube_active_channel_mode') || 'AUTO_FAILOVER';
+  return channels;
+}
+
+export async function getYouTubeChannelPool(): Promise<YouTubeChannelConfig[]> {
+  const channels = await getAllConfiguredYouTubeChannels();
+  if (channels.length === 0) return [];
+
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: 'youtube_active_channel_mode' },
+  });
+  const mode = setting?.value || 'AUTO_FAILOVER';
 
   if (mode === 'CHANNEL_2_ONLY') {
     return channels.filter((c) => c.channelIndex === 2);
@@ -430,6 +439,8 @@ export type ChannelVideoItem = {
   publishedAt: string;
   thumbnailUrl: string | null;
   youtubeUrl: string;
+  channelIndex?: number;
+  channelTitle?: string;
 };
 
 export async function getAccessToken(): Promise<string> {
@@ -443,7 +454,7 @@ export async function getAccessToken(): Promise<string> {
 /** Official CBOTWORLD channel uploads aggregated across all connected YouTube channels in the pool. */
 export async function listOfficialChannelVideos(limit = 300): Promise<ChannelVideoItem[]> {
   try {
-    const pool = await getYouTubeChannelPool();
+    const pool = await getAllConfiguredYouTubeChannels();
     if (pool.length === 0) return [];
 
     const allItems: ChannelVideoItem[] = [];
@@ -489,6 +500,8 @@ export async function listOfficialChannelVideos(limit = 300): Promise<ChannelVid
               thumbnailUrl:
                 it.snippet?.thumbnails?.high?.url || it.snippet?.thumbnails?.medium?.url || null,
               youtubeUrl: `https://www.youtube.com/watch?v=${id}`,
+              channelIndex: channel.channelIndex,
+              channelTitle: channel.channelTitle,
             });
             countForChannel += 1;
           }

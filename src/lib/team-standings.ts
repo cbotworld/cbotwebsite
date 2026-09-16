@@ -109,7 +109,10 @@ function emptyRow(team: StandingTeam): StageStandingRow {
     slamBonus: 0,
     avgBonus: 0,
     total: 0,
+    matchesPlayed: 0,
     matchesWon: 0,
+    matchesLost: 0,
+    matchesTied: 0,
     teamScore: 0,
     rank: 0,
     days: [],
@@ -256,8 +259,18 @@ function applyPairings(
     );
     r1.eventPts += result.team1EventPts;
     r2.eventPts += result.team2EventPts;
-    if (result.matchWinner === 1) r1.matchesWon += 1;
-    if (result.matchWinner === 2) r2.matchesWon += 1;
+    r1.matchesPlayed += 1;
+    r2.matchesPlayed += 1;
+    if (result.matchWinner === 1) {
+      r1.matchesWon += 1;
+      r2.matchesLost += 1;
+    } else if (result.matchWinner === 2) {
+      r2.matchesWon += 1;
+      r1.matchesLost += 1;
+    } else {
+      r1.matchesTied += 1;
+      r2.matchesTied += 1;
+    }
     const map = scoreMapForDay(scores, pair.dayNumber);
     const d1 = dayBucket(r1, pair.dayNumber);
     const d2 = dayBucket(r2, pair.dayNumber);

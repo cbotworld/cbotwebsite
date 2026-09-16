@@ -107,7 +107,7 @@ export function VideosScreen({ navigation, route }: Props) {
     if (dayFilter !== 'ALL' && v.dayNumber !== dayFilter) return false;
     if (playerFilter.trim()) {
       const q = playerFilter.trim().toLowerCase();
-      const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title}`.toLowerCase();
+      const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title} ${v.channelTitle || ''} ${v.channelIndex === 2 ? 'channel 2 ch 2' : 'channel 1 ch 1'}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -139,7 +139,7 @@ export function VideosScreen({ navigation, route }: Props) {
         <View style={{ flex: 1 }}>
           <Text style={styles.kicker}>CBOT WORLD</Text>
           <Text style={styles.title}>YouTube videos</Text>
-          <Text style={styles.sub}>All CBOT WORLD videos. Search by player or day.</Text>
+          <Text style={styles.sub}>All CBOT WORLD videos across channels. Search by player, day, or channel.</Text>
         </View>
         <HeaderActionButton label="Refresh" onPress={() => void load()} />
       </View>
@@ -257,6 +257,11 @@ export function VideosScreen({ navigation, route }: Props) {
                 <View style={styles.metaRow}>
                   {v.isLive ? <Text style={styles.live}>LIVE</Text> : null}
                   {v.dayNumber ? <Text style={styles.dayTag}>DAY {v.dayNumber}</Text> : null}
+                  {v.channelIndex === 2 || v.teamTag === 'CH 2' ? (
+                    <View style={styles.channel2Badge}>
+                      <Text style={styles.channel2BadgeText}>CHANNEL 2</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <Text style={styles.cardTitle} numberOfLines={2}>
                   {v.title}
@@ -361,9 +366,23 @@ const styles = StyleSheet.create({
   thumb: { width: 112, height: 72, borderRadius: 10, backgroundColor: '#1e293b' },
   thumbFallback: { alignItems: 'center', justifyContent: 'center' },
   play: { color: '#f8fafc', fontSize: 18 },
-  metaRow: { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   live: { color: '#ef4444', fontWeight: '900', fontSize: 10, letterSpacing: 1 },
   dayTag: { color: '#f59e0b', fontWeight: '800', fontSize: 10 },
+  channel2Badge: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.4)',
+  },
+  channel2BadgeText: {
+    color: '#60a5fa',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   cardTitle: { color: '#f8fafc', fontWeight: '800', fontSize: 13 },
   cardMeta: { color: '#94a3b8', fontSize: 11, marginTop: 4 },
   watchHint: { color: '#f59e0b', fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginTop: 6 },

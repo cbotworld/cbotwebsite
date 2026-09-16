@@ -8,13 +8,19 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Security check via CRON_SECRET or query secret parameter
-    const expectedSecret = process.env.CRON_SECRET || 'cbot_cron_secret_2026';
-    const secret =
-      searchParams.get('secret') ||
-      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    const defaultSecret = 'cbot_cron_secret_2026';
+    const envSecret = process.env.CRON_SECRET;
+    const querySecret = searchParams.get('secret');
+    const authHeader = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+    const isVercelCron = request.headers.get('x-vercel-cron') === '1';
 
-    if (secret !== expectedSecret) {
+    const isAuthorized =
+      isVercelCron ||
+      (envSecret && (querySecret === envSecret || authHeader === envSecret)) ||
+      querySecret === defaultSecret ||
+      authHeader === defaultSecret;
+
+    if (!isAuthorized) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized cron request.' },
         { status: 401 },
@@ -24,16 +30,29 @@ export async function GET(request: NextRequest) {
     const typeParam = (searchParams.get('type') || 'auto').toLowerCase();
     const dayParam = searchParams.get('day');
     const dayOverride = dayParam ? parseInt(dayParam, 10) : undefined;
+    const force = searchParams.get('force') === 'true';
 
     const validTypes = ['golive', 'score', 'combi', 'results', 'auto'];
     const type = validTypes.includes(typeParam) ? (typeParam as any) : 'auto';
 
-    console.log(`[CronNotifications] Dispatching push notifications (type: ${type}, dayOverride: ${dayOverride || 'none'})...`);
+    const istTimeStr = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour12: true,
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
-    const result = await dispatchNotifications(type, dayOverride);
+    console.log(`[CronNotifications] ${istTimeStr} IST — Dispatching push notifications (type: ${type}, dayOverride: ${dayOverride || 'none'}, force: ${force})...`);
+
+    const result = await dispatchNotifications(type, dayOverride, false, force);
 
     return NextResponse.json({
-      timestamp: new Date().toISOString(),
+      timestampUtc: new Date().toISOString(),
+      timestampIst: istTimeStr,
       ...result,
     });
   } catch (error: any) {
@@ -43,4 +62,8 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+export async function POST(request: NextRequest) {
+  return GET(request);
 }

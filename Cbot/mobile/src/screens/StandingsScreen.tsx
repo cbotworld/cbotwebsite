@@ -30,7 +30,7 @@ type FocusCol = 'event' | 'slams' | 'avg' | 'total';
 function focusLabel(focus: FocusCol) {
   if (focus === 'event') return 'Event points from each completed combi day (after 9:30pm IST).';
   if (focus === 'slams') return 'Slam bonus · +1 per published slam. Players who scored slams are listed by day.';
-  if (focus === 'avg') return 'Target bonus · +1 when a published day’s score is strictly below that day’s target. Players who earned it are listed by day.';
+  if (focus === 'avg') return 'Target bonus · +1 when a published day’s score is equal to or below that day’s target (Score ≤ Target). Players who earned it are listed by day.';
   return 'Event + slams + target bonus, day by day after the day completes.';
 }
 
@@ -475,32 +475,42 @@ export function StandingsScreen(_props: Props) {
               {(stage.groups || []).map((g: any) => (
                 <View key={g.key} style={styles.groupCard}>
                   <Text style={styles.groupTitle}>{g.name}</Text>
-                  <View style={styles.tableHead}>
-                    <Text style={[styles.th, styles.colRank]}>#</Text>
-                    <Text style={[styles.th, styles.colName]}>TEAM</Text>
-                    <Text style={[styles.th, styles.colStat]}>EVT</Text>
-                    <Text style={[styles.th, styles.colStat]}>SLM</Text>
-                    <Text style={[styles.th, styles.colStat]}>TGT</Text>
-                    <Text style={[styles.th, styles.colStat]}>TOT</Text>
-                    <Text style={[styles.th, styles.colStat]}>W</Text>
-                  </View>
-                  {(g.rows || []).map((row: any) => (
-                    <View key={row.teamId} style={styles.tableRow}>
-                      <Text style={[styles.tdRank, styles.colRank]}>{row.rank}</Text>
-                      <Text style={[styles.tdName, styles.colName]} numberOfLines={2}>
-                        {row.teamName}
-                      </Text>
-                      <StatCell value={row.eventPts} onPress={() => setOpen({ row, focus: 'event' })} />
-                      <StatCell value={row.slamBonus} onPress={() => setOpen({ row, focus: 'slams' })} />
-                      <StatCell value={row.avgBonus} onPress={() => setOpen({ row, focus: 'avg' })} />
-                      <StatCell
-                        value={row.total}
-                        emphasize
-                        onPress={() => setOpen({ row, focus: 'total' })}
-                      />
-                      <Text style={[styles.td, styles.colStat]}>{row.matchesWon}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ minWidth: 350 }}>
+                      <View style={styles.tableHead}>
+                        <Text style={[styles.th, styles.colRank]}>#</Text>
+                        <Text style={[styles.th, styles.colName]}>TEAM</Text>
+                        <Text style={[styles.th, styles.colStat]}>TOT</Text>
+                        <Text style={[styles.th, styles.colMiniStat]}>P</Text>
+                        <Text style={[styles.th, styles.colMiniStat]}>W</Text>
+                        <Text style={[styles.th, styles.colMiniStat]}>L</Text>
+                        <Text style={[styles.th, styles.colMiniStat]}>T</Text>
+                        <Text style={[styles.th, styles.colStat]}>EVT</Text>
+                        <Text style={[styles.th, styles.colStat]}>SLM</Text>
+                        <Text style={[styles.th, styles.colStat]}>TGT</Text>
+                      </View>
+                      {(g.rows || []).map((row: any) => (
+                        <View key={row.teamId} style={styles.tableRow}>
+                          <Text style={[styles.tdRank, styles.colRank]}>{row.rank}</Text>
+                          <Text style={[styles.tdName, styles.colName]} numberOfLines={1}>
+                            {row.teamName}
+                          </Text>
+                          <StatCell
+                            value={row.total}
+                            emphasize
+                            onPress={() => setOpen({ row, focus: 'total' })}
+                          />
+                          <Text style={[styles.td, styles.colMiniStat, { color: '#94a3b8' }]}>{row.matchesPlayed ?? 0}</Text>
+                          <Text style={[styles.td, styles.colMiniStat, { color: '#34d399' }]}>{row.matchesWon ?? 0}</Text>
+                          <Text style={[styles.td, styles.colMiniStat, { color: '#f87171' }]}>{row.matchesLost ?? 0}</Text>
+                          <Text style={[styles.td, styles.colMiniStat, { color: '#fbbf24' }]}>{row.matchesTied ?? 0}</Text>
+                          <StatCell value={row.eventPts} onPress={() => setOpen({ row, focus: 'event' })} />
+                          <StatCell value={row.slamBonus} onPress={() => setOpen({ row, focus: 'slams' })} />
+                          <StatCell value={row.avgBonus} onPress={() => setOpen({ row, focus: 'avg' })} />
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  </ScrollView>
                 </View>
               ))}
             </>
@@ -729,7 +739,8 @@ const styles = StyleSheet.create({
   colNum: { width: 32, textAlign: 'right' },
   colWo: { width: 26, textAlign: 'right' },
   colAvg: { width: 44, textAlign: 'right' },
-  colStat: { width: 32, textAlign: 'center' },
+  colStat: { width: 28, textAlign: 'center' },
+  colMiniStat: { width: 22, textAlign: 'center' },
   td: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
   tdDim: { color: '#64748b', fontSize: 11, fontWeight: '600' },
   tdOn: { color: '#fbbf24', fontWeight: '900' },

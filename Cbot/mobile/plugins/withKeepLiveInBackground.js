@@ -37,6 +37,7 @@ function patchFile(file, search, replace) {
 }
 
 function patchLiveStreamLibrary(projectRoot) {
+  // 1. Android PublisherView.kt
   patchFile(
     path.join(
       projectRoot,
@@ -54,7 +55,22 @@ function patchLiveStreamLibrary(projectRoot) {
         camera.stopPreview()
         isCameraInitialized = false
       } catch (e: Exception) { Log.w(TAG, "Error on background", e) }`,
-    `  override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+    `  var zoomLevel: Float = 1.0f
+
+  fun applyZoom(level: Float) {
+    zoomLevel = level
+    post {
+      val camera = rtmpCamera ?: return@post
+      try {
+        camera.setZoom(level)
+        Log.d(TAG, "applyZoom: level=$level")
+      } catch (e: Exception) {
+        Log.w(TAG, "applyZoom failed for level=$level", e)
+      }
+    }
+  }
+
+  override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
     super.onWindowFocusChanged(hasWindowFocus)
     // ${KEEP_MARKER}
     if (!hasWindowFocus) {
@@ -69,7 +85,100 @@ function patchLiveStreamLibrary(projectRoot) {
       } catch (e: Exception) { Log.w(TAG, "Error on background", e) }`,
   );
 
+  // 2. Android ExpoLiveStreamModule.kt
+  patchFile(
+    path.join(
+      projectRoot,
+      'node_modules/expo-live-stream/android/src/main/java/expo/modules/livestream/ExpoLiveStreamModule.kt',
+    ),
+    `    AsyncFunction("toggleMute") {
+      PublisherView.activeInstance?.let { view -> view.post { view.toggleMute() } }
+    }
+
+    // ======== Publisher View ========
+    View(PublisherView::class) {
+      Events(
+        "onConnectionSuccess",
+        "onConnectionFailed",
+        "onDisconnect",
+        "onStreamStateChanged",
+        "onBitrateUpdate"
+      )
+
+      Prop("url") { view: PublisherView, url: String ->
+        view.url = url
+      }
+      Prop("streamKey") { view: PublisherView, key: String ->
+        view.streamKey = key
+      }`,
+    `    AsyncFunction("toggleMute") {
+      PublisherView.activeInstance?.let { view -> view.post { view.toggleMute() } }
+    }
+
+    AsyncFunction("setZoom") { zoom: Double ->
+      // ${KEEP_MARKER}
+      PublisherView.activeInstance?.let { view -> view.post { view.applyZoom(zoom.toFloat()) } }
+    }
+
+    // ======== Publisher View ========
+    View(PublisherView::class) {
+      Events(
+        "onConnectionSuccess",
+        "onConnectionFailed",
+        "onDisconnect",
+        "onStreamStateChanged",
+        "onBitrateUpdate"
+      )
+
+      Prop("url") { view: PublisherView, url: String ->
+        view.url = url
+      }
+      Prop("streamKey") { view: PublisherView, key: String ->
+        view.streamKey = key
+      }
+      Prop("zoom") { view: PublisherView, zoom: Double ->
+        view.applyZoom(zoom.toFloat())
+      }`,
+  );
+
+  // 3. iOS PublisherView.swift
   const iosFile = path.join(projectRoot, 'node_modules/expo-live-stream/ios/PublisherView.swift');
+  patchFile(
+    iosFile,
+    `          await mixer.setVideoOrientation(.portrait)
+          try await mixer.attachVideo(camera)`,
+    `          let orientation: AVCaptureVideoOrientation = (self.videoWidth >= self.videoHeight) ? .landscapeRight : .portrait
+          await mixer.setVideoOrientation(orientation)
+          try await mixer.attachVideo(camera)`,
+  );
+  patchFile(
+    iosFile,
+    `    Task {
+      do {
+        let videoSettings = VideoCodecSettings(
+          videoSize: CGSize(width: CGFloat(videoWidth), height: CGFloat(videoHeight)),
+          bitRate: videoBitrate,
+          maxKeyFrameIntervalDuration: 1,
+          allowFrameReordering: false
+        )`,
+    `    Task {
+      do {
+        if let mixer = self.mixer {
+          let orientation: AVCaptureVideoOrientation = (self.videoWidth >= self.videoHeight) ? .landscapeRight : .portrait
+          await mixer.setVideoOrientation(orientation)
+          if let stream = self.stream {
+            await mixer.addOutput(stream)
+          }
+        }
+
+        let videoSettings = VideoCodecSettings(
+          videoSize: CGSize(width: CGFloat(videoWidth), height: CGFloat(videoHeight)),
+          bitRate: videoBitrate,
+          maxKeyFrameIntervalDuration: 2.0,
+          scalingMode: .trim,
+          allowFrameReordering: false
+        )`,
+  );
   patchFile(
     iosFile,
     `  @objc private func appWillResignActive() {
@@ -90,10 +199,104 @@ function patchLiveStreamLibrary(projectRoot) {
       }
     }
   }`,
-    `  @objc private func appWillResignActive() {
+    `  var zoom: CGFloat = 1.0
+
+  func applyZoom(_ level: CGFloat) {
+    zoom = level
+    let position: AVCaptureDevice.Position = isFrontCamera ? .front : .back
+
+    if level < 1.0 {
+      if let ultraWide = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: position) {
+        if let mixer = mixer {
+          Task {
+            try? await mixer.attachVideo(ultraWide)
+          }
+        }
+        return
+      }
+    }
+
+    if let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
+      if let mixer = mixer {
+        Task {
+          try? await mixer.attachVideo(camera)
+          do {
+            try camera.lockForConfiguration()
+            let clamped = min(max(level, camera.minAvailableVideoZoomFactor), camera.maxAvailableVideoZoomFactor)
+            camera.videoZoomFactor = clamped
+            camera.unlockForConfiguration()
+          } catch {
+            print("[ExpoLiveStream] Zoom error: \\(error)")
+          }
+        }
+      }
+    }
+  }
+
+  @objc private func appWillResignActive() {
     // ${KEEP_MARKER}
     print("[ExpoLiveStream] App going to background — keeping live stream")
   }`,
+  );
+
+  // 4. iOS ExpoLiveStreamModule.swift
+  const iosModuleFile = path.join(projectRoot, 'node_modules/expo-live-stream/ios/ExpoLiveStreamModule.swift');
+  patchFile(
+    iosModuleFile,
+    `    AsyncFunction("toggleMute") {
+      await MainActor.run {
+        PublisherView.activeInstance?.toggleMute()
+      }
+    }
+
+    // ======== Publisher View ========
+    View(PublisherView.self) {
+      Events(
+        "onConnectionSuccess",
+        "onConnectionFailed",
+        "onDisconnect",
+        "onStreamStateChanged",
+        "onBitrateUpdate"
+      )
+
+      Prop("url") { (view: PublisherView, url: String) in
+        view.url = url
+      }
+      Prop("streamKey") { (view: PublisherView, key: String) in
+        view.streamKey = key
+      }`,
+    `    AsyncFunction("toggleMute") {
+      await MainActor.run {
+        PublisherView.activeInstance?.toggleMute()
+      }
+    }
+
+    AsyncFunction("setZoom") { (zoom: Double) in
+      // ${KEEP_MARKER}
+      await MainActor.run {
+        PublisherView.activeInstance?.applyZoom(CGFloat(zoom))
+      }
+    }
+
+    // ======== Publisher View ========
+    View(PublisherView.self) {
+      Events(
+        "onConnectionSuccess",
+        "onConnectionFailed",
+        "onDisconnect",
+        "onStreamStateChanged",
+        "onBitrateUpdate"
+      )
+
+      Prop("url") { (view: PublisherView, url: String) in
+        view.url = url
+      }
+      Prop("streamKey") { (view: PublisherView, key: String) in
+        view.streamKey = key
+      }
+      Prop("zoom") { (view: PublisherView, zoom: Double) in
+        view.applyZoom(CGFloat(zoom))
+      }`,
   );
 }
 
