@@ -523,10 +523,14 @@ export async function fetchPlayerSchedule(opts?: {
   if (opts?.teamId) params.set('teamId', opts.teamId);
   if (opts?.view) params.set('view', opts.view);
   if (opts?.editionSlot) params.set('editionSlot', opts.editionSlot);
-  if (opts?.editionId) params.set('editionId', opts.editionId);
+  params.set('t', String(Date.now()));
   const qs = params.toString();
-  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/schedule${qs ? `?${qs}` : ''}`, {
-    headers: { Authorization: `Bearer ${current.token}` },
+  const res = await fetch(`${config.websiteBaseUrl}/api/mobile/schedule?${qs}`, {
+    headers: {
+      Authorization: `Bearer ${current.token}`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+    },
   });
   const data = await readJson(res);
   if (!data.success) {
