@@ -108,8 +108,9 @@ export function monumentStatus(
 ): 'live' | 'completed' | 'upcoming' {
   const startMs = new Date(monument.startIso).getTime();
   const endMs = new Date(monument.endIso).getTime();
-  if (nowMs >= endMs) return 'completed';
-  if (nowMs >= startMs && nowMs < endMs) return 'live';
+  const scoreLockMs = endMs + 3600000;
+  if (nowMs >= scoreLockMs) return 'completed';
+  if (nowMs >= startMs && nowMs < scoreLockMs) return 'live';
   return 'upcoming';
 }
 
@@ -122,7 +123,8 @@ export function lastCompletedMonumentDay(now = new Date()): number {
   const nowMs = now.getTime();
   let last = 0;
   eventDayWindows().forEach((window) => {
-    if (nowMs >= new Date(window.endIso).getTime()) last = Math.max(last, window.dayNumber);
+    const endMs = new Date(window.endIso).getTime();
+    if (nowMs >= endMs + 3600000) last = Math.max(last, window.dayNumber);
   });
   return last;
 }
@@ -131,7 +133,8 @@ export function lastCompletedMonumentDay(now = new Date()): number {
 export function isMonumentDayCompleted(dayNumber: number, now = new Date()): boolean | null {
   const window = eventDayWindow(dayNumber);
   if (!window) return null;
-  return now.getTime() >= new Date(window.endIso).getTime();
+  const endMs = new Date(window.endIso).getTime();
+  return now.getTime() >= endMs + 3600000;
 }
 
 export function roundRobinMatchCount() {

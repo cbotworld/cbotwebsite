@@ -294,26 +294,22 @@ export async function getPlayerMatchSchedule(
             id: teamByName.get(oppNameRaw)?.id,
             teams,
           });
-      const status = scheduled
-        ? monumentStatus(scheduled, now)
-        : dayNumber < currentDay
-          ? 'completed'
-          : dayNumber === currentDay
-            ? 'live'
-            : 'upcoming';
-      const isLiveDay = status === 'live';
+      const startMs = startIso ? new Date(startIso).getTime() : 0;
+      const endMs = endIso ? new Date(endIso).getTime() : 0;
+      const scoreCutoffMs = endMs ? endMs + 3600000 : 0;
+      const nowMs = new Date(now).getTime();
+
+      const isPast = scheduled && scoreCutoffMs > 0
+        ? nowMs >= scoreCutoffMs
+        : dayNumber < currentDay;
+      const isReplayHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
+      const isLiveDay = scheduled && startMs > 0 && scoreCutoffMs > 0
+        ? (nowMs >= startMs && nowMs < scoreCutoffMs)
+        : dayNumber === currentDay;
       const isCurrent = isLiveDay || dayNumber === currentDayForView;
-      const isPast = !isCurrent && dayNumber < currentDayForView;
-      const isFuture = dayNumber > currentDayForView && !isLiveDay;
-      const istHour = parseInt(
-        new Intl.DateTimeFormat('en-GB', {
-          timeZone: 'Asia/Kolkata',
-          hour: '2-digit',
-          hour12: false,
-        }).format(new Date(now)),
-        10,
-      );
-      const isAfter8PmIst = istHour >= 20;
+      const isFuture = !isPast && !isLiveDay && dayNumber > currentDayForView;
+
+      const status = isPast ? 'completed' : isLiveDay ? 'live' : 'upcoming';
       const latest = streamSummary.latestByDay[dayNumber] || null;
       const hasYoutube = Boolean(latest);
 
@@ -328,16 +324,16 @@ export async function getPlayerMatchSchedule(
       if (isPast) {
         canGoLive = false;
         goLiveButtonText = 'COMPLETED';
-        lockedReason = 'Go Live is closed for this match day (closed at 8:00pm IST). Existing live sessions started before 8:00pm IST can continue recording.';
-      } else if (isCurrent) {
-        if (isAfter8PmIst) {
+        lockedReason = 'Go Live and score submissions are closed for this match day.';
+      } else if (isLiveDay || isCurrent) {
+        if (isReplayHour) {
           if (hasYoutube) {
             canGoLive = true;
             goLiveButtonText = 'REPLAY';
           } else {
             canGoLive = false;
             goLiveButtonText = 'LOCKED';
-            lockedReason = 'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM.';
+            lockedReason = 'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.';
           }
         } else {
           canGoLive = true;

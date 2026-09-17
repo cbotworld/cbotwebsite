@@ -180,18 +180,18 @@ export function DashboardScreen({ navigation }: Props) {
 
   const onGoLive = (match: MatchDetails, mode: 'match' | 'practice' | 'tiebreak' = 'match') => {
     if (mode === 'match') {
-      const isLive = match.status === 'LIVE';
-      const isCurrent = isLive || match.dayNumber === currentDay;
-      const isPast = !isCurrent && match.dayNumber < currentDay;
-      const istHour = getIstHour();
-      const isAfter8PmIst = istHour >= 20;
+      const nowMs = Date.now();
+      const endMs = match.endIso ? new Date(match.endIso).getTime() : 0;
+      const scoreCutoffMs = endMs ? endMs + 3600000 : 0;
+      const isMatchGraceHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
+      const isMatchCompleted = (scoreCutoffMs > 0 && nowMs >= scoreCutoffMs) || match.status === 'COMPLETED';
 
-      if (isPast) {
-        showWarn(`${match.label} Closed`, 'Go Live is closed for this match day (closed at 8:00pm IST).');
+      if (isMatchCompleted) {
+        showWarn(`${match.label} Closed`, 'Go Live and score submissions are closed for this match day.');
         return;
       }
 
-      if (isCurrent && isAfter8PmIst && !match.hasYoutube) {
+      if (isMatchGraceHour && !match.hasYoutube) {
         showWarn(
           `${match.label} Closed`,
           'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.',
@@ -199,8 +199,7 @@ export function DashboardScreen({ navigation }: Props) {
         return;
       }
 
-      const liveNow = isCurrent && (!isAfter8PmIst || Boolean(match.hasYoutube));
-      if (!liveNow && !match.canGoLive) {
+      if (!match.canGoLive) {
         showWarn(
           `${match.label} Locked`,
           match.lockedReason ||
@@ -343,11 +342,15 @@ export function DashboardScreen({ navigation }: Props) {
           ) : null}
           {warning ? <Text style={styles.warning}>{warning}</Text> : null}
           {matches.map((match) => {
-            const isLive = match.status === 'LIVE';
+            const nowMs = Date.now();
+            const endMs = match.endIso ? new Date(match.endIso).getTime() : 0;
+            const scoreCutoffMs = endMs ? endMs + 3600000 : 0;
+            const isMatchGraceHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
+            const isMatchCompleted = (scoreCutoffMs > 0 && nowMs >= scoreCutoffMs) || match.status === 'COMPLETED';
+
+            const isLive = match.status === 'LIVE' || isMatchGraceHour;
+            const isPast = isMatchCompleted;
             const isCurrent = isLive || match.dayNumber === currentDay;
-            const isPast = !isCurrent && match.dayNumber < currentDay;
-            const istHour = getIstHour();
-            const isAfter8PmIst = istHour >= 20;
 
             let canPlay = false;
             let goLiveBtnText = 'GO LIVE';
@@ -355,23 +358,24 @@ export function DashboardScreen({ navigation }: Props) {
             if (isPast) {
               canPlay = false;
               goLiveBtnText = 'COMPLETED';
-            } else if (isCurrent) {
-              if (isAfter8PmIst) {
-                if (match.hasYoutube) {
-                  canPlay = true;
-                  goLiveBtnText = match.goLiveButtonText || 'REPLAY';
-                } else {
-                  canPlay = false;
-                  goLiveBtnText = match.goLiveButtonText || 'LOCKED';
-                }
-              } else {
+            } else if (match.goLiveButtonText) {
+              canPlay = Boolean(match.canGoLive);
+              goLiveBtnText = match.goLiveButtonText;
+            } else if (isMatchGraceHour) {
+              if (match.hasYoutube) {
                 canPlay = true;
-                goLiveBtnText = match.goLiveButtonText || (match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE');
+                goLiveBtnText = 'REPLAY';
+              } else {
+                canPlay = false;
+                goLiveBtnText = 'LOCKED';
               }
+            } else if (isCurrent) {
+              canPlay = true;
+              goLiveBtnText = match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
             } else {
               canPlay = Boolean(match.canGoLive);
               if (canPlay) {
-                goLiveBtnText = match.goLiveButtonText || (match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE');
+                goLiveBtnText = match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
               } else {
                 goLiveBtnText =
                   match.goLiveButtonText ||
@@ -381,14 +385,14 @@ export function DashboardScreen({ navigation }: Props) {
 
             const oppIsTbd = !match.opponentName || /^tbd$/i.test(match.opponentName);
             const pill = isLive
-              ? 'LIVE'
+              ? isMatchGraceHour && match.hasYoutube
+                ? 'REPLAY'
+                : 'LIVE'
               : isPast
                 ? 'COMPLETED'
                 : canPlay
                   ? isCurrent
-                    ? isAfter8PmIst && match.hasYoutube
-                      ? 'REPLAY'
-                      : 'TODAY'
+                    ? 'TODAY'
                     : 'OPEN'
                   : 'LOCKED';
             return (
