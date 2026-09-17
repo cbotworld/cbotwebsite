@@ -1,6 +1,6 @@
 {
   "name": "cbot-mobile",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
