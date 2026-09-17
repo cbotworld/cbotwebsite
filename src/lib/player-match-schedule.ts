@@ -329,7 +329,7 @@ export async function getPlayerMatchSchedule(
 
       const status = isPast ? 'completed' : isPrimaryLive ? 'live' : 'upcoming';
       const latest = streamSummary.latestByDay[dayNumber] || null;
-      const hasYoutube = Boolean(latest);
+      const actualHasYoutube = Boolean(latest);
 
       const prerequisiteDay = isFuture
         ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
@@ -344,7 +344,7 @@ export async function getPlayerMatchSchedule(
         goLiveButtonText = 'COMPLETED';
         lockedReason = 'Go Live and score submissions are closed for this match day.';
       } else if (isDayInGraceHour) {
-        if (hasYoutube) {
+        if (actualHasYoutube) {
           canGoLive = true;
           goLiveButtonText = 'REPLAY';
         } else {
@@ -354,11 +354,11 @@ export async function getPlayerMatchSchedule(
         }
       } else if (startMs > 0 && endMs > 0 && nowMs >= startMs && nowMs < endMs) {
         canGoLive = true;
-        goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
+        goLiveButtonText = actualHasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
       } else {
         canGoLive = isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysPlayed, currentDayForView);
         if (canGoLive) {
-          goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
+          goLiveButtonText = actualHasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
         } else {
           goLiveButtonText = prerequisiteDay ? `NEED DAY ${prerequisiteDay} PLAY` : 'LOCKED';
           lockedReason = prerequisiteDay
@@ -366,6 +366,9 @@ export async function getPlayerMatchSchedule(
             : 'This day is not unlocked yet.';
         }
       }
+
+      // If canGoLive is true, set hasYoutube = true so older installed mobile app builds (v1.4.5) enable the GO LIVE button between 8 PM and midnight IST on API-only deployments
+      const hasYoutube = actualHasYoutube || canGoLive;
       const revealed = isCombiSubmissionLocked(dayNumber, dayDates, new Date(now));
       const scoresReady = isDayScorePublished(dayNumber, dayDates, new Date(now));
       const scoreMap: Record<string, { score: number; slams: number }> = {};

@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { userFromBearer } from '@/lib/mobile-session';
 import { getPlayerMatchSchedule } from '@/lib/player-match-schedule';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
 };
 
 export async function OPTIONS() {
