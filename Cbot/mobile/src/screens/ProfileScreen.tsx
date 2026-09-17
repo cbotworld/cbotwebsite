@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
 import { PoweredByFooter } from '../components/PoweredByFooter';
@@ -40,6 +41,14 @@ type Props = {
 };
 
 const GENDERS = ['Male', 'Female', 'Other'];
+
+const appVersion = Constants.expoConfig?.version || Constants.nativeAppVersion || '1.4.6';
+const buildNumber = Platform.select({
+  ios: Constants.expoConfig?.ios?.buildNumber || Constants.nativeBuildVersion,
+  android: Constants.expoConfig?.android?.versionCode ? String(Constants.expoConfig.android.versionCode) : Constants.nativeBuildVersion,
+  default: undefined,
+});
+const versionDisplay = buildNumber ? `v${appVersion} (${buildNumber})` : `v${appVersion}`;
 
 export function ProfileScreen({ navigation }: Props) {
   const session = getSession();
@@ -303,11 +312,19 @@ export function ProfileScreen({ navigation }: Props) {
             <ActivityIndicator color="#f59e0b" />
           </View>
         ) : !getSession()?.token ? (
-          <LoginBanner
-            title="Your player profile"
-            message="Log in with your CBOT username and PIN to view stats, team, and update your details."
-            onLogin={() => navigation.getParent()?.navigate('Login')}
-          />
+          <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', padding: 16, paddingBottom: 40 }}>
+            <LoginBanner
+              title="Your player profile"
+              message="Log in with your CBOT username and PIN to view stats, team, and update your details."
+              onLogin={() => navigation.getParent()?.navigate('Login')}
+            />
+            <View>
+              <View style={styles.versionWrap}>
+                <Text style={styles.versionText}>CBOT App {versionDisplay}</Text>
+              </View>
+              <PoweredByFooter bottomPadding={16} />
+            </View>
+          </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={styles.scroll}>
             <View style={styles.identity}>
@@ -458,6 +475,9 @@ export function ProfileScreen({ navigation }: Props) {
               <Text style={styles.deleteBtnText}>DELETE ACCOUNT</Text>
             </Pressable>
             <Text style={styles.deleteHint}>Permanently removes your account, scores, and all data. This cannot be undone.</Text>
+            <View style={styles.versionWrap}>
+              <Text style={styles.versionText}>CBOT App {versionDisplay}</Text>
+            </View>
             <PoweredByFooter />
           </ScrollView>
         )}
@@ -828,6 +848,18 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: { color: '#ef4444', fontWeight: '900', letterSpacing: 1.5, fontSize: 13 },
   deleteHint: { color: '#64748b', fontSize: 11, textAlign: 'center', marginTop: 8, marginBottom: 12 },
+  versionWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  versionText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
   deleteConfirmBtn: {
     backgroundColor: '#ef4444',
     borderRadius: 14,

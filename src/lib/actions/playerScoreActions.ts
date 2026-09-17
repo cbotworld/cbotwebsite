@@ -227,13 +227,7 @@ async function playerHasGoneLive(userId: string, editionId?: string, dayNumber?:
   return count > 0;
 }
 
-function describeScoreWindow(day: number, dayDates: any, hasGoneLive = true) {
-  if (day > 1 && !hasGoneLive) {
-    return {
-      windowOpen: false,
-      windowReason: `Go live at least once to submit scores for Day ${day}.`,
-    };
-  }
+function describeScoreWindow(day: number, dayDates: any, _hasGoneLive = true) {
   if (isScoreSubmitOpen(day, dayDates)) {
     return { windowOpen: true, windowReason: null as string | null };
   }
@@ -308,16 +302,6 @@ export async function submitPlayerDayScoreForUser(
       }
     }
   } else {
-    if (day > 1) {
-      const hasLive = await playerHasGoneLive(userId, edition.id);
-      if (!hasLive) {
-        return {
-          success: false as const,
-          error: `Please go live at least once before submitting scores for Day ${day}.`,
-        };
-      }
-    }
-
     if (!isScoreSubmitOpen(day, edition.dayDates)) {
       return {
         success: false as const,

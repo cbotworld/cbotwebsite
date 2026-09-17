@@ -305,15 +305,55 @@ export async function getPlayerMatchSchedule(
       const isCurrent = isLiveDay || dayNumber === currentDayForView;
       const isPast = !isCurrent && dayNumber < currentDayForView;
       const isFuture = dayNumber > currentDayForView && !isLiveDay;
-      const canGoLive = isPast
-        ? false
-        : isCurrent
-          ? true
-          : isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysPlayed, currentDayForView);
+      const istHour = parseInt(
+        new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          hour12: false,
+        }).format(new Date(now)),
+        10,
+      );
+      const isAfter8PmIst = istHour >= 20;
       const latest = streamSummary.latestByDay[dayNumber] || null;
+      const hasYoutube = Boolean(latest);
+
       const prerequisiteDay = isFuture
         ? unlockPrerequisiteDay(dayNumber, fixtureDays, currentDayForView)
         : null;
+
+      let canGoLive = false;
+      let goLiveButtonText = 'GO LIVE';
+      let lockedReason: string | null = null;
+
+      if (isPast) {
+        canGoLive = false;
+        goLiveButtonText = 'COMPLETED';
+        lockedReason = 'Go Live is closed for this match day (closed at 8:00pm IST). Existing live sessions started before 8:00pm IST can continue recording.';
+      } else if (isCurrent) {
+        if (isAfter8PmIst) {
+          if (hasYoutube) {
+            canGoLive = true;
+            goLiveButtonText = 'REPLAY';
+          } else {
+            canGoLive = false;
+            goLiveButtonText = 'LOCKED';
+            lockedReason = 'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM.';
+          }
+        } else {
+          canGoLive = true;
+          goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
+        }
+      } else {
+        canGoLive = isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysPlayed, currentDayForView);
+        if (canGoLive) {
+          goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
+        } else {
+          goLiveButtonText = prerequisiteDay ? `NEED DAY ${prerequisiteDay} PLAY` : 'LOCKED';
+          lockedReason = prerequisiteDay
+            ? `Play Day ${prerequisiteDay} (go live or save a score) before Day ${dayNumber} unlocks.`
+            : 'This day is not unlocked yet.';
+        }
+      }
       const revealed = isCombiSubmissionLocked(dayNumber, dayDates, new Date(now));
       const scoresReady = isDayScorePublished(dayNumber, dayDates, new Date(now));
       const scoreMap: Record<string, { score: number; slams: number }> = {};
@@ -358,15 +398,10 @@ export async function getPlayerMatchSchedule(
         canGoLive,
         canPracticeGoLive: true,
         canTieBreakGoLive: true,
-        lockedReason: canGoLive
-          ? null
-          : isPast
-            ? 'Go Live is closed for this match day (closed at 8:00pm IST). Existing live sessions started before 8:00pm IST can continue recording.'
-            : prerequisiteDay
-              ? `Play Day ${prerequisiteDay} (go live or save a score) before Day ${dayNumber} unlocks.`
-              : 'This day is not unlocked yet.',
+        lockedReason,
+        goLiveButtonText,
         prerequisiteDay,
-        hasYoutube: Boolean(latest),
+        hasYoutube,
         latestYoutubeUrl: latest?.youtubeUrl || null,
         latestYoutubeVideoId: latest?.youtubeVideoId || null,
         streamCount: streamSummary.streamCountByDay[dayNumber] || 0,

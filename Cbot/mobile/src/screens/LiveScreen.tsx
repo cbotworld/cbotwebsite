@@ -852,17 +852,6 @@ export function LiveScreen({ route, navigation }: Props) {
         {statusText ? (
           <View style={[styles.statusPillWrap, { top: stream.isStreaming ? topInset + 90 : topInset + 44 }]}>
             <StatusPill text={statusText} type={statusType} />
-            {statusType === "error" && !stream.isStreaming ? (
-              <Pressable
-                style={styles.errorScoreBanner}
-                onPress={handleOpenScores}
-              >
-                <Ionicons name="create-outline" size={15} color="#5eead4" />
-                <Text style={styles.errorScoreBannerText}>
-                  Stream blocked? Tap to enter Day {numericDay} scores directly
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
         ) : null}
 
@@ -907,11 +896,11 @@ export function LiveScreen({ route, navigation }: Props) {
           ) : null}
         </View>
 
-        {/* Zoom Controls Overlay (0.6x, 1.0x, 2.0x) */}
+        {/* Zoom Controls Overlay (1.0x, 2.0x on Android; 0.6x, 1.0x, 2.0x on iOS) */}
         {session ? (
           <View style={[styles.zoomContainer, { bottom: bottomInset + 80 }]}>
             <View style={styles.zoomPillGroup}>
-              {([0.6, 1.0, 2.0] as const).map((z) => {
+              {(Platform.OS === 'ios' ? ([0.6, 1.0, 2.0] as const) : ([1.0, 2.0] as const)).map((z) => {
                 const isSelected = zoomLevel === z;
                 const label = z === 0.6 ? "0.6x" : z === 1.0 ? "1.0x" : "2.0x";
                 return (
@@ -935,27 +924,18 @@ export function LiveScreen({ route, navigation }: Props) {
         {/* Bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: bottomInset, paddingLeft: leftInset, paddingRight: rightInset }]}>
           {!showStop ? (
-            <View style={styles.idleActionCol}>
-              <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
-                {busy ? (
-                  <View style={styles.busyRow}>
-                    <ActivityIndicator color="#fff" />
-                    <Text style={styles.recordButtonText}>
-                      {countdown !== null ? `  Going Live (${countdown}s)…` : "  Setting up…"}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={styles.directScoreButton}
-                onPress={handleOpenScores}
-              >
-                <Ionicons name="create-outline" size={14} color="#5eead4" />
-                <Text style={styles.directScoreButtonText}>ENTER SCORES (NO STREAM)</Text>
-              </Pressable>
-            </View>
+            <Pressable style={[styles.recordButton, styles.goLiveButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleGoLive()}>
+              {busy ? (
+                <View style={styles.busyRow}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.recordButtonText}>
+                    {countdown !== null ? `  Going Live (${countdown}s)…` : "  Setting up…"}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.recordButtonText}>🔴  GO LIVE</Text>
+              )}
+            </Pressable>
           ) : (
             <Pressable style={[styles.recordButton, styles.stopButton, busy && styles.disabledButton]} disabled={busy} onPress={() => void handleStop()}>
               {busy ? (

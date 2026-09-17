@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cbot",
     "slug": "cbot",
-    "version": "1.4.0",
+    "version": "1.4.6",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cbotworld",
-      "buildNumber": "42",
+      "buildNumber": "48",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Cbot needs camera access to live stream to YouTube.",
@@ -42,7 +42,7 @@
     },
     "android": {
       "package": "com.cbotworld",
-      "versionCode": 41,
+      "versionCode": 48,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {

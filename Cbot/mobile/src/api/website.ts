@@ -53,6 +53,7 @@ export type MatchDetails = {
   canPracticeGoLive?: boolean;
   canTieBreakGoLive?: boolean;
   lockedReason?: string | null;
+  goLiveButtonText?: string | null;
   prerequisiteDay?: number | null;
   hasYoutube?: boolean;
   latestYoutubeUrl?: string | null;
@@ -558,6 +559,7 @@ export async function fetchPlayerSchedule(opts?: {
     canPracticeGoLive: day.canPracticeGoLive !== false,
     canTieBreakGoLive: day.canTieBreakGoLive !== false,
     lockedReason: day.lockedReason || null,
+    goLiveButtonText: day.goLiveButtonText || null,
     prerequisiteDay: typeof day.prerequisiteDay === 'number' ? day.prerequisiteDay : null,
     hasYoutube: Boolean(day.hasYoutube),
     latestYoutubeUrl: day.latestYoutubeUrl || null,

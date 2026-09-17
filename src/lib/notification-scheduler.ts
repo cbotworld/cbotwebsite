@@ -466,12 +466,12 @@ export async function dispatchNotifications(
       const processTeamGoLive = (team: typeof team1, myName: string, oppName: string) => {
         for (const m of team.members) {
           const hasScore = scoreMap.has(m.userId);
-          const scoreVal = scoreMap.get(m.userId);
+          // If score is already updated, do NOT send any notification
+          if (hasScore) continue;
+
           const name = m.user.name || m.user.username || 'Player';
-          const title = hasScore ? '📹 CBOT Live — Improve Score' : '⚠️ Go Live Required — CBOT';
-          const body = hasScore
-            ? `Hi ${name}! Day ${dayNumber} score recorded (${scoreVal} pts). You can optionally go live again before 8:00 PM to improve your score!`
-            : `Hi ${name}! Your Day ${dayNumber} match (${myName} vs ${oppName}) is active. Broadcast your match live or submit score before 8:00 PM to avoid Walkover!`;
+          const title = '⚠️ Go Live Required — CBOT';
+          const body = `Hi ${name}! Your Day ${dayNumber} match (${myName} vs ${oppName}) is active. Broadcast your match live or submit score before 8:00 PM to avoid Walkover!`;
 
           pushToUser(m.userId, name, myName, title, body, {
             type: 'golive',

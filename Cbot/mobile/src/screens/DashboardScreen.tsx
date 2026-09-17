@@ -1,7 +1,7 @@
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -16,24 +16,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EliteSponsorsStrip } from '../components/EliteSponsorsStrip';
 import { HeaderActionButton } from '../components/HeaderActionButton';
 import { LoginBanner } from '../components/LoginBanner';
-import {
-  BoardScoreModal,
-  boardsFromSaved,
-  parseBoardDrafts,
-} from '../components/BoardScoreModal';
 import { GoLivePromptModal } from '../components/GoLivePromptModal';
+import { BoardScoreModal, boardsFromSaved } from '../components/BoardScoreModal';
 import { PoweredByFooter } from '../components/PoweredByFooter';
-import { playerScoreUntilNote, SCORE_EDIT_PLAYER_CLOSED } from '../score-edit-policy';
 import {
   fetchPlayerSchedule,
   fetchPlayerScores,
-  getSession,
   submitPlayerDayScore,
+  getSession,
   type DayScoreInfo,
   type MatchDetails,
   type MobileTeam,
   type TournamentOptions,
 } from '../api/website';
+import { playerScoreUntilNote } from '../score-edit-policy';
 import { MainTabParamList, RootStackParamList } from '../navigation/types';
 import { useAppDialog } from '../components/AppDialog';
 
@@ -44,6 +40,24 @@ type Props = {
   >;
 };
 
+function getIstHour(): number {
+  try {
+    return parseInt(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+      10,
+    );
+  } catch {
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const ist = new Date(utc + 3600000 * 5.5);
+    return ist.getHours();
+  }
+}
+
 function currentMatchDay(matches: MatchDetails[], apiCurrent?: number) {
   const live = matches.filter((m) => m.status === 'LIVE').map((m) => m.dayNumber);
   if (live.length) return Math.max(...live);
@@ -52,72 +66,6 @@ function currentMatchDay(matches: MatchDetails[], apiCurrent?: number) {
   if (completed.length) return Math.max(...completed) + 1;
   const upcoming = matches.map((m) => m.dayNumber).filter((n) => n > 0);
   return upcoming.length ? Math.min(...upcoming) : 1;
-}
-
-function MatchDayScoreBox({
-  dayNumber,
-  scoreInfo,
-  saving,
-  onOpenBoards,
-}: {
-  dayNumber: number;
-  scoreInfo: DayScoreInfo | null;
-  saving: boolean;
-  onOpenBoards: () => void;
-}) {
-  const submitted = (scoreInfo?.scores || []).find((s) => s.dayNumber === dayNumber);
-  const published = (scoreInfo?.publishedDays || []).some((d) => d.dayNumber === dayNumber && d.published);
-  const dayWindow = (scoreInfo?.days || []).find((d) => d.dayNumber === dayNumber);
-  // Use per-day window if available, otherwise fall back to global windowOpen (only true for eligibleDay)
-  const canEdit = dayWindow != null
-    ? dayWindow.windowOpen
-    : (scoreInfo?.eligibleDay === dayNumber ? Boolean(scoreInfo?.windowOpen) : !published);
-  const stats = submitted ? parseBoardDrafts(boardsFromSaved(submitted)) : null;
-
-  let body: ReactNode;
-  if (published && !submitted) {
-    body = <Text style={styles.scoreLocked}>Empty — walkover if still blank at 9:00pm IST.</Text>;
-  } else if (canEdit) {
-    body = (
-      <>
-        {stats?.boardCount ? (
-          <Text style={styles.scoreLocked}>
-            {stats.total} pts · {stats.slams} slam{stats.slams === 1 ? '' : 's'} · {stats.boardCount} board
-            {stats.boardCount === 1 ? '' : 's'}
-          </Text>
-        ) : (
-          <Text style={styles.scoreHint}>No score yet. Enter board scores directly (no stream required).</Text>
-        )}
-        <Pressable style={[styles.scoreSave, saving && { opacity: 0.55 }]} onPress={onOpenBoards} disabled={saving}>
-          <Text style={styles.scoreSaveText}>
-            {saving ? 'SAVING…' : submitted ? 'UPDATE SCORES' : 'ENTER SCORES'}
-          </Text>
-        </Pressable>
-        <Text style={styles.scoreHint}>{playerScoreUntilNote(dayNumber)}</Text>
-      </>
-    );
-  } else if (submitted) {
-    body = (
-      <Text style={styles.scoreLocked}>
-        {submitted.score} pts · {submitted.slams ?? 0} slam{(submitted.slams ?? 0) === 1 ? '' : 's'}
-        {stats?.boardCount ? ` · ${stats.boardCount} board${stats.boardCount === 1 ? '' : 's'}` : ''}
-      </Text>
-    );
-  } else {
-    body = <Text style={styles.scoreHint}>{dayWindow?.windowReason || SCORE_EDIT_PLAYER_CLOSED}</Text>;
-  }
-
-  return (
-    <View style={styles.scoreBox}>
-      <View style={styles.scoreHeaderRow}>
-        <Text style={styles.scoreTitle}>DAY {dayNumber} SCORES</Text>
-        <View style={styles.scoreStreamBadge}>
-          <Text style={styles.scoreStreamBadgeText}>STREAM OPTIONAL</Text>
-        </View>
-      </View>
-      {body}
-    </View>
-  );
 }
 
 export function DashboardScreen({ navigation }: Props) {
@@ -165,7 +113,7 @@ export function DashboardScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [navigation, playerView, editionSlot]);
+  }, [playerView, editionSlot]);
 
   useFocusEffect(
     useCallback(() => {
@@ -232,7 +180,26 @@ export function DashboardScreen({ navigation }: Props) {
 
   const onGoLive = (match: MatchDetails, mode: 'match' | 'practice' | 'tiebreak' = 'match') => {
     if (mode === 'match') {
-      const liveNow = match.status === 'LIVE' || match.dayNumber === currentDay;
+      const isLive = match.status === 'LIVE';
+      const isCurrent = isLive || match.dayNumber === currentDay;
+      const isPast = !isCurrent && match.dayNumber < currentDay;
+      const istHour = getIstHour();
+      const isAfter8PmIst = istHour >= 20;
+
+      if (isPast) {
+        showWarn(`${match.label} Closed`, 'Go Live is closed for this match day (closed at 8:00pm IST).');
+        return;
+      }
+
+      if (isCurrent && isAfter8PmIst && !match.hasYoutube) {
+        showWarn(
+          `${match.label} Closed`,
+          'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.',
+        );
+        return;
+      }
+
+      const liveNow = isCurrent && (!isAfter8PmIst || Boolean(match.hasYoutube));
       if (!liveNow && !match.canGoLive) {
         showWarn(
           `${match.label} Locked`,
@@ -379,7 +346,39 @@ export function DashboardScreen({ navigation }: Props) {
             const isLive = match.status === 'LIVE';
             const isCurrent = isLive || match.dayNumber === currentDay;
             const isPast = !isCurrent && match.dayNumber < currentDay;
-            const canPlay = isCurrent || (!isPast && Boolean(match.canGoLive));
+            const istHour = getIstHour();
+            const isAfter8PmIst = istHour >= 20;
+
+            let canPlay = false;
+            let goLiveBtnText = 'GO LIVE';
+
+            if (isPast) {
+              canPlay = false;
+              goLiveBtnText = 'COMPLETED';
+            } else if (isCurrent) {
+              if (isAfter8PmIst) {
+                if (match.hasYoutube) {
+                  canPlay = true;
+                  goLiveBtnText = match.goLiveButtonText || 'REPLAY';
+                } else {
+                  canPlay = false;
+                  goLiveBtnText = match.goLiveButtonText || 'LOCKED';
+                }
+              } else {
+                canPlay = true;
+                goLiveBtnText = match.goLiveButtonText || (match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE');
+              }
+            } else {
+              canPlay = Boolean(match.canGoLive);
+              if (canPlay) {
+                goLiveBtnText = match.goLiveButtonText || (match.hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE');
+              } else {
+                goLiveBtnText =
+                  match.goLiveButtonText ||
+                  (match.prerequisiteDay ? `NEED DAY ${match.prerequisiteDay} PLAY` : 'LOCKED');
+              }
+            }
+
             const oppIsTbd = !match.opponentName || /^tbd$/i.test(match.opponentName);
             const pill = isLive
               ? 'LIVE'
@@ -387,7 +386,9 @@ export function DashboardScreen({ navigation }: Props) {
                 ? 'COMPLETED'
                 : canPlay
                   ? isCurrent
-                    ? 'TODAY'
+                    ? isAfter8PmIst && match.hasYoutube
+                      ? 'REPLAY'
+                      : 'TODAY'
                     : 'OPEN'
                   : 'LOCKED';
             return (
@@ -540,23 +541,27 @@ export function DashboardScreen({ navigation }: Props) {
                       onPress={() => onGoLive(match, 'match')}
                     >
                       <Text style={[styles.goLiveText, !canPlay && { color: '#64748b' }]}>
-                        {canPlay
-                          ? match.hasYoutube
-                            ? 'GO LIVE AGAIN'
-                            : 'GO LIVE'
-                          : match.prerequisiteDay
-                            ? `NEED DAY ${match.prerequisiteDay} PLAY`
-                            : 'LOCKED'}
+                        {goLiveBtnText}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.submitScoreBtn,
+                        savingDay === match.dayNumber && { opacity: 0.6 },
+                      ]}
+                      onPress={() => setBoardDay(match.dayNumber)}
+                      disabled={savingDay === match.dayNumber}
+                    >
+                      <Text style={styles.submitScoreBtnText}>
+                        {savingDay === match.dayNumber
+                          ? 'SAVING SCORES…'
+                          : (scoreInfo?.scores || []).some((s) => s.dayNumber === match.dayNumber && s.score != null)
+                            ? `SUBMIT SCORES (${(scoreInfo?.scores || []).find((s) => s.dayNumber === match.dayNumber)?.score} PTS)`
+                            : 'SUBMIT SCORES'}
                       </Text>
                     </Pressable>
                   </>
                 )}
-                <MatchDayScoreBox
-                  dayNumber={match.dayNumber}
-                  scoreInfo={scoreInfo}
-                  saving={savingDay === match.dayNumber}
-                  onOpenBoards={() => setBoardDay(match.dayNumber)}
-                />
               </View>
             );
           })}
@@ -585,13 +590,6 @@ export function DashboardScreen({ navigation }: Props) {
             const m = promptMatch;
             setPromptMatch(null);
             startStreamingMatch(m, 'match');
-          }
-        }}
-        onEnterScoresWithoutStreaming={() => {
-          if (promptMatch) {
-            const day = promptMatch.dayNumber;
-            setPromptMatch(null);
-            setBoardDay(day);
           }
         }}
       />
@@ -779,55 +777,14 @@ const styles = StyleSheet.create({
     borderColor: '#f59e0b',
   },
   watchBtnText: { color: '#f59e0b', fontWeight: '900', letterSpacing: 1 },
-  scoreBox: {
-    marginTop: 10,
-    backgroundColor: '#1c0205',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  scoreHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  scoreStreamBadge: {
-    backgroundColor: 'rgba(20, 184, 166, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(20, 184, 166, 0.3)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  scoreStreamBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#2dd4bf',
-    letterSpacing: 0.5,
-  },
-  scoreTitle: { fontSize: 10, fontWeight: '900', color: '#f59e0b', letterSpacing: 1.2 },
-  scoreInputs: { flexDirection: 'row', gap: 8 },
-  scoreLabel: { fontSize: 9, fontWeight: '800', color: '#64748b', letterSpacing: 0.8, marginBottom: 4 },
-  scoreInput: {
+  submitScoreBtn: {
+    marginTop: 8,
     backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  scoreSave: {
-    backgroundColor: '#f59e0b',
-    borderRadius: 10,
-    paddingVertical: 11,
+    borderRadius: 12,
     alignItems: 'center',
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
   },
-  scoreSaveText: { color: '#0f172a', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
-  scoreHint: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
-  scoreLocked: { fontSize: 14, color: '#f8fafc', fontWeight: '800' },
+  submitScoreBtnText: { color: '#f59e0b', fontWeight: '900', fontSize: 12, letterSpacing: 0.8 },
 });

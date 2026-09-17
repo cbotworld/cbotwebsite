@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!targetVersion) targetVersion = isIos ? '1.4.0' : '1.4.0';
-    if (!targetBuild) targetBuild = isIos ? '42' : '41';
+    if (!targetVersion) targetVersion = isIos ? '1.4.6' : '1.4.6';
+    if (!targetBuild) targetBuild = isIos ? '48' : '48';
 
     const numericTargetBuild = parseInt(targetBuild, 10);
     const numericCurrentBuild = parseInt(currentBuild, 10);

@@ -16,7 +16,6 @@ type Props = {
   match: MatchDetails | null;
   onClose: () => void;
   onConfirmGoLive: () => void;
-  onEnterScoresWithoutStreaming?: () => void;
 };
 
 export function GoLivePromptModal({
@@ -24,7 +23,6 @@ export function GoLivePromptModal({
   match,
   onClose,
   onConfirmGoLive,
-  onEnterScoresWithoutStreaming,
 }: Props) {
   if (!match) return null;
 
@@ -97,21 +95,6 @@ export function GoLivePromptModal({
             >
               <Text style={styles.goLiveBtnText}>🔴  OK & GO LIVE NOW</Text>
             </Pressable>
-
-            {onEnterScoresWithoutStreaming ? (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.scoresOnlyBtn,
-                  pressed && { opacity: 0.85 },
-                ]}
-                onPress={() => {
-                  onClose();
-                  onEnterScoresWithoutStreaming();
-                }}
-              >
-                <Text style={styles.scoresOnlyBtnText}>📝  ENTER SCORES (NO STREAMING)</Text>
-              </Pressable>
-            ) : null}
 
             <Pressable
               style={({ pressed }) => [
@@ -255,21 +238,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 14,
     letterSpacing: 1.2,
-  },
-  scoresOnlyBtn: {
-    backgroundColor: '#0f766e',
-    borderWidth: 1,
-    borderColor: '#14b8a6',
-    borderRadius: 14,
-    paddingVertical: 13,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  scoresOnlyBtnText: {
-    color: '#5eead4',
-    fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: 1,
   },
   cancelBtn: {
     paddingVertical: 10,
