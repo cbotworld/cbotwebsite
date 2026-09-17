@@ -163,10 +163,12 @@ export async function getPlayerMatchSchedule(
   );
   const hasStages = (stageConfig?.stages || []).some((s: any) => s?.kind && s.kind !== 'SPOC_EXHIBITION');
   const scheduleMax = Math.max(1, ...scheduleDays.map((d) => d.dayNumber), scheduleDays.length);
-  const currentDay = Math.min(
-    liveScheduleDay || scheduleCurrentDay || (hasStages ? 0 : officialWindow.currentDay) || 1,
-    scheduleMax,
-  );
+  const currentDay = isAdvancePlay
+    ? 0
+    : Math.min(
+        liveScheduleDay || scheduleCurrentDay || (hasStages ? 0 : officialWindow.currentDay) || 1,
+        scheduleMax,
+      );
   const totalDays = hasStages
     ? scheduleMax
     : Math.max(officialWindow.totalDays, edition?.totalDays || 0, scheduleMax, currentDay, 1);
@@ -241,7 +243,9 @@ export async function getPlayerMatchSchedule(
       }) ||
       fixtureDays.find((d) => d >= currentDay) ||
       (fixtureDays.length ? fixtureDays[fixtureDays.length - 1] : currentDay)
-    : currentDay;
+    : isAdvancePlay
+      ? fixtureDays[0] || 1
+      : currentDay;
 
   const userGradeMap = new Map<string, string>();
   if (edition?.id) {
