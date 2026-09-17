@@ -146,7 +146,15 @@ export async function getPlayerMatchSchedule(
     now,
     Math.max(scheduleDays.length, ...scheduleDays.map((d) => d.dayNumber), 0),
   );
-  const liveScheduleDay = scheduleDays.find((d) => monumentStatus(d, now) === 'live')?.dayNumber;
+  const liveScheduleDay = scheduleDays.find((d) => {
+    const endMs = d.endIso ? new Date(d.endIso).getTime() : 0;
+    const scoreLockMs = endMs ? endMs + 3600000 : 0;
+    const nowMs = new Date(now).getTime();
+    if (endMs > 0 && scoreLockMs > 0 && nowMs >= endMs && nowMs < scoreLockMs) {
+      return true;
+    }
+    return monumentStatus(d, now) === 'live';
+  })?.dayNumber;
   const scheduleCurrentDay = currentPlayDayNumber(
     scheduleDays.map((d) => ({
       dayNumber: d.dayNumber,
@@ -299,17 +307,23 @@ export async function getPlayerMatchSchedule(
       const scoreCutoffMs = endMs ? endMs + 3600000 : 0;
       const nowMs = new Date(now).getTime();
 
+      const isDayInGraceHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
       const isPast = scheduled && scoreCutoffMs > 0
         ? nowMs >= scoreCutoffMs
         : dayNumber < currentDay;
-      const isReplayHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
-      const isLiveDay = scheduled && startMs > 0 && scoreCutoffMs > 0
-        ? (nowMs >= startMs && nowMs < scoreCutoffMs)
-        : dayNumber === currentDay;
-      const isCurrent = isLiveDay || dayNumber === currentDayForView;
-      const isFuture = !isPast && !isLiveDay && dayNumber > currentDayForView;
 
-      const status = isPast ? 'completed' : isLiveDay ? 'live' : 'upcoming';
+      const hasEarlierDayInGrace = scheduleDays.some((other) => {
+        const otherEndMs = other.endIso ? new Date(other.endIso).getTime() : 0;
+        const otherCutoffMs = otherEndMs ? otherEndMs + 3600000 : 0;
+        return other.dayNumber < dayNumber && otherEndMs > 0 && otherCutoffMs > 0 && nowMs >= otherEndMs && nowMs < otherCutoffMs;
+      });
+
+      const isPrimaryLive = isDayInGraceHour || (startMs > 0 && endMs > 0 && nowMs >= startMs && nowMs < endMs && !hasEarlierDayInGrace);
+      const isLiveDay = isPrimaryLive;
+      const isCurrent = isLiveDay || (dayNumber === currentDayForView && !hasEarlierDayInGrace);
+      const isFuture = !isPast && !isLiveDay;
+
+      const status = isPast ? 'completed' : isPrimaryLive ? 'live' : 'upcoming';
       const latest = streamSummary.latestByDay[dayNumber] || null;
       const hasYoutube = Boolean(latest);
 
@@ -325,20 +339,18 @@ export async function getPlayerMatchSchedule(
         canGoLive = false;
         goLiveButtonText = 'COMPLETED';
         lockedReason = 'Go Live and score submissions are closed for this match day.';
-      } else if (isLiveDay || isCurrent) {
-        if (isReplayHour) {
-          if (hasYoutube) {
-            canGoLive = true;
-            goLiveButtonText = 'REPLAY';
-          } else {
-            canGoLive = false;
-            goLiveButtonText = 'LOCKED';
-            lockedReason = 'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.';
-          }
-        } else {
+      } else if (isDayInGraceHour) {
+        if (hasYoutube) {
           canGoLive = true;
-          goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
+          goLiveButtonText = 'REPLAY';
+        } else {
+          canGoLive = false;
+          goLiveButtonText = 'LOCKED';
+          lockedReason = 'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.';
         }
+      } else if (startMs > 0 && endMs > 0 && nowMs >= startMs && nowMs < endMs) {
+        canGoLive = true;
+        goLiveButtonText = hasYoutube ? 'GO LIVE AGAIN' : 'GO LIVE';
       } else {
         canGoLive = isDayUnlockedByYoutubeSequence(dayNumber, fixtureDays, daysPlayed, currentDayForView);
         if (canGoLive) {
