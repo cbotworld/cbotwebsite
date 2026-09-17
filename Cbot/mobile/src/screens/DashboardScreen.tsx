@@ -58,10 +58,11 @@ function getIstHour(): number {
   }
 }
 
-function currentMatchDay(matches: MatchDetails[], apiCurrent?: number) {
+function currentMatchDay(matches: MatchDetails[], apiCurrent?: number, isAdvance?: boolean) {
+  if (isAdvance) return 0;
+  if (typeof apiCurrent === 'number') return apiCurrent;
   const live = matches.filter((m) => m.status === 'LIVE').map((m) => m.dayNumber);
   if (live.length) return Math.max(...live);
-  if (typeof apiCurrent === 'number' && apiCurrent > 0) return apiCurrent;
   const completed = matches.filter((m) => m.status === 'COMPLETED').map((m) => m.dayNumber);
   if (completed.length) return Math.max(...completed) + 1;
   const upcoming = matches.map((m) => m.dayNumber).filter((n) => n > 0);
@@ -93,17 +94,18 @@ export function DashboardScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      const res = await fetchPlayerSchedule({ view, editionSlot: slot });
+      const [res, scores] = await Promise.all([
+        fetchPlayerSchedule({ view, editionSlot: slot }),
+        fetchPlayerScores({ slot }).catch(() => null),
+      ]);
       setMatches(res.matches);
       setTeam(res.team);
       setPlayerTeams(res.playerTeams || []);
       setTournamentOptions(res.tournamentOptions || null);
-      setCurrentDay(currentMatchDay(res.matches, res.currentDay));
+      setCurrentDay(currentMatchDay(res.matches, res.currentDay, slot === 'B'));
       setWarning(res.warning || (res.matches.length === 0 ? 'No fixtures found for your team.' : null));
-      try {
-        const scores = await fetchPlayerScores({ slot });
+      if (scores) {
         setScoreInfo(scores);
-      } catch {
         // Schedule should still show if scores fail.
       }
     } catch (e) {
@@ -186,12 +188,12 @@ export function DashboardScreen({ navigation }: Props) {
       const isMatchGraceHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
       const isMatchCompleted = (scoreCutoffMs > 0 && nowMs >= scoreCutoffMs) || match.status === 'COMPLETED';
 
-      if (isMatchCompleted) {
+      if (isMatchCompleted && editionSlot !== 'B') {
         showWarn(`${match.label} Closed`, 'Go Live and score submissions are closed for this match day.');
         return;
       }
 
-      if (isMatchGraceHour && !match.hasYoutube) {
+      if (isMatchGraceHour && !match.hasYoutube && editionSlot !== 'B') {
         showWarn(
           `${match.label} Closed`,
           'Go Live closed at 8:00 PM IST. Replay is only available for players who went live before 8:00 PM. You can still submit your scores using the SUBMIT SCORES button.',
@@ -345,12 +347,12 @@ export function DashboardScreen({ navigation }: Props) {
             const nowMs = Date.now();
             const endMs = match.endIso ? new Date(match.endIso).getTime() : 0;
             const scoreCutoffMs = endMs ? endMs + 3600000 : 0;
-            const isMatchGraceHour = endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
-            const isMatchCompleted = (scoreCutoffMs > 0 && nowMs >= scoreCutoffMs) || match.status === 'COMPLETED';
+            const isMatchGraceHour = editionSlot !== 'B' && endMs > 0 && scoreCutoffMs > 0 && nowMs >= endMs && nowMs < scoreCutoffMs;
+            const isMatchCompleted = editionSlot !== 'B' && ((scoreCutoffMs > 0 && nowMs >= scoreCutoffMs) || match.status === 'COMPLETED');
 
             const isLive = match.status === 'LIVE' || isMatchGraceHour;
             const isPast = isMatchCompleted;
-            const isCurrent = isLive || match.dayNumber === currentDay;
+            const isCurrent = (isLive || match.dayNumber === currentDay) && editionSlot !== 'B';
 
             let canPlay = false;
             let goLiveBtnText = 'GO LIVE';
