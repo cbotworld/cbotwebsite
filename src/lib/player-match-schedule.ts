@@ -19,12 +19,77 @@ import { isSpocExhibitionTeam } from '@/lib/spoc-teams';
 import { resolveCurrentEditionRecord, resolvePlayerTournamentOptions, resolveEditionBySlotOrId } from '@/lib/current-edition';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
+import { memoryCache } from '@/lib/memory-cache';
 import {
   parseSavedLineups,
   playerMatchEvent,
   type LineupRound,
   type RosterPlayer,
 } from '@/lib/combi-results';
+async function loadSharedEditionSchedule(editionId: string, dayDatesRaw?: string | null, totalDays?: number | null) {
+  return await memoryCache.getOrSet(`edition_schedule_shared_${editionId}`, 60, async () => {
+    const [setting, teams, gradingSetting] = await Promise.all([
+      prisma.systemSetting.findUnique({ where: { key: stageConfigKey(editionId) } }),
+      prisma.team.findMany({
+        where: { editionId },
+        select: {
+          id: true,
+          name: true,
+          tag: true,
+          logo: true,
+          savedLineups: true,
+          teamType: true,
+          captain: { select: { id: true, name: true, username: true } },
+          members: { include: { user: { select: { id: true, name: true, username: true } } } },
+          spocMembers: { include: { user: { select: { id: true, name: true, username: true } } } },
+        },
+      }),
+      prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(editionId) } }),
+    ]);
+
+    let stageConfig: { stages?: any[] } | null = null;
+    if (setting?.value) {
+      try {
+        stageConfig = JSON.parse(setting.value);
+      } catch {}
+    }
+
+    let dayDates: Record<number, string> = {};
+    if (dayDatesRaw) {
+      try {
+        dayDates = JSON.parse(dayDatesRaw);
+      } catch {}
+    }
+
+    const pairings = resolveOrganizerPairings(stageConfig?.stages || [], teams);
+    const scheduleDays = buildOrganizerScheduleDays({
+      totalDays: totalDays || undefined,
+      dayDates,
+      pairings,
+      stages: stageConfig?.stages || [],
+      teams,
+    });
+
+    const userGradeList: Array<{ userId: string; grade: string }> = [];
+    if (gradingSetting?.value) {
+      try {
+        const grid = parseGradingGrid(gradingSetting.value);
+        const updates = computePlayerGradeUpdates(grid);
+        updates.forEach((u) => userGradeList.push({ userId: u.userId, grade: u.grade }));
+      } catch {}
+    }
+
+    return {
+      stageConfig,
+      teams,
+      dayDates,
+      pairings,
+      scheduleDays,
+      userGradeList,
+    };
+  });
+}
+
 export async function getPlayerMatchSchedule(
   userId: string,
   opts?: { teamId?: string; view?: 'MAIN' | 'SPOC'; editionSlot?: 'A' | 'B'; editionId?: string },
@@ -79,52 +144,20 @@ export async function getPlayerMatchSchedule(
       }
     : participation?.team || (isAdvancePlay ? { id: 'advance', name: user.name || user.username || 'Advance Play', tag: 'ADV', logo: null } : null);
 
-  let stageConfig: { stages?: any[] } | null = null;
-  if (edition?.id) {
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: stageConfigKey(edition.id) },
-    });
-    if (setting?.value) {
-      try {
-        stageConfig = JSON.parse(setting.value);
-      } catch {}
-    }
-  }
+  const shared = edition?.id
+    ? await loadSharedEditionSchedule(edition.id, edition.dayDates, edition.totalDays)
+    : {
+        stageConfig: null,
+        teams: [],
+        dayDates: {},
+        pairings: [],
+        scheduleDays: buildOrganizerScheduleDays(),
+        userGradeList: [] as Array<{ userId: string; grade: string }>,
+      };
 
-  const teams = edition?.id
-    ? await prisma.team.findMany({
-        where: { editionId: edition.id },
-        select: {
-          id: true,
-          name: true,
-          tag: true,
-          logo: true,
-          savedLineups: true,
-          teamType: true,
-          captain: { select: { id: true, name: true, username: true } },
-          members: { include: { user: { select: { id: true, name: true, username: true } } } },
-          spocMembers: { include: { user: { select: { id: true, name: true, username: true } } } },
-        },
-      })
-    : [];
+  const { stageConfig, teams, dayDates, pairings, scheduleDays, userGradeList } = shared;
   const teamByName = new Map(teams.map((t) => [t.name.toUpperCase().trim(), t]));
   const teamById = new Map(teams.map((t) => [t.id, t]));
-  const pairings = resolveOrganizerPairings(stageConfig?.stages || [], teams);
-
-  let dayDates: Record<number, string> = {};
-  if (edition?.dayDates) {
-    try {
-      dayDates = JSON.parse(edition.dayDates);
-    } catch {}
-  }
-
-  const scheduleDays = buildOrganizerScheduleDays({
-    totalDays: edition?.totalDays,
-    dayDates,
-    pairings,
-    stages: stageConfig?.stages || [],
-    teams,
-  });
 
   const now = Date.now();
   const isSpocView = requested?.kind === 'SPOC';
@@ -248,15 +281,8 @@ export async function getPlayerMatchSchedule(
       : currentDay;
 
   const userGradeMap = new Map<string, string>();
-  if (edition?.id) {
-    const gradingSetting = await prisma.systemSetting.findUnique({
-      where: { key: gradingSettingKey(edition.id) },
-    });
-    if (gradingSetting?.value) {
-      const grid = parseGradingGrid(gradingSetting.value);
-      const updates = computePlayerGradeUpdates(grid);
-      updates.forEach((u) => userGradeMap.set(u.userId, u.grade));
-    }
+  for (const ug of userGradeList) {
+    userGradeMap.set(ug.userId, ug.grade);
   }
 
   const roundFormats = (edition as any)?.patterns?.map((bp: any) => bp.matchFormat || 'SINGLES').filter(Boolean) || [

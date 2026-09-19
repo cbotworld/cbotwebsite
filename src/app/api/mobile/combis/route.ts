@@ -21,6 +21,7 @@ import { hasSubmittedPriorDays, previewAvgBonus, previewTargetBonus } from '@/li
 import { combiRoundLabel, slotsForCombiFormat } from '@/lib/combi-round-label';
 import { gradingSettingKey } from '@/lib/grading';
 import { extractGradeAndTargetMaps } from '@/lib/actions/playerScoreActions';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -481,6 +482,10 @@ export async function PUT(request: NextRequest) {
       where: { id: team.id },
       data: { savedLineups: JSON.stringify(lineupsObj) },
     });
+
+    memoryCache.invalidate('current_edition_combis');
+    memoryCache.invalidate('mobile_public_combis');
+    memoryCache.invalidate('edition_schedule_ctx_');
 
     return NextResponse.json({ success: true, submittedAt }, { headers: mobileCorsHeaders });
   } catch (error: any) {

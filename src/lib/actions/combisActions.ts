@@ -127,9 +127,9 @@ async function fetchCurrentEditionCombisData() {
 }
 
 export async function getCurrentEditionCombisData() {
-  return await memoryCache.getOrSet('current_edition_combis', 10, async () => {
+  return await memoryCache.getOrSet('current_edition_combis', 180, async () => {
     return unstable_cache(fetchCurrentEditionCombisData, ['edition-combis-data'], {
-      revalidate: 15,
+      revalidate: 60,
       tags: ['edition-combis-data', 'organizer-schedule'],
     })();
   });

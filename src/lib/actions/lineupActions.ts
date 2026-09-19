@@ -7,6 +7,7 @@ import { isCombiSubmissionLocked, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 import { currentServerIstTimestamp } from '@/lib/ist-time';
+import { memoryCache } from '@/lib/memory-cache';
 
 export async function submitMatchLineup(data: {
   matchId: string;
@@ -330,6 +331,10 @@ export async function saveTeamDailyLineup(
         savedLineups: JSON.stringify(lineupsObj)
       }
     });
+
+    memoryCache.invalidate('current_edition_combis');
+    memoryCache.invalidate('mobile_public_combis');
+    memoryCache.invalidate('edition_schedule_ctx_');
 
     revalidatePath('/dashboard/captain');
     revalidatePath('/combis');

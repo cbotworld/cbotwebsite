@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
+import { memoryCache } from '@/lib/memory-cache';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,12 +43,13 @@ export async function GET(request: NextRequest) {
     const requestedSlot = (request.nextUrl.searchParams.get('slot') || '').trim().toUpperCase();
     const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
 
-    let targetEdition: any = null;
-    if (requestedEditionId) {
-      targetEdition = await prisma.edition.findUnique({ where: { id: requestedEditionId } });
-    } else if (requestedSlot === 'B') {
-      targetEdition = await prisma.edition.findFirst({ where: { slot: 'B' } });
-    }
+    const payload = await memoryCache.getOrSet(`mobile_matches_${userId}_${requestedSlot}_${requestedEditionId || 'none'}`, 15, async () => {
+      let targetEdition: any = null;
+      if (requestedEditionId) {
+        targetEdition = await prisma.edition.findUnique({ where: { id: requestedEditionId } });
+      } else if (requestedSlot === 'B') {
+        targetEdition = await prisma.edition.findFirst({ where: { slot: 'B' } });
+      }
 
     if (requestedSlot === 'B' || (targetEdition && targetEdition.slot === 'B')) {
       const edition = targetEdition || await prisma.edition.findFirst({ where: { slot: 'B' } });
@@ -64,13 +66,13 @@ export async function GET(request: NextRequest) {
         }
 
         if (!hasStages) {
-          return NextResponse.json({
+          return {
             success: true,
             matches: [],
             isAdvancePlay: true,
             editionTitle: edition.title,
             message: 'No tournament stages scheduled yet.',
-          }, { headers: corsHeaders });
+          };
         }
         const participant = await prisma.editionParticipant.findFirst({
           where: { editionId: edition.id, userId },
@@ -86,14 +88,14 @@ export async function GET(request: NextRequest) {
         );
 
         if (!isEnrolled) {
-          return NextResponse.json({
+          return {
             success: true,
             matches: [],
             isAdvancePlay: true,
             isEnrolled: false,
             editionTitle: edition.title,
             message: 'You are not enrolled in this edition yet.',
-          }, { headers: corsHeaders });
+          };
         }
 
         const playerScores = await prisma.playerDayScore.findMany({
@@ -135,12 +137,12 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        return NextResponse.json({
+        return {
           success: true,
           matches: advanceMatches,
           isAdvancePlay: true,
           editionTitle: edition.title,
-        }, { headers: corsHeaders });
+        };
       }
     }
 
@@ -247,7 +249,10 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ success: true, matches: formattedMatches }, { headers: corsHeaders });
+    return { success: true, matches: formattedMatches };
+    });
+
+    return NextResponse.json(payload, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Mobile matches error:', error);
     return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: corsHeaders });

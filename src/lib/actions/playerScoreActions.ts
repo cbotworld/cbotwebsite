@@ -66,22 +66,26 @@ export async function loadLatestEdition() {
 
 export async function loadEditionById(editionId?: string | null) {
   if (!editionId) return null;
-  const edition = await prisma.edition.findUnique({
-    where: { id: editionId },
-    select: { id: true, title: true, number: true, dayDates: true, totalDays: true, status: true, tournamentStartDate: true },
+  return await memoryCache.getOrSet(`edition_by_id_${editionId}`, 180, async () => {
+    const edition = await prisma.edition.findUnique({
+      where: { id: editionId },
+      select: { id: true, title: true, number: true, dayDates: true, totalDays: true, status: true, tournamentStartDate: true },
+    });
+    return ensureOfficialDayDates(edition);
   });
-  return ensureOfficialDayDates(edition);
 }
 
 async function loadStageConfig(editionId: string): Promise<TournamentStageConfig> {
-  const setting = await prisma.systemSetting.findUnique({ where: { key: stageConfigKey(editionId) } });
-  if (!setting?.value) return { stages: [] };
-  try {
-    const parsed = JSON.parse(setting.value);
-    return { stages: parsed.stages || [], scheduleMode: parsed.scheduleMode };
-  } catch {
-    return { stages: [] };
-  }
+  return await memoryCache.getOrSet(`stage_config_${editionId}`, 180, async () => {
+    const setting = await prisma.systemSetting.findUnique({ where: { key: stageConfigKey(editionId) } });
+    if (!setting?.value) return { stages: [] };
+    try {
+      const parsed = JSON.parse(setting.value);
+      return { stages: parsed.stages || [], scheduleMode: parsed.scheduleMode };
+    } catch {
+      return { stages: [] };
+    }
+  });
 }
 
 function revalidateScorePages() {
@@ -1249,7 +1253,7 @@ async function loadPublicScoreboard() {
 export async function getPublicStandings(editionId?: string) {
   try {
     const cacheKey = `public_standings_${editionId || 'latest'}`;
-    return await memoryCache.getOrSet(cacheKey, 10, () => loadPublicStandings(editionId));
+    return await memoryCache.getOrSet(cacheKey, 300, () => loadPublicStandings(editionId));
   } catch (error) {
     console.error('getPublicStandings', error);
     return { edition: null, blocks: [] as any[], players: [] as any[], placement: [] as any[], stages: [] as any[], allEditions: [] as any[] };
