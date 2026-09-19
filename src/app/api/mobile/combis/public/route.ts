@@ -8,6 +8,7 @@ import { combiCutoffIso, combiCalendarDate } from '@/lib/combi-cutoff';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 import { combiRoundLabel } from '@/lib/combi-round-label';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,106 +120,108 @@ function teamPayload(
 
 export async function GET() {
   try {
-    const editionRef = await resolveCurrentEdition();
-    const rawEdition = editionRef
-      ? await prisma.edition.findUnique({
-          where: { id: editionRef.id },
-          include: {
-            patterns: { orderBy: { sequence: 'asc' } },
-          },
-        })
-      : null;
-    const edition = await ensureOfficialDayDates(rawEdition);
+    const days = await memoryCache.getOrSet('mobile_public_combis_days', 10, async () => {
+      const editionRef = await resolveCurrentEdition();
+      const rawEdition = editionRef
+        ? await prisma.edition.findUnique({
+            where: { id: editionRef.id },
+            include: {
+              patterns: { orderBy: { sequence: 'asc' } },
+            },
+          })
+        : null;
+      const edition = await ensureOfficialDayDates(rawEdition);
 
-    const teams = edition?.id
-      ? await prisma.team.findMany({
-          where: { editionId: edition.id },
-          select: {
-            id: true,
-            name: true,
-            tag: true,
-            logo: true,
-            savedLineups: true,
-            captain: { select: { name: true, username: true } },
-          },
-        })
-      : [];
+      const teams = edition?.id
+        ? await prisma.team.findMany({
+            where: { editionId: edition.id },
+            select: {
+              id: true,
+              name: true,
+              tag: true,
+              logo: true,
+              savedLineups: true,
+              captain: { select: { name: true, username: true } },
+            },
+          })
+        : [];
 
-    const teamsById = new Map(teams.map((t) => [t.id, t]));
-    const teamsByName = new Map(teams.map((t) => [t.name.toUpperCase().trim(), t]));
+      const teamsById = new Map(teams.map((t) => [t.id, t]));
+      const teamsByName = new Map(teams.map((t) => [t.name.toUpperCase().trim(), t]));
 
-    let stages: any[] = [];
-    if (edition?.id) {
-      const setting = await prisma.systemSetting.findUnique({ where: { key: stageConfigKey(edition.id) } });
-      if (setting?.value) {
-        try {
-          stages = JSON.parse(setting.value)?.stages || [];
-        } catch {}
+      let stages: any[] = [];
+      if (edition?.id) {
+        const setting = await prisma.systemSetting.findUnique({ where: { key: stageConfigKey(edition.id) } });
+        if (setting?.value) {
+          try {
+            stages = JSON.parse(setting.value)?.stages || [];
+          } catch {}
+        }
       }
-    }
 
-    const pairings = resolveOrganizerPairings(stages, teams);
-    const dayDates = parseDayDates(edition?.dayDates);
-    const now = Date.now();
-    const slots = eventSlotsFromPatterns(edition?.patterns);
-    const scheduleDays = buildOrganizerScheduleDays({
-      totalDays: edition?.totalDays,
-      dayDates,
-      teams,
-      pairings,
-      stages,
-    });
-
-    const days = scheduleDays.map((day) => {
-      const calendarDate = day.calendarDate || combiCalendarDate(day.dayNumber, dayDates);
-      const cutoffIso = combiCutoffIso(day.dayNumber, dayDates);
-      const revealed = now >= new Date(cutoffIso).getTime();
-
-      const matches = (day.matches || []).map((m) => {
-        const t1 =
-          (m.team1Id && teamsById.get(m.team1Id)) ||
-          teamsByName.get(String(m.team1 || '').toUpperCase().trim());
-        const t2 =
-          (m.team2Id && teamsById.get(m.team2Id)) ||
-          teamsByName.get(String(m.team2 || '').toUpperCase().trim());
-        const left = teamPayload(t1, m.team1, m.team1Tag || 'T1', teams);
-        const right = teamPayload(t2, m.team2, m.team2Tag || 'T2', teams);
-        const leftSlots = revealed ? lineupSlots(left.savedLineups, day.dayNumber, slots) : {};
-        const rightSlots = revealed ? lineupSlots(right.savedLineups, day.dayNumber, slots) : {};
-
-        return {
-          team1: {
-            id: left.id,
-            name: left.name,
-            tag: left.tag,
-            logo: left.logo,
-            captainName: left.captainName,
-          },
-          team2: {
-            id: right.id,
-            name: right.name,
-            tag: right.tag,
-            logo: right.logo,
-            captainName: right.captainName,
-          },
-          events: slots.map((slot, index) => ({
-            index,
-            name: slot.name,
-            format: slot.format,
-            leftPlayers: revealed ? leftSlots[slot.key] || '' : 'Locked until 9:30 PM IST',
-            rightPlayers: revealed ? rightSlots[slot.key] || '' : 'Locked until 9:30 PM IST',
-          })),
-        };
+      const pairings = resolveOrganizerPairings(stages, teams);
+      const dayDates = parseDayDates(edition?.dayDates);
+      const now = Date.now();
+      const slots = eventSlotsFromPatterns(edition?.patterns);
+      const scheduleDays = buildOrganizerScheduleDays({
+        totalDays: edition?.totalDays,
+        dayDates,
+        teams,
+        pairings,
+        stages,
       });
 
-      return {
-        dayNumber: day.dayNumber,
-        calendarDate,
-        cutoffIso,
-        revealed,
-        title: day.title,
-        matches,
-      };
+      return scheduleDays.map((day) => {
+        const calendarDate = day.calendarDate || combiCalendarDate(day.dayNumber, dayDates);
+        const cutoffIso = combiCutoffIso(day.dayNumber, dayDates);
+        const revealed = now >= new Date(cutoffIso).getTime();
+
+        const matches = (day.matches || []).map((m) => {
+          const t1 =
+            (m.team1Id && teamsById.get(m.team1Id)) ||
+            teamsByName.get(String(m.team1 || '').toUpperCase().trim());
+          const t2 =
+            (m.team2Id && teamsById.get(m.team2Id)) ||
+            teamsByName.get(String(m.team2 || '').toUpperCase().trim());
+          const left = teamPayload(t1, m.team1, m.team1Tag || 'T1', teams);
+          const right = teamPayload(t2, m.team2, m.team2Tag || 'T2', teams);
+          const leftSlots = revealed ? lineupSlots(left.savedLineups, day.dayNumber, slots) : {};
+          const rightSlots = revealed ? lineupSlots(right.savedLineups, day.dayNumber, slots) : {};
+
+          return {
+            team1: {
+              id: left.id,
+              name: left.name,
+              tag: left.tag,
+              logo: left.logo,
+              captainName: left.captainName,
+            },
+            team2: {
+              id: right.id,
+              name: right.name,
+              tag: right.tag,
+              logo: right.logo,
+              captainName: right.captainName,
+            },
+            events: slots.map((slot, index) => ({
+              index,
+              name: slot.name,
+              format: slot.format,
+              leftPlayers: revealed ? leftSlots[slot.key] || '' : 'Locked until 9:30 PM IST',
+              rightPlayers: revealed ? rightSlots[slot.key] || '' : 'Locked until 9:30 PM IST',
+            })),
+          };
+        });
+
+        return {
+          dayNumber: day.dayNumber,
+          calendarDate,
+          cutoffIso,
+          revealed,
+          title: day.title,
+          matches,
+        };
+      });
     });
 
     return NextResponse.json(

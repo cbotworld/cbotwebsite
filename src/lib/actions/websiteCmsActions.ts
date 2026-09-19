@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { revalidatePath } from 'next/cache';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { memoryCache } from '@/lib/memory-cache';
 import {
   DEFAULT_WEBSITE_CMS,
   parseWebsiteCms,
@@ -37,8 +38,10 @@ async function requireOrganizer() {
 
 export async function getWebsiteCmsContent(): Promise<WebsiteCmsContent> {
   try {
-    const row = await prisma.systemSetting.findUnique({ where: { key: WEBSITE_CMS_KEY } });
-    return parseWebsiteCms(row?.value);
+    return await memoryCache.getOrSet('website_cms_content', 60, async () => {
+      const row = await prisma.systemSetting.findUnique({ where: { key: WEBSITE_CMS_KEY } });
+      return parseWebsiteCms(row?.value);
+    });
   } catch (error) {
     console.error('[getWebsiteCmsContent]', error);
     return DEFAULT_WEBSITE_CMS;
@@ -46,6 +49,7 @@ export async function getWebsiteCmsContent(): Promise<WebsiteCmsContent> {
 }
 
 async function saveWebsiteCms(content: WebsiteCmsContent) {
+  memoryCache.invalidate('website_cms_content');
   await prisma.systemSetting.upsert({
     where: { key: WEBSITE_CMS_KEY },
     create: { key: WEBSITE_CMS_KEY, value: JSON.stringify(content) },

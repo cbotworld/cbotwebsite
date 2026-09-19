@@ -172,7 +172,7 @@ export default function PlayerClient({
       }
     };
     load();
-    const id = setInterval(load, 15000);
+    const id = setInterval(load, 60000);
     return () => {
       cancelled = true;
       clearInterval(id);

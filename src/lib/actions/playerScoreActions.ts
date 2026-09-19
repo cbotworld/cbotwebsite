@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
+import { memoryCache } from '@/lib/memory-cache';
 import { lastCompletedDay, stageConfigKey, stageJustFinishedForAverageReview } from '@/lib/tournament-stages';
 import type { PlayerAverageLogRow, PlayerDayScoreRow, TournamentStageConfig } from '@/types';
 import {
@@ -84,6 +85,7 @@ async function loadStageConfig(editionId: string): Promise<TournamentStageConfig
 }
 
 function revalidateScorePages() {
+  memoryCache.invalidate('public_standings_');
   revalidatePath(PUBLIC_PLAYER_SCORES_PATH);
   revalidatePath(PUBLIC_STANDINGS_PATH);
   revalidatePath('/dashboard/player');
@@ -1246,7 +1248,8 @@ async function loadPublicScoreboard() {
 
 export async function getPublicStandings(editionId?: string) {
   try {
-    return await loadPublicStandings(editionId);
+    const cacheKey = `public_standings_${editionId || 'latest'}`;
+    return await memoryCache.getOrSet(cacheKey, 10, () => loadPublicStandings(editionId));
   } catch (error) {
     console.error('getPublicStandings', error);
     return { edition: null, blocks: [] as any[], players: [] as any[], placement: [] as any[], stages: [] as any[], allEditions: [] as any[] };
@@ -1255,6 +1258,7 @@ export async function getPublicStandings(editionId?: string) {
 
 export async function snapshotEditionStandings(editionId: string) {
   try {
+    memoryCache.invalidate('public_standings_');
     const data = await loadPublicStandings(editionId, { skipSnapshotRead: true });
     if (data && data.edition?.id) {
       const textJson = JSON.stringify(data);

@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
+import { memoryCache } from '@/lib/memory-cache';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
@@ -126,8 +127,10 @@ async function fetchCurrentEditionCombisData() {
 }
 
 export async function getCurrentEditionCombisData() {
-  return unstable_cache(fetchCurrentEditionCombisData, ['edition-combis-data'], {
-    revalidate: 15,
-    tags: ['edition-combis-data', 'organizer-schedule'],
-  })();
+  return await memoryCache.getOrSet('current_edition_combis', 10, async () => {
+    return unstable_cache(fetchCurrentEditionCombisData, ['edition-combis-data'], {
+      revalidate: 15,
+      tags: ['edition-combis-data', 'organizer-schedule'],
+    })();
+  });
 }
