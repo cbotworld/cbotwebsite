@@ -7,6 +7,7 @@ import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { MOCK_SCORE_REPORTS, MOCK_TEAMS, MOCK_USERS, DELETED_USERNAMES } from '@/lib/mock-data';
 import { ensureOfficialDayDates } from '@/lib/edition-day-dates';
 import { resolveCurrentEdition } from '@/lib/current-edition';
+import { parseGradingGrid, computePlayerTargetUpdates, computePlayerGradeUpdates } from '@/lib/grading';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -29,11 +30,12 @@ export default async function OrganizerPage() {
   let editions: any[] = [];
   let users: any[] = [];
   let dbTeams: any[] = [];
+  let gradingSettings: any[] = [];
 
   let websiteCms = await getWebsiteCmsContent();
 
   try {
-    [editions, users, dbTeams, websiteCms] = await Promise.all([
+    [editions, users, dbTeams, gradingSettings, websiteCms] = await Promise.all([
       prisma.edition.findMany({
         orderBy: { number: 'desc' },
         include: {
@@ -82,6 +84,11 @@ export default async function OrganizerPage() {
         },
         orderBy: { createdAt: 'desc' }
       }),
+      prisma.systemSetting.findMany({
+        where: {
+          key: { startsWith: 'edition_grading_' }
+        }
+      }),
       getWebsiteCmsContent(),
     ]);
 
@@ -106,6 +113,29 @@ export default async function OrganizerPage() {
 
   const usersList = filteredDbUsers;
 
+  const initialEditionTargetMaps: Record<string, Record<string, number>> = {};
+  const initialEditionGradeMaps: Record<string, Record<string, string>> = {};
+
+  gradingSettings.forEach((setting) => {
+    const editionId = setting.key.replace('edition_grading_', '');
+    const grid = parseGradingGrid(setting.value);
+    if (!grid) return;
+
+    const targetUpdates = computePlayerTargetUpdates(grid);
+    const targetMap: Record<string, number> = {};
+    targetUpdates.forEach((t) => {
+      targetMap[t.userId] = t.target;
+    });
+    initialEditionTargetMaps[editionId] = targetMap;
+
+    const gradeUpdates = computePlayerGradeUpdates(grid);
+    const gradeMap: Record<string, string> = {};
+    gradeUpdates.forEach((g) => {
+      gradeMap[g.userId] = g.grade;
+    });
+    initialEditionGradeMaps[editionId] = gradeMap;
+  });
+
   return (
     <OrganizerClient 
       initialEditions={editions}
@@ -113,6 +143,8 @@ export default async function OrganizerPage() {
       initialScoreReports={MOCK_SCORE_REPORTS}
       initialTeams={teams}
       initialWebsiteCms={websiteCms}
+      initialEditionTargetMaps={initialEditionTargetMaps}
+      initialEditionGradeMaps={initialEditionGradeMaps}
     />
   );
 }

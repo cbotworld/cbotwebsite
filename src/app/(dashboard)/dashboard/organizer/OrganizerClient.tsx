@@ -90,9 +90,27 @@ function sortPlayersByStat(users: any[], field: InlineStatField, direction: 'asc
   });
 }
 
-export default function OrganizerClient({ initialEditions, initialScoreReports, initialUsersList, initialTeams, initialWebsiteCms }: { initialEditions: any[], initialScoreReports: any[], initialUsersList: any[], initialTeams: any[], initialWebsiteCms: WebsiteCmsContent }) {
+export default function OrganizerClient({
+  initialEditions,
+  initialScoreReports,
+  initialUsersList,
+  initialTeams,
+  initialWebsiteCms,
+  initialEditionTargetMaps = {},
+  initialEditionGradeMaps = {},
+}: {
+  initialEditions: any[];
+  initialScoreReports: any[];
+  initialUsersList: any[];
+  initialTeams: any[];
+  initialWebsiteCms: WebsiteCmsContent;
+  initialEditionTargetMaps?: Record<string, Record<string, number>>;
+  initialEditionGradeMaps?: Record<string, Record<string, string>>;
+}) {
   const router = useRouter();
   const [editions, setEditions] = React.useState<any[]>(initialEditions);
+  const [editionTargetMaps, setEditionTargetMaps] = React.useState<Record<string, Record<string, number>>>(initialEditionTargetMaps);
+  const [editionGradeMaps, setEditionGradeMaps] = React.useState<Record<string, Record<string, string>>>(initialEditionGradeMaps);
   const [tournamentSlot, setTournamentSlot] = React.useState<TournamentSlot>('A');
   const [ensuringSlots, setEnsuringSlots] = React.useState(false);
   const [slotActionBusy, setSlotActionBusy] = React.useState<string | null>(null);
@@ -110,6 +128,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
   React.useEffect(() => {
     setEditions(initialEditions);
   }, [initialEditions]);
+
+  React.useEffect(() => {
+    if (initialEditionTargetMaps) setEditionTargetMaps(initialEditionTargetMaps);
+  }, [initialEditionTargetMaps]);
+
+  React.useEffect(() => {
+    if (initialEditionGradeMaps) setEditionGradeMaps(initialEditionGradeMaps);
+  }, [initialEditionGradeMaps]);
 
   React.useEffect(() => {
     setScoreReports(initialScoreReports);
@@ -359,19 +385,31 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
     return !isLiveCup;
   }, [selectedEdition, hasTournamentPayload]);
 
+  // Map user IDs to their edition-specific target from the grading grid
+  const playerTargetMap = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    if (selectedEditionId && editionTargetMaps[selectedEditionId]) {
+      Object.assign(map, editionTargetMaps[selectedEditionId]);
+    }
+    return map;
+  }, [selectedEditionId, editionTargetMaps]);
+
   // Map user IDs to their grade / category for the currently selected edition
   const playerGradeMap = React.useMemo(() => {
     const map: Record<string, string> = {};
+    if (selectedEditionId && editionGradeMaps[selectedEditionId]) {
+      Object.assign(map, editionGradeMaps[selectedEditionId]);
+    }
     const participants = selectedEdition?.participants || [];
     participants.forEach((p: any) => {
       const uId = p.userId || p.user?.id || p.id;
       const g = p.category || p.grade;
-      if (uId && g) {
+      if (uId && g && !map[uId]) {
         map[uId] = String(g);
       }
     });
     return map;
-  }, [selectedEdition]);
+  }, [selectedEdition, selectedEditionId, editionGradeMaps]);
 
   // Map user IDs to their tournament grading average (G.Avg) for the currently selected edition
   const playerGradingAverageMap = React.useMemo(() => {
@@ -3358,13 +3396,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
                   const isSpoc = !!playerSpocMap[usr.id];
                   const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
+                  const userTarget = playerTargetMap[usr.id] ?? (usr.target !== undefined && usr.target !== null && Number(usr.target) > 0 ? Number(usr.target) : null);
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
                     (grade && String(grade).toLowerCase().includes(q)) ||
                     (isSpoc && 'spoc'.includes(q)) ||
                     (userGradingAvg !== null && String(userGradingAvg).includes(q)) ||
-                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
+                    (userTarget !== null && String(userTarget).includes(q))
                   );
                 })
                 .map((usr) => {
@@ -3374,6 +3413,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
                 const isSpoc = !!playerSpocMap[usr.id];
                 const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
+                const userTarget = playerTargetMap[usr.id] ?? (usr.target !== undefined && usr.target !== null && Number(usr.target) > 0 ? Number(usr.target) : null);
 
                 return (
                   <label
@@ -3418,9 +3458,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                           G.Avg: {Number(userGradingAvg).toFixed(2)}
                         </span>
                       ) : null}
-                      {usr.target ? (
+                      {userTarget !== null ? (
                         <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
-                          Tgt: {usr.target}
+                          Tgt: {userTarget}
                         </span>
                       ) : null}
                     </div>
@@ -3585,13 +3625,14 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                   const grade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || '';
                   const isSpoc = !!playerSpocMap[usr.id];
                   const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
+                  const userTarget = playerTargetMap[usr.id] ?? (usr.target !== undefined && usr.target !== null && Number(usr.target) > 0 ? Number(usr.target) : null);
                   return (
                     (usr.name || '').toLowerCase().includes(q) ||
                     (usr.username || '').toLowerCase().includes(qClean) ||
                     (grade && String(grade).toLowerCase().includes(q)) ||
                     (isSpoc && 'spoc'.includes(q)) ||
                     (userGradingAvg !== null && String(userGradingAvg).includes(q)) ||
-                    (usr.target !== undefined && usr.target !== null && String(usr.target).includes(q))
+                    (userTarget !== null && String(userTarget).includes(q))
                   );
                 })
                 .map((usr) => {
@@ -3601,6 +3642,7 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                 const userGrade = playerGradeMap[usr.id] || usr.grade || (usr as any)?.category || null;
                 const isSpoc = !!playerSpocMap[usr.id];
                 const userGradingAvg = playerGradingAverageMap[usr.id] ?? (usr.average !== undefined && usr.average !== null && Number(usr.average) > 0 ? Number(usr.average) : null);
+                const userTarget = playerTargetMap[usr.id] ?? (usr.target !== undefined && usr.target !== null && Number(usr.target) > 0 ? Number(usr.target) : null);
 
                 return (
                   <label
@@ -3645,9 +3687,9 @@ export default function OrganizerClient({ initialEditions, initialScoreReports, 
                           G.Avg: {Number(userGradingAvg).toFixed(2)}
                         </span>
                       ) : null}
-                      {usr.target ? (
+                      {userTarget !== null ? (
                         <span className="text-amber-400 font-mono font-bold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
-                          Tgt: {usr.target}
+                          Tgt: {userTarget}
                         </span>
                       ) : null}
                     </div>

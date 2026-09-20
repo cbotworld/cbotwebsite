@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 import { recordPlayerTargetChange } from '@/lib/actions/playerScoreActions';
+import { memoryCache } from '@/lib/memory-cache';
 import {
   assignedUserIdsFromGrid,
   gradingSettingKey,
@@ -96,6 +97,12 @@ export async function saveEditionGrading(
       if (changedById) {
         await recordPlayerTargetChange(userId, target, changedById, false, editionId);
       }
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { target },
+        });
+      } catch {}
       targetsUpdated += 1;
     }
 
@@ -134,8 +141,15 @@ export async function saveEditionGrading(
       gradesUpdated += 1;
     }
 
+    memoryCache.invalidate(`stage_config_${editionId}`);
+    memoryCache.invalidate(`edition_schedule_shared_${editionId}`);
+    memoryCache.invalidate('public_standings_');
+    memoryCache.invalidate('current_edition_combis');
+    memoryCache.invalidate('mobile_public_combis');
+
     revalidatePath('/dashboard/organizer');
     revalidatePath('/dashboard/player');
+    revalidatePath('/teams-and-players');
     return { success: true, grid: cleaned, targetsUpdated, gradesUpdated };
   } catch (error) {
     console.error('[saveEditionGrading]', error);
