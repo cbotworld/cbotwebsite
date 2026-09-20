@@ -354,6 +354,7 @@ export function Navbar({
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
             </Link>
+            {/* Sub-Tab 5: Standings */}
             <Link
               href={PUBLIC_STANDINGS_PATH}
               className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
@@ -365,6 +366,15 @@ export function Navbar({
               {isStandingsActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
+            </Link>
+
+            {/* Sub-Tab 6: Final Standings */}
+            <Link
+              href="/standings?tab=final"
+              className="relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all text-amber-300/90 hover:text-amber-300 font-extrabold"
+            >
+              <span>🏆</span>
+              <span>Final Standings</span>
             </Link>
           </div>
         </div>
@@ -438,13 +448,20 @@ export function Navbar({
               <Link
                 href={PUBLIC_STANDINGS_PATH}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`col-span-2 min-[440px]:col-span-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
                   isStandingsActive
                     ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
                     : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
                 }`}
               >
                 <Trophy className="h-3.5 w-3.5 shrink-0" /> Table
+              </Link>
+              <Link
+                href="/standings?tab=final"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30"
+              >
+                <span>🏆</span> Final
               </Link>
             </div>
           </div>

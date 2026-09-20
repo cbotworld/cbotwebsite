@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X } from 'lucide-react';
+import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X, Award, Download, Medal, ChevronRight, CheckCircle2, Crown, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { resolveTop4Podium } from '@/lib/tournament-podium';
+import { exportFinalStandingsWorkbook } from '@/lib/export-final-standings';
 
 type FocusCol = 'event' | 'slams' | 'avg' | 'total';
 
@@ -55,10 +57,21 @@ function constraintBadgeLabel(appliedConstraint?: string) {
 
 export default function StandingsClient({ payload }: { payload: any }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get('tab');
   const data = payload || {};
   const allEditions = Array.isArray(data.allEditions) ? data.allEditions : [];
   const blocks = Array.isArray(data.blocks) ? data.blocks : [];
-  const [tab, setTab] = React.useState<'teams' | 'players'>('teams');
+  const [tab, setTab] = React.useState<'teams' | 'players' | 'final'>(
+    urlTab === 'final' ? 'final' : urlTab === 'players' ? 'players' : 'teams'
+  );
+
+  React.useEffect(() => {
+    if (urlTab === 'final' || urlTab === 'players' || urlTab === 'teams') {
+      setTab(urlTab);
+    }
+  }, [urlTab]);
+
   const [stageId, setStageId] = React.useState(blocks.find((b: any) => b.current)?.stageId || blocks[0]?.stageId || '');
   const stage = blocks.find((b: any) => b.stageId === stageId) || blocks[0];
   const players = Array.isArray(data.players) ? data.players : [];
@@ -68,6 +81,54 @@ export default function StandingsClient({ payload }: { payload: any }) {
   const [selectedPlayer, setSelectedPlayer] = React.useState<any | null>(null);
 
   const [playerSearch, setPlayerSearch] = React.useState('');
+
+  const standingTeamsMap = React.useMemo(() => {
+    const map = new Map<string, { id: string; name: string; logo?: string | null; tag?: string | null }>();
+    blocks.forEach((b: any) => {
+      (b.groups || []).forEach((g: any) => {
+        (g.rows || []).forEach((r: any) => {
+          if (r.teamId) {
+            map.set(r.teamId, { id: r.teamId, name: r.teamName, logo: r.teamLogo, tag: r.teamTag });
+          }
+        });
+      });
+      (b.knockout || []).forEach((k: any) => {
+        if (k.team1Id && !map.has(k.team1Id)) {
+          map.set(k.team1Id, { id: k.team1Id, name: k.team1Name });
+        }
+        if (k.team2Id && !map.has(k.team2Id)) {
+          map.set(k.team2Id, { id: k.team2Id, name: k.team2Name });
+        }
+      });
+    });
+    return map;
+  }, [blocks]);
+
+  const podium = React.useMemo(() => {
+    return resolveTop4Podium(blocks, standingTeamsMap);
+  }, [blocks, standingTeamsMap]);
+
+  const rrBlock = React.useMemo(() => {
+    return blocks.find((b: any) => b.kind === 'LEAGUE' || b.kind === 'ROUND_ROBIN') || blocks[0];
+  }, [blocks]);
+
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  const handleDownloadExcel = () => {
+    try {
+      setIsExporting(true);
+      exportFinalStandingsWorkbook({
+        edition: data.edition,
+        blocks,
+        players,
+        standingTeamsMap,
+      });
+    } catch (err) {
+      console.error('Error exporting final standings excel:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const filteredPlayers = React.useMemo(() => {
     const q = playerSearch.trim().toLowerCase();
@@ -121,45 +182,389 @@ export default function StandingsClient({ payload }: { payload: any }) {
           </p>
         </div>
 
-        {allEditions.length > 1 && (
-          <div className="shrink-0 flex items-center gap-2 bg-card/80 p-2.5 rounded-2xl border border-border">
-            <label className="text-xs font-bold text-muted-foreground">Edition:</label>
-            <select
-              value={data.edition?.id || ''}
-              onChange={(e) => router.push(`/standings?editionId=${e.target.value}`)}
-              className="h-8 px-3 text-xs font-bold rounded-lg border border-amber-500/40 bg-background text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-            >
-              {allEditions.map((ed: any) => (
-                <option key={ed.id} value={ed.id}>
-                  {ed.title} {ed.isCurrent ? '(Live)' : '(Completed)'}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setTab('teams')}
-          className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${
-            tab === 'teams' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20' : 'border-border bg-card/60 text-muted-foreground'
-          }`}
-        >
-          Teams
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('players')}
-          className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${
-            tab === 'players' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20' : 'border-border bg-card/60 text-muted-foreground'
-          }`}
-        >
-          Players
-        </button>
+        <div className="shrink-0 flex flex-wrap items-center gap-2.5">
+          {allEditions.length > 1 && (
+            <div className="flex items-center gap-2 bg-card/80 p-2.5 rounded-2xl border border-border">
+              <label className="text-xs font-bold text-muted-foreground">Edition:</label>
+              <select
+                value={data.edition?.id || ''}
+                onChange={(e) => router.push(`/standings?editionId=${e.target.value}`)}
+                className="h-8 px-3 text-xs font-bold rounded-lg border border-amber-500/40 bg-background text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+              >
+                {allEditions.map((ed: any) => (
+                  <option key={ed.id} value={ed.id}>
+                    {ed.title} {ed.isCurrent ? '(Live)' : '(Completed)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={isExporting}
+            className="h-10 px-3.5 py-1.5 rounded-2xl text-xs font-black border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 shadow-sm"
+            title="Download complete 4-sheet tournament excel with all match combis"
+          >
+            <Download className="h-4 w-4 text-emerald-400" />
+            <span>{isExporting ? 'Generating...' : 'Download Excel (.xlsx)'}</span>
+          </button>
+        </div>
       </div>
 
-      {tab === 'players' ? (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTab('teams')}
+            className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${
+              tab === 'teams' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20' : 'border-border bg-card/60 text-muted-foreground'
+            }`}
+          >
+            Teams
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('players')}
+            className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${
+              tab === 'players' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20' : 'border-border bg-card/60 text-muted-foreground'
+            }`}
+          >
+            Players
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('final')}
+            className={`px-4 py-2 rounded-xl text-xs font-black border transition-all flex items-center gap-1.5 ${
+              tab === 'final' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20' : 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+            }`}
+          >
+            <Trophy className="h-3.5 w-3.5 text-amber-400" />
+            <span>Final Standings (Top 4)</span>
+          </button>
+        </div>
+      </div>
+
+      {tab === 'final' ? (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Top 4 Tournament Podium Card */}
+          <Card className="border-amber-500/40 bg-gradient-to-b from-amber-500/10 via-card/90 to-card shadow-2xl overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 border-b border-border/60 bg-muted/20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-amber-400" />
+                    <CardTitle className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
+                      Top 4 Tournament Standings
+                    </CardTitle>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {podium.stageStatusDescription} · Grand Final Winner (1st), Grand Finalist (2nd), Qualifier 2 Loser (3rd), Eliminator Loser (4th)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadExcel}
+                  disabled={isExporting}
+                  className="shrink-0 px-4 py-2 rounded-xl text-xs font-black border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all flex items-center gap-2 shadow-sm"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+                  <span>Download Report (.xlsx)</span>
+                </button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-4 sm:p-6 space-y-6">
+              {/* Podium Grid for Top 4 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1st Place: Champion */}
+                <div className="p-4 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-500/25 via-amber-500/10 to-card shadow-lg flex flex-col justify-between space-y-3 relative overflow-hidden">
+                  <div className="absolute -right-4 -top-4 opacity-15">
+                    <Trophy className="h-24 w-24 text-amber-400" />
+                  </div>
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow-sm">
+                        🥇 1st Place
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded border border-amber-400/30">
+                        CHAMPION
+                      </span>
+                    </div>
+                    <div className="pt-2 flex items-center gap-3">
+                      {podium.champion?.teamLogo ? (
+                        <img src={podium.champion.teamLogo} alt={podium.champion.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-400/60 shadow-md shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border-2 border-amber-400/60 flex items-center justify-center text-lg font-black text-amber-300 shrink-0">
+                          {podium.champion?.teamName?.[0] || '1'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-base sm:text-lg font-black text-foreground truncate">{podium.champion?.teamName || 'TBD'}</div>
+                        {podium.champion?.tag && <div className="text-[11px] font-bold text-amber-400 font-mono">[{podium.champion.tag}]</div>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-bold text-amber-300/90 pt-2 border-t border-amber-400/20 relative z-10">
+                    {podium.champion?.matchDetail || 'Grand Final Winner'}
+                  </div>
+                </div>
+
+                {/* 2nd Place: Runner-Up */}
+                <div className="p-4 rounded-2xl border-2 border-slate-400/60 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider bg-slate-300 text-slate-950 px-2.5 py-0.5 rounded-full shadow-sm">
+                        🥈 2nd Place
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-300 bg-slate-400/15 px-2 py-0.5 rounded border border-slate-400/30">
+                        RUNNER-UP
+                      </span>
+                    </div>
+                    <div className="pt-2 flex items-center gap-3">
+                      {podium.runnerUp?.teamLogo ? (
+                        <img src={podium.runnerUp.teamLogo} alt={podium.runnerUp.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-slate-400/60 shadow-md shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-slate-400/20 border-2 border-slate-400/60 flex items-center justify-center text-lg font-black text-slate-300 shrink-0">
+                          {podium.runnerUp?.teamName?.[0] || '2'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-base sm:text-lg font-black text-foreground truncate">{podium.runnerUp?.teamName || 'TBD'}</div>
+                        {podium.runnerUp?.tag && <div className="text-[11px] font-bold text-slate-400 font-mono">[{podium.runnerUp.tag}]</div>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-300/90 pt-2 border-t border-slate-400/20 relative z-10">
+                    {podium.runnerUp?.matchDetail || 'Grand Final Finalist'}
+                  </div>
+                </div>
+
+                {/* 3rd Place */}
+                <div className="p-4 rounded-2xl border-2 border-amber-700/60 bg-gradient-to-b from-amber-700/20 via-amber-700/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider bg-amber-700 text-amber-100 px-2.5 py-0.5 rounded-full shadow-sm">
+                        🥉 3rd Place
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-700/15 px-2 py-0.5 rounded border border-amber-700/30">
+                        3rd PLACE
+                      </span>
+                    </div>
+                    <div className="pt-2 flex items-center gap-3">
+                      {podium.thirdPlace?.teamLogo ? (
+                        <img src={podium.thirdPlace.teamLogo} alt={podium.thirdPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-700/60 shadow-md shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-amber-700/20 border-2 border-amber-700/60 flex items-center justify-center text-lg font-black text-amber-400 shrink-0">
+                          {podium.thirdPlace?.teamName?.[0] || '3'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-base sm:text-lg font-black text-foreground truncate">{podium.thirdPlace?.teamName || 'TBD'}</div>
+                        {podium.thirdPlace?.tag && <div className="text-[11px] font-bold text-amber-600 font-mono">[{podium.thirdPlace.tag}]</div>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-bold text-amber-500/90 pt-2 border-t border-amber-700/20 relative z-10">
+                    {podium.thirdPlace?.matchDetail || 'Qualifier 2 Loser'}
+                  </div>
+                </div>
+
+                {/* 4th Place */}
+                <div className="p-4 rounded-2xl border-2 border-zinc-600/50 bg-gradient-to-b from-zinc-600/20 via-zinc-600/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider bg-zinc-700 text-zinc-100 px-2.5 py-0.5 rounded-full shadow-sm">
+                        4️⃣ 4th Place
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-600/15 px-2 py-0.5 rounded border border-zinc-600/30">
+                        4th PLACE
+                      </span>
+                    </div>
+                    <div className="pt-2 flex items-center gap-3">
+                      {podium.fourthPlace?.teamLogo ? (
+                        <img src={podium.fourthPlace.teamLogo} alt={podium.fourthPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-zinc-600/60 shadow-md shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-zinc-600/20 border-2 border-zinc-600/60 flex items-center justify-center text-lg font-black text-zinc-300 shrink-0">
+                          {podium.fourthPlace?.teamName?.[0] || '4'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-base sm:text-lg font-black text-foreground truncate">{podium.fourthPlace?.teamName || 'TBD'}</div>
+                        {podium.fourthPlace?.tag && <div className="text-[11px] font-bold text-zinc-400 font-mono">[{podium.fourthPlace.tag}]</div>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-bold text-zinc-400/90 pt-2 border-t border-zinc-600/20 relative z-10">
+                    {podium.fourthPlace?.matchDetail || 'Eliminator Loser'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Excel Download Info Callout */}
+              <div className="p-4 rounded-2xl bg-background/80 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
+                    <FileSpreadsheet className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
+                      <span>Complete Multi-Sheet Tournament Excel (.xlsx)</span>
+                      <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">4 Sheets</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Includes: (1) Round Robin Standings &amp; Combis, (2) Qualifier Matches &amp; Scores, (3) Finals &amp; Placements, (4) Official Player Standings.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadExcel}
+                  disabled={isExporting}
+                  className="px-4 py-2.5 rounded-xl text-xs font-black border border-emerald-500/60 bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 shrink-0"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExporting ? 'Generating...' : 'Download Complete Excel'}</span>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Complete Tournament Multi-Stage Journey */}
+          <div className="space-y-6 pt-2">
+            <h2 className="text-lg font-black text-foreground flex items-center gap-2">
+              <span>Tournament Journey Across All Stages</span>
+            </h2>
+
+            {/* Stage 1: Round Robin Standings */}
+            {rrBlock && (
+              <Card className="border-border bg-card/80 backdrop-blur-sm">
+                <CardHeader className="p-4 bg-muted/20 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-black flex items-center gap-2">
+                      <span>Stage 1: {rrBlock.name || 'Round Robin'}</span>
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] font-bold">Full Stage Table</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {(rrBlock.groups || []).map((g: any) => (
+                    <Table key={g.key}>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10">#</TableHead>
+                          <TableHead>Team</TableHead>
+                          <TableHead className="text-center">Total</TableHead>
+                          <TableHead className="text-center">Played</TableHead>
+                          <TableHead className="text-center">Won</TableHead>
+                          <TableHead className="text-center">Lost</TableHead>
+                          <TableHead className="text-center">Tied</TableHead>
+                          <TableHead className="text-center font-bold text-foreground">Team Score</TableHead>
+                          <TableHead className="text-center">Event</TableHead>
+                          <TableHead className="text-center">Slams</TableHead>
+                          <TableHead className="text-center">Target+</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(g.rows || []).map((row: any) => (
+                          <TableRow key={row.teamId} className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-black text-amber-500">{row.rank}</TableCell>
+                            <TableCell className="font-semibold">
+                              <div className="flex items-center gap-2">
+                                {row.teamLogo ? (
+                                  <img src={row.teamLogo} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-border flex items-center justify-center text-[10px] text-slate-400 font-bold">
+                                    {row.teamName?.[0]}
+                                  </div>
+                                )}
+                                <span className="truncate">{row.teamName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center font-black">
+                              <StatButton value={row.total} onClick={() => setOpen({ row, focus: 'total' })} className="font-black text-amber-400" />
+                            </TableCell>
+                            <TableCell className="text-center font-bold text-muted-foreground">{row.matchesPlayed ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-emerald-400">{row.matchesWon ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-rose-400">{row.matchesLost ?? 0}</TableCell>
+                            <TableCell className="text-center font-bold text-amber-300">{row.matchesTied ?? 0}</TableCell>
+                            <TableCell className="text-center font-mono font-bold text-foreground">{row.teamScore ?? 0}</TableCell>
+                            <TableCell className="text-center">
+                              <StatButton value={row.eventPts} onClick={() => setOpen({ row, focus: 'event' })} />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <StatButton value={row.slamBonus} onClick={() => setOpen({ row, focus: 'slams' })} />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <StatButton value={row.avgBonus} onClick={() => setOpen({ row, focus: 'avg' })} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Stage 2 & 3: Playoff Knockout Stages */}
+            {blocks.filter((b: any) => b.knockout && b.knockout.length > 0).map((b: any) => (
+              <Card key={b.stageId} className="border-border bg-card/80 backdrop-blur-sm">
+                <CardHeader className="p-4 bg-muted/20 border-b border-border/50">
+                  <CardTitle className="text-base font-black flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-amber-400" />
+                    <span>{b.name}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  {(b.knockout || []).map((m: any, i: number) => {
+                    const isT1Winner = m.team1EventPts != null && m.team2EventPts != null && m.team1EventPts > m.team2EventPts;
+                    const isT2Winner = m.team1EventPts != null && m.team2EventPts != null && m.team2EventPts > m.team1EventPts;
+
+                    return (
+                      <div key={`${m.label}-${i}`} className="p-3.5 rounded-xl border border-border/70 bg-background/80 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              {m.label}
+                            </span>
+                            {m.dayNumber && <span className="text-[10px] font-bold text-muted-foreground">Day {m.dayNumber}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 font-mono font-bold text-sm">
+                            <span className={isT1Winner ? 'text-emerald-400 font-black' : 'text-foreground'}>{m.team1Name} ({m.team1EventPts ?? '—'})</span>
+                            <span className="text-muted-foreground text-xs font-bold">vs</span>
+                            <span className={isT2Winner ? 'text-emerald-400 font-black' : 'text-foreground'}>{m.team2Name} ({m.team2EventPts ?? '—'})</span>
+                          </div>
+                        </div>
+
+                        {/* Combi Events */}
+                        {m.events && m.events.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {m.events.map((ev: any, evIdx: number) => (
+                              <div key={evIdx} className="text-xs p-2 rounded-lg bg-card/60 border border-border/40 flex flex-wrap items-center justify-between gap-2">
+                                <div className="font-bold flex items-center gap-1.5">
+                                  <span>{ev.name}</span>
+                                  {ev.format && <span className="text-[10px] text-muted-foreground">({ev.format})</span>}
+                                </div>
+                                <div className="text-[11px] font-mono text-muted-foreground">
+                                  <span className="text-sky-400 font-bold">{ev.team1Players || '—'}</span>
+                                  <span className="font-black px-1.5 text-foreground">{ev.team1Pts ?? 0} – {ev.team2Pts ?? 0}</span>
+                                  <span className="text-rose-400 font-bold">{ev.team2Players || '—'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : tab === 'players' ? (
         <Card className="border-border/80 bg-card/70 backdrop-blur-sm shadow-xl">
           <CardHeader className="pb-3 border-b border-border/50">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

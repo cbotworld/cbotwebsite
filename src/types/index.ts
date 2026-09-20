@@ -401,3 +401,38 @@ export interface EditionProfileStats {
   slams: number;
   averageBonuses: number;
 }
+
+export type KnockoutMatchRow = {
+  label: string;
+  team1Name: string;
+  team2Name: string;
+  team1Id: string;
+  team2Id: string;
+  team1EventPts: number | null;
+  team2EventPts: number | null;
+  winnerTeamId: string | null;
+  dayNumber: number;
+  events?: Array<{
+    name: string;
+    format: string;
+    team1Players: string;
+    team2Players: string;
+    team1PlayerList: any[];
+    team2PlayerList: any[];
+    team1Pts: number;
+    team2Pts: number;
+    team1Score: number | null;
+    team2Score: number | null;
+    result: string;
+    reason?: string;
+  }>;
+};
+
+export type StageStandingBlock = {
+  stageId: string;
+  kind: string;
+  name: string;
+  current: boolean;
+  groups: Array<{ key: string; name: string; rows: StageStandingRow[] }>;
+  knockout?: KnockoutMatchRow[];
+};

@@ -1,0 +1,421 @@
+import * as XLSX from 'xlsx';
+import type { StageStandingBlock, StageStandingRow } from '@/types';
+import { resolveTop4Podium } from '@/lib/tournament-podium';
+
+export type ExportFinalStandingsOptions = {
+  edition: {
+    id: string;
+    number?: number | string;
+    title?: string;
+    status?: string;
+  } | null;
+  blocks: StageStandingBlock[];
+  players: any[];
+  standingTeamsMap?: Map<string, { id: string; name: string; logo?: string | null; tag?: string | null }>;
+};
+
+function formatPlayerList(list: any[] = []): string {
+  if (!list || list.length === 0) return '—';
+  return list
+    .map((p) => {
+      const name = p.name || 'Player';
+      const score = p.score != null ? ` (${p.score})` : '';
+      const wo = p.isWalkover ? ' [WO]' : '';
+      return `${name}${score}${wo}`;
+    })
+    .join(', ');
+}
+
+export function exportFinalStandingsWorkbook({
+  edition,
+  blocks,
+  players,
+  standingTeamsMap = new Map(),
+}: ExportFinalStandingsOptions) {
+  const wb = XLSX.utils.book_new();
+  const editionTitle = edition?.title || (edition?.number ? `Edition ${edition.number}` : 'Tournament');
+  const safeEditionNum = edition?.number || 'Final';
+
+  // ==========================================
+  // SHEET 1: ROUND ROBIN (Standings & Combis)
+  // ==========================================
+  const rrBlock = blocks.find((b) => b.kind === 'LEAGUE' || b.kind === 'ROUND_ROBIN') || blocks[0];
+  const rrSheetData: any[] = [];
+
+  // Sheet Title
+  rrSheetData.push({ 'CBOT TOURNAMENT REPORT': `${editionTitle} — ROUND ROBIN STAGE` });
+  rrSheetData.push({}); // Empty separator row
+
+  // Section 1: Standings Table Header
+  rrSheetData.push({
+    'Rank (#)': 'Rank (#)',
+    'Team Name': 'Team Name',
+    'Total Points': 'Total Points',
+    'Matches Played': 'Matches Played',
+    'Won': 'Won',
+    'Lost': 'Lost',
+    'Tied': 'Tied',
+    'Team Total Score': 'Team Total Score',
+    'Event Points': 'Event Points',
+    'Slam Bonus': 'Slam Bonus',
+    'Target Bonus': 'Target Bonus',
+  });
+
+  const rrRows: StageStandingRow[] = [];
+  if (rrBlock?.groups) {
+    rrBlock.groups.forEach((g) => {
+      if (g.rows && Array.isArray(g.rows)) {
+        rrRows.push(...g.rows);
+      }
+    });
+  }
+  const sortedRR = [...rrRows].sort((a, b) => (a.rank || 0) - (b.rank || 0));
+
+  sortedRR.forEach((r) => {
+    rrSheetData.push({
+      'Rank (#)': r.rank,
+      'Team Name': r.teamName,
+      'Total Points': r.total,
+      'Matches Played': r.matchesPlayed ?? 0,
+      'Won': r.matchesWon ?? 0,
+      'Lost': r.matchesLost ?? 0,
+      'Tied': r.matchesTied ?? 0,
+      'Team Total Score': r.teamScore ?? 0,
+      'Event Points': r.eventPts ?? 0,
+      'Slam Bonus': r.slamBonus ?? 0,
+      'Target Bonus': r.avgBonus ?? 0,
+    });
+  });
+
+  rrSheetData.push({}); // Empty separator row
+  rrSheetData.push({ 'Rank (#)': 'ROUND ROBIN DAY-BY-DAY MATCH COMBIS & PLAYER SCORES' });
+  rrSheetData.push({
+    'Rank (#)': 'Day #',
+    'Team Name': 'Match Pairing',
+    'Total Points': 'Event Name',
+    'Matches Played': 'Format',
+    'Won': 'Team 1 Players & Scores',
+    'Lost': 'T1 Pts',
+    'Tied': 'T2 Pts',
+    'Team Total Score': 'Team 2 Players & Scores',
+    'Event Points': 'Result / Winner',
+    'Slam Bonus': 'Walkover Notes',
+  });
+
+  // Extract all combi events from Round Robin days
+  sortedRR.forEach((r) => {
+    const days = r.days || [];
+    days.forEach((d) => {
+      const events = d.events || [];
+      events.forEach((ev: any) => {
+        rrSheetData.push({
+          'Rank (#)': `Day ${d.dayNumber}`,
+          'Team Name': `${r.teamName} vs ${d.opponentName || 'Opponent'}`,
+          'Total Points': ev.name || 'Combi Event',
+          'Matches Played': ev.format || 'Standard',
+          'Won': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
+          'Lost': ev.team1Pts ?? 0,
+          'Tied': ev.team2Pts ?? 0,
+          'Team Total Score': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+          'Event Points': ev.result || 'Completed',
+          'Slam Bonus': ev.reason || '',
+        });
+      });
+    });
+  });
+
+  const wsRoundRobin = XLSX.utils.json_to_sheet(rrSheetData, { skipHeader: true });
+  wsRoundRobin['!cols'] = [
+    { wch: 10 }, // Day / Rank
+    { wch: 28 }, // Team / Match
+    { wch: 20 }, // Total Pts / Event
+    { wch: 14 }, // Played / Format
+    { wch: 34 }, // Won / Team 1 Players
+    { wch: 10 }, // Lost / T1 Pts
+    { wch: 10 }, // Tied / T2 Pts
+    { wch: 34 }, // Score / Team 2 Players
+    { wch: 18 }, // Event Pts / Result
+    { wch: 16 }, // Slam / Notes
+    { wch: 14 }, // Target+
+  ];
+  XLSX.utils.book_append_sheet(wb, wsRoundRobin, 'Round Robin');
+
+  // ==========================================
+  // SHEET 2: QUALIFIER MATCHES (Playoffs & Combis)
+  // ==========================================
+  const qualifierBlock = blocks.find(
+    (b) => (b.name || '').toUpperCase().includes('QUALIFIER') || (b.name || '').toUpperCase().includes('PLAYOFF') || (b.kind || '').toUpperCase().includes('QUALIFIER'),
+  );
+
+  const qualifierMatches = (qualifierBlock?.knockout || []).concat(
+    blocks.flatMap((b) => (b.knockout || []).filter((m) => {
+      const l = (m.label || '').toUpperCase();
+      return l.includes('QUALIFIER') || l.includes('ELIMINATOR') || l.includes('SEMI');
+    }))
+  );
+
+  // Remove duplicate matches by label and dayNumber
+  const seenQual = new Set<string>();
+  const uniqueQualMatches = qualifierMatches.filter((m) => {
+    const key = `${m.label}-${m.dayNumber}-${m.team1Name}-${m.team2Name}`;
+    if (seenQual.has(key)) return false;
+    seenQual.add(key);
+    return true;
+  });
+
+  const qualSheetData: any[] = [];
+  qualSheetData.push({ 'QUALIFIERS': `${editionTitle} — QUALIFIERS & PLAYOFF MATCHES` });
+  qualSheetData.push({});
+
+  // Summary Table of Qualifier Matches
+  qualSheetData.push({
+    'Match': 'Match Title',
+    'Day': 'Day #',
+    'Team 1': 'Team 1',
+    'T1 Score': 'Team 1 Event Pts',
+    'T2 Score': 'Team 2 Event Pts',
+    'Team 2': 'Team 2',
+    'Winner': 'Match Winner',
+    'Status': 'Playoff Impact',
+  });
+
+  uniqueQualMatches.forEach((m) => {
+    const winnerName = m.winnerTeamId === m.team1Id ? m.team1Name : m.winnerTeamId === m.team2Id ? m.team2Name : m.winnerTeamId ? 'Concluded' : 'TBD';
+    const labelUpper = (m.label || '').toUpperCase();
+    let impact = '';
+    if (labelUpper.includes('QUALIFIER 1') || labelUpper.includes('Q1')) {
+      impact = 'Winner -> Grand Final | Loser -> Qualifier 2';
+    } else if (labelUpper.includes('ELIMINATOR')) {
+      impact = 'Winner -> Qualifier 2 | Loser -> 4th Place';
+    } else if (labelUpper.includes('QUALIFIER 2') || labelUpper.includes('Q2')) {
+      impact = 'Winner -> Grand Final | Loser -> 3rd Place';
+    } else if (labelUpper.includes('SEMI')) {
+      impact = 'Winner -> Grand Final | Loser -> 3rd/4th Playoff';
+    }
+
+    qualSheetData.push({
+      'Match': m.label || 'Qualifier Match',
+      'Day': m.dayNumber ? `Day ${m.dayNumber}` : '—',
+      'Team 1': m.team1Name || 'TBD',
+      'T1 Score': m.team1EventPts ?? '—',
+      'T2 Score': m.team2EventPts ?? '—',
+      'Team 2': m.team2Name || 'TBD',
+      'Winner': winnerName,
+      'Status': impact,
+    });
+  });
+
+  qualSheetData.push({});
+  qualSheetData.push({ 'Match': 'DETAILED QUALIFIER COMBI EVENTS & PLAYER SCORES' });
+  qualSheetData.push({
+    'Match': 'Match Label',
+    'Day': 'Event Name',
+    'Team 1': 'Format',
+    'T1 Score': 'Team 1 Lineup & Scores',
+    'T2 Score': 'T1 Pts',
+    'Team 2': 'T2 Pts',
+    'Winner': 'Team 2 Lineup & Scores',
+    'Status': 'Event Result / Status',
+  });
+
+  uniqueQualMatches.forEach((m) => {
+    const events = m.events || [];
+    events.forEach((ev: any) => {
+      qualSheetData.push({
+        'Match': m.label,
+        'Day': ev.name || 'Combi Event',
+        'Team 1': ev.format || 'Standard',
+        'T1 Score': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
+        'T2 Score': ev.team1Pts ?? 0,
+        'Team 2': ev.team2Pts ?? 0,
+        'Winner': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+        'Status': ev.result || 'Completed',
+      });
+    });
+  });
+
+  const wsQualifiers = XLSX.utils.json_to_sheet(qualSheetData, { skipHeader: true });
+  wsQualifiers['!cols'] = [
+    { wch: 22 }, // Match
+    { wch: 18 }, // Day / Event
+    { wch: 18 }, // Team 1 / Format
+    { wch: 34 }, // T1 Score / Team 1 Lineup
+    { wch: 12 }, // T2 Score / T1 Pts
+    { wch: 12 }, // Team 2 / T2 Pts
+    { wch: 34 }, // Winner / Team 2 Lineup
+    { wch: 38 }, // Status / Impact
+  ];
+  XLSX.utils.book_append_sheet(wb, wsQualifiers, 'Qualifier Matches');
+
+  // ==========================================
+  // SHEET 3: FINALS & PLACEMENTS (Top 4 + Grand Final Combis)
+  // ==========================================
+  const podium = resolveTop4Podium(blocks, standingTeamsMap);
+  const finalsSheetData: any[] = [];
+
+  finalsSheetData.push({ 'FINALS': `${editionTitle} — TOP 4 PLACEMENTS & GRAND FINALS` });
+  finalsSheetData.push({});
+
+  // Section 1: Official Top 4 Placements Table
+  finalsSheetData.push({ 'FINALS': 'OFFICIAL TOP 4 TOURNAMENT STANDINGS & PODIUM' });
+  finalsSheetData.push({
+    'Position': 'Position',
+    'Placement': 'Official Title',
+    'Team Name': 'Team Name',
+    'Details': 'Match Path / Resolution',
+  });
+
+  finalsSheetData.push({
+    'Position': '1st Place 🥇',
+    'Placement': 'CHAMPION',
+    'Team Name': podium.champion?.teamName || 'TBD',
+    'Details': podium.champion?.matchDetail || 'Grand Final Winner',
+  });
+
+  finalsSheetData.push({
+    'Position': '2nd Place 🥈',
+    'Placement': 'RUNNER-UP',
+    'Team Name': podium.runnerUp?.teamName || 'TBD',
+    'Details': podium.runnerUp?.matchDetail || 'Grand Final Finalist',
+  });
+
+  finalsSheetData.push({
+    'Position': '3rd Place 🥉',
+    'Placement': '3rd PLACE',
+    'Team Name': podium.thirdPlace?.teamName || 'TBD',
+    'Details': podium.thirdPlace?.matchDetail || 'Qualifier 2 Loser',
+  });
+
+  finalsSheetData.push({
+    'Position': '4th Place 4️⃣',
+    'Placement': '4th PLACE',
+    'Team Name': podium.fourthPlace?.teamName || 'TBD',
+    'Details': podium.fourthPlace?.matchDetail || 'Eliminator Loser',
+  });
+
+  finalsSheetData.push({});
+
+  // Section 2: Final Matches (Grand Final & 3rd Place Playoff)
+  const finalMatches = blocks.flatMap((b) => (b.knockout || []).filter((m) => {
+    const l = (m.label || '').toUpperCase();
+    return (l.includes('FINAL') || l.includes('3RD') || l.includes('THIRD')) && !l.includes('QUALIFIER') && !l.includes('SEMI');
+  }));
+
+  const seenFinal = new Set<string>();
+  const uniqueFinalMatches = finalMatches.filter((m) => {
+    const key = `${m.label}-${m.dayNumber}-${m.team1Name}-${m.team2Name}`;
+    if (seenFinal.has(key)) return false;
+    seenFinal.add(key);
+    return true;
+  });
+
+  finalsSheetData.push({ 'FINALS': 'GRAND FINAL & PLAYOFF MATCH COMBI DETAILS' });
+  finalsSheetData.push({
+    'Position': 'Match Title',
+    'Placement': 'Event Name',
+    'Team Name': 'Format',
+    'Details': 'Team 1 Players & Scores',
+    'T1 Pts': 'T1 Pts',
+    'T2 Pts': 'T2 Pts',
+    'Team 2 Players': 'Team 2 Players & Scores',
+    'Result': 'Event Result / Status',
+  });
+
+  uniqueFinalMatches.forEach((m) => {
+    const events = m.events || [];
+    if (events.length === 0) {
+      const winnerName = m.winnerTeamId === m.team1Id ? m.team1Name : m.winnerTeamId === m.team2Id ? m.team2Name : m.winnerTeamId ? 'Concluded' : 'TBD';
+      finalsSheetData.push({
+        'Position': m.label,
+        'Placement': `Day ${m.dayNumber || 'Final'}`,
+        'Team Name': `${m.team1Name} vs ${m.team2Name}`,
+        'Details': `Score: ${m.team1EventPts ?? 0} – ${m.team2EventPts ?? 0} | Winner: ${winnerName}`,
+        'T1 Pts': m.team1EventPts ?? 0,
+        'T2 Pts': m.team2EventPts ?? 0,
+        'Team 2 Players': '',
+        'Result': winnerName,
+      });
+    } else {
+      events.forEach((ev: any) => {
+        finalsSheetData.push({
+          'Position': m.label,
+          'Placement': ev.name || 'Combi Event',
+          'Team Name': ev.format || 'Standard',
+          'Details': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
+          'T1 Pts': ev.team1Pts ?? 0,
+          'T2 Pts': ev.team2Pts ?? 0,
+          'Team 2 Players': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+          'Result': ev.result || 'Completed',
+        });
+      });
+    }
+  });
+
+  const wsFinals = XLSX.utils.json_to_sheet(finalsSheetData, { skipHeader: true });
+  wsFinals['!cols'] = [
+    { wch: 18 }, // Position / Match Title
+    { wch: 20 }, // Placement / Event Name
+    { wch: 24 }, // Team Name / Format
+    { wch: 36 }, // Details / Team 1 Players
+    { wch: 10 }, // T1 Pts
+    { wch: 10 }, // T2 Pts
+    { wch: 36 }, // Team 2 Players
+    { wch: 24 }, // Result
+  ];
+  XLSX.utils.book_append_sheet(wb, wsFinals, 'Finals & Placements');
+
+  // ==========================================
+  // SHEET 4: PLAYER RANKINGS (Standings Table)
+  // ==========================================
+  const playerSheetData: any[] = [];
+  playerSheetData.push({ 'PLAYER RANKINGS': `${editionTitle} — OFFICIAL PLAYER STANDINGS` });
+  playerSheetData.push({});
+
+  playerSheetData.push({
+    'Rank (#)': 'Rank (#)',
+    'Player Name': 'Player Name',
+    'Team Name': 'Team Name',
+    'Grade': 'Grade',
+    'Target': 'Edition Target',
+    'Matches Played': 'Matches / Days Counted',
+    'Slams': 'Total Slams',
+    'Walkovers': 'Walkovers (WO)',
+    'Board Average': 'Board Average (G.Avg)',
+    'Matches Won': 'Matches Won',
+  });
+
+  players.forEach((p) => {
+    playerSheetData.push({
+      'Rank (#)': p.rank,
+      'Player Name': p.name,
+      'Team Name': p.teamName || '—',
+      'Grade': p.grade || '—',
+      'Target': p.target ?? '—',
+      'Matches Played': p.matches ?? p.daysCounted ?? 0,
+      'Slams': p.slams ?? 0,
+      'Walkovers': p.walkovers ?? 0,
+      'Board Average': p.boardAverage != null ? Number(p.boardAverage).toFixed(2) : '—',
+      'Matches Won': p.matchesWon ?? 0,
+    });
+  });
+
+  const wsPlayers = XLSX.utils.json_to_sheet(playerSheetData, { skipHeader: true });
+  wsPlayers['!cols'] = [
+    { wch: 10 }, // Rank
+    { wch: 28 }, // Player Name
+    { wch: 24 }, // Team Name
+    { wch: 10 }, // Grade
+    { wch: 14 }, // Target
+    { wch: 22 }, // Matches Played
+    { wch: 14 }, // Slams
+    { wch: 16 }, // Walkovers
+    { wch: 22 }, // Board Average
+    { wch: 14 }, // Matches Won
+  ];
+  XLSX.utils.book_append_sheet(wb, wsPlayers, 'Player Rankings');
+
+  // Trigger download in browser
+  const today = new Date().toISOString().split('T')[0];
+  const filename = `CBOT-Edition-${safeEditionNum}-Final-Standings-${today}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
