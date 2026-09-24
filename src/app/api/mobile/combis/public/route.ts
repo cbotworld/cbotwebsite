@@ -118,9 +118,25 @@ function teamPayload(
   };
 }
 
+function combisCacheTtl(dayDates: Record<string, string>): number {
+  // After any day's 9:30 PM IST (16:00 UTC) reveal has passed today, cache for 1 hour.
+  // Before tonight's reveal, cache for 10 minutes so the flip is snappy.
+  const now = Date.now();
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  for (const iso of Object.values(dayDates)) {
+    if (iso && iso.startsWith(todayStr)) {
+      const cutoff = new Date(`${todayStr}T16:00:00.000Z`).getTime();
+      if (now >= cutoff) return 3600; // after reveal: 1 hr
+      return 600; // before tonight's reveal: 10 min
+    }
+  }
+  // No match today — data won't change for a while, cache 1 hr
+  return 3600;
+}
+
 export async function GET() {
   try {
-    const days = await memoryCache.getOrSet('mobile_public_combis_days', 10, async () => {
+    const days = await memoryCache.getOrSet('mobile_public_combis_days', 600, async () => {
       const editionRef = await resolveCurrentEdition();
       const rawEdition = editionRef
         ? await prisma.edition.findUnique({
@@ -226,7 +242,7 @@ export async function GET() {
 
     return NextResponse.json(
       { success: true, days },
-      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store' } },
+      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60' } },
     );
   } catch (error: any) {
     console.error('Mobile public combis GET:', error);

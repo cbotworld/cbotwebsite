@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { userFromBearer } from '@/lib/mobile-session';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
-
 import { resolveEditionAndTeam } from '@/lib/mobile-team';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,19 +63,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: mobileCorsHeaders });
     }
     const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
-    const team = await teamForUser(user.id, requestedEditionId);
-    const { getEditionProfileStatsForUser } = await import('@/lib/actions/playerScoreActions');
-    const editionStats = await getEditionProfileStatsForUser(user.id, requestedEditionId);
-    return NextResponse.json(
-      {
+
+    const cacheKey = `mobile_profile_${user.id}_${requestedEditionId || 'cur'}`;
+    const data = await memoryCache.getOrSet(cacheKey, 120, async () => {
+      const team = await teamForUser(user.id, requestedEditionId);
+      const { getEditionProfileStatsForUser } = await import('@/lib/actions/playerScoreActions');
+      const editionStats = await getEditionProfileStatsForUser(user.id, requestedEditionId);
+      return {
         success: true,
         ...publicProfile(user, team, editionStats.average, editionStats.wins, editionStats.target),
         editionStats,
         averageHistory: editionStats.history || [],
         targetHistory: editionStats.targetHistory || [],
-      },
-      { headers: mobileCorsHeaders },
-    );
+      };
+    });
+
+    return NextResponse.json(data, { headers: mobileCorsHeaders });
   } catch (error: any) {
     console.error('Mobile profile GET:', error);
     return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: mobileCorsHeaders });
@@ -152,6 +155,8 @@ export async function PATCH(request: NextRequest) {
     });
 
     const team = await teamForUser(updated.id);
+    // Invalidate cached profile so next GET is fresh
+    memoryCache.invalidate(`mobile_profile_${updated.id}`);
     return NextResponse.json({ success: true, ...publicProfile(updated, team) }, { headers: mobileCorsHeaders });
   } catch (error: any) {
     console.error('Mobile profile PATCH:', error);

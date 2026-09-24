@@ -17,7 +17,7 @@ export async function GET() {
     const payload = await getPublicStandings();
     return NextResponse.json(
       { success: true, ...payload },
-      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store' } },
+      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60' } },
     );
   } catch (error) {
     console.error('[mobile/standings]', error);

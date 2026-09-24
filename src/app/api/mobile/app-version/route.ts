@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { compareAppVersions, getPlayStoreAndroidVersion } from '@/lib/play-store-version';
 import { prisma } from '@/lib/prisma';
+import { memoryCache } from '@/lib/memory-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,17 @@ async function getSettingValue(key: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/** Fetch all version-related DB settings once per hour — they rarely change */
+async function getVersionConfig() {
+  return memoryCache.getOrSet('mobile_app_version_config', 3600, async () => ({
+    androidVersion: await getSettingValue('cbot_latest_android_version'),
+    androidBuild: await getSettingValue('cbot_latest_android_build'),
+    iosVersion: await getSettingValue('cbot_latest_ios_version'),
+    iosBuild: await getSettingValue('cbot_latest_ios_build'),
+    enableUpdatePopup: await getSettingValue('cbot_enable_update_popup'),
+  }));
 }
 
 export async function GET(request: NextRequest) {
@@ -43,16 +55,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Environment variables → Database SystemSetting → Hardcoded Fallback
-    const envVersion = isIos
-      ? process.env.LATEST_IOS_VERSION
-      : process.env.LATEST_ANDROID_VERSION;
-    const envBuild = isIos
-      ? process.env.LATEST_IOS_BUILD
-      : process.env.LATEST_ANDROID_BUILD;
+    // Environment variables → Cached Database SystemSetting → Hardcoded Fallback
+    const versionConfig = await getVersionConfig();
+    const envVersion = isIos ? process.env.LATEST_IOS_VERSION : process.env.LATEST_ANDROID_VERSION;
+    const envBuild = isIos ? process.env.LATEST_IOS_BUILD : process.env.LATEST_ANDROID_BUILD;
 
-    const dbVersion = await getSettingValue(isIos ? 'cbot_latest_ios_version' : 'cbot_latest_android_version');
-    const dbBuild = await getSettingValue(isIos ? 'cbot_latest_ios_build' : 'cbot_latest_android_build');
+    const dbVersion = isIos ? versionConfig.iosVersion : versionConfig.androidVersion;
+    const dbBuild = isIos ? versionConfig.iosBuild : versionConfig.androidBuild;
 
     let storeUrl = isIos
       ? (process.env.IOS_STORE_URL || 'https://apps.apple.com/app/id6742533036')
@@ -74,15 +83,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!targetVersion) targetVersion = isIos ? '1.4.8' : '1.4.8';
-    if (!targetBuild) targetBuild = isIos ? '50' : '50';
+    if (!targetVersion) targetVersion = '1.4.8';
+    if (!targetBuild) targetBuild = '50';
 
     const numericTargetBuild = parseInt(targetBuild, 10);
     const numericCurrentBuild = parseInt(currentBuild, 10);
     const forceUpdateEnabled =
       process.env.ENABLE_UPDATE_POPUP === 'true' ||
       process.env.NEXT_PUBLIC_ENABLE_UPDATE_POPUP === 'true' ||
-      (await getSettingValue('cbot_enable_update_popup')) === 'true';
+      versionConfig.enableUpdatePopup === 'true';
     let updateAvailable = false;
     if (forceUpdateEnabled) {
       if (currentVersion && targetVersion) {

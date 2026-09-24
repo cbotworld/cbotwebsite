@@ -45,7 +45,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
   },
   text: {
     color: '#94a3b8',
@@ -57,5 +56,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 136,
     height: 26,
+    marginLeft: -6,
   },
 });

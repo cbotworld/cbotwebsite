@@ -3,6 +3,7 @@ import { userFromBearer } from '@/lib/mobile-session';
 import { mobileCorsHeaders } from '@/lib/mobile-cors';
 import { resolveEditionAndTeam } from '@/lib/mobile-team';
 import { resolvePlayerTournamentOptions } from '@/lib/current-edition';
+import { memoryCache } from '@/lib/memory-cache';
 import {
   getEditionProfileStatsForUser,
   getMyDayScoresForUser,
@@ -31,31 +32,32 @@ export async function GET(request: NextRequest) {
     const requestedEditionId = (request.nextUrl.searchParams.get('editionId') || '').trim() || undefined;
     const slot = requestedSlot === 'B' ? 'B' : requestedSlot === 'A' ? 'A' : undefined;
 
-    const [mine, tournamentOptions] = await Promise.all([
-      getMyDayScoresForUser(user.id, requestedEditionId, slot),
-      resolvePlayerTournamentOptions(user.id),
-    ]);
+    const cacheKey = `mobile_scores_${user.id}_${slot || 'A'}_${requestedEditionId || 'cur'}_day${requestedDay || 0}`;
+    const payload = await memoryCache.getOrSet(cacheKey, 60, async () => {
+      const [mine, tournamentOptions] = await Promise.all([
+        getMyDayScoresForUser(user.id, requestedEditionId, slot),
+        resolvePlayerTournamentOptions(user.id),
+      ]);
 
-    const { team } = await resolveEditionAndTeam(user.id, {
-      teamId: requestedTeamId,
-      editionId: requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
-    });
+      const { team } = await resolveEditionAndTeam(user.id, {
+        teamId: requestedTeamId,
+        editionId: requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
+      });
 
-    let teammates: any[] = [];
-    let teamScoreWindowOpen = false;
-    const teamDay =
-      Number.isInteger(requestedDay) && requestedDay > 0 ? requestedDay : mine.eligibleDay;
-    if (team && team.captainId === user.id) {
-      const teamScores = await getTeamDayScoresForActor(team.id, teamDay, user.id, false);
-      teammates = teamScores.players || [];
-      teamScoreWindowOpen = Boolean(teamScores.windowOpen);
-    }
-    const editionStats = await getEditionProfileStatsForUser(
-      user.id,
-      requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
-    );
-    return NextResponse.json(
-      {
+      let teammates: any[] = [];
+      let teamScoreWindowOpen = false;
+      const teamDay =
+        Number.isInteger(requestedDay) && requestedDay > 0 ? requestedDay : mine.eligibleDay;
+      if (team && team.captainId === user.id) {
+        const teamScores = await getTeamDayScoresForActor(team.id, teamDay, user.id, false);
+        teammates = teamScores.players || [];
+        teamScoreWindowOpen = Boolean(teamScores.windowOpen);
+      }
+      const editionStats = await getEditionProfileStatsForUser(
+        user.id,
+        requestedEditionId || (slot === 'B' ? tournamentOptions.nextTournament?.id : tournamentOptions.currentTournament?.id),
+      );
+      return {
         ...mine,
         success: true,
         teammates,
@@ -67,9 +69,10 @@ export async function GET(request: NextRequest) {
         editionStats,
         tournaments: tournamentOptions,
         activeSlot: slot || (mine.isAdvancePlay ? 'B' : 'A'),
-      },
-      { headers: mobileCorsHeaders },
-    );
+      };
+    });
+
+    return NextResponse.json(payload, { headers: mobileCorsHeaders });
   } catch (error: any) {
     console.error('Mobile scores GET', error);
     return NextResponse.json({ success: false, error: 'Server error.' }, { status: 500, headers: mobileCorsHeaders });
@@ -100,6 +103,8 @@ export async function POST(request: NextRequest) {
         dayNumber: Number(body.dayNumber),
         rows: body.rows,
       });
+      // Invalidate cached scores for this user so next GET is fresh
+      memoryCache.invalidate(`mobile_scores_${user.id}`);
       return NextResponse.json(result, { headers: mobileCorsHeaders });
     }
 
@@ -112,6 +117,8 @@ export async function POST(request: NextRequest) {
       requestedEditionId,
       requestedSlot,
     );
+    // Invalidate cached scores for this user so next GET is fresh
+    memoryCache.invalidate(`mobile_scores_${user.id}`);
     return NextResponse.json(result, { headers: mobileCorsHeaders });
   } catch (error: any) {
     console.error('Mobile scores POST', error);
