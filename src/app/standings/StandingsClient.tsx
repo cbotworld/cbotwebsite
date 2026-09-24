@@ -187,7 +187,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
       ].join(';');
 
       const subtitleEl = document.createElement('div');
-      subtitleEl.textContent = 'CBOT · Carrom Board of Tamil Nadu';
+      subtitleEl.textContent = 'CBOT · Carrom Balu Online Tournament';
       subtitleEl.style.cssText = [
         'font-size:11px',
         'font-weight:700',
