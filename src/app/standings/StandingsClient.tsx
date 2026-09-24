@@ -263,15 +263,6 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     {podium.stageStatusDescription} · Grand Final Winner (1st), Grand Finalist (2nd), Qualifier 2 Loser (3rd), Eliminator Loser (4th)
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadExcel}
-                  disabled={isExporting}
-                  className="shrink-0 px-4 py-2 rounded-xl text-xs font-black border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-all flex items-center gap-2 shadow-sm"
-                >
-                  <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
-                  <span>Download Report (.xlsx)</span>
-                </button>
               </div>
             </CardHeader>
 
@@ -388,33 +379,6 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     {podium.fourthPlace?.matchDetail || 'Eliminator Loser'}
                   </div>
                 </div>
-              </div>
-
-              {/* Excel Download Info Callout */}
-              <div className="p-4 rounded-2xl bg-background/80 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
-                    <FileSpreadsheet className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-0.5">
-                    <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
-                      <span>Complete Multi-Sheet Tournament Excel (.xlsx)</span>
-                      <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">5 Sheets</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Includes: (1) Round Robin Standings &amp; Combis, (2) Qualifier Matches &amp; Scores, (3) Finals &amp; Placements, (4) Official Player Standings, (5) Player Daily Scores Matrix.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleDownloadExcel}
-                  disabled={isExporting}
-                  className="px-4 py-2.5 rounded-xl text-xs font-black border border-emerald-500/60 bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 shrink-0"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>{isExporting ? 'Generating...' : 'Download Complete Excel'}</span>
-                </button>
               </div>
             </CardContent>
           </Card>
