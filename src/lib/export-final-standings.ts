@@ -15,15 +15,26 @@ export type ExportFinalStandingsOptions = {
 };
 
 function formatPlayerList(list: any[] = []): string {
-  if (!list || list.length === 0) return '—';
+  if (!list || list.length === 0) return '';
   return list
     .map((p) => {
-      const name = p.name || 'Player';
+      const name = p.name || p.username || 'Player';
       const score = p.score != null ? ` (${p.score})` : '';
       const wo = p.isWalkover ? ' [WO]' : '';
       return `${name}${score}${wo}`;
     })
     .join(', ');
+}
+
+function resolvePlayerNames(playerList?: any[], rawNames?: string): string {
+  if (Array.isArray(playerList) && playerList.length > 0) {
+    const formatted = formatPlayerList(playerList);
+    if (formatted) return formatted;
+  }
+  if (rawNames && typeof rawNames === 'string' && rawNames.trim()) {
+    return rawNames.trim();
+  }
+  return '—';
 }
 
 export function exportFinalStandingsWorkbook({
@@ -103,20 +114,32 @@ export function exportFinalStandingsWorkbook({
   });
 
   // Extract all combi events from Round Robin days
+  const seenRoundRobinEvents = new Set<string>();
   sortedRR.forEach((r) => {
     const days = r.days || [];
     days.forEach((d) => {
       const events = d.events || [];
       events.forEach((ev: any) => {
+        // Create canonical match-event pairing key to avoid duplicate inverted rows
+        const teamsSorted = [r.teamName, d.opponentName || 'Opponent'].sort().join(' vs ');
+        const eventKey = `Day-${d.dayNumber}-${teamsSorted}-${ev.name || ''}`;
+        if (seenRoundRobinEvents.has(eventKey)) return;
+        seenRoundRobinEvents.add(eventKey);
+
+        const t1Players = resolvePlayerNames(ev.myPlayerList || ev.team1PlayerList, ev.myPlayers || ev.team1Players);
+        const t2Players = resolvePlayerNames(ev.oppPlayerList || ev.team2PlayerList, ev.oppPlayers || ev.team2Players);
+        const t1Pts = ev.myPts ?? ev.team1Pts ?? 0;
+        const t2Pts = ev.oppPts ?? ev.team2Pts ?? 0;
+
         rrSheetData.push({
           'Rank (#)': `Day ${d.dayNumber}`,
           'Team Name': `${r.teamName} vs ${d.opponentName || 'Opponent'}`,
           'Total Points': ev.name || 'Combi Event',
           'Matches Played': ev.format || 'Standard',
-          'Won': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
-          'Lost': ev.team1Pts ?? 0,
-          'Tied': ev.team2Pts ?? 0,
-          'Team Total Score': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+          'Won': t1Players,
+          'Lost': t1Pts,
+          'Tied': t2Pts,
+          'Team Total Score': t2Players,
           'Event Points': ev.result || 'Completed',
           'Slam Bonus': ev.reason || '',
         });
@@ -127,14 +150,14 @@ export function exportFinalStandingsWorkbook({
   const wsRoundRobin = XLSX.utils.json_to_sheet(rrSheetData, { skipHeader: true });
   wsRoundRobin['!cols'] = [
     { wch: 10 }, // Day / Rank
-    { wch: 28 }, // Team / Match
+    { wch: 32 }, // Team / Match
     { wch: 20 }, // Total Pts / Event
     { wch: 14 }, // Played / Format
-    { wch: 34 }, // Won / Team 1 Players
+    { wch: 36 }, // Won / Team 1 Players
     { wch: 10 }, // Lost / T1 Pts
     { wch: 10 }, // Tied / T2 Pts
-    { wch: 34 }, // Score / Team 2 Players
-    { wch: 18 }, // Event Pts / Result
+    { wch: 36 }, // Score / Team 2 Players
+    { wch: 20 }, // Event Pts / Result
     { wch: 16 }, // Slam / Notes
     { wch: 14 }, // Target+
   ];
@@ -221,14 +244,19 @@ export function exportFinalStandingsWorkbook({
   uniqueQualMatches.forEach((m) => {
     const events = m.events || [];
     events.forEach((ev: any) => {
+      const t1Players = resolvePlayerNames(ev.team1PlayerList || ev.myPlayerList, ev.team1Players || ev.myPlayers);
+      const t2Players = resolvePlayerNames(ev.team2PlayerList || ev.oppPlayerList, ev.team2Players || ev.oppPlayers);
+      const t1Pts = ev.team1Pts ?? ev.myPts ?? 0;
+      const t2Pts = ev.team2Pts ?? ev.oppPts ?? 0;
+
       qualSheetData.push({
         'Match': m.label,
         'Day': ev.name || 'Combi Event',
         'Team 1': ev.format || 'Standard',
-        'T1 Score': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
-        'T2 Score': ev.team1Pts ?? 0,
-        'Team 2': ev.team2Pts ?? 0,
-        'Winner': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+        'T1 Score': t1Players,
+        'T2 Score': t1Pts,
+        'Team 2': t2Pts,
+        'Winner': t2Players,
         'Status': ev.result || 'Completed',
       });
     });
@@ -337,14 +365,19 @@ export function exportFinalStandingsWorkbook({
       });
     } else {
       events.forEach((ev: any) => {
+        const t1Players = resolvePlayerNames(ev.team1PlayerList || ev.myPlayerList, ev.team1Players || ev.myPlayers);
+        const t2Players = resolvePlayerNames(ev.team2PlayerList || ev.oppPlayerList, ev.team2Players || ev.oppPlayers);
+        const t1Pts = ev.team1Pts ?? ev.myPts ?? 0;
+        const t2Pts = ev.team2Pts ?? ev.oppPts ?? 0;
+
         finalsSheetData.push({
           'Position': m.label,
           'Placement': ev.name || 'Combi Event',
           'Team Name': ev.format || 'Standard',
-          'Details': ev.team1PlayerList ? formatPlayerList(ev.team1PlayerList) : ev.team1Players || '—',
-          'T1 Pts': ev.team1Pts ?? 0,
-          'T2 Pts': ev.team2Pts ?? 0,
-          'Team 2 Players': ev.team2PlayerList ? formatPlayerList(ev.team2PlayerList) : ev.team2Players || '—',
+          'Details': t1Players,
+          'T1 Pts': t1Pts,
+          'T2 Pts': t2Pts,
+          'Team 2 Players': t2Players,
           'Result': ev.result || 'Completed',
         });
       });

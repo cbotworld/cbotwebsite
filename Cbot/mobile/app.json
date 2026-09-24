@@ -64,11 +64,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "karthikipad",
     "extra": {
       "eas": {
-        "projectId": "f4ca4f57-6593-4d04-9e02-ae5939b964ca"
+        "projectId": "7484a5da-59e7-470f-a5ea-2d4d5e2badaf"
       }
-    }
+    },
+    "owner": "cbotworld"
   }
 }
