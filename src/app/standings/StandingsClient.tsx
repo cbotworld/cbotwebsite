@@ -256,7 +256,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
         }
       });
 
-      // 4. Force all table cells to allow wrapping (no hidden overflow on cells)
+      // 4. Force all table cells to allow wrapping
       clone.querySelectorAll<HTMLElement>('td, th').forEach((el) => {
         el.style.whiteSpace = 'normal';
         el.style.overflow = 'visible';
@@ -268,6 +268,57 @@ export default function StandingsClient({ payload }: { payload: any }) {
         el.style.overflow = 'visible';
       });
 
+      // ── Remove placement chip pill boxes → plain text ──────────────
+      // The badge spans have one of these background classes
+      const placementBgMap: Record<string, string> = {
+        'bg-amber-400': '#fbbf24',   // 1st — gold
+        'bg-slate-300': '#cbd5e1',   // 2nd — silver
+        'bg-amber-700': '#b45309',   // 3rd — bronze
+        'bg-zinc-700':  '#3f3f46',   // 4th — zinc
+      };
+      Object.entries(placementBgMap).forEach(([bgClass, _color]) => {
+        clone.querySelectorAll<HTMLElement>(`span.${bgClass}`).forEach((el) => {
+          // Strip the pill look
+          el.style.background = 'transparent';
+          el.style.backgroundColor = 'transparent';
+          el.style.borderRadius = '0';
+          el.style.padding = '0';
+          el.style.boxShadow = 'none';
+          el.style.border = 'none';
+          // Increase font & use tier colour
+          el.style.fontSize = '13px';
+          el.style.fontWeight = '900';
+          el.style.letterSpacing = '1px';
+          el.style.color = bgClass === 'bg-amber-400' ? '#fbbf24'
+                         : bgClass === 'bg-slate-300' ? '#94a3b8'
+                         : bgClass === 'bg-amber-700' ? '#d97706'
+                         : '#71717a';
+        });
+      });
+
+      // ── Increase team name font sizes in podium cards ──────────────
+      // Team name: text-base sm:text-lg → boost to 20px
+      clone.querySelectorAll<HTMLElement>('.text-base.font-black, .sm\\:text-lg.font-black').forEach((el) => {
+        el.style.fontSize = '20px';
+      });
+      // Fallback: any font-black inside a podium card flex row
+      clone.querySelectorAll<HTMLElement>('.font-black').forEach((el) => {
+        const computed = window.getComputedStyle(el);
+        const fs = parseFloat(computed.fontSize);
+        if (fs >= 16 && fs <= 20) {
+          el.style.fontSize = '20px';
+        }
+      });
+
+      // Tag text [SID], [VAK] etc. — boost from 11px to 13px
+      clone.querySelectorAll<HTMLElement>('.font-mono.font-bold').forEach((el) => {
+        el.style.fontSize = '13px';
+      });
+
+      // Match detail footer text on each podium card
+      clone.querySelectorAll<HTMLElement>('.text-\\[11px\\]').forEach((el) => {
+        el.style.fontSize = '12px';
+      });
 
 
       // ── Footer watermark ───────────────────────────────────────────
