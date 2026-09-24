@@ -1,4 +1,6 @@
 import * as React from 'react';
+import fs from 'fs';
+import path from 'path';
 import nodemailer from 'nodemailer';
 import { prisma } from '@/lib/prisma';
 import { getPublicStandings } from '@/lib/actions/playerScoreActions';
@@ -53,6 +55,18 @@ export async function generateFinalStandingsImageBuffer(payload: any): Promise<B
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
+  // Load CBOT logo from filesystem as base64 data URI
+  let logoDataUri = '';
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+    if (fs.existsSync(logoPath)) {
+      const base64 = fs.readFileSync(logoPath).toString('base64');
+      logoDataUri = `data:image/png;base64,${base64}`;
+    }
+  } catch (err) {
+    console.warn('[generateFinalStandingsImageBuffer] Could not load logo file:', err);
+  }
+
   // Calculate dynamic canvas height based on number of rows
   const rowCount = Math.min(rrRows.length, 12);
   const calculatedHeight = Math.max(900, 480 + rowCount * 42);
@@ -88,21 +102,40 @@ export async function generateFinalStandingsImageBuffer(payload: any): Promise<B
           },
         },
         [
-          React.createElement('div', { key: 'h-left', style: { display: 'flex', flexDirection: 'column' } }, [
-            React.createElement(
-              'span',
-              { key: 'title', style: { fontSize: '24px', fontWeight: 900, color: '#f9fafb', letterSpacing: '-0.5px' } },
-              edition.title || 'CBOT Tournament Final Standings',
-            ),
-            React.createElement(
-              'span',
-              {
-                key: 'sub',
-                style: { fontSize: '11px', fontWeight: 700, color: '#fbbf24', marginTop: '4px', letterSpacing: '0.8px', textTransform: 'uppercase' },
-              },
-              'CBOT · CARROM BALU ONLINE TOURNAMENT',
-            ),
-          ]),
+          React.createElement(
+            'div',
+            { key: 'h-left', style: { display: 'flex', alignItems: 'center', gap: '16px' } },
+            [
+              logoDataUri
+                ? React.createElement('img', {
+                    key: 'logo',
+                    src: logoDataUri,
+                    style: {
+                      height: '56px',
+                      width: '56px',
+                      objectFit: 'contain',
+                      borderRadius: '8px',
+                      flexShrink: 0,
+                    },
+                  })
+                : null,
+              React.createElement('div', { key: 'h-text', style: { display: 'flex', flexDirection: 'column' } }, [
+                React.createElement(
+                  'span',
+                  { key: 'title', style: { fontSize: '24px', fontWeight: 900, color: '#f9fafb', letterSpacing: '-0.5px' } },
+                  edition.title || 'CBOT Tournament Final Standings',
+                ),
+                React.createElement(
+                  'span',
+                  {
+                    key: 'sub',
+                    style: { fontSize: '11px', fontWeight: 700, color: '#fbbf24', marginTop: '4px', letterSpacing: '0.8px', textTransform: 'uppercase' },
+                  },
+                  'CBOT · CARROM BALU ONLINE TOURNAMENT',
+                ),
+              ]),
+            ],
+          ),
           React.createElement(
             'div',
             {
