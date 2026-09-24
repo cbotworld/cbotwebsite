@@ -138,79 +138,151 @@ export default function StandingsClient({ payload }: { payload: any }) {
     try {
       const html2canvas = (await import('html2canvas')).default;
 
-      // Build a wrapper that includes a header with logo + title
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = `
-        position: fixed;
-        left: -9999px;
-        top: 0;
-        width: ${captureRef.current.scrollWidth}px;
-        background: #0f0f0f;
-        padding: 0;
-        font-family: inherit;
-      `;
+      const CANVAS_WIDTH = 1200;
 
-      // Header row: logo + title
+      // ── Outer wrapper ──────────────────────────────────────────────
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = [
+        'position:fixed',
+        'left:-99999px',
+        'top:0',
+        `width:${CANVAS_WIDTH}px`,
+        'background:#0d0d0d',
+        'font-family:ui-sans-serif,system-ui,-apple-system,sans-serif',
+        'color:#f9fafb',
+        'box-sizing:border-box',
+      ].join(';');
+
+      // ── Header ─────────────────────────────────────────────────────
       const header = document.createElement('div');
-      header.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 20px 24px;
-        border-bottom: 1px solid rgba(251,191,36,0.3);
-        background: linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(15,15,15,0) 60%);
-      `;
+      header.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'justify-content:space-between',
+        'padding:18px 28px',
+        'background:linear-gradient(135deg,rgba(251,191,36,0.18) 0%,rgba(13,13,13,0) 55%)',
+        'border-bottom:2px solid rgba(251,191,36,0.35)',
+      ].join(';');
+
+      // Logo + text group (left)
+      const leftGroup = document.createElement('div');
+      leftGroup.style.cssText = 'display:flex;align-items:center;gap:14px;';
 
       const logoImg = document.createElement('img');
       logoImg.src = '/logo.png';
-      logoImg.style.cssText = 'height: 52px; width: auto; object-fit: contain;';
+      logoImg.style.cssText = 'height:56px;width:auto;object-fit:contain;flex-shrink:0;';
       logoImg.crossOrigin = 'anonymous';
 
-      const titleWrap = document.createElement('div');
+      const textBlock = document.createElement('div');
+      textBlock.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+
       const titleEl = document.createElement('div');
       titleEl.textContent = data.edition?.title || 'Final Standings';
-      titleEl.style.cssText = 'font-size: 22px; font-weight: 900; color: #f9fafb; letter-spacing: -0.5px;';
+      titleEl.style.cssText = [
+        'font-size:20px',
+        'font-weight:900',
+        'color:#f9fafb',
+        'letter-spacing:-0.4px',
+        'line-height:1.2',
+      ].join(';');
+
       const subtitleEl = document.createElement('div');
-      subtitleEl.textContent = 'CBOT — Carrom Board of Tamil Nadu';
-      subtitleEl.style.cssText = 'font-size: 12px; font-weight: 600; color: rgba(251,191,36,0.8); margin-top: 2px;';
-      titleWrap.appendChild(titleEl);
-      titleWrap.appendChild(subtitleEl);
+      subtitleEl.textContent = 'CBOT · Carrom Board of Tamil Nadu';
+      subtitleEl.style.cssText = [
+        'font-size:11px',
+        'font-weight:700',
+        'color:rgba(251,191,36,0.85)',
+        'letter-spacing:0.5px',
+        'text-transform:uppercase',
+      ].join(';');
 
-      header.appendChild(logoImg);
-      header.appendChild(titleWrap);
+      textBlock.appendChild(titleEl);
+      textBlock.appendChild(subtitleEl);
+      leftGroup.appendChild(logoImg);
+      leftGroup.appendChild(textBlock);
 
-      // Clone the captured content
+      // Date badge (right)
+      const dateBadge = document.createElement('div');
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      dateBadge.textContent = `Final Standings · ${dateStr}`;
+      dateBadge.style.cssText = [
+        'font-size:10px',
+        'font-weight:700',
+        'color:rgba(251,191,36,0.6)',
+        'background:rgba(251,191,36,0.08)',
+        'border:1px solid rgba(251,191,36,0.25)',
+        'padding:5px 12px',
+        'border-radius:20px',
+        'letter-spacing:0.3px',
+        'white-space:nowrap',
+      ].join(';');
+
+      header.appendChild(leftGroup);
+      header.appendChild(dateBadge);
+
+      // ── Content clone ──────────────────────────────────────────────
       const clone = captureRef.current.cloneNode(true) as HTMLElement;
-      clone.style.cssText = 'padding: 20px 24px;';
+      // Remove Tailwind animation classes that delay rendering
+      clone.classList.remove('animate-in', 'fade-in');
+      clone.style.cssText = [
+        'padding:20px 28px 28px',
+        'background:#0d0d0d',
+        'color:#f9fafb',
+        'display:block',
+        'width:100%',
+        'box-sizing:border-box',
+      ].join(';');
+
+      // ── Footer watermark ───────────────────────────────────────────
+      const footer = document.createElement('div');
+      footer.textContent = 'cbotworld.com  ·  Generated by CBOT Tournament System';
+      footer.style.cssText = [
+        'text-align:center',
+        'padding:12px 28px',
+        'font-size:9px',
+        'font-weight:600',
+        'color:rgba(255,255,255,0.2)',
+        'letter-spacing:0.8px',
+        'text-transform:uppercase',
+        'border-top:1px solid rgba(255,255,255,0.06)',
+      ].join(';');
 
       wrapper.appendChild(header);
       wrapper.appendChild(clone);
+      wrapper.appendChild(footer);
       document.body.appendChild(wrapper);
 
-      // Wait for logo image to load
+      // Wait for logo to load
       await new Promise<void>((resolve) => {
-        if (logoImg.complete) { resolve(); return; }
+        if (logoImg.complete && logoImg.naturalWidth > 0) { resolve(); return; }
         logoImg.onload = () => resolve();
         logoImg.onerror = () => resolve();
-        setTimeout(resolve, 2000);
+        setTimeout(resolve, 2500);
       });
+
+      // Small settle delay so the DOM is fully painted
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
       const canvas = await html2canvas(wrapper, {
         scale: 2,
-        backgroundColor: '#0f0f0f',
+        backgroundColor: '#0d0d0d',
         useCORS: true,
         allowTaint: false,
         logging: false,
-        width: wrapper.scrollWidth,
+        width: CANVAS_WIDTH,
         height: wrapper.scrollHeight,
+        windowWidth: CANVAS_WIDTH,
       });
 
       document.body.removeChild(wrapper);
 
       const link = document.createElement('a');
-      const editionTitle = (data.edition?.title || 'final-standings').replace(/\s+/g, '-').toLowerCase();
+      const editionTitle = (data.edition?.title || 'final-standings')
+        .replace(/\s+/g, '-')
+        .toLowerCase();
       link.download = `${editionTitle}-standings.jpg`;
-      link.href = canvas.toDataURL('image/jpeg', 0.92);
+      link.href = canvas.toDataURL('image/jpeg', 0.93);
       link.click();
     } catch (err) {
       console.error('Error capturing standings image:', err);
@@ -218,6 +290,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
       setIsCapturing(false);
     }
   };
+
 
   const filteredPlayers = React.useMemo(() => {
     const q = playerSearch.trim().toLowerCase();
