@@ -43,7 +43,7 @@ type Props = {
 
 const GENDERS = ['Male', 'Female', 'Other'];
 
-const appVersion = Constants.expoConfig?.version || Constants.nativeAppVersion || '1.4.7';
+const appVersion = Constants.expoConfig?.version || Constants.nativeAppVersion || '1.4.8';
 const buildNumber = Platform.select({
   ios: Constants.expoConfig?.ios?.buildNumber || Constants.nativeBuildVersion,
   android: Constants.expoConfig?.android?.versionCode ? String(Constants.expoConfig.android.versionCode) : Constants.nativeBuildVersion,
