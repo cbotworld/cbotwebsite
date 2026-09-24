@@ -447,6 +447,87 @@ export function exportFinalStandingsWorkbook({
   ];
   XLSX.utils.book_append_sheet(wb, wsPlayers, 'Player Rankings');
 
+  // ==========================================
+  // SHEET 5: DAILY SCORES (Player Daily Matrix)
+  // ==========================================
+  const dailyScoresSheetData: any[] = [];
+
+  // Determine total days in edition / player scores
+  let maxTournamentDay = 10;
+  players.forEach((p) => {
+    (p.dayScores || []).forEach((ds: any) => {
+      if (typeof ds.dayNumber === 'number' && ds.dayNumber > maxTournamentDay) {
+        maxTournamentDay = ds.dayNumber;
+      }
+    });
+  });
+
+  const dayCols: number[] = [];
+  for (let d = 1; d <= maxTournamentDay; d++) {
+    dayCols.push(d);
+  }
+
+  // Header row matching screenshot: Sl.No | TEAMS | Player | Group | Day1 | Day2 | ... | DayN
+  const dailyHeader: Record<string, string> = {
+    'Sl.No': 'Sl.No',
+    'TEAMS': 'TEAMS',
+    'Player': 'Player',
+    'Group': 'Group',
+  };
+  dayCols.forEach((d) => {
+    dailyHeader[`Day${d}`] = `Day${d}`;
+  });
+  dailyScoresSheetData.push(dailyHeader);
+
+  // Group and sort players by Team name, then Grade (G1..G8), then Player name
+  const sortedPlayersForDaily = [...players].sort((a, b) => {
+    const teamA = (a.teamName || '').toLowerCase();
+    const teamB = (b.teamName || '').toLowerCase();
+    if (teamA !== teamB) return teamA.localeCompare(teamB);
+
+    const gradeA = String(a.grade || '').toUpperCase();
+    const gradeB = String(b.grade || '').toUpperCase();
+    if (gradeA !== gradeB) {
+      return gradeA.localeCompare(gradeB, undefined, { numeric: true });
+    }
+
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  sortedPlayersForDaily.forEach((p, idx) => {
+    const dayMap = new Map<number, number | string>();
+    (p.dayScores || []).forEach((ds: any) => {
+      if (ds.dayNumber) {
+        dayMap.set(ds.dayNumber, ds.score != null ? ds.score : '');
+      }
+    });
+
+    const row: Record<string, any> = {
+      'Sl.No': idx + 1,
+      'TEAMS': p.teamName || '—',
+      'Player': p.name || 'Player',
+      'Group': p.grade || '—',
+    };
+
+    dayCols.forEach((d) => {
+      row[`Day${d}`] = dayMap.has(d) ? dayMap.get(d) : '';
+    });
+
+    dailyScoresSheetData.push(row);
+  });
+
+  const wsDailyScores = XLSX.utils.json_to_sheet(dailyScoresSheetData, { skipHeader: true });
+  wsDailyScores['!cols'] = [
+    { wch: 8 },  // Sl.No
+    { wch: 26 }, // TEAMS
+    { wch: 26 }, // Player
+    { wch: 10 }, // Group
+    ...dayCols.map(() => ({ wch: 9 })), // Day1..DayN
+  ];
+  XLSX.utils.book_append_sheet(wb, wsDailyScores, 'Daily Scores');
+
   // Trigger download in browser
   const today = new Date().toISOString().split('T')[0];
   const filename = `CBOT-Edition-${safeEditionNum}-Final-Standings-${today}.xlsx`;
