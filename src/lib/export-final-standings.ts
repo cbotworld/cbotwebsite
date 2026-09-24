@@ -37,12 +37,12 @@ function resolvePlayerNames(playerList?: any[], rawNames?: string): string {
   return '—';
 }
 
-export function exportFinalStandingsWorkbook({
+export function buildFinalStandingsWorkbook({
   edition,
   blocks,
   players,
   standingTeamsMap = new Map(),
-}: ExportFinalStandingsOptions) {
+}: ExportFinalStandingsOptions): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const editionTitle = edition?.title || (edition?.number ? `Edition ${edition.number}` : 'Tournament');
   const safeEditionNum = edition?.number || 'Final';
@@ -528,8 +528,19 @@ export function exportFinalStandingsWorkbook({
   ];
   XLSX.utils.book_append_sheet(wb, wsDailyScores, 'Daily Scores');
 
-  // Trigger download in browser
+  return wb;
+}
+
+export function exportFinalStandingsWorkbook(options: ExportFinalStandingsOptions) {
+  const wb = buildFinalStandingsWorkbook(options);
+  const safeEditionNum = options.edition?.number || 'Final';
   const today = new Date().toISOString().split('T')[0];
   const filename = `CBOT-Edition-${safeEditionNum}-Final-Standings-${today}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
+
+export function buildFinalStandingsBuffer(options: ExportFinalStandingsOptions): Buffer {
+  const wb = buildFinalStandingsWorkbook(options);
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+

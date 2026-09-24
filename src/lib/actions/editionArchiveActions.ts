@@ -8,6 +8,7 @@ import { resolveCurrentEdition } from '@/lib/current-edition';
 import { buildEditionArchiveWorkbook } from '@/lib/edition-archive';
 import { gradingSettingKey } from '@/lib/grading';
 import { stageConfigKey, defaultTournamentStages } from '@/lib/tournament-stages';
+import { sendFinalStandingsEmail } from '@/lib/tournament-report-email';
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -75,6 +76,17 @@ export async function emptyEditionTournamentData(editionId: string, confirmation
       select: { captainId: true },
     });
     const captainIds = captainRows.map((t) => t.captainId).filter((id): id is string => Boolean(id));
+
+    // Automatically send full archive email with Excel & JPEG to cbotworld@gmail.com before clearing data
+    try {
+      console.log(`[emptyEditionTournamentData] Sending automated archive backup email for Edition ${edition.number}...`);
+      await sendFinalStandingsEmail({
+        editionId,
+        triggerReason: 'ORGANIZER_CLEAR',
+      });
+    } catch (mailErr) {
+      console.error('[emptyEditionTournamentData] Error sending automated backup email:', mailErr);
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.liveStream.deleteMany({ where: { editionId } });

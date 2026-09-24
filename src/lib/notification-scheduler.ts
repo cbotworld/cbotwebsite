@@ -7,6 +7,7 @@ import { resolveOrganizerPairings } from '@/lib/organizer-schedule';
 import { getPublicStandings } from '@/lib/actions/playerScoreActions';
 import { scoreMatchDay } from '@/lib/combi-results';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
+import { sendFinalStandingsEmail } from '@/lib/tournament-report-email';
 
 function ordinalRank(rank: number): string {
   if (rank <= 0) return `${rank}`;
@@ -822,6 +823,47 @@ export async function dispatchNotifications(
       });
     } catch (saveErr) {
       console.warn('[NotificationScheduler] Failed to save slot dispatch record:', saveErr);
+    }
+  }
+
+  // 5. Automated Final Standings & Excel Email on Qualifier and Finals Match Days
+  if (activeType === 'results' && !dryRun) {
+    try {
+      const stageSetting = await prisma.systemSetting.findUnique({
+        where: { key: stageConfigKey(activeEdition.id) },
+      });
+      if (stageSetting?.value) {
+        const config = JSON.parse(stageSetting.value);
+        const stages: any[] = config.stages || [];
+        const qualStage = stages.find((s) => s.kind === 'QUALIFIER');
+        const finalsStage = stages.find((s) => s.kind === 'FINALS');
+
+        let isQualDay = false;
+        let isFinalsDay = false;
+
+        if (qualStage) {
+          const start = qualStage.startDay || 0;
+          const end = start + (qualStage.durationDays || 1) - 1;
+          if (dayNumber >= start && dayNumber <= end) isQualDay = true;
+        }
+
+        if (finalsStage) {
+          const start = finalsStage.startDay || 0;
+          const end = start + (finalsStage.durationDays || 1) - 1;
+          if (dayNumber >= start && dayNumber <= end) isFinalsDay = true;
+        }
+
+        if (isQualDay || isFinalsDay) {
+          console.log(`[NotificationScheduler] Day ${dayNumber} is a ${isFinalsDay ? 'Finals' : 'Qualifier'} match day. Dispatching automated report email to cbotworld@gmail.com...`);
+          await sendFinalStandingsEmail({
+            editionId: activeEdition.id,
+            triggerReason: isFinalsDay ? 'FINALS_END' : 'QUALIFIER_END',
+            dayNumber,
+          });
+        }
+      }
+    } catch (emailErr) {
+      console.error('[NotificationScheduler] Failed to dispatch qualifier/finals report email:', emailErr);
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { sendFinalStandingsEmail } from '@/lib/tournament-report-email';
 
 export async function submitScoreReport(data: {
   matchId: string;
@@ -69,6 +70,30 @@ export async function verifyScoreReport(reportId: string, action: 'APPROVE' | 'R
           winnerId: winnerId,
         }
       });
+
+      // If this was a playoff / qualifier / finals match, check if all matches for the stage are complete
+      if (['QUALIFIER_1', 'QUALIFIER_2', 'QUALIFIER_3', 'QUALIFIER_4', 'SEMI_FINAL', 'GRAND_FINAL', 'THIRD_PLACE'].includes(match.stage || '')) {
+        try {
+          const pendingMatchesOnStage = await prisma.match.count({
+            where: {
+              editionId: match.editionId,
+              stage: match.stage,
+              id: { not: match.id },
+              status: { not: 'COMPLETED' },
+            },
+          });
+          if (pendingMatchesOnStage === 0) {
+            console.log(`[verifyScoreReport] All matches for stage ${match.stage} are completed. Dispatching automated report email...`);
+            await sendFinalStandingsEmail({
+              editionId: match.editionId,
+              triggerReason: match.stage === 'GRAND_FINAL' ? 'FINALS_END' : 'QUALIFIER_END',
+              dayNumber: match.round,
+            });
+          }
+        } catch (mailErr) {
+          console.error('[verifyScoreReport] Error sending automated report email:', mailErr);
+        }
+      }
     }
 
     revalidatePath('/dashboard/organizer');
