@@ -1688,8 +1688,22 @@ export default function OrganizerClient({
     }
     setExportingTeamsJpeg(true);
     try {
-      await new Promise((r) => setTimeout(r, 150));
       const element = teamsPosterRef.current;
+      // Ensure all images inside teamsPosterRef are fully loaded before capturing
+      const imgs = element.querySelectorAll('img');
+      await Promise.all(
+        Array.from(imgs).map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete && img.naturalWidth > 0) return resolve();
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 2000);
+            })
+        )
+      );
+      await new Promise((r) => setTimeout(r, 150));
+
       const canvas = await html2canvas(element, {
         backgroundColor: '#090d16',
         scale: 3,
@@ -4090,28 +4104,42 @@ function TeamsExportPoster({
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           }}
         >
-          <div>
-            <div
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <img
+              src="/logo.png"
+              alt="CBOT Logo"
+              crossOrigin="anonymous"
               style={{
-                fontSize: '13px',
-                fontWeight: '900',
-                letterSpacing: '0.2em',
-                color: '#f59e0b',
-                textTransform: 'uppercase',
-                marginBottom: '4px',
+                height: '68px',
+                width: 'auto',
+                objectFit: 'contain',
+                flexShrink: 0,
+                borderRadius: '8px',
               }}
-            >
-              CBOT TOURNAMENT • OFFICIAL TEAM ROSTERS
-            </div>
-            <div
-              style={{
-                fontSize: '32px',
-                fontWeight: '900',
-                color: '#ffffff',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {editionTitle || 'Tournament Teams'}
+            />
+            <div>
+              <div
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '900',
+                  letterSpacing: '0.2em',
+                  color: '#f59e0b',
+                  textTransform: 'uppercase',
+                  marginBottom: '4px',
+                }}
+              >
+                CBOT TOURNAMENT • OFFICIAL TEAM ROSTERS
+              </div>
+              <div
+                style={{
+                  fontSize: '32px',
+                  fontWeight: '900',
+                  color: '#ffffff',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {editionTitle || 'Tournament Teams'}
+              </div>
             </div>
           </div>
 
