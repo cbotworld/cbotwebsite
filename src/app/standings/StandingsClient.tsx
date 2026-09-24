@@ -278,18 +278,15 @@ export default function StandingsClient({ payload }: { payload: any }) {
             <CardContent className="p-4 sm:p-6 space-y-6">
               {/* Podium Grid for Top 4 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1st Place: Champion */}
+                {/* 1st Place */}
                 <div className="p-4 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-500/25 via-amber-500/10 to-card shadow-lg flex flex-col justify-between space-y-3 relative overflow-hidden">
                   <div className="absolute -right-4 -top-4 opacity-15">
                     <Trophy className="h-24 w-24 text-amber-400" />
                   </div>
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       <span className="text-[11px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow-sm">
                         🥇 1st Place
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded border border-amber-400/30">
-                        CHAMPION
                       </span>
                     </div>
                     <div className="pt-2 flex items-center gap-3">
@@ -311,15 +308,12 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   </div>
                 </div>
 
-                {/* 2nd Place: Runner-Up */}
+                {/* 2nd Place */}
                 <div className="p-4 rounded-2xl border-2 border-slate-400/60 bg-gradient-to-b from-slate-400/20 via-slate-400/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       <span className="text-[11px] font-black uppercase tracking-wider bg-slate-300 text-slate-950 px-2.5 py-0.5 rounded-full shadow-sm">
                         🥈 2nd Place
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-300 bg-slate-400/15 px-2 py-0.5 rounded border border-slate-400/30">
-                        RUNNER-UP
                       </span>
                     </div>
                     <div className="pt-2 flex items-center gap-3">
@@ -344,12 +338,9 @@ export default function StandingsClient({ payload }: { payload: any }) {
                 {/* 3rd Place */}
                 <div className="p-4 rounded-2xl border-2 border-amber-700/60 bg-gradient-to-b from-amber-700/20 via-amber-700/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       <span className="text-[11px] font-black uppercase tracking-wider bg-amber-700 text-amber-100 px-2.5 py-0.5 rounded-full shadow-sm">
                         🥉 3rd Place
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-700/15 px-2 py-0.5 rounded border border-amber-700/30">
-                        3rd PLACE
                       </span>
                     </div>
                     <div className="pt-2 flex items-center gap-3">
@@ -374,12 +365,9 @@ export default function StandingsClient({ payload }: { payload: any }) {
                 {/* 4th Place */}
                 <div className="p-4 rounded-2xl border-2 border-zinc-600/50 bg-gradient-to-b from-zinc-600/20 via-zinc-600/10 to-card shadow-md flex flex-col justify-between space-y-3 relative overflow-hidden">
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       <span className="text-[11px] font-black uppercase tracking-wider bg-zinc-700 text-zinc-100 px-2.5 py-0.5 rounded-full shadow-sm">
                         4️⃣ 4th Place
-                      </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 bg-zinc-600/15 px-2 py-0.5 rounded border border-zinc-600/30">
-                        4th PLACE
                       </span>
                     </div>
                     <div className="pt-2 flex items-center gap-3">
@@ -411,10 +399,10 @@ export default function StandingsClient({ payload }: { payload: any }) {
                   <div className="space-y-0.5">
                     <div className="text-sm font-extrabold text-foreground flex items-center gap-2">
                       <span>Complete Multi-Sheet Tournament Excel (.xlsx)</span>
-                      <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">4 Sheets</Badge>
+                      <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400">5 Sheets</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Includes: (1) Round Robin Standings &amp; Combis, (2) Qualifier Matches &amp; Scores, (3) Finals &amp; Placements, (4) Official Player Standings.
+                      Includes: (1) Round Robin Standings &amp; Combis, (2) Qualifier Matches &amp; Scores, (3) Finals &amp; Placements, (4) Official Player Standings, (5) Player Daily Scores Matrix.
                     </p>
                   </div>
                 </div>
