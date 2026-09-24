@@ -143,11 +143,28 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="text-center text-xs text-muted-foreground pt-4 border-t border-border mt-4">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-amber-500 font-bold hover:underline">
-              Create Account with Email OTP
-            </Link>
+          <div className="text-center text-xs text-muted-foreground pt-4 border-t border-border mt-4 space-y-2.5">
+            <div>
+              Don't have an account?{' '}
+              <Link href="/register" className="text-amber-500 font-bold hover:underline">
+                Create Account with Email OTP
+              </Link>
+            </div>
+            <div className="text-[11px] text-muted-foreground/80 flex flex-wrap items-center justify-center gap-1.5">
+              <span>By logging in, you agree to our</span>
+              <Link href="/privacy" className="text-amber-500 font-bold underline hover:text-amber-400">
+                Privacy Policy
+              </Link>
+              <span>&amp;</span>
+              <a
+                href="https://www.youtube.com/t/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-500 font-bold underline hover:text-amber-400"
+              >
+                YouTube Terms of Service
+              </a>
+            </div>
           </div>
         </CardContent>
       </Card>

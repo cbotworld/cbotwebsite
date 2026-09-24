@@ -5,6 +5,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -76,6 +77,14 @@ export function RegisterScreen({ navigation }: Props) {
       setError(err.message || 'Failed to send verification OTP.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openYouTubeTerms = async () => {
+    try {
+      await Linking.openURL('https://www.youtube.com/t/terms');
+    } catch (e) {
+      console.error('Failed to open YouTube terms:', e);
     }
   };
 
@@ -203,12 +212,16 @@ export function RegisterScreen({ navigation }: Props) {
                 </Text>
               </Pressable>
 
-              <Pressable style={styles.privacyWrap} onPress={() => setPrivacyOpen(true)}>
-                <Text style={styles.privacyText}>
-                  By creating an account, you agree to our{' '}
-                  <Text style={styles.privacyHighlight}>Privacy Policy</Text>
-                </Text>
-              </Pressable>
+              <View style={styles.legalWrap}>
+                <Text style={styles.legalText}>By creating an account, you agree to our </Text>
+                <Pressable onPress={() => setPrivacyOpen(true)} hitSlop={6}>
+                  <Text style={styles.legalHighlight}>Privacy Policy</Text>
+                </Pressable>
+                <Text style={styles.legalText}> &amp; </Text>
+                <Pressable onPress={openYouTubeTerms} hitSlop={6}>
+                  <Text style={styles.legalHighlight}>YouTube Terms of Service</Text>
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -353,7 +366,15 @@ const styles = StyleSheet.create({
   credLabel: { color: '#d4a5aa', fontSize: 13 },
   credValueAmber: { color: '#f59e0b', fontSize: 15, fontWeight: '900' },
   credValueGreen: { color: '#22c55e', fontSize: 15, fontWeight: '900' },
-  privacyWrap: { marginTop: 14, alignItems: 'center', paddingVertical: 4 },
-  privacyText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
-  privacyHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline' },
+  legalWrap: {
+    marginTop: 14,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  legalText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
+  legalHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline', fontSize: 11.5 },
 });

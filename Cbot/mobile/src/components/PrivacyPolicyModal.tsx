@@ -18,17 +18,24 @@ interface Props {
 }
 
 export function PrivacyPolicyModal({ visible, onClose }: Props) {
-  const openWebPolicy = async () => {
+  const openUrl = async (url: string) => {
     try {
-      const url = `${config.websiteBaseUrl}/privacy`;
       const supported = await Linking.canOpenURL(url);
       if (supported) {
         await Linking.openURL(url);
+      } else {
+        await Linking.openURL(url);
       }
     } catch (e) {
-      console.error('Failed to open privacy policy URL:', e);
+      console.error('Failed to open URL:', url, e);
     }
   };
+
+  const openWebPolicy = () => openUrl(`${config.websiteBaseUrl}/privacy`);
+  const openYouTubeTerms = () => openUrl('https://www.youtube.com/t/terms');
+  const openGooglePrivacy = () => openUrl('http://www.google.com/policies/privacy');
+  const openGooglePermissions = () => openUrl('https://security.google.com/settings/security/permissions');
+  const openEmail = () => openUrl('mailto:cbotworld@gmail.com');
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -50,60 +57,105 @@ export function PrivacyPolicyModal({ visible, onClose }: Props) {
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             <View style={styles.introCard}>
               <Text style={styles.introText}>
-                Carrom BALU Online Tournament (CBOT) is committed to protecting your privacy. This policy outlines how we handle player and participant information across our mobile app and platform.
+                Carrom Balu Online Tournament (CBOT) is committed to protecting your privacy. This Privacy Policy explains how we collect, use, store, and process your personal information and data accessed through third-party services across our website, platform, and mobile applications.
               </Text>
             </View>
 
+            {/* Section 1 */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>1. Information We Collect</Text>
               <Text style={styles.paragraph}>
-                When you register or use the CBOT Player Live app, we collect:
-              </Text>
-              <Text style={styles.bullet}>• <Text style={styles.bold}>Account Info:</Text> Name, username, email address, WhatsApp mobile number, and login PIN.</Text>
-              <Text style={styles.bullet}>• <Text style={styles.bold}>Player Profile:</Text> Bio, age, gender, city, state, country, and player averages.</Text>
-              <Text style={styles.bullet}>• <Text style={styles.bold}>Gameplay Data:</Text> Match scores, day scores, target achievements, live stream videos, and team lineups.</Text>
-              <Text style={styles.bullet}>• <Text style={styles.bold}>Device Tokens:</Text> Push notification tokens to alert you of match schedules and results.</Text>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>2. How We Use Your Data</Text>
-              <Text style={styles.paragraph}>
-                We use the collected information exclusively to:
-              </Text>
-              <Text style={styles.bullet}>• Facilitate fair-play tournament matchups and combis pairings.</Text>
-              <Text style={styles.bullet}>• Compute official player grades, averages, targets, and team standings.</Text>
-              <Text style={styles.bullet}>• Broadcast and archive verified match streams.</Text>
-              <Text style={styles.bullet}>• Distribute match schedule reminders, login PIN updates, and score alerts.</Text>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>3. Data Protection & Sharing</Text>
-              <Text style={styles.paragraph}>
-                We guarantee that your personal data is stored securely and is <Text style={styles.bold}>never shared, sold, or rented</Text> to third-party sponsors, advertisers, or external organizations.
+                We collect player profile information (name, username, email, WhatsApp phone number, and location) solely to manage tournament registrations, standings, schedules, leaderboard rankings, and match communication.
               </Text>
             </View>
 
+            {/* Section 2 */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>4. Account Deletion & Data Rights</Text>
+              <Text style={styles.sectionTitle}>2. YouTube API Services & Integration</Text>
               <Text style={styles.paragraph}>
-                You have full control over your data. You can delete your account directly at any time inside the app via <Text style={styles.bold}>Profile → Delete Account</Text>.
+                Our application uses <Text style={styles.bold}>YouTube API Services</Text> to facilitate tournament live streaming, generate official match broadcasts, verify fair-play match gameplay, and archive match recordings.
+              </Text>
+              <Text style={styles.paragraph}>
+                By using these features and our application, you acknowledge and agree that you are also bound by the{' '}
+                <Text style={styles.linkText} onPress={openYouTubeTerms}>
+                  YouTube Terms of Service
+                </Text>
+                .
+              </Text>
+              <Text style={styles.paragraph}>
+                For more information about how Google collects and uses your data, please review the{' '}
+                <Text style={styles.linkText} onPress={openGooglePrivacy}>
+                  Google Privacy Policy
+                </Text>
+                .
+              </Text>
+            </View>
+
+            {/* Section 3 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>3. YouTube Data Access, Storage & Deletion</Text>
+              <Text style={styles.paragraph}>
+                When organizers and authorized tournament creators connect YouTube, our application accesses YouTube broadcast and stream metadata (such as broadcast title, live stream status, RTMP ingestion URL, stream keys, and video IDs) solely to initialize match streams and display live video feeds to viewers.
+              </Text>
+              <Text style={styles.bullet}>
+                • <Text style={styles.bold}>Data Storage:</Text> We do not store sensitive private Google credentials permanently. OAuth tokens are stored in an encrypted database strictly for the duration of the tournament broadcast session.
+              </Text>
+              <Text style={styles.bullet}>
+                • <Text style={styles.bold}>Data Retention & Deletion:</Text> Broadcast identifiers are retained only as long as required for tournament record-keeping. You may request immediate deletion of any associated account data or stored video records at any time by contacting{' '}
+                <Text style={styles.linkText} onPress={openEmail}>
+                  cbotworld@gmail.com
+                </Text>
+                .
+              </Text>
+            </View>
+
+            {/* Section 4 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>4. Revocation of Access to Google & YouTube Data</Text>
+              <Text style={styles.paragraph}>
+                You can revoke our application's access to your Google and YouTube account data at any time via the official{' '}
+                <Text style={styles.linkText} onPress={openGooglePermissions}>
+                  Google Security Settings Permissions Page
+                </Text>
+                .
+              </Text>
+            </View>
+
+            {/* Section 5 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>5. Data Protection & Sharing</Text>
+              <Text style={styles.paragraph}>
+                We guarantee that your personal information is stored securely and is <Text style={styles.bold}>never shared, sold, or rented</Text> to third-party advertisers, data brokers, or external commercial organizations.
+              </Text>
+            </View>
+
+            {/* Section 6 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>6. Account Deletion & Data Rights</Text>
+              <Text style={styles.paragraph}>
+                You have full control over your data. You can delete your account directly at any time inside the mobile application via <Text style={styles.bold}>Profile → Delete Account</Text> or by contacting us via email.
               </Text>
               <Text style={styles.paragraph}>
                 Account deletion is immediate and permanent: your profile, login credentials, match scores, statistics, and tournament history are erased completely from our database.
               </Text>
             </View>
 
+            {/* Section 7 */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>5. Contact & Support</Text>
+              <Text style={styles.sectionTitle}>7. Contact Us</Text>
               <Text style={styles.paragraph}>
-                If you have any questions regarding privacy or data practices, please reach out to us:
+                If you have any questions about this Privacy Policy, YouTube API data handling, or wish to delete your account, please email us directly at:
               </Text>
-              <Text style={styles.contactItem}>📧 Email: <Text style={styles.goldText}>cbotworld@gmail.com</Text></Text>
-              <Text style={styles.contactItem}>🌐 Website: <Text style={styles.goldText}>www.cbotworld.com</Text></Text>
+              <Pressable onPress={openEmail} style={styles.contactRow}>
+                <Text style={styles.contactItem}>📧 Email: <Text style={styles.goldText}>cbotworld@gmail.com</Text></Text>
+              </Pressable>
+              <Pressable onPress={openWebPolicy} style={styles.contactRow}>
+                <Text style={styles.contactItem}>🌐 Website: <Text style={styles.goldText}>www.cbotworld.com</Text></Text>
+              </Pressable>
             </View>
 
             <Pressable style={styles.webBtn} onPress={openWebPolicy}>
-              <Text style={styles.webBtnText}>OPEN IN BROWSER ↗</Text>
+              <Text style={styles.webBtnText}>OPEN FULL POLICY IN BROWSER ↗</Text>
             </Pressable>
           </ScrollView>
 
@@ -216,11 +268,19 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     lineHeight: 18,
     marginLeft: 4,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   bold: {
     fontWeight: '700',
     color: '#f1f5f9',
+  },
+  linkText: {
+    color: '#f59e0b',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  contactRow: {
+    paddingVertical: 2,
   },
   contactItem: {
     fontSize: 12.5,
@@ -231,9 +291,10 @@ const styles = StyleSheet.create({
   goldText: {
     color: '#f59e0b',
     fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   webBtn: {
-    marginTop: 10,
+    marginTop: 14,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#334155',

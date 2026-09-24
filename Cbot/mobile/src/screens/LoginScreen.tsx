@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -96,6 +97,14 @@ export function LoginScreen({ navigation }: Props) {
       setError(e instanceof Error ? e.message : 'Login failed.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openYouTubeTerms = async () => {
+    try {
+      await Linking.openURL('https://www.youtube.com/t/terms');
+    } catch (e) {
+      console.error('Failed to open YouTube terms:', e);
     }
   };
 
@@ -192,12 +201,16 @@ export function LoginScreen({ navigation }: Props) {
             <Text style={styles.skipText}>CONTINUE WITHOUT LOGIN</Text>
           </Pressable>
 
-          <Pressable style={styles.privacyLink} onPress={() => setPrivacyOpen(true)}>
-            <Text style={styles.privacyLinkText}>
-              By signing in, you agree to our{' '}
-              <Text style={styles.privacyLinkHighlight}>Privacy Policy</Text>
-            </Text>
-          </Pressable>
+          <View style={styles.legalWrap}>
+            <Text style={styles.legalText}>By signing in, you agree to our </Text>
+            <Pressable onPress={() => setPrivacyOpen(true)} hitSlop={6}>
+              <Text style={styles.legalHighlight}>Privacy Policy</Text>
+            </Pressable>
+            <Text style={styles.legalText}> &amp; </Text>
+            <Pressable onPress={openYouTubeTerms} hitSlop={6}>
+              <Text style={styles.legalHighlight}>YouTube Terms of Service</Text>
+            </Pressable>
+          </View>
 
           <PoweredByFooter />
         </ScrollView>
@@ -271,8 +284,16 @@ const styles = StyleSheet.create({
   registerLink: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
   registerLinkText: { color: '#cbd5e1', fontSize: 13 },
   registerLinkBold: { color: '#f59e0b', fontWeight: '800' },
-  privacyLink: { marginTop: 20, alignItems: 'center', paddingVertical: 8 },
-  privacyLinkText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
-  privacyLinkHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline' },
+  legalWrap: {
+    marginTop: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  legalText: { color: '#94a3b8', fontSize: 11.5, textAlign: 'center' },
+  legalHighlight: { color: '#f59e0b', fontWeight: '800', textDecorationLine: 'underline', fontSize: 11.5 },
   error: { color: '#fca5a5', marginTop: 12, textAlign: 'center' },
 });

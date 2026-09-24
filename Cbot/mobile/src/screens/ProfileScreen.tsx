@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -464,6 +465,13 @@ export function ProfileScreen({ navigation }: Props) {
 
             <Pressable style={[styles.secondary, { marginTop: 8 }]} onPress={() => setPrivacyOpen(true)}>
               <Text style={styles.secondaryText}>PRIVACY POLICY</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.secondary, { marginTop: 8 }]}
+              onPress={() => void Linking.openURL('https://www.youtube.com/t/terms')}
+            >
+              <Text style={styles.secondaryText}>YOUTUBE TERMS OF SERVICE ↗</Text>
             </Pressable>
 
             <Pressable style={styles.logout} onPress={logout}>

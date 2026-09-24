@@ -121,10 +121,20 @@ export default async function PrivacyPolicyPage() {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">6. Contact Us</h2>
+            <h2 className="text-base font-bold text-foreground">6. Account Deletion & Data Rights</h2>
+            <p>
+              You have full control over your data. You can delete your account directly at any time inside the mobile application via <strong>Profile → Delete Account</strong> or by contacting us via email.
+            </p>
+            <p>
+              Account deletion is immediate and permanent: your profile, login credentials, match scores, statistics, and tournament history are erased completely from our database.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-base font-bold text-foreground">7. Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, YouTube API data handling, or wish to delete your account, please email us directly at{' '}
-              <a href="mailto:cbotworld@gmail.com" className="text-amber-400 font-bold">
+              <a href="mailto:cbotworld@gmail.com" className="text-amber-400 font-bold underline">
                 cbotworld@gmail.com
               </a>
               .

@@ -26,11 +26,23 @@ export function GoLivePromptModal({
 }: Props) {
   if (!match) return null;
 
-  const descriptionText =
+  const rawDescription =
     match.editionDescription?.trim() ||
     match.editionRules?.trim() ||
     match.editionTheme?.trim() ||
     `${match.editionTitle} — Standard match play. Stream your boards continuously until match completion.`;
+
+  // Clean description and extract disclaimer if embedded
+  let cleanDescription = rawDescription;
+  let customDisclaimer = 'Phone screen will be dimmed for performance reasons - recording is un-interrupted';
+
+  const disclaimerMatch = rawDescription.match(/(?:[\r\n\s_—-]*)Disclaimer:\s*([\s\S]+)$/i);
+  if (disclaimerMatch) {
+    cleanDescription = rawDescription.replace(/(?:[\r\n\s_—-]*)Disclaimer:\s*[\s\S]+$/i, '').trim();
+    if (disclaimerMatch[1]?.trim()) {
+      customDisclaimer = disclaimerMatch[1].trim();
+    }
+  }
 
   return (
     <Modal
@@ -44,7 +56,7 @@ export function GoLivePromptModal({
         
         <View style={styles.card}>
           <ScrollView
-            style={{ maxHeight: 520 }}
+            style={{ maxHeight: 540 }}
             contentContainerStyle={{ paddingBottom: 8 }}
             showsVerticalScrollIndicator={false}
           >
@@ -63,7 +75,7 @@ export function GoLivePromptModal({
             <View style={styles.descriptionSection}>
               <Text style={styles.descriptionHeader}>Description</Text>
               <View style={styles.descriptionBox}>
-                <Text style={styles.descriptionContent}>{descriptionText}</Text>
+                <Text style={styles.descriptionContent}>{cleanDescription}</Text>
               </View>
             </View>
 
@@ -77,12 +89,26 @@ export function GoLivePromptModal({
               </View>
             ) : null}
 
-            {/* Live Camera Guidelines Warning */}
+            {/* Live Camera Guidelines & Disclaimer Warning Box */}
             <View style={styles.guidelinesBox}>
-              <Ionicons name="information-circle" size={16} color="#f59e0b" style={{ marginTop: 1 }} />
-              <Text style={styles.guidelinesText}>
-                Make sure your phone camera clearly captures the entire carrom board and all pockets during the broadcast.
-              </Text>
+              <View style={styles.guidelinesList}>
+                {/* Point 1 */}
+                <View style={styles.guidelineItem}>
+                  <Ionicons name="information-circle" size={16} color="#f59e0b" style={{ marginTop: 2 }} />
+                  <Text style={styles.guidelinesText}>
+                    Make sure your phone camera clearly captures the entire carrom board and all pockets during the broadcast.
+                  </Text>
+                </View>
+
+                {/* Point 2: Disclaimer */}
+                <View style={styles.guidelineItem}>
+                  <Ionicons name="information-circle" size={16} color="#f59e0b" style={{ marginTop: 2 }} />
+                  <Text style={styles.guidelinesText}>
+                    <Text style={styles.guidelinesBold}>Disclaimer: </Text>
+                    {customDisclaimer}
+                  </Text>
+                </View>
+              </View>
             </View>
 
             {/* Action Buttons */}
@@ -203,23 +229,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   guidelinesBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    borderRadius: 12,
-    padding: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderRadius: 14,
+    padding: 14,
     marginTop: 14,
     marginBottom: 18,
   },
+  guidelinesList: {
+    gap: 10,
+  },
+  guidelineItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
   guidelinesText: {
     flex: 1,
-    fontSize: 12,
-    color: '#cbd5e1',
-    lineHeight: 17,
-    fontWeight: '600',
+    fontSize: 12.5,
+    color: '#fef3c7',
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  guidelinesBold: {
+    fontWeight: '800',
+    color: '#fbbf24',
   },
   goLiveBtn: {
     backgroundColor: '#dc2626',
