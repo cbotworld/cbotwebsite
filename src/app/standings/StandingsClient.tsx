@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X, Award, Download, Medal, ChevronRight, CheckCircle2, Crown, Sparkles, FileSpreadsheet } from 'lucide-react';
+import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X, Award, Download, Medal, ChevronRight, CheckCircle2, Crown, Sparkles, FileSpreadsheet, ImageIcon } from 'lucide-react';
 import { resolveTop4Podium } from '@/lib/tournament-podium';
 import { exportFinalStandingsWorkbook } from '@/lib/export-final-standings';
 
@@ -113,6 +113,8 @@ export default function StandingsClient({ payload }: { payload: any }) {
   }, [blocks]);
 
   const [isExporting, setIsExporting] = React.useState(false);
+  const [isCapturing, setIsCapturing] = React.useState(false);
+  const captureRef = React.useRef<HTMLDivElement>(null);
 
   const handleDownloadExcel = () => {
     try {
@@ -127,6 +129,93 @@ export default function StandingsClient({ payload }: { payload: any }) {
       console.error('Error exporting final standings excel:', err);
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleDownloadJpeg = async () => {
+    if (!captureRef.current) return;
+    setIsCapturing(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Build a wrapper that includes a header with logo + title
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: ${captureRef.current.scrollWidth}px;
+        background: #0f0f0f;
+        padding: 0;
+        font-family: inherit;
+      `;
+
+      // Header row: logo + title
+      const header = document.createElement('div');
+      header.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(251,191,36,0.3);
+        background: linear-gradient(135deg, rgba(251,191,36,0.12) 0%, rgba(15,15,15,0) 60%);
+      `;
+
+      const logoImg = document.createElement('img');
+      logoImg.src = '/logo.png';
+      logoImg.style.cssText = 'height: 52px; width: auto; object-fit: contain;';
+      logoImg.crossOrigin = 'anonymous';
+
+      const titleWrap = document.createElement('div');
+      const titleEl = document.createElement('div');
+      titleEl.textContent = data.edition?.title || 'Final Standings';
+      titleEl.style.cssText = 'font-size: 22px; font-weight: 900; color: #f9fafb; letter-spacing: -0.5px;';
+      const subtitleEl = document.createElement('div');
+      subtitleEl.textContent = 'CBOT — Carrom Board of Tamil Nadu';
+      subtitleEl.style.cssText = 'font-size: 12px; font-weight: 600; color: rgba(251,191,36,0.8); margin-top: 2px;';
+      titleWrap.appendChild(titleEl);
+      titleWrap.appendChild(subtitleEl);
+
+      header.appendChild(logoImg);
+      header.appendChild(titleWrap);
+
+      // Clone the captured content
+      const clone = captureRef.current.cloneNode(true) as HTMLElement;
+      clone.style.cssText = 'padding: 20px 24px;';
+
+      wrapper.appendChild(header);
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      // Wait for logo image to load
+      await new Promise<void>((resolve) => {
+        if (logoImg.complete) { resolve(); return; }
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => resolve();
+        setTimeout(resolve, 2000);
+      });
+
+      const canvas = await html2canvas(wrapper, {
+        scale: 2,
+        backgroundColor: '#0f0f0f',
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: wrapper.scrollWidth,
+        height: wrapper.scrollHeight,
+      });
+
+      document.body.removeChild(wrapper);
+
+      const link = document.createElement('a');
+      const editionTitle = (data.edition?.title || 'final-standings').replace(/\s+/g, '-').toLowerCase();
+      link.download = `${editionTitle}-standings.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.92);
+      link.click();
+    } catch (err) {
+      console.error('Error capturing standings image:', err);
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -205,11 +294,24 @@ export default function StandingsClient({ payload }: { payload: any }) {
             onClick={handleDownloadExcel}
             disabled={isExporting}
             className="h-10 px-3.5 py-1.5 rounded-2xl text-xs font-black border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 shadow-sm"
-            title="Download complete 4-sheet tournament excel with all match combis"
+            title="Download complete 5-sheet tournament excel with all match combis"
           >
             <Download className="h-4 w-4 text-emerald-400" />
             <span>{isExporting ? 'Generating...' : 'Download Excel (.xlsx)'}</span>
           </button>
+
+          {tab === 'final' && (
+            <button
+              type="button"
+              onClick={handleDownloadJpeg}
+              disabled={isCapturing}
+              className="h-10 px-3.5 py-1.5 rounded-2xl text-xs font-black border border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 transition-all flex items-center gap-1.5 shadow-sm"
+              title="Download Final Standings as JPEG image with CBOT logo"
+            >
+              <ImageIcon className="h-4 w-4 text-sky-400" />
+              <span>{isCapturing ? 'Capturing...' : 'Download Image (.jpg)'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -247,7 +349,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
       </div>
 
       {tab === 'final' ? (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div ref={captureRef} className="space-y-6 animate-in fade-in duration-200">
           {/* Top 4 Tournament Podium Card */}
           <Card className="border-amber-500/40 bg-gradient-to-b from-amber-500/10 via-card/90 to-card shadow-2xl overflow-hidden">
             <CardHeader className="p-4 sm:p-6 border-b border-border/60 bg-muted/20">
