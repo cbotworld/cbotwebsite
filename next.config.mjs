@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  staticPageGenerationTimeout: 120,
   async redirects() {
     return [
       { source: '/edition-200-combis', destination: '/combis', permanent: true },

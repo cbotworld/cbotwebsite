@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -10,7 +11,6 @@ import { getMyRegistrationEnrollment } from '@/lib/actions/tournamentSlotActions
 import { gradingSettingKey } from '@/lib/grading';
 import { extractGradeAndTargetMaps } from '@/lib/actions/playerScoreActions';
 
-export const revalidate = 0;
 
 export default async function PlayerPage() {
   const session = await getServerSession(authOptions);

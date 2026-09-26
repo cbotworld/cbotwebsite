@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -18,7 +19,6 @@ import { resolveCurrentEditionRecord } from '@/lib/current-edition';
 import { getMyRegistrationEnrollment } from '@/lib/actions/tournamentSlotActions';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
-export const revalidate = 0;
 
 export default async function CaptainPage() {
   const session = await getServerSession(authOptions);

@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { Badge } from '@/components/ui/badge';
@@ -5,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Trophy, Star, Shield, Award } from 'lucide-react';
 
-export const revalidate = 3600;
 
 export default async function HallOfFamePage() {
   const [members, cms] = await Promise.all([

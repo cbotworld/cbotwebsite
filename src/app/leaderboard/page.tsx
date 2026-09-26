@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import LeaderboardClient from './LeaderboardClient';

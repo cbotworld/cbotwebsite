@@ -1,8 +1,8 @@
+﻿export const dynamic = 'force-dynamic';
 import { getEditions } from '@/lib/actions/tournamentActions';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import EditionsClient from './EditionsClient';
 
-export const revalidate = 3600;
 
 export default async function EditionsPage() {
   const [res, cms] = await Promise.all([getEditions(), getWebsiteCmsContent()]);

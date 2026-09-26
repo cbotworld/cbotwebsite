@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import HomeClient from './HomeClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';

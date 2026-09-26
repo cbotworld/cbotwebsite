@@ -1,8 +1,7 @@
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import FixturesClient from './FixturesClient';
-
-export const revalidate = 3600; // Cache fixtures for up to 1 hour; revalidated on-demand via actions
 
 export default async function FixturesPage() {
   const [matches, cms] = await Promise.all([

@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { ContactClient } from './ContactClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 

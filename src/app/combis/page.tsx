@@ -1,9 +1,9 @@
+﻿export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import DailyCombisClient from '../editions/200th-combis/DailyCombisClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import { PUBLIC_COMBIS_PATH } from '@/lib/website-cms';
 
-export const revalidate = 300;
 
 export default async function CombisPage() {
   const cms = await getWebsiteCmsContent();

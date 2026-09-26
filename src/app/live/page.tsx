@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { LiveClient } from './LiveClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 

@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import PlayersClient from './PlayersClient';
 import { DELETED_USERNAMES } from '@/lib/mock-data';
