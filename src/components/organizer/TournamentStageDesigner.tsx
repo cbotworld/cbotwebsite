@@ -32,6 +32,8 @@ import {
   suggestLeaguePairings,
   suggestQualifierPairings,
   suggestRoundRobinPairings,
+  suggestRRKnockoutDay1Pairings,
+  suggestRRKnockoutDay2Pairings,
   nextRoundRobinPairing,
   nextQualifierPairing,
   nextFinalsPairing,
@@ -729,11 +731,21 @@ export default function TournamentStageDesigner({
   }, [dayDatesSignature, active?.kind]);
 
   const suggestedQualifiers = React.useMemo(() => {
+    const hasLeague = stages.some((s) => s.kind === 'LEAGUE');
+
+    // RR → Qualifier direct path: auto-schedule from RR standings
+    if (!hasLeague) {
+      const day1 = suggestRRKnockoutDay1Pairings(rrStandings, teams);
+      const day2 = suggestRRKnockoutDay2Pairings(matches.filter((m) => matchesStageKind(m.stage, 'QUALIFIER')));
+      return [...day1, ...day2];
+    }
+
+    // League → Qualifier path: existing cross/ranked pairing logic
     const league = [...stages].reverse().find((s) => s.kind === 'LEAGUE');
     if (!league?.groups?.length) return [];
     const qualified = qualifiedFromGroups(league.groups, standingsByGroup, league.qualifyPerGroup || 2);
     return suggestQualifierPairings(qualified, active?.pairing || league.pairing || 'CROSS');
-  }, [stages, standingsByGroup, active?.pairing]);
+  }, [stages, rrStandings, teams, matches, standingsByGroup, active?.pairing]);
 
   const [qualifierPairings, setQualifierPairings] = React.useState(suggestedQualifiers);
   const [finalsPairings, setFinalsPairings] = React.useState(
@@ -745,15 +757,24 @@ export default function TournamentStageDesigner({
 
   const applyQualifierPairings = (next: SuggestedPairing[]) => {
     const validTeamIds = new Set(teams.map((t) => t.id));
+    // For pairings with pending/TBD teams, allow empty team IDs (Day 2 before Day 1 results)
     const enriched = next
       .filter((p) => (!p.team1Id || validTeamIds.has(p.team1Id)) && (!p.team2Id || validTeamIds.has(p.team2Id)))
       .map((p) => ({
         ...p,
-        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || '',
-        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || '',
+        team1Name: (p.team1Id && teams.find((t) => t.id === p.team1Id)?.name) || p.team1Name || '',
+        team2Name: (p.team2Id && teams.find((t) => t.id === p.team2Id)?.name) || p.team2Name || '',
       }));
-    setQualifierPairings(enriched);
-    updateStage({ matchPairings: enriched });
+    // Keep pairings with empty team IDs (pending Day 2 matches) that were not filtered above
+    const pendingPairings = next.filter(
+      (p) => !p.team1Id && !p.team2Id
+    );
+    const merged = [
+      ...enriched,
+      ...pendingPairings.filter((p) => !enriched.some((e) => e.stage === p.stage)),
+    ];
+    setQualifierPairings(merged);
+    updateStage({ matchPairings: merged });
   };
 
   const applyFinalsPairings = (next: SuggestedPairing[]) => {
@@ -800,14 +821,29 @@ export default function TournamentStageDesigner({
       setQualifierPairings(active.matchPairings);
       return;
     }
-    applyQualifierPairings(
-      suggestedQualifiers.length
-        ? suggestedQualifiers
-        : [
-            { stage: 'QUALIFIER_1', label: 'Qualifier 1', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
-            { stage: 'QUALIFIER_2', label: 'Qualifier 2', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
-          ]
-    );
+    const hasLeague = stages.some((s) => s.kind === 'LEAGUE');
+    if (!hasLeague) {
+      // RR → Qualifier: auto-schedule all Day 1 + Day 2 matches
+      const day1 = suggestRRKnockoutDay1Pairings(rrStandings, teams);
+      const day2 = suggestRRKnockoutDay2Pairings(matches.filter((m) => matchesStageKind(m.stage, 'QUALIFIER')));
+      const slotted = assignScheduleSlots([...day1, ...day2], {
+        mode: scheduleMode,
+        eventsPerDay,
+        dayDates,
+        startDay: active?.startDay || 9,
+        durationDays: active?.durationDays || 2,
+      });
+      applyQualifierPairings(slotted);
+    } else {
+      applyQualifierPairings(
+        suggestedQualifiers.length
+          ? suggestedQualifiers
+          : [
+              { stage: 'QUALIFIER_1', label: 'Qualifier 1', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
+              { stage: 'QUALIFIER_2', label: 'Qualifier 2', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
+            ]
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.kind, active?.id]);
 
@@ -1609,37 +1645,75 @@ export default function TournamentStageDesigner({
               {active?.kind === 'QUALIFIER' && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                    <div className="flex-1 max-w-sm">
-                      <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">Pairing</label>
-                      <Select
-                        value={active.pairing || 'CROSS'}
-                        onChange={(e) => {
-                          const pairing = e.target.value as QualifierPairing;
-                          updateStage({ pairing });
-                          const extras = qualifierPairings.filter((p) => !['QUALIFIER_1', 'QUALIFIER_2'].includes(p.stage));
-                          const seeded = suggestedQualifiers.length
-                            ? suggestedQualifiers
-                            : [
-                                { stage: 'QUALIFIER_1', label: 'Qualifier 1', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
-                                { stage: 'QUALIFIER_2', label: 'Qualifier 2', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
-                              ];
-                          applyQualifierPairings([...seeded, ...extras]);
+                    {!stages.some((s) => s.kind === 'LEAGUE') ? (
+                      <div className="flex-1">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-500 block mb-1">
+                          Auto-Knockout from Round Robin
+                        </span>
+                        <p className="text-[11px] text-muted-foreground">
+                          Day 1: Qualifier 1 (1st vs 2nd), Eliminator (3rd vs 4th), Position 5v8 &amp; 6v7. Day 2: Qualifier 2, 5th &amp; 7th Place.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex-1 max-w-sm">
+                        <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">Pairing</label>
+                        <Select
+                          value={active.pairing || 'CROSS'}
+                          onChange={(e) => {
+                            const pairing = e.target.value as QualifierPairing;
+                            updateStage({ pairing });
+                            const extras = qualifierPairings.filter((p) => !['QUALIFIER_1', 'QUALIFIER_2'].includes(p.stage));
+                            const seeded = suggestedQualifiers.length
+                              ? suggestedQualifiers
+                              : [
+                                  { stage: 'QUALIFIER_1', label: 'Qualifier 1', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
+                                  { stage: 'QUALIFIER_2', label: 'Qualifier 2', team1Id: '', team2Id: '', team1Name: '', team2Name: '' },
+                                ];
+                            applyQualifierPairings([...seeded, ...extras]);
+                          }}
+                          className="h-9 text-xs font-bold"
+                        >
+                          <option value="CROSS">Cross: A1 vs B2 · B1 vs A2</option>
+                          <option value="RANKED">Ranked: 1st vs 2nd · 3rd vs 4th</option>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-[11px] font-bold h-9"
+                        onClick={() => {
+                          const hasLeague = stages.some((s) => s.kind === 'LEAGUE');
+                          if (!hasLeague) {
+                            const day1 = suggestRRKnockoutDay1Pairings(rrStandings, teams);
+                            const day2 = suggestRRKnockoutDay2Pairings(matches.filter((m) => matchesStageKind(m.stage, 'QUALIFIER')));
+                            const slotted = assignScheduleSlots([...day1, ...day2], {
+                              mode: scheduleMode,
+                              eventsPerDay,
+                              dayDates,
+                              startDay: active?.startDay || 9,
+                              durationDays: active?.durationDays || 2,
+                            });
+                            applyQualifierPairings(slotted);
+                          } else {
+                            applyQualifierPairings(suggestedQualifiers);
+                          }
                         }}
-                        className="h-9 text-xs font-bold"
                       >
-                        <option value="CROSS">Cross: A1 vs B2 · B1 vs A2</option>
-                        <option value="RANKED">Ranked: 1st vs 2nd · 3rd vs 4th</option>
-                      </Select>
+                        <RotateCcw className="h-3.5 w-3.5" /> Re-seed from Standings
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-[11px] font-bold h-9"
+                        onClick={() => applyQualifierPairings([...qualifierPairings, nextQualifierPairing(qualifierPairings)])}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add match
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-[11px] font-bold h-9"
-                      onClick={() => applyQualifierPairings([...qualifierPairings, nextQualifierPairing(qualifierPairings)])}
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Add match
-                    </Button>
                   </div>
                   <div className="space-y-3">
                     {qualifierPairings.map((pair, idx) => (

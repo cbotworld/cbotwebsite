@@ -126,7 +126,14 @@ export function matchesStageKind(stage: string | undefined | null, kind: StageKi
   const value = (stage || '').toUpperCase();
   if (kind === 'ROUND_ROBIN') return value === 'ROUND_ROBIN';
   if (kind === 'LEAGUE') return value.startsWith('LEAGUE');
-  if (kind === 'QUALIFIER') return value.startsWith('QUALIFIER');
+  if (kind === 'QUALIFIER') return (
+    value.startsWith('QUALIFIER') ||
+    value === 'ELIMINATOR' ||
+    value === 'POSITION_5V8' ||
+    value === 'POSITION_6V7' ||
+    value === 'FIFTH_PLACE' ||
+    value === 'SEVENTH_PLACE'
+  );
   if (kind === 'FINALS') {
     return (
       value === 'GRAND_FINAL' ||
@@ -147,6 +154,9 @@ export function formatMatchStage(stage?: string | null): string {
   if (value === 'THIRD_PLACE') return '3rd Place';
   if (value === 'FIFTH_PLACE') return '5th Place';
   if (value === 'SEVENTH_PLACE') return '7th Place';
+  if (value === 'ELIMINATOR') return 'Eliminator';
+  if (value === 'POSITION_5V8') return 'Position Match · 5v8';
+  if (value === 'POSITION_6V7') return 'Position Match · 6v7';
   if (value === 'SPOC_EXHIBITION' || value.startsWith('SPOC_EXHIBITION_')) return 'Spoc Exhibition';
   const league = parseLeagueGroup(value);
   if (league) {
@@ -198,7 +208,7 @@ export function circleMethodRounds(teamIds: string[]): Array<{ round: number; pa
 export function stageFamily(stage?: string | null): string {
   const value = (stage || '').toUpperCase();
   if (value.startsWith('LEAGUE')) return 'LEAGUE';
-  if (value.startsWith('QUALIFIER')) return 'QUALIFIER';
+  if (value.startsWith('QUALIFIER') || value === 'ELIMINATOR' || value === 'POSITION_5V8' || value === 'POSITION_6V7') return 'QUALIFIER';
   if (value === 'GRAND_FINAL' || value.endsWith('_PLACE') || value.startsWith('PLACE_') || value === 'FINAL') return 'FINALS';
   return value || 'UNKNOWN';
 }
@@ -569,6 +579,173 @@ export function suggestFinalsPairings(
 
   return pairings;
 }
+
+/**
+ * Auto-schedule Day 1 matches for RR → Qualifier path:
+ * Qualifier 1 (1st vs 2nd), Eliminator (3rd vs 4th),
+ * Position 5v8 (5th vs 8th), Position 6v7 (6th vs 7th).
+ */
+export function suggestRRKnockoutDay1Pairings(
+  rrStandings: StandingRow[],
+  teams: Array<{ id: string; name: string; tag?: string | null }>
+): SuggestedPairing[] {
+  const nameOf = (id: string) => teams.find((t) => t.id === id)?.name || '';
+  const ranked = rrStandings.filter((r) => r.teamId);
+  const get = (rank: number) => ranked[rank - 1];
+
+  const pairings: SuggestedPairing[] = [];
+
+  const t1 = get(1);
+  const t2 = get(2);
+  const t3 = get(3);
+  const t4 = get(4);
+  const t5 = get(5);
+  const t6 = get(6);
+  const t7 = get(7);
+  const t8 = get(8);
+
+  if (t1 && t2) {
+    pairings.push({
+      stage: 'QUALIFIER_1',
+      label: 'Qualifier 1',
+      team1Id: t1.teamId,
+      team2Id: t2.teamId,
+      team1Name: nameOf(t1.teamId),
+      team2Name: nameOf(t2.teamId),
+      round: 1,
+    });
+  }
+
+  if (t3 && t4) {
+    pairings.push({
+      stage: 'ELIMINATOR',
+      label: 'Eliminator',
+      team1Id: t3.teamId,
+      team2Id: t4.teamId,
+      team1Name: nameOf(t3.teamId),
+      team2Name: nameOf(t4.teamId),
+      round: 1,
+    });
+  }
+
+  if (t5 && t8) {
+    pairings.push({
+      stage: 'POSITION_5V8',
+      label: 'Position Match · 5th vs 8th',
+      team1Id: t5.teamId,
+      team2Id: t8.teamId,
+      team1Name: nameOf(t5.teamId),
+      team2Name: nameOf(t8.teamId),
+      round: 1,
+    });
+  }
+
+  if (t6 && t7) {
+    pairings.push({
+      stage: 'POSITION_6V7',
+      label: 'Position Match · 6th vs 7th',
+      team1Id: t6.teamId,
+      team2Id: t7.teamId,
+      team1Name: nameOf(t6.teamId),
+      team2Name: nameOf(t7.teamId),
+      round: 1,
+    });
+  }
+
+  return pairings;
+}
+
+/**
+ * Auto-schedule Day 2 matches for RR → Qualifier path:
+ * Qualifier 2 (Q1 Loser vs Eliminator Winner),
+ * 5th Place (5v8 Winner vs 6v7 Winner),
+ * 7th Place (5v8 Loser vs 6v7 Loser).
+ * When Day 1 results are not yet in, team IDs are empty and labels show "pending".
+ */
+export function suggestRRKnockoutDay2Pairings(
+  day1Matches: Array<{
+    stage?: string | null;
+    team1Id?: string | null;
+    team2Id?: string | null;
+    team1?: { name?: string } | null;
+    team2?: { name?: string } | null;
+    winnerId?: string | null;
+    status?: string | null;
+    score1?: number | null;
+    score2?: number | null;
+  }>
+): SuggestedPairing[] {
+  const q1Match = day1Matches.find((m) => m.stage === 'QUALIFIER_1');
+  const elimMatch = day1Matches.find((m) => m.stage === 'ELIMINATOR');
+  const p5v8Match = day1Matches.find((m) => m.stage === 'POSITION_5V8');
+  const p6v7Match = day1Matches.find((m) => m.stage === 'POSITION_6V7');
+
+  const winnerOf = (match?: typeof q1Match): { id: string; name: string } => {
+    if (!match) return { id: '', name: 'TBD' };
+    if (match.winnerId) {
+      const name = match.winnerId === match.team1Id ? match.team1?.name : match.team2?.name;
+      return { id: match.winnerId, name: name || 'Winner' };
+    }
+    if (match.status === 'COMPLETED') {
+      const id = (match.score1 || 0) >= (match.score2 || 0) ? match.team1Id : match.team2Id;
+      const name = id === match.team1Id ? match.team1?.name : match.team2?.name;
+      return { id: id || '', name: name || 'Winner' };
+    }
+    return { id: '', name: 'Winner (pending)' };
+  };
+
+  const loserOf = (match?: typeof q1Match): { id: string; name: string } => {
+    if (!match || !match.team1Id || !match.team2Id) return { id: '', name: 'TBD' };
+    const winner = winnerOf(match);
+    if (!winner.id) return { id: '', name: 'Loser (pending)' };
+    const loserId = winner.id === match.team1Id ? match.team2Id : match.team1Id;
+    const name = loserId === match.team1Id ? match.team1?.name : match.team2?.name;
+    return { id: loserId || '', name: name || 'Loser' };
+  };
+
+  const q1Loser = loserOf(q1Match);
+  const elimWinner = winnerOf(elimMatch);
+  const p5v8Winner = winnerOf(p5v8Match);
+  const p6v7Winner = winnerOf(p6v7Match);
+  const p5v8Loser = loserOf(p5v8Match);
+  const p6v7Loser = loserOf(p6v7Match);
+
+  const pairings: SuggestedPairing[] = [
+    {
+      stage: 'QUALIFIER_2',
+      label: 'Qualifier 2 · Q1 Loser vs Eliminator Winner',
+      team1Id: q1Loser.id,
+      team2Id: elimWinner.id,
+      team1Name: q1Loser.name,
+      team2Name: elimWinner.name,
+      round: 2,
+    },
+  ];
+
+  if (p5v8Match || p6v7Match) {
+    pairings.push({
+      stage: 'FIFTH_PLACE',
+      label: '5th Place · 5v8 Winner vs 6v7 Winner',
+      team1Id: p5v8Winner.id,
+      team2Id: p6v7Winner.id,
+      team1Name: p5v8Winner.name,
+      team2Name: p6v7Winner.name,
+      round: 2,
+    });
+    pairings.push({
+      stage: 'SEVENTH_PLACE',
+      label: '7th Place · 5v8 Loser vs 6v7 Loser',
+      team1Id: p5v8Loser.id,
+      team2Id: p6v7Loser.id,
+      team1Name: p5v8Loser.name,
+      team2Name: p6v7Loser.name,
+      round: 2,
+    });
+  }
+
+  return pairings;
+}
+
 
 export function orderPairingsForMode(pairings: SuggestedPairing[], mode: ScheduleMode): SuggestedPairing[] {
   const copy = [...pairings];
@@ -1019,6 +1196,15 @@ export function buildAutoPairingsForStage(
 
   if (stage.kind === 'QUALIFIER') {
     const league = extras?.groups || stage.groups;
+    const hasLeagueGroups = Boolean(league && league.length > 0 && league.some((g) => (g.teamIds || []).filter(Boolean).length >= 2));
+    
+    if (!hasLeagueGroups) {
+      const rr = computeStandings(teams, matches, (s) => matchesStageKind(s, 'ROUND_ROBIN'));
+      const day1 = suggestRRKnockoutDay1Pairings(rr, teams);
+      const day2 = suggestRRKnockoutDay2Pairings(matches.filter((m) => matchesStageKind(m.stage, 'QUALIFIER')));
+      return [...day1, ...day2];
+    }
+
     const standingsByGroup: Record<string, StandingRow[]> = {};
     (league || []).forEach((group, gi) => {
       const groupTeams = teams.filter((t) => group.teamIds.includes(t.id));
@@ -1122,7 +1308,12 @@ export function stageMatchStages(stage: TournamentStage): string[] {
       ...extra,
     ]);
   }
-  if (stage.kind === 'QUALIFIER') return unique(['QUALIFIER_1', 'QUALIFIER_2', ...extra]);
+  if (stage.kind === 'QUALIFIER') return unique([
+    'QUALIFIER_1', 'QUALIFIER_2',
+    'ELIMINATOR', 'POSITION_5V8', 'POSITION_6V7',
+    'FIFTH_PLACE', 'SEVENTH_PLACE',
+    ...extra,
+  ]);
   if (stage.kind === 'SPOC_EXHIBITION') return unique(['SPOC_EXHIBITION', ...extra]);
   return unique([
     'GRAND_FINAL',
