@@ -52,6 +52,10 @@ export async function generateFinalStandingsImageBuffer(payload: any): Promise<B
   const rrBlock = blocks.find((b: any) => b.kind === 'LEAGUE' || b.kind === 'ROUND_ROBIN') || blocks[0];
   const rrRows: any[] = rrBlock?.groups?.[0]?.rows || [];
 
+  // Find Qualifier and Finals blocks
+  const qualBlock = blocks.find((b: any) => b.kind === 'QUALIFIER');
+  const finalsBlock = blocks.find((b: any) => b.kind === 'FINALS');
+
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -67,9 +71,72 @@ export async function generateFinalStandingsImageBuffer(payload: any): Promise<B
     console.warn('[generateFinalStandingsImageBuffer] Could not load logo file:', err);
   }
 
-  // Calculate dynamic canvas height based on number of rows
+  // Calculate dynamic canvas height based on number of rows + qualifier + finals sections
   const rowCount = Math.min(rrRows.length, 12);
-  const calculatedHeight = Math.max(900, 480 + rowCount * 42);
+  const qualRows = qualBlock?.groups?.[0]?.rows?.length || 0;
+  const qualKOs = qualBlock?.knockout?.length || 0;
+  const finalsKOs = finalsBlock?.knockout?.length || 0;
+  const extraRows = Math.min(qualRows, 8) + qualKOs + finalsKOs;
+  const calculatedHeight = Math.max(900, 480 + rowCount * 42 + extraRows * 36 + (qualBlock ? 80 : 0) + (finalsBlock ? 80 : 0));
+
+  // Helper: render a stage section (table rows + knockout matches)
+  function renderStageSection(block: any, stageLabel: string, keyPrefix: string): any[] {
+    if (!block) return [];
+    const stageRows: any[] = block?.groups?.[0]?.rows || [];
+    const knockouts: any[] = block?.knockout || [];
+    const els: any[] = [];
+
+    els.push(React.createElement('div', {
+      key: `${keyPrefix}-hdr`,
+      style: { display: 'flex', fontSize: '14px', fontWeight: 900, color: '#f9fafb', marginBottom: '8px', marginTop: '20px', borderTop: '1px solid rgba(251,191,36,0.2)', paddingTop: '16px' },
+    }, stageLabel));
+
+    if (stageRows.length > 0) {
+      els.push(React.createElement('div', {
+        key: `${keyPrefix}-th`,
+        style: { display: 'flex', backgroundColor: 'rgba(255,255,255,0.05)', padding: '8px 12px', fontSize: '11px', fontWeight: 800, color: '#94a3b8', borderRadius: '6px 6px 0 0' },
+      }, [
+        React.createElement('span', { key: 'rk', style: { width: '40px' } }, '#'),
+        React.createElement('span', { key: 'tm', style: { flex: 1 } }, 'Team'),
+        React.createElement('span', { key: 'tot', style: { width: '70px', textAlign: 'center' } }, 'Total Pts'),
+        React.createElement('span', { key: 'pl', style: { width: '55px', textAlign: 'center' } }, 'Played'),
+        React.createElement('span', { key: 'w', style: { width: '50px', textAlign: 'center' } }, 'Won'),
+        React.createElement('span', { key: 'l', style: { width: '50px', textAlign: 'center' } }, 'Lost'),
+        React.createElement('span', { key: 'sc', style: { width: '85px', textAlign: 'center' } }, 'Team Score'),
+      ]));
+      stageRows.slice(0, 8).forEach((r: any, idx: number) => {
+        els.push(React.createElement('div', {
+          key: `${keyPrefix}-r${idx}`,
+          style: { display: 'flex', alignItems: 'center', padding: '7px 12px', fontSize: '12px', fontWeight: 700, backgroundColor: idx % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+        }, [
+          React.createElement('span', { key: 'rk', style: { width: '40px', color: '#fbbf24', fontWeight: 900 } }, `${r.rank}`),
+          React.createElement('span', { key: 'tm', style: { flex: 1, color: '#f9fafb' } }, r.teamName),
+          React.createElement('span', { key: 'tot', style: { width: '70px', textAlign: 'center', color: '#fbbf24', fontWeight: 900 } }, `${r.total ?? 0}`),
+          React.createElement('span', { key: 'pl', style: { width: '55px', textAlign: 'center', color: '#94a3b8' } }, `${r.matchesPlayed ?? 0}`),
+          React.createElement('span', { key: 'w', style: { width: '50px', textAlign: 'center', color: '#34d399' } }, `${r.matchesWon ?? 0}`),
+          React.createElement('span', { key: 'l', style: { width: '50px', textAlign: 'center', color: '#f87171' } }, `${r.matchesLost ?? 0}`),
+          React.createElement('span', { key: 'sc', style: { width: '85px', textAlign: 'center', color: '#f9fafb' } }, `${r.teamScore ?? 0}`),
+        ]));
+      });
+    }
+
+    knockouts.forEach((k: any, idx: number) => {
+      const t1Won = (k.team1Score ?? 0) > (k.team2Score ?? 0);
+      const t2Won = (k.team2Score ?? 0) > (k.team1Score ?? 0);
+      els.push(React.createElement('div', {
+        key: `${keyPrefix}-ko${idx}`,
+        style: { display: 'flex', alignItems: 'center', padding: '8px 12px', fontSize: '12px', fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '8px' },
+      }, [
+        React.createElement('span', { key: 'label', style: { color: '#fbbf24', minWidth: '110px', fontSize: '11px', fontWeight: 900 } }, k.matchName || k.name || `Match ${idx + 1}`),
+        React.createElement('span', { key: 't1', style: { flex: 1, color: t1Won ? '#34d399' : '#f9fafb', fontWeight: t1Won ? 900 : 700 } }, k.team1Name || 'TBD'),
+        React.createElement('span', { key: 'score', style: { color: '#fbbf24', fontWeight: 900, fontSize: '14px', minWidth: '60px', textAlign: 'center' } },
+          (k.team1Score != null && k.team2Score != null) ? `${k.team1Score}–${k.team2Score}` : 'vs'),
+        React.createElement('span', { key: 't2', style: { flex: 1, textAlign: 'right', color: t2Won ? '#34d399' : '#f9fafb', fontWeight: t2Won ? 900 : 700 } }, k.team2Name || 'TBD'),
+      ]));
+    });
+
+    return els;
+  }
 
   const element = React.createElement(
     'div',
@@ -351,6 +418,12 @@ export async function generateFinalStandingsImageBuffer(payload: any): Promise<B
         ),
       ),
 
+      // Qualifier stage section
+      ...renderStageSection(qualBlock, `Stage 2: ${qualBlock?.name || 'Qualifiers'}`, 'qual'),
+
+      // Finals stage section
+      ...renderStageSection(finalsBlock, `Stage 3: ${finalsBlock?.name || 'Finals'}`, 'finals'),
+
       // Footer
       React.createElement(
         'div',
@@ -404,6 +477,20 @@ export async function sendFinalStandingsEmail({
     if (!targetEditionId) {
       return { success: false, error: 'No active edition found.' };
     }
+
+    // 1b. Idempotency guard — send only once per edition + day + trigger reason
+    const dedupeKey = `email_sent_${triggerReason}_${targetEditionId}_day${dayNumber ?? 'all'}`;
+    const alreadySent = await prisma.systemSetting.findUnique({ where: { key: dedupeKey } });
+    if (alreadySent) {
+      console.log(`[sendFinalStandingsEmail] Duplicate suppressed — already sent for key: ${dedupeKey}`);
+      return { success: true, messageId: 'already-sent-deduped' };
+    }
+    // Reserve the key immediately to prevent race conditions
+    await prisma.systemSetting.upsert({
+      where: { key: dedupeKey },
+      update: { value: new Date().toISOString() },
+      create: { key: dedupeKey, value: new Date().toISOString() },
+    });
 
     // 2. Fetch public standings payload
     const payload = await getPublicStandings(targetEditionId);
