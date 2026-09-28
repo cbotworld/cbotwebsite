@@ -1750,21 +1750,52 @@ export default function OrganizerScoresPanel({
             )}
 
             <BoardScoreEditor boards={boards} onChange={setBoards} target={target} defaultMode="summary" />
-            <Button
-              disabled={busy || !userId}
-              onClick={async () => {
-                setBusy(true);
-                setMsg(null);
-                const payload = draftToPayload(boards);
-                const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload, editionId);
-                setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
-                if (res.success) await loadDesk();
-                setBusy(false);
-              }}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
-            >
-              {busy ? 'Saving…' : existing ? `Update Day ${day}` : `Save Day ${day}`}
-            </Button>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                disabled={busy || !userId}
+                onClick={async () => {
+                  setBusy(true);
+                  setMsg(null);
+                  const payload = draftToPayload(boards);
+                  const res = await organiserUpsertPlayerDayScore(userId, day, 0, 0, payload, editionId);
+                  setMsg(res.success ? 'Saved. Standings will use this score.' : res.error || 'Failed');
+                  if (res.success) await loadDesk();
+                  setBusy(false);
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs"
+              >
+                {busy ? 'Saving…' : existing ? `Update Day ${day}` : `Save Day ${day}`}
+              </Button>
+
+              {/* ── Mark as Walkover ─────────────────────────────────── */}
+              <Button
+                disabled={busy || !userId}
+                variant="outline"
+                onClick={async () => {
+                  const playerName = selected?.name || selected?.username || 'this player';
+                  if (!confirm(`Mark ${playerName} as WALKOVER for Day ${day}?\n\nThis will remove their manual score so the system auto-calculates their walkover score based on opponent scores and grade.`)) return;
+                  setBusy(true);
+                  setMsg(null);
+                  const res = await bulkOrganiserUpsertDayScores({
+                    editionId,
+                    rows: [{ userId, dayNumber: day, isWalkover: true }],
+                  });
+                  setMsg(
+                    res.success
+                      ? `✅ Day ${day} marked as Walkover for ${playerName}. System will auto-calculate their score.`
+                      : res.error || 'Failed to mark walkover.'
+                  );
+                  if (res.success) await loadDesk();
+                  setBusy(false);
+                }}
+                className="border-sky-500/40 text-sky-300 hover:bg-sky-500/15 font-bold text-xs gap-1.5"
+                title="Mark this player as absent/walkover for this day — system will auto-calculate their score"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 text-sky-400" />
+                Mark as Walkover
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>
