@@ -48,7 +48,13 @@ function playerFromTitle(title: string) {
   return first || 'CBOT WORLD';
 }
 
-/** Public catalog: all official primary YouTube videos. No auth. */
+function isChannel2Reference(str?: string | null): boolean {
+  if (!str) return false;
+  const s = str.toLowerCase();
+  return s.includes('channel 2') || s === 'ch 2' || s.includes('backup channel') || s.includes('failover');
+}
+
+/** Public catalog: strictly primary official YouTube videos. No auth. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -56,7 +62,7 @@ export async function GET(request: NextRequest) {
     const dayQ = searchParams.get('day');
     const dayFilter = dayQ && dayQ !== 'ALL' ? Number(dayQ) : null;
 
-    const { mapped, allDays } = await memoryCache.getOrSet('mobile_videos_catalog', 15, async () => {
+    const { mapped, allDays } = await memoryCache.getOrSet('mobile_videos_catalog_v2', 15, async () => {
       const streams = await prisma.liveStream.findMany({
         orderBy: { createdAt: 'desc' },
         include: {
@@ -79,6 +85,11 @@ export async function GET(request: NextRequest) {
       const seen = new Set<string>();
 
       for (const s of streams) {
+        // Exclude any streams flagged with Channel 2
+        if (isChannel2Reference(s.team?.tag) || isChannel2Reference(s.team?.name)) {
+          continue;
+        }
+
         const isLive = s.status === 'LIVE';
         const url = watchUrl(s);
         const videoId =
@@ -91,13 +102,15 @@ export async function GET(request: NextRequest) {
 
         const playerName = s.player?.name || s.player?.username || 'Player';
         const dayNumber = dayFromStream(s);
+        const teamName = s.team?.name || s.match?.team1?.name || s.edition?.title || 'CBOT WORLD';
+
         mappedList.push({
           id: s.id,
           source: 'match' as const,
           dayNumber,
           playerName,
           playerUsername: s.player?.username || null,
-          teamName: s.team?.name || s.match?.team1?.name || s.edition?.title || 'CBOT WORLD',
+          teamName,
           teamTag: s.team?.tag || null,
           teamLogo: s.team?.logo || null,
           status: s.status,
@@ -106,14 +119,17 @@ export async function GET(request: NextRequest) {
           youtubeVideoId: videoId,
           thumbnailUrl: thumbUrl(videoId),
           recordedAt: s.recordedAt || s.createdAt,
-          title: `${playerName} · Day ${dayNumber || '?'} · ${s.team?.name || s.edition?.title || 'Match'}`,
+          title: `${playerName} · Day ${dayNumber || '?'} · ${teamName}`,
         });
       }
 
+      // Fetch primary official channel videos only
       const channelVideos = await listOfficialChannelVideos(300);
       for (const v of channelVideos) {
-        // Exclude any Channel 2 / secondary channel videos
-        if (v.channelIndex === 2) continue;
+        // Strictly exclude secondary channel videos
+        if (v.channelIndex === 2 || isChannel2Reference(v.channelTitle) || isChannel2Reference(v.title)) {
+          continue;
+        }
         if (!v.youtubeVideoId || seen.has(v.youtubeVideoId)) continue;
         seen.add(v.youtubeVideoId);
         mappedList.push({
@@ -143,10 +159,13 @@ export async function GET(request: NextRequest) {
 
     const videos = mapped
       .filter((v) => {
-        if (v.channelIndex === 2 || v.teamTag === 'CH 2') return false;
+        // Extra safeguard: exclude Channel 2
+        if (v.channelIndex === 2 || isChannel2Reference(v.teamTag) || isChannel2Reference(v.teamName) || isChannel2Reference(v.channelTitle)) {
+          return false;
+        }
         if (dayFilter && v.dayNumber !== dayFilter) return false;
         if (playerQ) {
-          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title} ${v.channelTitle || ''}`.toLowerCase();
+          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title}`.toLowerCase();
           if (!hay.includes(playerQ)) return false;
         }
         return true;
@@ -168,7 +187,7 @@ export async function GET(request: NextRequest) {
         videos,
         count: videos.length,
       },
-      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store' } },
+      { headers: { ...mobileCorsHeaders, 'Cache-Control': 'no-store, must-revalidate' } },
     );
   } catch (error: any) {
     console.error('Mobile videos GET:', error);

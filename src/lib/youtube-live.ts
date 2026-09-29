@@ -90,18 +90,13 @@ export async function getAllConfiguredYouTubeChannels(): Promise<YouTubeChannelC
           'youtube_channel_1_id',
           'youtube_client_id_1',
           'youtube_client_secret_1',
-          'youtube_refresh_token_2',
-          'youtube_channel_2_title',
-          'youtube_channel_2_id',
-          'youtube_client_id_2',
-          'youtube_client_secret_2',
         ],
       },
     },
   });
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
-  // Channel 1 (Primary)
+  // Channel 1 (Primary official channel)
   const ch1RefreshToken =
     settingsMap.get('youtube_refresh_token') ||
     process.env.YOUTUBE_REFRESH_TOKEN ||
@@ -115,25 +110,8 @@ export async function getAllConfiguredYouTubeChannels(): Promise<YouTubeChannelC
     settingsMap.get('youtube_client_secret_1') ||
     process.env.GOOGLE_CLIENT_SECRET ||
     DEFAULT_GOOGLE_CLIENT_SECRET;
-  const ch1Title = settingsMap.get('youtube_channel_1_title') || 'Channel 1 (Primary)';
+  const ch1Title = settingsMap.get('youtube_channel_1_title') || 'CBOT World';
   const ch1Id = settingsMap.get('youtube_channel_1_id') || '';
-
-  // Channel 2 (Secondary / Backup with fresh quota)
-  const ch2RefreshToken =
-    settingsMap.get('youtube_refresh_token_2') ||
-    process.env.YOUTUBE_REFRESH_TOKEN_2 ||
-    process.env.GOOGLE_REFRESH_TOKEN_2 ||
-    '';
-  const ch2ClientId =
-    settingsMap.get('youtube_client_id_2') ||
-    process.env.GOOGLE_CLIENT_ID_2 ||
-    ch1ClientId;
-  const ch2ClientSecret =
-    settingsMap.get('youtube_client_secret_2') ||
-    process.env.GOOGLE_CLIENT_SECRET_2 ||
-    ch1ClientSecret;
-  const ch2Title = settingsMap.get('youtube_channel_2_title') || 'Channel 2 (Backup)';
-  const ch2Id = settingsMap.get('youtube_channel_2_id') || '';
 
   const channels: YouTubeChannelConfig[] = [];
 
@@ -149,38 +127,13 @@ export async function getAllConfiguredYouTubeChannels(): Promise<YouTubeChannelC
     });
   }
 
-  if (ch2RefreshToken) {
-    channels.push({
-      channelIndex: 2,
-      label: 'Channel 2',
-      clientId: ch2ClientId,
-      clientSecret: ch2ClientSecret,
-      refreshToken: ch2RefreshToken,
-      channelTitle: ch2Title,
-      channelId: ch2Id,
-    });
-  }
-
   return channels;
 }
 
 export async function getYouTubeChannelPool(): Promise<YouTubeChannelConfig[]> {
   const channels = await getAllConfiguredYouTubeChannels();
   if (channels.length === 0) return [];
-
-  const setting = await prisma.systemSetting.findUnique({
-    where: { key: 'youtube_active_channel_mode' },
-  });
-  const mode = setting?.value || 'AUTO_FAILOVER';
-
-  if (mode === 'CHANNEL_2_ONLY') {
-    return channels.filter((c) => c.channelIndex === 2);
-  }
-  if (mode === 'CHANNEL_1_ONLY') {
-    return channels.filter((c) => c.channelIndex === 1);
-  }
-
-  return channels;
+  return channels.filter((c) => c.channelIndex === 1);
 }
 
 export async function getAccessTokenForChannel(channel: YouTubeChannelConfig): Promise<string> {
