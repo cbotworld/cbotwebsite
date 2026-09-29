@@ -1,4 +1,4 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Shield } from 'lucide-react';
@@ -115,14 +115,38 @@ export default async function PrivacyPolicyPage() {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">5. Data Protection & Sharing</h2>
+            <h2 className="text-base font-bold text-foreground">5. Device Information, Cookies & Local Storage (Policy III.A.2g)</h2>
+            <p>
+              Our API Client and application store, access, and collect information directly or indirectly on or from users&apos; devices, including by placing, accessing, or recognizing cookies, local storage, session identifiers, and similar technologies on users&apos; browsers and mobile devices.
+            </p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Purpose of Storage:</strong> We use cookies and device local storage to manage authentication sessions, remember user preferences, maintain live stream configurations, and ensure secure platform operations.
+              </li>
+              <li>
+                <strong>Third-Party Technologies:</strong> We also allow third parties, specifically Google and YouTube API Services, to place, access, or recognize cookies and similar technologies on users&apos; devices or browsers when users interact with embedded video streams, broadcasts, or YouTube player components in accordance with the{' '}
+                <a
+                  href="http://www.google.com/policies/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-400 font-bold underline hover:text-amber-300"
+                >
+                  Google Privacy Policy
+                </a>
+                .
+              </li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-base font-bold text-foreground">6. Data Protection & Sharing</h2>
             <p>
               We guarantee that your personal information is stored securely and is <strong>never shared, sold, or rented</strong> to third-party advertisers, data brokers, or external commercial organizations.
             </p>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">6. Account Deletion & Data Rights</h2>
+            <h2 className="text-base font-bold text-foreground">7. Account Deletion & Data Rights</h2>
             <p>
               You have full control over your data. You can delete your account directly at any time inside the mobile application via <strong>Profile → Delete Account</strong> or by contacting us via email.
             </p>
@@ -132,7 +156,7 @@ export default async function PrivacyPolicyPage() {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-base font-bold text-foreground">7. Contact Us</h2>
+            <h2 className="text-base font-bold text-foreground">8. Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, YouTube API data handling, or wish to delete your account, please email us directly at{' '}
               <a href="mailto:cbotworld@gmail.com" className="text-amber-400 font-bold underline">

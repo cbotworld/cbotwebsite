@@ -5,6 +5,7 @@ import { Providers } from './providers';
 import { NavbarWithCms } from '@/components/layout/NavbarWithCms';
 import { FooterWithCms } from '@/components/layout/FooterWithCms';
 import { WhatsAppButtonWithCms } from '@/components/ui/WhatsAppButtonWithCms';
+import { CookieConsent } from '@/components/layout/CookieConsent';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
@@ -58,6 +59,7 @@ export default function RootLayout({
           <main className="flex-1">{children}</main>
           <FooterWithCms />
           <WhatsAppButtonWithCms />
+          <CookieConsent />
         </Providers>
       </body>
     </html>

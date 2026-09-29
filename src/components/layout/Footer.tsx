@@ -2,13 +2,34 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Youtube } from 'lucide-react';
 import { DEFAULT_WEBSITE_CMS, type WebsiteFooterCms } from '@/lib/website-cms';
 
 type FooterProps = {
   footerCms?: WebsiteFooterCms;
   brandName?: string;
 };
+
+// Official YouTube Brand Icon compliant with YouTube Developer Branding Guidelines (height >= 20px)
+function OfficialYouTubeIcon({ className = 'h-5 w-7 shrink-0' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 28 20"
+      width="28"
+      height="20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ minHeight: '20px', minWidth: '28px' }}
+    >
+      <path
+        d="M27.42 3.08a3.52 3.52 0 0 0-2.48-2.49C22.75 0 14 0 14 0S5.25 0 3.06.59A3.52 3.52 0 0 0 .58 3.08C0 5.28 0 10 0 10s0 4.72.58 6.92a3.52 3.52 0 0 0 2.48 2.49C5.25 20 14 20 14 20s8.75 0 10.94-.59a3.52 3.52 0 0 0 2.48-2.49C28 14.72 28 10 28 10s0-4.72-.58-6.92Z"
+        fill="#FF0000"
+      />
+      <polygon points="11.2,14.3 18.5,10 11.2,5.7" fill="#FFFFFF" />
+    </svg>
+  );
+}
 
 export function Footer({
   footerCms = DEFAULT_WEBSITE_CMS.footer,
@@ -38,10 +59,10 @@ export function Footer({
                 href="https://www.youtube.com/@CBOTworld"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 text-red-400 hover:text-red-300 text-xs font-bold transition-all group shadow-xs"
+                className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 text-red-400 hover:text-red-300 text-xs font-bold transition-all group shadow-xs"
                 title="Watch CBOT World Matches on YouTube"
               >
-                <Youtube className="h-4 w-4 text-red-500 group-hover:scale-110 transition-transform fill-current" />
+                <OfficialYouTubeIcon className="h-5 w-7 shrink-0 group-hover:scale-105 transition-transform" />
                 <span>Watch on YouTube (@CBOTworld)</span>
               </a>
             </div>

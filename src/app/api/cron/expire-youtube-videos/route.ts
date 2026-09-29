@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const authHeader = request.headers.get('authorization');
     const secretParam = searchParams.get('secret');
-    const expectedSecret = process.env.CRON_SECRET || 'cbot-cron-secret-key-2026';
+    const expectedSecret = process.env.CRON_SECRET || 'cbot_cron_secret_2026';
 
     // Verify secret parameter or authorization header for cron execution security
     if (secretParam !== expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
@@ -17,21 +17,27 @@ export async function GET(request: Request) {
     }
 
     const now = new Date();
-    console.log(`[Cron Expiry] Checking for expired match live streams at ${now.toISOString()}...`);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    console.log(`[Cron Expiry] Checking for expired or 30-day old match live streams at ${now.toISOString()}...`);
 
-    // Find all ARCHIVED or LIVE streams whose 15-day expiry date has passed
+    // Find all streams where either:
+    // 1. Explicit expiresAt date has passed, OR
+    // 2. Stream was created more than 30 days ago (Policy III.E.4 compliance)
     const expiredStreams = await prisma.liveStream.findMany({
       where: {
-        status: { in: ['ARCHIVED', 'LIVE', 'ENDED'] },
-        expiresAt: { lte: now }
-      }
+        status: { in: ['ARCHIVED', 'LIVE', 'ENDED', 'READY', 'CREATED'] },
+        OR: [
+          { expiresAt: { lte: now } },
+          { createdAt: { lte: thirtyDaysAgo } },
+        ],
+      },
     });
 
-    console.log(`[Cron Expiry] Found ${expiredStreams.length} streams to expire.`);
+    console.log(`[Cron Expiry] Found ${expiredStreams.length} streams to delete/expire.`);
 
     let processedCount = 0;
-    const googleClientId = process.env.GOOGLE_CLIENT_ID || '857312173626-97fujm4mo4srp18mlvasmbfvfrfma2ap.apps.googleusercontent.com';
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
     let googleRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
     if (!googleRefreshToken) {
@@ -43,7 +49,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // Optional: Call YouTube API to set privacyStatus to 'private' if tokens exist
+    // Refresh Google OAuth token to interact with YouTube API if needed
     let accessToken: string | null = null;
     if (googleClientId && googleClientSecret && googleRefreshToken) {
       try {
@@ -65,29 +71,31 @@ export async function GET(request: Request) {
     }
 
     for (const stream of expiredStreams) {
-      // 1. If YouTube Video ID exists, attempt setting privacy to private
+      // 1. Optionally delete or set privacy to private on YouTube if valid video ID exists
       if (accessToken && stream.youtubeVideoId && !stream.youtubeVideoId.startsWith('cbot_yt_')) {
         try {
-          await fetch('https://www.googleapis.com/youtube/v3/videos?part=status', {
-            method: 'PUT',
+          // Attempt to delete video or set private
+          await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${stream.youtubeVideoId}`, {
+            method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              id: stream.youtubeVideoId,
-              status: { privacyStatus: 'private' }
-            }),
           });
         } catch (ytErr) {
-          console.error(`[Cron Expiry] Failed to update YouTube privacy for video ${stream.youtubeVideoId}:`, ytErr);
+          console.error(`[Cron Expiry] YouTube API deletion error for video ${stream.youtubeVideoId}:`, ytErr);
         }
       }
 
-      // 2. Mark stream as EXPIRED in Prisma DB
+      // 2. Mark as EXPIRED or delete stream record in Prisma DB after 30 days
       await prisma.liveStream.update({
         where: { id: stream.id },
-        data: { status: 'EXPIRED' }
+        data: {
+          status: 'EXPIRED',
+          youtubeUrl: null,
+          youtubeEmbedUrl: null,
+          streamKey: null,
+          rtmpIngestionUrl: null,
+        },
       });
 
       processedCount++;
@@ -96,7 +104,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       processedCount,
-      message: `Successfully processed 15-day expiry for ${processedCount} streams.`,
+      message: `Successfully processed 30-day automated cleanup for ${processedCount} streams.`,
       executedAt: now.toISOString(),
     });
   } catch (error: any) {

@@ -48,7 +48,7 @@ function playerFromTitle(title: string) {
   return first || 'CBOT WORLD';
 }
 
-/** Public catalog: all official YouTube videos. No auth. */
+/** Public catalog: all official primary YouTube videos. No auth. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -112,6 +112,8 @@ export async function GET(request: NextRequest) {
 
       const channelVideos = await listOfficialChannelVideos(300);
       for (const v of channelVideos) {
+        // Exclude any Channel 2 / secondary channel videos
+        if (v.channelIndex === 2) continue;
         if (!v.youtubeVideoId || seen.has(v.youtubeVideoId)) continue;
         seen.add(v.youtubeVideoId);
         mappedList.push({
@@ -120,8 +122,8 @@ export async function GET(request: NextRequest) {
           dayNumber: dayNumberFromVideoTitle(v.title),
           playerName: playerFromTitle(v.title),
           playerUsername: null,
-          teamName: v.channelTitle || (v.channelIndex === 2 ? 'Channel 2 (Backup)' : 'CBOT WORLD'),
-          teamTag: v.channelIndex === 2 ? 'CH 2' : null,
+          teamName: v.channelTitle || 'CBOT WORLD',
+          teamTag: null,
           teamLogo: null,
           status: 'ENDED',
           isLive: false,
@@ -130,8 +132,8 @@ export async function GET(request: NextRequest) {
           thumbnailUrl: v.thumbnailUrl || thumbUrl(v.youtubeVideoId),
           recordedAt: v.publishedAt || null,
           title: v.title,
-          channelIndex: v.channelIndex || 1,
-          channelTitle: v.channelTitle || 'Channel 1',
+          channelIndex: 1,
+          channelTitle: v.channelTitle || 'CBOT WORLD',
         });
       }
 
@@ -141,9 +143,10 @@ export async function GET(request: NextRequest) {
 
     const videos = mapped
       .filter((v) => {
+        if (v.channelIndex === 2 || v.teamTag === 'CH 2') return false;
         if (dayFilter && v.dayNumber !== dayFilter) return false;
         if (playerQ) {
-          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title} ${v.channelTitle || ''} ${v.channelIndex === 2 ? 'channel 2 ch 2' : 'channel 1 ch 1'}`.toLowerCase();
+          const hay = `${v.playerName} ${v.playerUsername || ''} ${v.teamName} ${v.title} ${v.channelTitle || ''}`.toLowerCase();
           if (!hay.includes(playerQ)) return false;
         }
         return true;

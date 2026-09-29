@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/expire-youtube-videos?secret=cbot_cron_secret_2026",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron/notifications?type=golive&secret=cbot_cron_secret_2026",
       "schedule": "30 10 * * *"
     },
