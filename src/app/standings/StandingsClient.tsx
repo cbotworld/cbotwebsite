@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ShieldAlert, Info, Flame, Trophy, Activity, Users, Calculator, Search, X, Award, Download, Medal, ChevronRight, CheckCircle2, Crown, Sparkles, FileSpreadsheet, ImageIcon } from 'lucide-react';
 import { resolveTop4Podium } from '@/lib/tournament-podium';
 import { exportFinalStandingsWorkbook } from '@/lib/export-final-standings';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 type FocusCol = 'event' | 'slams' | 'avg' | 'total';
 
@@ -544,7 +545,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     </div>
                     <div className="pt-2 flex items-center gap-3">
                       {podium.champion?.teamLogo ? (
-                        <img src={podium.champion.teamLogo} alt={podium.champion.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-400/60 shadow-md shrink-0" />
+                        <img src={toStorageProxyUrl(podium.champion.teamLogo)} alt={podium.champion.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-400/60 shadow-md shrink-0" />
                       ) : (
                         <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border-2 border-amber-400/60 flex items-center justify-center text-lg font-black text-amber-300 shrink-0">
                           {podium.champion?.teamName?.[0] || '1'}
@@ -571,7 +572,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     </div>
                     <div className="pt-2 flex items-center gap-3">
                       {podium.runnerUp?.teamLogo ? (
-                        <img src={podium.runnerUp.teamLogo} alt={podium.runnerUp.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-slate-400/60 shadow-md shrink-0" />
+                        <img src={toStorageProxyUrl(podium.runnerUp.teamLogo)} alt={podium.runnerUp.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-slate-400/60 shadow-md shrink-0" />
                       ) : (
                         <div className="w-12 h-12 rounded-2xl bg-slate-400/20 border-2 border-slate-400/60 flex items-center justify-center text-lg font-black text-slate-300 shrink-0">
                           {podium.runnerUp?.teamName?.[0] || '2'}
@@ -598,7 +599,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     </div>
                     <div className="pt-2 flex items-center gap-3">
                       {podium.thirdPlace?.teamLogo ? (
-                        <img src={podium.thirdPlace.teamLogo} alt={podium.thirdPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-700/60 shadow-md shrink-0" />
+                        <img src={toStorageProxyUrl(podium.thirdPlace.teamLogo)} alt={podium.thirdPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-amber-700/60 shadow-md shrink-0" />
                       ) : (
                         <div className="w-12 h-12 rounded-2xl bg-amber-700/20 border-2 border-amber-700/60 flex items-center justify-center text-lg font-black text-amber-400 shrink-0">
                           {podium.thirdPlace?.teamName?.[0] || '3'}
@@ -625,7 +626,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                     </div>
                     <div className="pt-2 flex items-center gap-3">
                       {podium.fourthPlace?.teamLogo ? (
-                        <img src={podium.fourthPlace.teamLogo} alt={podium.fourthPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-zinc-600/60 shadow-md shrink-0" />
+                        <img src={toStorageProxyUrl(podium.fourthPlace.teamLogo)} alt={podium.fourthPlace.teamName} className="w-12 h-12 rounded-2xl object-cover bg-slate-900 border-2 border-zinc-600/60 shadow-md shrink-0" />
                       ) : (
                         <div className="w-12 h-12 rounded-2xl bg-zinc-600/20 border-2 border-zinc-600/60 flex items-center justify-center text-lg font-black text-zinc-300 shrink-0">
                           {podium.fourthPlace?.teamName?.[0] || '4'}
@@ -687,7 +688,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                             <TableCell className="font-semibold">
                               <div className="flex items-center gap-2">
                                 {row.teamLogo ? (
-                                  <img src={row.teamLogo} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
+                                  <img src={toStorageProxyUrl(row.teamLogo)} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
                                 ) : (
                                   <div className="w-6 h-6 rounded-full bg-slate-800 border border-border flex items-center justify-center text-[10px] text-slate-400 font-bold">
                                     {row.teamName?.[0]}
@@ -1137,7 +1138,7 @@ export default function StandingsClient({ payload }: { payload: any }) {
                             <TableCell className="font-semibold">
                               <div className="flex items-center gap-2">
                                 {row.teamLogo ? (
-                                  <img src={row.teamLogo} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
+                                  <img src={toStorageProxyUrl(row.teamLogo)} alt={row.teamName} className="w-6 h-6 rounded-full object-cover bg-slate-900 border border-border" />
                                 ) : (
                                   <div className="w-6 h-6 rounded-full bg-slate-800 border border-border flex items-center justify-center text-[10px] text-slate-400 font-bold">
                                     {row.teamName?.[0]}

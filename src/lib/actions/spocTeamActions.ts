@@ -59,7 +59,7 @@ export async function addOrUpdateSpocTeam(data: {
       where: { editionId: data.editionId, name: data.name, teamType: TEAM_TYPE_SPOC },
     });
 
-    const defaultLogo = `https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
+    const defaultLogo = `/api/storage/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
 
     let teamRecord;
     if (existing) {

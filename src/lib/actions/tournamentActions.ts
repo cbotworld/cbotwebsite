@@ -555,7 +555,7 @@ export async function addOrUpdateEditionTeam(data: {
     });
 
     let teamRecord;
-    const defaultLogo = `https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
+    const defaultLogo = `/api/storage/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
     if (existing) {
       teamRecord = await prisma.team.update({
         where: { id: existing.id },
@@ -657,7 +657,7 @@ export async function updateTeamRosterAndCaptain(data: {
       }
     });
 
-    const defaultLogo = `https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
+    const defaultLogo = `/api/storage/teams/${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`;
 
     let targetTeamId = team ? team.id : data.teamId;
 

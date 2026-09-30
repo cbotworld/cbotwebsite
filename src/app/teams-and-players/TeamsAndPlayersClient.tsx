@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 export type RosterMember = {
   id: string;
@@ -127,7 +128,7 @@ function TeamSection({
           >
             <div className="flex items-center gap-3 sm:gap-4">
               <div className="h-13 w-13 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-slate-950 border border-amber-500/40 p-1 sm:p-1.5 shrink-0">
-                <img src={team.logo} alt={team.name} className="h-full w-full object-contain" />
+                <img src={toStorageProxyUrl(team.logo)} alt={team.name} className="h-full w-full object-contain" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">

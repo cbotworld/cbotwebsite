@@ -9,6 +9,7 @@ import { Radio, Trophy, ShieldCheck, Clock, Lock, CheckCircle2, Video, Download,
 import Link from 'next/link';
 import MatchShareCard from '@/components/stream/MatchShareCard';
 import WebRTCLiveViewer from '@/components/stream/WebRTCLiveViewer';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 interface MatchPageProps {
   params: Promise<{ id: string }>;
@@ -85,7 +86,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {/* Team 1 */}
           <div className="space-y-1.5 sm:space-y-2 min-w-0">
             <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-0.5 sm:p-1 mx-auto flex items-center justify-center shadow-lg">
-              <img src={match?.team1?.logo || '/logo.png'} alt={team1Name} className="h-full w-full object-contain" />
+              <img src={toStorageProxyUrl(match?.team1?.logo) || '/logo.png'} alt={team1Name} className="h-full w-full object-contain" />
             </div>
             <h2 className="text-xs sm:text-base font-black text-amber-400 leading-tight truncate" title={team1Name}>{team1Name}</h2>
           </div>
@@ -109,7 +110,7 @@ export default async function PublicMatchPage({ params }: MatchPageProps) {
           {/* Team 2 */}
           <div className="space-y-1.5 sm:space-y-2 min-w-0">
             <div className="h-11 w-11 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-slate-900 border-2 border-amber-500/40 p-0.5 sm:p-1 mx-auto flex items-center justify-center shadow-lg">
-              <img src={match?.team2?.logo || '/logo.png'} alt={team2Name} className="h-full w-full object-contain" />
+              <img src={toStorageProxyUrl(match?.team2?.logo) || '/logo.png'} alt={team2Name} className="h-full w-full object-contain" />
             </div>
             <h2 className="text-xs sm:text-base font-black text-emerald-400 leading-tight truncate" title={team2Name}>{team2Name}</h2>
           </div>

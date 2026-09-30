@@ -7,6 +7,10 @@ export function safePublicImageUrl(value?: string | null): string | null {
   if (!trimmed) return null;
   if (trimmed.startsWith('data:')) return null;
   if (trimmed.length > MAX_PUBLIC_IMAGE_CHARS) return null;
+  if (trimmed.includes('/storage/v1/object/public/')) {
+    const parts = trimmed.split('/storage/v1/object/public/');
+    return `/api/storage/${parts[1]}`;
+  }
   if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('/')) return null;
   return trimmed;
 }

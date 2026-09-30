@@ -195,14 +195,14 @@ export default function PlayerClient({
     );
 
     const teamLogos: Record<string, string> = {
-      'PLYWOOD PIONEERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
-      'SUPERNOVA QUEEN':   'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
-      'POCKET DYNAMOS':    'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
-      'LUMEN PILLAR':      'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
-      'VANILLA FALCONS':   'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
-      'VINTAGE STRIKERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
-      'EBONY OVERLORDS':   'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
-      'BORIC SPEEDSTERS':  'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
+      'PLYWOOD PIONEERS':  '/api/storage/teams/plywood-pioneers.jpeg',
+      'SUPERNOVA QUEEN':   '/api/storage/teams/supernova-queen.jpeg',
+      'POCKET DYNAMOS':    '/api/storage/teams/pocket-dynamos.jpeg',
+      'LUMEN PILLAR':      '/api/storage/teams/lumen-pillar.jpeg',
+      'VANILLA FALCONS':   '/api/storage/teams/vanilla-falcons.jpeg',
+      'VINTAGE STRIKERS':  '/api/storage/teams/vintage-strikers.jpeg',
+      'EBONY OVERLORDS':   '/api/storage/teams/ebony-overlords.jpeg',
+      'BORIC SPEEDSTERS':  '/api/storage/teams/boric-speedsters.jpeg',
     };
 
     const usedDbIds = new Set<string>();

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { TEAM_TYPE_SPOC } from '@/lib/spoc-teams';
 import { resolveLiveEditionForPlayers } from '@/lib/current-edition';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 export type CaptainDeskKind = 'MAIN' | 'SPOC';
 
@@ -34,7 +35,7 @@ export async function listPlayerTeams(userId: string, editionId?: string): Promi
       id: participation.team.id,
       name: participation.team.name,
       tag: participation.team.tag,
-      logo: participation.team.logo,
+      logo: toStorageProxyUrl(participation.team.logo),
       kind: 'MAIN',
       isCaptain: participation.team.captainId === userId,
     });
@@ -61,7 +62,7 @@ export async function listPlayerTeams(userId: string, editionId?: string): Promi
       id: spocTeam.id,
       name: spocTeam.name,
       tag: spocTeam.tag,
-      logo: spocTeam.logo,
+      logo: toStorageProxyUrl(spocTeam.logo),
       kind: 'SPOC',
       isCaptain: spocTeam.captainId === userId,
     });

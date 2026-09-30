@@ -24,59 +24,60 @@ import {
 import { coherentMatchSides } from '@/lib/team-identity';
 import { DEFAULT_WEBSITE_CMS, type WebsitePageHeading } from '@/lib/website-cms';
 import { resolveDayWalkoversAndScores } from '@/lib/walkover-scoring';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 const TEAMS_INFO: Record<string, { logo: string; tag: string; color: string; border: string; bg: string }> = {
   'PLYWOOD PIONEERS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
+    logo: '/api/storage/teams/plywood-pioneers.jpeg',
     tag: 'PP',
     color: 'text-amber-400',
     border: 'border-amber-500/40',
     bg: 'bg-amber-500/10',
   },
   'SUPERNOVA QUEEN': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
+    logo: '/api/storage/teams/supernova-queen.jpeg',
     tag: 'SQ',
     color: 'text-pink-400',
     border: 'border-pink-500/40',
     bg: 'bg-pink-500/10',
   },
   'POCKET DYNAMOS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
+    logo: '/api/storage/teams/pocket-dynamos.jpeg',
     tag: 'PD',
     color: 'text-sky-400',
     border: 'border-sky-500/40',
     bg: 'bg-sky-500/10',
   },
   'LUMEN PILLAR': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
+    logo: '/api/storage/teams/lumen-pillar.jpeg',
     tag: 'LP',
     color: 'text-yellow-400',
     border: 'border-yellow-500/40',
     bg: 'bg-yellow-500/10',
   },
   'VANILLA FALCONS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
+    logo: '/api/storage/teams/vanilla-falcons.jpeg',
     tag: 'VF',
     color: 'text-emerald-400',
     border: 'border-emerald-500/40',
     bg: 'bg-emerald-500/10',
   },
   'VINTAGE STRIKERS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
+    logo: '/api/storage/teams/vintage-strikers.jpeg',
     tag: 'VS',
     color: 'text-orange-400',
     border: 'border-orange-500/40',
     bg: 'bg-orange-500/10',
   },
   'EBONY OVERLORDS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
+    logo: '/api/storage/teams/ebony-overlords.jpeg',
     tag: 'EO',
     color: 'text-purple-400',
     border: 'border-purple-500/40',
     bg: 'bg-purple-500/10',
   },
   'BORIC SPEEDSTERS': {
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
+    logo: '/api/storage/teams/boric-speedsters.jpeg',
     tag: 'BS',
     color: 'text-cyan-400',
     border: 'border-cyan-500/40',
@@ -665,12 +666,14 @@ export function ScheduleClient({
                   const { team1: t1Face, team2: t2Face } = coherentMatchSides(match);
                   const t1 = {
                     ...t1Face,
+                    logo: toStorageProxyUrl(t1Face.logo),
                     color: t1Face.color || TEAMS_INFO[t1Face.name]?.color || 'text-foreground',
                     border: t1Face.border || TEAMS_INFO[t1Face.name]?.border || 'border-border',
                     bg: t1Face.bg || TEAMS_INFO[t1Face.name]?.bg || 'bg-muted',
                   };
                   const t2 = {
                     ...t2Face,
+                    logo: toStorageProxyUrl(t2Face.logo),
                     color: t2Face.color || TEAMS_INFO[t2Face.name]?.color || 'text-foreground',
                     border: t2Face.border || TEAMS_INFO[t2Face.name]?.border || 'border-border',
                     bg: t2Face.bg || TEAMS_INFO[t2Face.name]?.bg || 'bg-muted',

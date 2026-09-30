@@ -6,6 +6,7 @@ import { parseSavedLineups, scoreMatchDay, type LineupRound, type RosterPlayer }
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import { daysForStage } from '@/lib/player-ranking';
 import { filterMainTeams, filterSpocTeams } from '@/lib/spoc-teams';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 export type StandingTeam = {
   id: string;
@@ -103,7 +104,7 @@ function emptyRow(team: StandingTeam): StageStandingRow {
   return {
     teamId: team.id,
     teamName: team.name,
-    teamLogo: team.logo,
+    teamLogo: toStorageProxyUrl(team.logo) || undefined,
     teamTag: team.tag || undefined,
     eventPts: 0,
     slamBonus: 0,

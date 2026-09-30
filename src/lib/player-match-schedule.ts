@@ -20,6 +20,7 @@ import { resolveCurrentEditionRecord, resolvePlayerTournamentOptions, resolveEdi
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
 import { gradingSettingKey, parseGradingGrid, computePlayerGradeUpdates } from '@/lib/grading';
 import { memoryCache } from '@/lib/memory-cache';
+import { toStorageProxyUrl } from '@/lib/supabase';
 import {
   parseSavedLineups,
   playerMatchEvent,
@@ -488,7 +489,7 @@ export async function getPlayerMatchSchedule(
       ? { id: edition.id, title: edition.title, number: edition.number }
       : null,
     team: team
-      ? { id: team.id, name: team.name, tag: team.tag, logo: team.logo }
+      ? { id: team.id, name: team.name, tag: team.tag, logo: toStorageProxyUrl(team.logo) }
       : null,
     playerTeams,
     captainDesks,
