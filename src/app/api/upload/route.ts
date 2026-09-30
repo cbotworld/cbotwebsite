@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import https from 'https';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,61 @@ const corsHeaders = {
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
+}
+
+function uploadToSupabaseHttps(
+  supabaseBaseUrl: string,
+  key: string,
+  bucket: string,
+  fileName: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ success: boolean; status: number; body?: string; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const url = new URL(`${supabaseBaseUrl}/storage/v1/object/${bucket}/${fileName}`);
+      const options: https.RequestOptions = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          'Content-Type': mimeType,
+          'Content-Length': buffer.length,
+          'x-upsert': 'true',
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ success: true, status: res.statusCode, body: data });
+          } else {
+            resolve({
+              success: false,
+              status: res.statusCode || 500,
+              error: data || `HTTP ${res.statusCode}`,
+            });
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        resolve({ success: false, status: 500, error: err?.message || String(err) });
+      });
+
+      req.write(buffer);
+      req.end();
+    } catch (err: any) {
+      resolve({ success: false, status: 500, error: err?.message || String(err) });
+    }
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +103,8 @@ export async function POST(request: NextRequest) {
       DEFAULT_ANON_KEY;
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const ext = file.type?.includes('png') ? 'png' : file.type?.includes('webp') ? 'webp' : file.type?.includes('svg') ? 'svg' : 'jpg';
+    const mimeType = file.type || 'image/jpeg';
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : mimeType.includes('svg') ? 'svg' : 'jpg';
     const originalName = ('name' in file && typeof file.name === 'string')
       ? file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)
       : 'img';
@@ -68,29 +125,12 @@ export async function POST(request: NextRequest) {
     let lastError: string = '';
 
     for (const b of candidateBuckets) {
-      try {
-        const uploadEndpoint = `${supabaseUrl}/storage/v1/object/${b}/${fileName}`;
-        const uploadRes = await fetch(uploadEndpoint, {
-          method: 'POST',
-          headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            'Content-Type': file.type || 'image/jpeg',
-            'Content-Length': String(bytes.length),
-            'x-upsert': 'true',
-          },
-          body: new Uint8Array(bytes),
-        });
-
-        if (uploadRes.ok) {
-          successBucket = b;
-          break;
-        } else {
-          const errText = await uploadRes.text();
-          lastError = `[${b}] ${uploadRes.status}: ${errText}`;
-        }
-      } catch (err: any) {
-        lastError = err?.message || String(err);
+      const res = await uploadToSupabaseHttps(supabaseUrl, key, b, fileName, bytes, mimeType);
+      if (res.success) {
+        successBucket = b;
+        break;
+      } else {
+        lastError = `[${b}] ${res.status}: ${res.error}`;
       }
     }
 

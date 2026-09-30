@@ -2,12 +2,68 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import https from 'https';
 
 const DEFAULT_SUPABASE_URL = 'https://otvbywtuyvufxxvlizqp.supabase.co';
 const DEFAULT_SERVICE_ROLE_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90dmJ5d3R1eXZ1Znh4dmxpenFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjA3ODk0NywiZXhwIjoyMTAxNjU0OTQ3fQ.WUg--SXP1DAvSXJqinDzorRNkJTGciNnBoK1_80NHB0';
 const DEFAULT_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90dmJ5d3R1eXZ1Znh4dmxpenFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwNzg5NDcsImV4cCI6MjEwMTY1NDk0N30.wZzOnG9WTDKoCTHP1Xupiv1GMY5TZ0qelyWcA7L5o_4';
+
+function uploadToSupabaseHttps(
+  supabaseBaseUrl: string,
+  key: string,
+  bucket: string,
+  fileName: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<{ success: boolean; status: number; body?: string; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const url = new URL(`${supabaseBaseUrl}/storage/v1/object/${bucket}/${fileName}`);
+      const options: https.RequestOptions = {
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          'Content-Type': mimeType,
+          'Content-Length': buffer.length,
+          'x-upsert': 'true',
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ success: true, status: res.statusCode, body: data });
+          } else {
+            resolve({
+              success: false,
+              status: res.statusCode || 500,
+              error: data || `HTTP ${res.statusCode}`,
+            });
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        resolve({ success: false, status: 500, error: err?.message || String(err) });
+      });
+
+      req.write(buffer);
+      req.end();
+    } catch (err: any) {
+      resolve({ success: false, status: 500, error: err?.message || String(err) });
+    }
+  });
+}
 
 /**
  * Server upload that uses the service role key to bypass RLS and store
@@ -40,7 +96,8 @@ export async function uploadPublicImage(
     DEFAULT_ANON_KEY;
 
   const bytes = Buffer.from(await blob.arrayBuffer());
-  const ext = blob.type?.includes('png') ? 'png' : blob.type?.includes('webp') ? 'webp' : blob.type?.includes('svg') ? 'svg' : 'jpg';
+  const mimeType = blob.type || 'image/jpeg';
+  const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : mimeType.includes('svg') ? 'svg' : 'jpg';
   const fileName = `uploads/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const candidateBuckets = Array.from(
@@ -58,29 +115,12 @@ export async function uploadPublicImage(
   let lastError: string = '';
 
   for (const b of candidateBuckets) {
-    try {
-      const uploadEndpoint = `${supabaseUrl}/storage/v1/object/${b}/${fileName}`;
-      const uploadRes = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-          'Content-Type': blob.type || 'image/jpeg',
-          'Content-Length': String(bytes.length),
-          'x-upsert': 'true',
-        },
-        body: new Uint8Array(bytes),
-      });
-
-      if (uploadRes.ok) {
-        successBucket = b;
-        break;
-      } else {
-        const errText = await uploadRes.text();
-        lastError = `[${b}] ${uploadRes.status}: ${errText}`;
-      }
-    } catch (err: any) {
-      lastError = err?.message || String(err);
+    const res = await uploadToSupabaseHttps(supabaseUrl, key, b, fileName, bytes, mimeType);
+    if (res.success) {
+      successBucket = b;
+      break;
+    } else {
+      lastError = `[${b}] ${res.status}: ${res.error}`;
     }
   }
 
