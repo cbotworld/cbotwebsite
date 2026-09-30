@@ -76,9 +76,10 @@ export async function POST(request: NextRequest) {
             apikey: key,
             Authorization: `Bearer ${key}`,
             'Content-Type': file.type || 'image/jpeg',
+            'Content-Length': String(bytes.length),
             'x-upsert': 'true',
           },
-          body: bytes,
+          body: new Uint8Array(bytes),
         });
 
         if (uploadRes.ok) {

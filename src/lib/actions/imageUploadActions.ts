@@ -66,9 +66,10 @@ export async function uploadPublicImage(
           apikey: key,
           Authorization: `Bearer ${key}`,
           'Content-Type': blob.type || 'image/jpeg',
+          'Content-Length': String(bytes.length),
           'x-upsert': 'true',
         },
-        body: bytes,
+        body: new Uint8Array(bytes),
       });
 
       if (uploadRes.ok) {
