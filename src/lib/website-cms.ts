@@ -445,6 +445,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       { id: 'v3', youtubeId: 'szimIRoO0jI', title: '25th Edition Closing Video', label: '25th Closing', sortOrder: 2 },
       { id: 'v4', youtubeId: '9i3_S7JpN74', title: '50th Edition Closing Video', label: '50th Closing', sortOrder: 3 },
       { id: 'v5', youtubeId: 'eMnF5vIAlPw', title: '100th Centenary Closing Video', label: '100th Centenary', sortOrder: 4 },
+      { id: 'v6', youtubeId: '', title: '200th Edition Closing Video', label: '200th Closing', sortOrder: 5 },
     ],
   },
   footer: {

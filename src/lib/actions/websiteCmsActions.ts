@@ -40,7 +40,7 @@ import { cache } from 'react';
 
 export const getWebsiteCmsContent = cache(async function getWebsiteCmsContent(): Promise<WebsiteCmsContent> {
   try {
-    return await memoryCache.getOrSet('website_cms_content', 60, async () => {
+    return await memoryCache.getOrSet('website_cms_content', 5, async () => {
       try {
         const row = await prisma.systemSetting.findUnique({ where: { key: WEBSITE_CMS_KEY } });
         return parseWebsiteCms(row?.value);
