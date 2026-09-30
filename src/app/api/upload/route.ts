@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+const DEFAULT_SUPABASE_URL = 'https://otvbywtuyvufxxvlizqp.supabase.co';
+const DEFAULT_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90dmJ5d3R1eXZ1Znh4dmxpenFwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjA3ODk0NywiZXhwIjoyMTAxNjU0OTQ3fQ.WUg--SXP1DAvSXJqinDzorRNkJTGciNnBoK1_80NHB0';
+const DEFAULT_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90dmJ5d3R1eXZ1Znh4dmxpenFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwNzg5NDcsImV4cCI6MjEwMTY1NDk0N30.wZzOnG9WTDKoCTHP1Xupiv1GMY5TZ0qelyWcA7L5o_4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,22 +38,13 @@ export async function POST(request: NextRequest) {
     }
 
     const requestedBucket = String(formData.get('bucket') || 'teams');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+    const supabaseUrl = (rawUrl.includes('placeholder') ? DEFAULT_SUPABASE_URL : rawUrl).replace(/\/+$/, '');
     const key =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      DEFAULT_SERVICE_ROLE_KEY ||
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      '';
-
-    if (!supabaseUrl || !key || supabaseUrl.includes('placeholder')) {
-      return NextResponse.json(
-        { success: false, error: 'Supabase storage is not configured on the server.' },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+      DEFAULT_ANON_KEY;
 
     const bytes = Buffer.from(await file.arrayBuffer());
     const ext = file.type?.includes('png') ? 'png' : file.type?.includes('webp') ? 'webp' : file.type?.includes('svg') ? 'svg' : 'jpg';
@@ -61,7 +57,6 @@ export async function POST(request: NextRequest) {
       new Set([
         requestedBucket,
         requestedBucket.toLowerCase(),
-        requestedBucket.toUpperCase(),
         'teams',
         'images',
         'TEAMS',
@@ -69,50 +64,51 @@ export async function POST(request: NextRequest) {
       ])
     );
 
-    let uploadData: any = null;
-    let uploadError: any = null;
-    let targetBucket = candidateBuckets[0];
+    let successBucket: string | null = null;
+    let lastError: string = '';
 
     for (const b of candidateBuckets) {
-      const result = await supabase.storage.from(b).upload(fileName, bytes, {
-        contentType: file.type || 'image/jpeg',
-        cacheControl: '31536000',
-        upsert: true,
-      });
-      if (result.data) {
-        uploadData = result.data;
-        uploadError = null;
-        targetBucket = b;
-        break;
-      } else {
-        uploadError = result.error;
+      try {
+        const uploadEndpoint = `${supabaseUrl}/storage/v1/object/${b}/${fileName}`;
+        const uploadRes = await fetch(uploadEndpoint, {
+          method: 'POST',
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            'Content-Type': file.type || 'image/jpeg',
+            'x-upsert': 'true',
+          },
+          body: bytes,
+        });
+
+        if (uploadRes.ok) {
+          successBucket = b;
+          break;
+        } else {
+          const errText = await uploadRes.text();
+          lastError = `[${b}] ${uploadRes.status}: ${errText}`;
+        }
+      } catch (err: any) {
+        lastError = err?.message || String(err);
       }
     }
 
-    if (uploadError || !uploadData) {
-      console.error('[Upload API] Supabase storage upload error:', uploadError);
+    if (!successBucket) {
+      console.error('[Upload API] All bucket upload attempts failed:', lastError);
       return NextResponse.json(
-        { success: false, error: uploadError?.message || 'Storage upload failed' },
+        { success: false, error: `Upload failed: ${lastError}` },
         { status: 500, headers: corsHeaders }
       );
     }
 
-    const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(uploadData.path);
-    const publicUrl = publicUrlData?.publicUrl;
-
-    if (!publicUrl) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to retrieve public URL from storage.' },
-        { status: 500, headers: corsHeaders }
-      );
-    }
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${successBucket}/${fileName}`;
 
     return NextResponse.json(
       {
         success: true,
         url: `${publicUrl}?v=${Date.now()}`,
-        path: uploadData.path,
-        bucket: targetBucket,
+        path: fileName,
+        bucket: successBucket,
       },
       { headers: corsHeaders }
     );
