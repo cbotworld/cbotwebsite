@@ -209,26 +209,14 @@ export default function HomeClient({
 
       {/* TEAMS MARQUEE STRIP */}
       {(() => {
-        const sourceTeams = (teams && teams.length > 0)
-          ? teams
-          : (allTeams && allTeams.length > 0)
-          ? allTeams
-          : [
-              { id: '1', name: 'Vintage Strikers', tag: 'PRECISION', logo: getTeamPosterUrl('vintage-strikers.jpeg') },
-              { id: '2', name: 'Boric Speedsters', tag: 'SPEED', logo: getTeamPosterUrl('boric-speedsters.jpeg') },
-              { id: '3', name: 'Plywood Pioneers', tag: 'FOUNDATION', logo: getTeamPosterUrl('plywood-pioneers.jpeg') },
-              { id: '4', name: 'Pocket Dynamos', tag: 'ACCURACY', logo: getTeamPosterUrl('pocket-dynamos.jpeg') },
-              { id: '5', name: 'Vanilla Falcons', tag: 'STRATEGY', logo: getTeamPosterUrl('vanilla-falcons.jpeg') },
-              { id: '6', name: 'Ebony Overlords', tag: 'DOMINANCE', logo: getTeamPosterUrl('ebony-overlords.jpeg') },
-              { id: '7', name: 'Supernova Queen', tag: 'GLORY', logo: getTeamPosterUrl('supernova-queen.jpeg') },
-              { id: '8', name: 'Lumen Pillar', tag: 'ILLUMINATION', logo: getTeamPosterUrl('lumen-pillar.jpeg') },
-            ];
+        const sourceTeams = teams && teams.length > 0 ? teams : [];
+        if (sourceTeams.length === 0) return null;
 
         const marqueeBaseItems = sourceTeams.map((t: any) => ({
           id: t.id || t.name,
           name: t.name,
           tag: t.tag || 'FRANCHISE',
-          img: t.logo || t.posterUrl || getTeamPosterUrl(`${(t.name || 'team').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.jpeg`),
+          img: t.logo || t.posterUrl || '',
           border: 'border-amber-500/50',
           glow: 'shadow-amber-500/30',
         }));
