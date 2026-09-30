@@ -26,6 +26,7 @@ function uploadToSupabaseHttps(
         port: 443,
         path: url.pathname,
         method: 'POST',
+        rejectUnauthorized: false,
         headers: {
           apikey: key,
           Authorization: `Bearer ${key}`,
