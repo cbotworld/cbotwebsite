@@ -20,21 +20,29 @@ export function getPublicUrl(path: string): string {
 }
 
 export function getAppBaseUrl(): string {
+  const getCleanOrigin = (u?: string | null): string | null => {
+    if (!u) return null;
+    try {
+      const parsed = new URL(u.startsWith('http://') || u.startsWith('https://') ? u : `https://${u}`);
+      return parsed.origin;
+    } catch {
+      return null;
+    }
+  };
+
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
   }
-  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('localhost')) {
-    return process.env.NEXTAUTH_URL.replace(/\/+$/, '');
+  const fromNextAuth = getCleanOrigin(process.env.NEXTAUTH_URL);
+  if (fromNextAuth && !fromNextAuth.includes('localhost')) {
+    return fromNextAuth;
   }
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, '');
-  }
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/+$/, '')}`;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL.replace(/\/+$/, '')}`;
-  }
+  const fromAppUrl = getCleanOrigin(process.env.NEXT_PUBLIC_APP_URL);
+  if (fromAppUrl) return fromAppUrl;
+  const fromVercelProd = getCleanOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (fromVercelProd) return fromVercelProd;
+  const fromVercel = getCleanOrigin(process.env.VERCEL_URL);
+  if (fromVercel) return fromVercel;
   return 'https://www.cbotworld.com';
 }
 
@@ -49,7 +57,7 @@ export function toStorageProxyUrl(url?: string | null): string {
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
   const baseUrl = getAppBaseUrl();
 
-  // If corrupted with prefix like /login/api/storage/... or /dashboard/api/storage/... or /organizer/api/storage/...
+  // Strip any accidental corrupted subpath prefix before /api/storage/ (e.g., /login/api/storage/ -> /api/storage/)
   if (trimmed.includes('/api/storage/')) {
     const storagePath = trimmed.split('/api/storage/')[1];
     return `${baseUrl}/api/storage/${storagePath}`;
@@ -62,7 +70,7 @@ export function toStorageProxyUrl(url?: string | null): string {
   if (trimmed.startsWith('api/storage/')) {
     return `${baseUrl}/${trimmed}`;
   }
-  if (trimmed.startsWith('/teams/')) {
+  if (trimmed.startsWith('/')) {
     return `${baseUrl}${trimmed}`;
   }
   if (/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp|svg)$/i.test(trimmed)) {
