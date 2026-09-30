@@ -101,16 +101,7 @@ export async function uploadPublicImage(
   const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : mimeType.includes('svg') ? 'svg' : 'jpg';
   const fileName = `uploads/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const candidateBuckets = Array.from(
-    new Set([
-      requestedBucket,
-      requestedBucket.toLowerCase(),
-      'teams',
-      'images',
-      'TEAMS',
-      'Images',
-    ])
-  );
+  const candidateBuckets = requestedBucket.toLowerCase() === 'images' ? ['images', 'teams'] : ['teams', 'images'];
 
   let successBucket: string | null = null;
   let lastError: string = '';

@@ -110,17 +110,7 @@ export async function POST(request: NextRequest) {
       ? file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30)
       : 'img';
     const fileName = `${Date.now()}_${originalName}.${ext}`;
-
-    const candidateBuckets = Array.from(
-      new Set([
-        requestedBucket,
-        requestedBucket.toLowerCase(),
-        'teams',
-        'images',
-        'TEAMS',
-        'Images',
-      ])
-    );
+    const candidateBuckets = requestedBucket.toLowerCase() === 'images' ? ['images', 'teams'] : ['teams', 'images'];
 
     let successBucket: string | null = null;
     let lastError: string = '';
