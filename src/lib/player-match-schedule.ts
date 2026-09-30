@@ -324,13 +324,14 @@ export async function getPlayerMatchSchedule(
         id: team?.id,
         teams,
       });
+      const oppNorm = String(oppNameRaw || '').toUpperCase().trim();
       const oppFace = oppMissing
         ? { name: 'TBD', tag: 'TBD', logo: null as string | null }
         : resolveTeamFace({
             name: oppNameRaw,
-            tag: teamByName.get(oppNameRaw)?.tag,
-            logo: teamByName.get(oppNameRaw)?.logo,
-            id: teamByName.get(oppNameRaw)?.id,
+            tag: oppRow?.tag || teamByName.get(oppNorm)?.tag,
+            logo: oppRow?.logo || teamByName.get(oppNorm)?.logo,
+            id: oppRow?.id || teamByName.get(oppNorm)?.id,
             teams,
           });
       const startMs = startIso ? new Date(startIso).getTime() : 0;
@@ -451,10 +452,18 @@ export async function getPlayerMatchSchedule(
         stageLabel: scheduled?.stageLabel || title,
         teamName: myFace.name,
         teamTag: myFace.tag,
-        teamLogo: myFace.logo,
+        teamLogo: toStorageProxyUrl(myFace.logo),
+        team1Name: myFace.name,
+        team1Tag: myFace.tag,
+        team1Logo: toStorageProxyUrl(myFace.logo),
+        myTeamLogo: toStorageProxyUrl(myFace.logo),
         opponentName: oppFace.name,
         opponentTag: oppFace.tag,
-        opponentLogo: oppFace.logo,
+        opponentLogo: toStorageProxyUrl(oppFace.logo),
+        team2Name: oppFace.name,
+        team2Tag: oppFace.tag,
+        team2Logo: toStorageProxyUrl(oppFace.logo),
+        oppTeamLogo: toStorageProxyUrl(oppFace.logo),
         tableNumber: 1,
         editionId: edition?.id || null,
         editionTitle: edition?.title || fallbackEditionTitle,

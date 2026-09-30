@@ -123,7 +123,7 @@ function customFace(name?: string | null, tag?: string | null, logo?: string | n
   return {
     name: resolvedName,
     tag: (tag || resolvedName.slice(0, 3) || 'TBD').toUpperCase().trim(),
-    logo: toStorageProxyUrl(logo) || '/logo.png',
+    logo: toStorageProxyUrl(logo) || `${toStorageProxyUrl('/logo.png')}`,
   };
 }
 
@@ -158,13 +158,18 @@ export function resolveTeamFace(input: {
   const byTag = officialFromTag(tag);
   const byName = officialFromName(name);
 
-  if (byLogo && byTag && byLogo.tag !== byTag.tag) return byLogo;
-  if (byLogo && byName && byLogo.tag !== byName.tag) return byLogo;
-  if (byTag && byName && byTag.tag !== byName.tag) return byTag;
+  const formatFace = (f: TeamFace): TeamFace => ({
+    ...f,
+    logo: toStorageProxyUrl(f.logo) || `${toStorageProxyUrl('/logo.png')}`,
+  });
 
-  if (byLogo) return byLogo;
-  if (byTag) return byTag;
-  if (byName) return byName;
+  if (byLogo && byTag && byLogo.tag !== byTag.tag) return formatFace(byLogo);
+  if (byLogo && byName && byLogo.tag !== byName.tag) return formatFace(byLogo);
+  if (byTag && byName && byTag.tag !== byName.tag) return formatFace(byTag);
+
+  if (byLogo) return formatFace(byLogo);
+  if (byTag) return formatFace(byTag);
+  if (byName) return formatFace(byName);
 
   if (fromId?.name) return customFace(fromId.name, fromId.tag, fromId.logo);
   return customFace(name, tag, logo);

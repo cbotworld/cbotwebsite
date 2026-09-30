@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { resolveTeamFace } from '@/lib/team-identity';
 import { stageConfigKey } from '@/lib/tournament-stages';
 import { memoryCache } from '@/lib/memory-cache';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -234,10 +235,18 @@ export async function GET(request: NextRequest) {
         playerRole: user.role || 'PLAYER',
         teamName: mine.name,
         teamTag: mine.tag,
-        teamLogo: mine.logo,
+        teamLogo: toStorageProxyUrl(mine.logo || playerTeam?.logo),
+        team1Name: mine.name,
+        team1Tag: mine.tag,
+        team1Logo: toStorageProxyUrl(mine.logo || playerTeam?.logo),
+        myTeamLogo: toStorageProxyUrl(mine.logo || playerTeam?.logo),
         opponentName: opp.name,
         opponentTag: opp.tag,
-        opponentLogo: opp.logo,
+        opponentLogo: toStorageProxyUrl(opp.logo || opponentTeam?.logo),
+        team2Name: opp.name,
+        team2Tag: opp.tag,
+        team2Logo: toStorageProxyUrl(opp.logo || opponentTeam?.logo),
+        oppTeamLogo: toStorageProxyUrl(opp.logo || opponentTeam?.logo),
         score1: match.score1 || 0,
         score2: match.score2 || 0,
         queenStrikes1: match.queenStrikes1 || 0,
