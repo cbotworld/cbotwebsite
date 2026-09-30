@@ -12,18 +12,16 @@ export default async function HomePage() {
   try {
     // Only query what is actually rendered on the UI to minimize data transfer size.
     // HomeClient only needs edition metadata for basic display, and teams/allTeams for the marquee image strip (using id, name, tag, logo).
-    const [currentEditionRef, allTeams, websiteCms] = await Promise.all([
-      resolveCurrentEdition(),
-      prisma.team.findMany({
-        select: {
-          id: true,
-          name: true,
-          tag: true,
-          logo: true,
-        },
-      }),
-      getWebsiteCmsContent(),
-    ]);
+    const currentEditionRef = await resolveCurrentEdition();
+    const allTeams = await prisma.team.findMany({
+      select: {
+        id: true,
+        name: true,
+        tag: true,
+        logo: true,
+      },
+    });
+    const websiteCms = await getWebsiteCmsContent();
 
     const currentEdition = currentEditionRef
       ? await prisma.edition.findUnique({

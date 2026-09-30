@@ -35,62 +35,62 @@ export default async function OrganizerPage() {
   let websiteCms = await getWebsiteCmsContent();
 
   try {
-    [editions, users, dbTeams, gradingSettings, websiteCms] = await Promise.all([
-      prisma.edition.findMany({
-        orderBy: { number: 'desc' },
-        include: {
-          participants: {
-            orderBy: [{ gradeAverage: 'asc' }, { user: { name: 'asc' } }],
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  username: true,
-                  average: true,
-                  target: true,
-                  role: true,
-                  isActivated: true,
-                },
+    editions = await prisma.edition.findMany({
+      orderBy: { number: 'desc' },
+      include: {
+        participants: {
+          orderBy: [{ gradeAverage: 'asc' }, { user: { name: 'asc' } }],
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                average: true,
+                target: true,
+                role: true,
+                isActivated: true,
               },
-              team: {
-                select: {
-                  id: true,
-                  name: true,
-                  tag: true,
-                },
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+                tag: true,
               },
             },
           },
-          patterns: {
-            orderBy: { sequence: 'asc' },
-            include: { pattern: true },
-          },
         },
-      }),
-      prisma.user.findMany({
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.team.findMany({
-        include: {
-          captain: true,
-          members: {
-            include: { user: true }
-          },
-          spocMembers: {
-            include: { user: true }
-          },
-          leagueStandings: true
+        patterns: {
+          orderBy: { sequence: 'asc' },
+          include: { pattern: true },
         },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.systemSetting.findMany({
-        where: {
-          key: { startsWith: 'edition_grading_' }
-        }
-      }),
-      getWebsiteCmsContent(),
-    ]);
+      },
+    });
+
+    users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    dbTeams = await prisma.team.findMany({
+      include: {
+        captain: true,
+        members: {
+          include: { user: true },
+        },
+        spocMembers: {
+          include: { user: true },
+        },
+        leagueStandings: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    gradingSettings = await prisma.systemSetting.findMany({
+      where: {
+        key: { startsWith: 'edition_grading_' },
+      },
+    });
 
     // Only the edition the dashboard opens on; archived ones keep their own dates.
     const liveEditionRef = await resolveCurrentEdition();

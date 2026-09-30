@@ -46,6 +46,12 @@ class MemoryCache {
           expiresAt: Date.now() + Math.max(1, ttlSeconds) * 1000,
         });
         return freshValue;
+      } catch (err) {
+        // If an existing stale cache entry exists, return it to keep site online
+        if (entry) {
+          return entry.value;
+        }
+        throw err;
       } finally {
         this.inFlight.delete(key);
       }

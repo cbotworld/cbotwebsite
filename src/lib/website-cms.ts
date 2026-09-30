@@ -349,7 +349,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
       { value: '100+', label: 'Active Participants', color: 'emerald' },
     ],
     bannerImage: '',
-    posterUrl: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/images/1790785488348_1790785488150.jpg?v=1790785489281',
+    posterUrl: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/images/1790785488348_1790785488150.jpg?v=1790785489281',
     currentEditionBadge: 'Current Edition',
     ctaButtonText: 'View Live Edition Schedule (Edition 204)',
     ctaButtonLink: PUBLIC_SCHEDULE_PATH,

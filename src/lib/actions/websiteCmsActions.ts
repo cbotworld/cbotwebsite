@@ -36,17 +36,24 @@ async function requireOrganizer() {
   return { ok: true as const };
 }
 
-export async function getWebsiteCmsContent(): Promise<WebsiteCmsContent> {
+import { cache } from 'react';
+
+export const getWebsiteCmsContent = cache(async function getWebsiteCmsContent(): Promise<WebsiteCmsContent> {
   try {
     return await memoryCache.getOrSet('website_cms_content', 60, async () => {
-      const row = await prisma.systemSetting.findUnique({ where: { key: WEBSITE_CMS_KEY } });
-      return parseWebsiteCms(row?.value);
+      try {
+        const row = await prisma.systemSetting.findUnique({ where: { key: WEBSITE_CMS_KEY } });
+        return parseWebsiteCms(row?.value);
+      } catch (dbErr) {
+        console.warn('[getWebsiteCmsContent] DB query warning, falling back to default:', dbErr);
+        return DEFAULT_WEBSITE_CMS;
+      }
     });
   } catch (error) {
-    console.error('[getWebsiteCmsContent]', error);
+    console.warn('[getWebsiteCmsContent] Memory cache error:', error);
     return DEFAULT_WEBSITE_CMS;
   }
-}
+});
 
 async function saveWebsiteCms(content: WebsiteCmsContent) {
   memoryCache.invalidate('website_cms_content');

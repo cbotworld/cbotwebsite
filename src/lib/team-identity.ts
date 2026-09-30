@@ -19,7 +19,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'PLYWOOD PIONEERS': {
     name: 'PLYWOOD PIONEERS',
     tag: 'PP',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/plywood-pioneers.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/plywood-pioneers.jpeg',
     color: 'text-amber-400',
     border: 'border-amber-500/40',
     bg: 'bg-amber-500/10',
@@ -27,7 +27,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'SUPERNOVA QUEEN': {
     name: 'SUPERNOVA QUEEN',
     tag: 'SQ',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/supernova-queen.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/supernova-queen.jpeg',
     color: 'text-pink-400',
     border: 'border-pink-500/40',
     bg: 'bg-pink-500/10',
@@ -35,7 +35,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'POCKET DYNAMOS': {
     name: 'POCKET DYNAMOS',
     tag: 'PD',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/pocket-dynamos.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/pocket-dynamos.jpeg',
     color: 'text-sky-400',
     border: 'border-sky-500/40',
     bg: 'bg-sky-500/10',
@@ -43,7 +43,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'LUMEN PILLAR': {
     name: 'LUMEN PILLAR',
     tag: 'LP',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/lumen-pillar.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/lumen-pillar.jpeg',
     color: 'text-yellow-400',
     border: 'border-yellow-500/40',
     bg: 'bg-yellow-500/10',
@@ -51,7 +51,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'VANILLA FALCONS': {
     name: 'VANILLA FALCONS',
     tag: 'VF',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vanilla-falcons.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/vanilla-falcons.jpeg',
     color: 'text-emerald-400',
     border: 'border-emerald-500/40',
     bg: 'bg-emerald-500/10',
@@ -59,7 +59,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'VINTAGE STRIKERS': {
     name: 'VINTAGE STRIKERS',
     tag: 'VS',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/vintage-strikers.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/vintage-strikers.jpeg',
     color: 'text-orange-400',
     border: 'border-orange-500/40',
     bg: 'bg-orange-500/10',
@@ -67,7 +67,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'EBONY OVERLORDS': {
     name: 'EBONY OVERLORDS',
     tag: 'EO',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/ebony-overlords.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/ebony-overlords.jpeg',
     color: 'text-purple-400',
     border: 'border-purple-500/40',
     bg: 'bg-purple-500/10',
@@ -75,7 +75,7 @@ export const OFFICIAL_TEAM_FACES: Record<string, TeamFace> = {
   'BORIC SPEEDSTERS': {
     name: 'BORIC SPEEDSTERS',
     tag: 'BS',
-    logo: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/teams/boric-speedsters.jpeg',
+    logo: 'http://cbot-supabase-f44128-62-72-41-216.sslip.io/storage/v1/object/public/teams/boric-speedsters.jpeg',
     color: 'text-cyan-400',
     border: 'border-cyan-500/40',
     bg: 'bg-cyan-500/10',
