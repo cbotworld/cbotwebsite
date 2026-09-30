@@ -42,6 +42,31 @@ export async function uploadImageToSupabase(file: File, bucket = 'teams'): Promi
     quality: 0.78,
     maxBytes: 350_000,
   });
+
+  // 1. Prefer uploading via server-side /api/upload endpoint (service role powered, bypasses RLS)
+  try {
+    if (typeof window !== 'undefined') {
+      const formData = new FormData();
+      formData.append('file', compressed, file.name || 'image.jpg');
+      formData.append('bucket', bucket);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.url) {
+          return json.url;
+        }
+      }
+    }
+  } catch (apiErr) {
+    console.warn('[uploadImageToSupabase] /api/upload endpoint error, falling back to client:', apiErr);
+  }
+
+  // 2. Direct client upload fallback
   const fileName = `${Date.now()}_${(file.name || 'image')
     .replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9.-]/g, '_')
