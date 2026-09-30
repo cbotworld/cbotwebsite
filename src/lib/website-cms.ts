@@ -229,9 +229,9 @@ export type WebsiteCmsContent = {
 
 const DEFAULT_GOLD_SPONSORS: NamedSponsor[] = [
   { id: 'scrapplique', name: 'Scrapplique Galore', imageUrl: '/sponsors/scrapplique-galore-logo.png', sortOrder: 0 },
-  { id: 'packiya', name: 'Packiya', sortOrder: 1 },
-  { id: 'abhijit', name: 'Abhijit', sortOrder: 2 },
-  { id: 'manoj', name: 'Manoj PS', sortOrder: 3 },
+  { id: 'packiya', name: 'Packiya', imageUrl: '/sponsors/packiya.jpg', sortOrder: 1 },
+  { id: 'abhijit', name: 'Abhijit', imageUrl: '/sponsors/abhijit.jpg', sortOrder: 2 },
+  { id: 'manoj', name: 'Manoj PS', imageUrl: '/sponsors/manoj-ps.jpg', sortOrder: 3 },
   { id: 'mahesh', name: 'Mahesh TN', sortOrder: 4 },
   { id: 'kumar', name: 'Kumar A', sortOrder: 5 },
   { id: 'ramesh', name: 'Ramesh', sortOrder: 6 },
@@ -417,7 +417,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   goldSponsors: {
     sectionBadge: '🥇 Gold Sponsors',
     sectionTitle: 'Our Gold Sponsors',
-    sectionDescription: 'Proud supporters powering CBOT 201st Edition. Thank you for your generous contributions!',
+    sectionDescription: 'Proud supporters powering CBOT Edition 204. Thank you for your generous contributions!',
     sponsors: DEFAULT_GOLD_SPONSORS,
   },
   legacy: {
@@ -435,7 +435,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
   },
   footer: {
     brandDescription:
-      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 201 — connecting players worldwide in the live cup.',
+      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 204 — connecting players worldwide in the live cup.',
     exploreHeading: 'Explore',
     exploreSoonLabel: 'Soon',
     governanceHeading: 'Tournament Governance',

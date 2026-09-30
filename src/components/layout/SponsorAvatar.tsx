@@ -1,5 +1,8 @@
+'use client';
+
 import * as React from 'react';
 import { sponsorInitials } from '@/lib/website-cms';
+import { toStorageProxyUrl } from '@/lib/supabase';
 
 type SponsorAvatarProps = {
   name: string;
@@ -13,12 +16,16 @@ export function SponsorAvatar({
   imageUrl,
   imageClassName = 'object-cover',
 }: SponsorAvatarProps) {
-  if (imageUrl) {
+  const [loadError, setLoadError] = React.useState(false);
+
+  if (imageUrl && !loadError) {
+    const resolvedUrl = toStorageProxyUrl(imageUrl);
     return (
       <img
-        src={imageUrl}
+        src={resolvedUrl}
         alt={name}
         className={`h-full w-full ${imageClassName}`}
+        onError={() => setLoadError(true)}
       />
     );
   }
