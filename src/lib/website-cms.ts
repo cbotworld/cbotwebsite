@@ -255,38 +255,38 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     brandTagline: 'Connect Carrom Enthusiasts Worldwide',
     organizationName: 'Carrom Balu Online Tournament',
     founderName: 'Carrom Balu',
-    editionLabel: '201st Edition',
-    editionSeriesName: 'Cornerstones of Carrom',
+    editionLabel: '204th Edition',
+    editionSeriesName: 'Remembering SPB',
     metaTitle: 'CBOT World - Carrom Balu Online Tournament',
     metaDescription:
       'The ultimate online Carrom esports tournament platform for Organizers, Captains, and Players. Live brackets, automated match scoring, and global leaderboards.',
     metaKeywords:
       'Carrom, CBOT, CBOT World, Carrom Balu, Online Tournament, Esports, Match Scoring, Tournament Brackets',
-    ogUrl: 'https://cbot.gg',
+    ogUrl: 'https://cbotworld.com',
     whatsappNumber: '6594519986',
     whatsappMessage:
       'Hi Carrom Balu! I would like to know more about CBOT (Carrom Balu Online Tournament).',
   },
   pages: {
     schedule: {
-      badge: '✨ 201st Edition',
+      badge: '✨ Edition 204',
       title: 'Official Match Fixtures',
       subtitle: 'Carrom Balu Online Tournament',
     },
     combis: {
       badge: 'Official Combis & Lineups',
-      title: 'BICENTENNIAL DAILY TEAM COMBIS',
+      title: 'DAILY TEAM COMBIS',
       subtitle: 'Submitted by Captains • Auto-Published Every Day at 9:30 PM IST',
     },
     videos: {
-      badge: '🏆 201st Edition Video Center',
-      title: 'Live & Recorded Match Videos | CBOT 201st Edition',
+      badge: '🏆 Edition 204 Video Center',
+      title: 'Live & Recorded Match Videos | CBOT Edition 204',
       subtitle:
-        'Watch all official live streams and recorded match videos day-wise across all tournament days of the CBOT 201st Edition.',
+        'Watch all official live streams and recorded match videos day-wise across all tournament days of the CBOT Edition 204.',
     },
     fixtures: {
       badge: 'Official Fixtures & Public Schedule',
-      title: 'Cornerstones of Carrom (Edition #201) Schedule',
+      title: 'Remembering SPB (Edition #204) Schedule',
       subtitle:
         'Inspect upcoming round-robin, league group, qualifier, and finals fixtures, plus table numbers and time slots.',
     },
@@ -328,7 +328,7 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     },
   },
   nav: {
-    editionButtonLabel: '201st Edition',
+    editionButtonLabel: 'Edition 204',
     editionButtonHref: PUBLIC_COMBIS_PATH,
     combisLabel: 'Daily Team Combis',
     combisHref: PUBLIC_COMBIS_PATH,
@@ -336,27 +336,27 @@ export const DEFAULT_WEBSITE_CMS: WebsiteCmsContent = {
     scheduleHref: PUBLIC_SCHEDULE_PATH,
   },
   hero: {
-    badgeText: 'Celebrating 201st Edition',
+    badgeText: 'Celebrating Edition 204',
     headlineLine1: "World's Premier Online",
     headlineLine2: 'Carrom Arena.',
-    headlineAccent: '201st Edition.',
+    headlineAccent: 'Edition 204 - Remembering SPB',
     description:
-      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 201 — the live cup where players compete today.',
+      'Founded by Carrom Balu in August 2020, CBOT World continues with Edition 204 : Remembering SPB — the live cup where players compete today.',
     stats: [
-      { value: '201st', label: 'Live Edition', color: 'amber' },
+      { value: '204th', label: 'Live Edition', color: 'amber' },
       { value: '12,000+', label: 'Matches Played', color: 'foreground' },
       { value: '2,000+', label: 'Slams', color: 'pink' },
       { value: '100+', label: 'Active Participants', color: 'emerald' },
     ],
     bannerImage: '',
-    posterUrl: '',
+    posterUrl: 'https://otvbywtuyvufxxvlizqp.supabase.co/storage/v1/object/public/images/1790785488348_1790785488150.jpg?v=1790785489281',
     currentEditionBadge: 'Current Edition',
-    ctaButtonText: 'View Live Edition Schedule (201st Edition)',
+    ctaButtonText: 'View Live Edition Schedule (Edition 204)',
     ctaButtonLink: PUBLIC_SCHEDULE_PATH,
   },
   sponsors: {
     sectionBadge: '💎 Official Elite Sponsors',
-    sectionTitle: 'Powering CBOT 201st Edition',
+    sectionTitle: 'Powering CBOT Edition 204',
     sectionDescription:
       'Our elite sponsors make this milestone tournament possible — supporting communities, sports talent, & cultural empowerment.',
     eliteSponsors: [

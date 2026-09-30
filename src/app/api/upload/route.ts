@@ -57,38 +57,35 @@ export async function POST(request: NextRequest) {
       : 'img';
     const fileName = `${Date.now()}_${originalName}.${ext}`;
 
-    let targetBucket = requestedBucket.toLowerCase() === 'images' ? 'images' : 'teams';
+    const candidateBuckets = Array.from(
+      new Set([
+        requestedBucket,
+        requestedBucket.toLowerCase(),
+        requestedBucket.toUpperCase(),
+        'teams',
+        'images',
+        'TEAMS',
+        'Images',
+      ])
+    );
 
-    let { data: uploadData, error: uploadError } = await supabase.storage
-      .from(targetBucket)
-      .upload(fileName, bytes, {
+    let uploadData: any = null;
+    let uploadError: any = null;
+    let targetBucket = candidateBuckets[0];
+
+    for (const b of candidateBuckets) {
+      const result = await supabase.storage.from(b).upload(fileName, bytes, {
         contentType: file.type || 'image/jpeg',
         cacheControl: '31536000',
         upsert: true,
       });
-
-    // If bucket 'images' failed due to casing, try 'Images' or fallback to 'teams'
-    if (uploadError && targetBucket === 'images') {
-      const retryImages = await supabase.storage.from('Images').upload(fileName, bytes, {
-        contentType: file.type || 'image/jpeg',
-        cacheControl: '31536000',
-        upsert: true,
-      });
-      if (retryImages.data) {
-        uploadData = retryImages.data;
+      if (result.data) {
+        uploadData = result.data;
         uploadError = null;
-        targetBucket = 'Images';
+        targetBucket = b;
+        break;
       } else {
-        const retryTeams = await supabase.storage.from('teams').upload(fileName, bytes, {
-          contentType: file.type || 'image/jpeg',
-          cacheControl: '31536000',
-          upsert: true,
-        });
-        if (retryTeams.data) {
-          uploadData = retryTeams.data;
-          uploadError = null;
-          targetBucket = 'teams';
-        }
+        uploadError = result.error;
       }
     }
 

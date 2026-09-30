@@ -75,7 +75,7 @@ export default function HomeClient({
   const specialSponsorsCms = websiteCms.specialSponsors;
   const goldSponsorsCms = websiteCms.goldSponsors;
   const legacyCms = websiteCms.legacy;
-  const heroPosterUrl = withImageCacheBust(hero.posterUrl || editionPosterUrl || '/edition-poster.jpg');
+  const heroPosterUrl = withImageCacheBust(editionPosterUrl || currentEdition?.posterUrl || hero.posterUrl || '/edition-poster.jpg');
   const heroBannerImage = hero.bannerImage || currentEdition?.bannerImage || null;
 
   const legacyVideos = React.useMemo(

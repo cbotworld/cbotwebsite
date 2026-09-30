@@ -94,7 +94,7 @@ export default async function HomePage() {
           players={[]}
           matches={[]}
           currentEditionName={DEFAULT_WEBSITE_CMS.site.editionLabel}
-          editionPosterUrl={null}
+          editionPosterUrl={DEFAULT_WEBSITE_CMS.hero.posterUrl || null}
           currentEdition={null}
           websiteCms={DEFAULT_WEBSITE_CMS}
         />

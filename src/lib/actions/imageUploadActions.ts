@@ -44,35 +44,35 @@ export async function uploadPublicImage(
   const ext = blob.type?.includes('png') ? 'png' : blob.type?.includes('webp') ? 'webp' : blob.type?.includes('svg') ? 'svg' : 'jpg';
   const path = `uploads/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  let targetBucket = requestedBucket.toLowerCase() === 'images' ? 'images' : 'teams';
+  const candidateBuckets = Array.from(
+    new Set([
+      requestedBucket,
+      requestedBucket.toLowerCase(),
+      requestedBucket.toUpperCase(),
+      'teams',
+      'images',
+      'TEAMS',
+      'Images',
+    ])
+  );
 
-  let { data: uploadData, error } = await supabase.storage.from(targetBucket).upload(path, bytes, {
-    contentType: blob.type || 'image/jpeg',
-    upsert: true,
-    cacheControl: '31536000',
-  });
+  let uploadData: any = null;
+  let error: any = null;
+  let targetBucket = candidateBuckets[0];
 
-  if (error && targetBucket === 'images') {
-    const retryImages = await supabase.storage.from('Images').upload(path, bytes, {
+  for (const b of candidateBuckets) {
+    const res = await supabase.storage.from(b).upload(path, bytes, {
       contentType: blob.type || 'image/jpeg',
       upsert: true,
       cacheControl: '31536000',
     });
-    if (retryImages.data) {
-      uploadData = retryImages.data;
+    if (res.data) {
+      uploadData = res.data;
       error = null;
-      targetBucket = 'Images';
+      targetBucket = b;
+      break;
     } else {
-      const retryTeams = await supabase.storage.from('teams').upload(path, bytes, {
-        contentType: blob.type || 'image/jpeg',
-        upsert: true,
-        cacheControl: '31536000',
-      });
-      if (retryTeams.data) {
-        uploadData = retryTeams.data;
-        error = null;
-        targetBucket = 'teams';
-      }
+      error = res.error;
     }
   }
 
