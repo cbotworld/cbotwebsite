@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { getTeamPosterUrl } from '@/lib/supabase';
+import { getTeamPosterUrl, toStorageProxyUrl } from '@/lib/supabase';
 import {
   sponsorAccentClasses,
   specialSponsorAccentClasses,
@@ -75,7 +75,8 @@ export default function HomeClient({
   const specialSponsorsCms = websiteCms.specialSponsors;
   const goldSponsorsCms = websiteCms.goldSponsors;
   const legacyCms = websiteCms.legacy;
-  const heroPosterUrl = withImageCacheBust(editionPosterUrl || currentEdition?.posterUrl || hero.posterUrl || '/edition-poster.jpg');
+  const rawPoster = editionPosterUrl || currentEdition?.posterUrl || hero.posterUrl || '/edition-poster.jpg';
+  const heroPosterUrl = toStorageProxyUrl(withImageCacheBust(rawPoster));
   const heroBannerImage = hero.bannerImage || currentEdition?.bannerImage || null;
 
   const legacyVideos = React.useMemo(
@@ -216,7 +217,7 @@ export default function HomeClient({
           id: t.id || t.name,
           name: t.name,
           tag: t.tag || 'FRANCHISE',
-          img: t.logo || t.posterUrl || '',
+          img: toStorageProxyUrl(t.logo || t.posterUrl || ''),
           border: 'border-amber-500/50',
           glow: 'shadow-amber-500/30',
         }));

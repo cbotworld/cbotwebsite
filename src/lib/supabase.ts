@@ -20,12 +20,27 @@ export function getPublicUrl(path: string): string {
 }
 
 /**
+ * Converts any direct Supabase storage URL to the local /api/storage proxy URL
+ * to avoid browser mixed-content and cross-origin blocking on HTTPS.
+ */
+export function toStorageProxyUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.includes('/storage/v1/object/public/')) {
+    const parts = url.split('/storage/v1/object/public/');
+    return `/api/storage/${parts[1]}`;
+  }
+  return url;
+}
+
+/**
  * Returns the public URL for a team poster image from the 'teams' bucket.
  */
 export function getTeamPosterUrl(filename: string): string {
   try {
     const { data } = supabase.storage.from('teams').getPublicUrl(filename);
-    return data?.publicUrl || `/teams/${filename}`;
+    const raw = data?.publicUrl || `/teams/${filename}`;
+    return toStorageProxyUrl(raw);
   } catch (e) {
     return `/teams/${filename}`;
   }

@@ -28,6 +28,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'api.dicebear.com',
       },
+      {
+        protocol: 'http',
+        hostname: 'cbot-supabase-f44128-62-72-41-216.sslip.io',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cbot-supabase-f44128-62-72-41-216.sslip.io',
+      },
     ],
   },
 };

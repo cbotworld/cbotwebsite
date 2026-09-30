@@ -7,6 +7,16 @@ import { uploadPublicImage } from '@/lib/actions/imageUploadActions';
 import { Button } from './button';
 import { Input } from './input';
 
+function getPreviewSrc(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.includes('/storage/v1/object/public/')) {
+    const parts = url.split('/storage/v1/object/public/');
+    return `/api/storage/${parts[1]}`;
+  }
+  return url;
+}
+
 interface ImageUploaderProps {
   value: string;
   onChange: (url: string) => void;
@@ -203,7 +213,7 @@ export function ImageUploader({
           </p>
           {value && (
             <div className="relative h-28 w-full rounded-lg overflow-hidden border border-border bg-black/40 flex items-center justify-center">
-              <img src={value} alt="Preview" className="h-full w-full object-contain" />
+              <img src={getPreviewSrc(value)} alt="Preview" className="h-full w-full object-contain" />
             </div>
           )}
         </div>
@@ -217,7 +227,7 @@ export function ImageUploader({
                 {/* Image Thumbnail */}
                 <div className="relative h-20 w-24 rounded-lg overflow-hidden border border-amber-500/30 bg-black/60 shrink-0 group">
                   <img
-                    src={value}
+                    src={getPreviewSrc(value)}
                     alt="Team Poster"
                     className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

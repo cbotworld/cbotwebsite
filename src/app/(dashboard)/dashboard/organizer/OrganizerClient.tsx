@@ -90,6 +90,16 @@ function sortPlayersByStat(users: any[], field: InlineStatField, direction: 'asc
   });
 }
 
+function getStorageUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (url.includes('/storage/v1/object/public/')) {
+    const parts = url.split('/storage/v1/object/public/');
+    return `/api/storage/${parts[1]}`;
+  }
+  return url;
+}
+
 export default function OrganizerClient({
   initialEditions,
   initialScoreReports,
@@ -2284,7 +2294,7 @@ export default function OrganizerClient({
                   <TableRow key={team.id}>
                     <TableCell className="font-bold text-xs flex items-center gap-2.5">
                       {team.logo ? (
-                        <img src={team.logo} alt={team.name} className="h-7 w-7 rounded-full object-cover border border-amber-500/40" />
+                        <img src={getStorageUrl(team.logo)} alt={team.name} className="h-7 w-7 rounded-full object-cover border border-amber-500/40" />
                       ) : (
                         <span className="h-7 w-7 rounded-full bg-amber-500/20 text-amber-500 font-black text-[10px] flex items-center justify-center border border-amber-500/30">
                           {(team.tag || 'CB').slice(0, 2)}
@@ -4230,7 +4240,7 @@ function TeamsExportPoster({
                     {/* Team Poster / Avatar */}
                     {team.logo ? (
                       <img
-                        src={team.logo}
+                        src={getStorageUrl(team.logo)}
                         alt={team.name}
                         style={{
                           width: '60px',
