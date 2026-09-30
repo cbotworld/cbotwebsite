@@ -1,9 +1,9 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
 import LeaderboardClient from './LeaderboardClient';
 
-export const revalidate = 3600; // Cache rankings for up to 1 hour; revalidated on-demand via actions
+export const revalidate = 0;
 
 export default async function LeaderboardPage() {
   let users: any[] = [];

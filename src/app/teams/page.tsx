@@ -1,4 +1,4 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import * as React from 'react';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 
-export const revalidate = 3600; // Cache teams directory for up to 1 hour; revalidated on-demand via actions
+export const revalidate = 0;
 
 export default async function TeamsPage() {
   const teams = await prisma.team.findMany({

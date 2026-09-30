@@ -1,4 +1,5 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { prisma } from '@/lib/prisma';
 import HomeClient from './HomeClient';
 import { getWebsiteCmsContent } from '@/lib/actions/websiteCmsActions';
@@ -6,8 +7,6 @@ import { DEFAULT_WEBSITE_CMS } from '@/lib/website-cms';
 import { sanitizeCmsImages, safePublicImageUrl, withSafeTeamLogo } from '@/lib/safe-image-url';
 import { resolveCurrentEdition } from '@/lib/current-edition';
 import { EnrollmentBarWithRegistration } from '@/components/layout/EnrollmentBarWithRegistration';
-
-export const revalidate = 3600; // Cache homepage for 1 hour; revalidated on-demand via server actions
 
 export default async function HomePage() {
   try {

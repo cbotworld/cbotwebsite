@@ -1,9 +1,9 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-export const revalidate = 3600; // Cache patterns for up to 1 hour; revalidated on-demand via actions
+export const revalidate = 0;
 
 export default async function PatternsPage() {
   const patterns = await prisma.boardPattern.findMany({
