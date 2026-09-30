@@ -191,6 +191,12 @@ export default function HomeClient({
                       alt="Current Edition Poster"
                       className="w-full h-auto object-cover"
                       style={{ display: 'block' }}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (!target.src.endsWith('/edition-poster.jpg')) {
+                          target.src = '/edition-poster.jpg';
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -241,6 +247,12 @@ export default function HomeClient({
                     alt={team.name}
                     className="h-48 sm:h-64 w-auto object-contain rounded-xl"
                     loading="lazy"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.endsWith('/logo.png')) {
+                        target.src = '/logo.png';
+                      }
+                    }}
                   />
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300 pointer-events-none" />
                 </Link>

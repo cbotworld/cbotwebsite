@@ -45,16 +45,19 @@ export function getAppBaseUrl(): string {
  */
 export function toStorageProxyUrl(url?: string | null): string {
   if (!url) return '';
-  const trimmed = url.trim();
+  let trimmed = url.trim();
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
   const baseUrl = getAppBaseUrl();
+
+  // If corrupted with prefix like /login/api/storage/... or /dashboard/api/storage/... or /organizer/api/storage/...
+  if (trimmed.includes('/api/storage/')) {
+    const storagePath = trimmed.split('/api/storage/')[1];
+    return `${baseUrl}/api/storage/${storagePath}`;
+  }
 
   if (trimmed.includes('/storage/v1/object/public/')) {
     const parts = trimmed.split('/storage/v1/object/public/');
     return `${baseUrl}/api/storage/${parts[1]}`;
-  }
-  if (trimmed.startsWith('/api/storage/')) {
-    return `${baseUrl}${trimmed}`;
   }
   if (trimmed.startsWith('api/storage/')) {
     return `${baseUrl}/${trimmed}`;

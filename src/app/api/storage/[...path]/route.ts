@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import http from 'http';
-import https from 'https';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,53 +17,54 @@ export async function GET(
     const relativePath = path.join('/');
     const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
     const baseUrl = rawUrl.replace(/\/+$/, '');
-    const targetUrl = new URL(`${baseUrl}/storage/v1/object/public/${relativePath}`);
+    const targetUrl = `${baseUrl}/storage/v1/object/public/${relativePath}`;
 
-    const isHttps = targetUrl.protocol === 'https:';
-    const transport = isHttps ? https : http;
-    const port = targetUrl.port ? parseInt(targetUrl.port, 10) : isHttps ? 443 : 80;
+    try {
+      const res = await fetch(targetUrl, {
+        cache: 'no-store',
+      });
 
-    return new Promise<NextResponse>((resolve) => {
-      const options: http.RequestOptions = {
-        hostname: targetUrl.hostname,
-        port: port,
-        path: targetUrl.pathname + targetUrl.search,
-        method: 'GET',
-        ...(isHttps ? { rejectUnauthorized: false } : {}),
-      };
-
-      const req = transport.request(options, (res) => {
-        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-          resolve(new NextResponse('Asset not found', { status: res.statusCode || 404 }));
-          return;
-        }
-
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-        res.on('end', () => {
-          const bodyBuffer = Buffer.concat(chunks);
-          const contentType = res.headers['content-type'] || 'image/jpeg';
-          const cacheControl = 'public, max-age=31536000, immutable';
-
-          resolve(
-            new NextResponse(bodyBuffer, {
-              status: 200,
-              headers: {
-                'Content-Type': contentType,
-                'Cache-Control': cacheControl,
-                'Access-Control-Allow-Origin': '*',
-              },
-            })
-          );
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || 'image/jpeg';
+        const arrayBuffer = await res.arrayBuffer();
+        return new NextResponse(arrayBuffer, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'Access-Control-Allow-Origin': '*',
+          },
         });
-      });
+      }
+    } catch (e) {
+      // Ignore and attempt bucket fallback below
+    }
 
-      req.on('error', (err) => {
-        resolve(new NextResponse(`Fetch error: ${err.message}`, { status: 502 }));
-      });
+    // Bucket swap fallback: if requested in 'images' check 'teams' and vice versa
+    if (path[0] === 'images' || path[0] === 'teams') {
+      const altBucket = path[0] === 'images' ? 'teams' : 'images';
+      const altPath = [altBucket, ...path.slice(1)].join('/');
+      const altUrl = `${baseUrl}/storage/v1/object/public/${altPath}`;
+      try {
+        const altRes = await fetch(altUrl, { cache: 'no-store' });
+        if (altRes.ok) {
+          const contentType = altRes.headers.get('content-type') || 'image/jpeg';
+          const arrayBuffer = await altRes.arrayBuffer();
+          return new NextResponse(arrayBuffer, {
+            status: 200,
+            headers: {
+              'Content-Type': contentType,
+              'Cache-Control': 'public, max-age=31536000, immutable',
+              'Access-Control-Allow-Origin': '*',
+            },
+          });
+        }
+      } catch (e) {
+        // Fallback failed
+      }
+    }
 
-      req.end();
-    });
+    return new NextResponse('Asset not found', { status: 404 });
   } catch (error: any) {
     return new NextResponse(`Server error: ${error.message}`, { status: 500 });
   }
