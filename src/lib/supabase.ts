@@ -19,18 +19,53 @@ export function getPublicUrl(path: string): string {
   }
 }
 
+export function getAppBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('localhost')) {
+    return process.env.NEXTAUTH_URL.replace(/\/+$/, '');
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/+$/, '')}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/+$/, '')}`;
+  }
+  return 'https://www.cbotworld.com';
+}
+
 /**
- * Converts any direct Supabase storage URL to the local /api/storage proxy URL
- * to avoid browser mixed-content and cross-origin blocking on HTTPS.
+ * Converts any direct Supabase storage URL or relative path to an absolute
+ * /api/storage proxy URL so mobile apps (React Native/iOS/Android) and web browsers
+ * can load images over HTTPS without ATS or relative-path errors.
  */
 export function toStorageProxyUrl(url?: string | null): string {
   if (!url) return '';
-  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.includes('/storage/v1/object/public/')) {
-    const parts = url.split('/storage/v1/object/public/');
-    return `/api/storage/${parts[1]}`;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+  const baseUrl = getAppBaseUrl();
+
+  if (trimmed.includes('/storage/v1/object/public/')) {
+    const parts = trimmed.split('/storage/v1/object/public/');
+    return `${baseUrl}/api/storage/${parts[1]}`;
   }
-  return url;
+  if (trimmed.startsWith('/api/storage/')) {
+    return `${baseUrl}${trimmed}`;
+  }
+  if (trimmed.startsWith('api/storage/')) {
+    return `${baseUrl}/${trimmed}`;
+  }
+  if (trimmed.startsWith('/teams/')) {
+    return `${baseUrl}${trimmed}`;
+  }
+  if (/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|webp|svg)$/i.test(trimmed)) {
+    return `${baseUrl}/api/storage/teams/${trimmed}`;
+  }
+  return trimmed;
 }
 
 /**

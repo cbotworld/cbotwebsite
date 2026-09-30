@@ -1,3 +1,5 @@
+import { toStorageProxyUrl } from '@/lib/supabase';
+
 /** Keep page props / ISR payloads small — reject inline base64 and oversized strings. */
 const MAX_PUBLIC_IMAGE_CHARS = 2048;
 
@@ -7,10 +9,8 @@ export function safePublicImageUrl(value?: string | null): string | null {
   if (!trimmed) return null;
   if (trimmed.startsWith('data:')) return null;
   if (trimmed.length > MAX_PUBLIC_IMAGE_CHARS) return null;
-  if (trimmed.includes('/storage/v1/object/public/')) {
-    const parts = trimmed.split('/storage/v1/object/public/');
-    return `/api/storage/${parts[1]}`;
-  }
+  const proxied = toStorageProxyUrl(trimmed);
+  if (proxied) return proxied;
   if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('/')) return null;
   return trimmed;
 }

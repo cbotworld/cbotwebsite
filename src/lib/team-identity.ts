@@ -1,3 +1,5 @@
+import { toStorageProxyUrl } from '@/lib/supabase';
+
 export type TeamFace = {
   name: string;
   tag: string;
@@ -114,16 +116,6 @@ function officialFromTag(tag?: string | null) {
 function officialFromLogo(logo?: string | null) {
   const key = logoKey(logo);
   return key ? FACE_BY_LOGO.get(key) : undefined;
-}
-
-function toStorageProxyUrl(url?: string | null): string {
-  if (!url) return '';
-  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
-  if (url.includes('/storage/v1/object/public/')) {
-    const parts = url.split('/storage/v1/object/public/');
-    return `/api/storage/${parts[1]}`;
-  }
-  return url;
 }
 
 function customFace(name?: string | null, tag?: string | null, logo?: string | null): TeamFace {
