@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Calendar, Clock, Lock, Unlock, Shield, Trophy, Eye, Search, Sparkles, CheckCircle2, ChevronRight, Users, Download, FileSpreadsheet } from 'lucide-react';
+import { Calendar, Clock, Lock, Unlock, Shield, Trophy, Eye, Search, Sparkles, CheckCircle2, ChevronRight, Users, Download, FileSpreadsheet, Play } from 'lucide-react';
+import { MatchVideoPlayer } from '@/components/video/MatchVideoPlayer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -712,6 +713,50 @@ export default function DailyCombisClient({
   const nowMs = new Date().getTime();
   const roundFormats = scheduleMeta.roundFormats || [];
 
+  const [combiVideoModal, setCombiVideoModal] = React.useState<{
+    isOpen: boolean;
+    matchTitle: string;
+    team1Name?: string;
+    team2Name?: string;
+    players: string[];
+    dayNumber: number;
+    activePlayer: string;
+  } | null>(null);
+
+  const openCombiVideoModal = (
+    matchEvents: any[],
+    clickedPlayer: string,
+    matchTitle: string,
+    team1Name?: string,
+    team2Name?: string
+  ) => {
+    const allMatchPlayers: string[] = [];
+    (matchEvents || []).forEach((ev: any) => {
+      if (ev.leftPlayers) {
+        ev.leftPlayers.split(',').forEach((p: string) => {
+          const clean = p.trim();
+          if (clean && !allMatchPlayers.includes(clean)) allMatchPlayers.push(clean);
+        });
+      }
+      if (ev.rightPlayers) {
+        ev.rightPlayers.split(',').forEach((p: string) => {
+          const clean = p.trim();
+          if (clean && !allMatchPlayers.includes(clean)) allMatchPlayers.push(clean);
+        });
+      }
+    });
+
+    setCombiVideoModal({
+      isOpen: true,
+      matchTitle,
+      team1Name,
+      team2Name,
+      players: allMatchPlayers.length > 0 ? allMatchPlayers : [clickedPlayer],
+      dayNumber: selectedDayNum,
+      activePlayer: clickedPlayer,
+    });
+  };
+
   const scheduleDays = React.useMemo(
     () =>
       buildCombiSchedule({
@@ -1106,11 +1151,25 @@ export default function DailyCombisClient({
                     </div>
                   </div>
 
-                  {/* Center VS Badge */}
-                  <div className="col-span-2 flex items-center justify-center">
-                    <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-[10px] sm:text-xs font-black text-amber-400 shadow-md">
+                  {/* Center VS Badge + Match Videos button */}
+                  <div className="col-span-2 flex flex-col items-center justify-center gap-1">
+                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-amber-500/10 border border-amber-500/50 flex items-center justify-center text-[10px] sm:text-xs font-black text-amber-400 shadow-md">
                       VS
                     </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openCombiVideoModal(
+                          match.events,
+                          match.events[0]?.leftPlayers?.split(',')[0]?.trim() || '',
+                          `${t1.name} vs ${t2.name}`
+                        )
+                      }
+                      className="inline-flex items-center gap-0.5 text-[7.5px] min-[400px]:text-[8.5px] font-black px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/35 hover:bg-violet-500/35 transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                      title="Watch match videos"
+                    >
+                      <Play className="h-2 w-2 fill-violet-400" /> Videos
+                    </button>
                   </div>
 
                   {/* Right Team */}
@@ -1154,8 +1213,39 @@ export default function DailyCombisClient({
                         className="grid grid-cols-12 items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-lg border border-border/40 bg-card/90 hover:bg-amber-500/10 hover:border-amber-500/30 transition-all shadow-none"
                       >
                         {/* Left Team Player(s) */}
-                        <div className="col-span-5 text-center font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.leftPlayers}>
-                          {evt.leftPlayers}
+                        <div className="col-span-5 text-center">
+                          <div className="font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.leftPlayers}>
+                            {evt.leftPlayers}
+                          </div>
+                          {evt.leftPlayers && (
+                            <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
+                              {evt.leftPlayers.split(',').map((pStr: string, pIdx: number) => {
+                                const pName = pStr.trim();
+                                if (!pName) return null;
+                                const isMultiple = evt.leftPlayers.includes(',');
+                                const firstName = pName.split(/\s+/)[0];
+                                return (
+                                  <button
+                                    key={pIdx}
+                                    type="button"
+                                    onClick={() =>
+                                      openCombiVideoModal(
+                                        match.events,
+                                        pName,
+                                        `${t1.name} vs ${t2.name}`,
+                                        t1.name,
+                                        t2.name
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer"
+                                    title={`Watch ${pName} video`}
+                                  >
+                                    <Play className="h-2 w-2 fill-violet-400" /> Watch {isMultiple ? firstName : ''}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         {/* Center Event Badge */}
@@ -1174,8 +1264,39 @@ export default function DailyCombisClient({
                         </div>
 
                         {/* Right Team Player(s) */}
-                        <div className="col-span-5 text-center font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.rightPlayers}>
-                          {evt.rightPlayers}
+                        <div className="col-span-5 text-center">
+                          <div className="font-extrabold text-[9.5px] min-[400px]:text-[10.5px] sm:text-[11.5px] text-foreground uppercase tracking-tight break-words leading-tight whitespace-normal px-0.5 sm:px-1" title={evt.rightPlayers}>
+                            {evt.rightPlayers}
+                          </div>
+                          {evt.rightPlayers && (
+                            <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
+                              {evt.rightPlayers.split(',').map((pStr: string, pIdx: number) => {
+                                const pName = pStr.trim();
+                                if (!pName) return null;
+                                const isMultiple = evt.rightPlayers.includes(',');
+                                const firstName = pName.split(/\s+/)[0];
+                                return (
+                                  <button
+                                    key={pIdx}
+                                    type="button"
+                                    onClick={() =>
+                                      openCombiVideoModal(
+                                        match.events,
+                                        pName,
+                                        `${t1.name} vs ${t2.name}`,
+                                        t1.name,
+                                        t2.name
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-0.5 text-[8px] font-black px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 transition-colors cursor-pointer"
+                                    title={`Watch ${pName} video`}
+                                  >
+                                    <Play className="h-2 w-2 fill-violet-400" /> Watch {isMultiple ? firstName : ''}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1186,6 +1307,21 @@ export default function DailyCombisClient({
           })}
         </div>
       </div>
+    )}
+
+    {/* Combi Video Pop-up Modal */}
+    {combiVideoModal?.isOpen && (
+      <MatchVideoPlayer
+        players={combiVideoModal.players}
+        dayNumber={combiVideoModal.dayNumber}
+        editionNumber={205}
+        matchTitle={combiVideoModal.matchTitle}
+        team1Name={combiVideoModal.team1Name}
+        team2Name={combiVideoModal.team2Name}
+        activePlayer={combiVideoModal.activePlayer}
+        isModal={true}
+        onClose={() => setCombiVideoModal(null)}
+      />
     )}
   </div>
 );

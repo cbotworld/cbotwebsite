@@ -56,7 +56,7 @@ function StatCell({
   );
 }
 
-export function StandingsScreen(_props: Props) {
+export function StandingsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<StandingsPayload | null>(null);
@@ -82,6 +82,13 @@ export function StandingsScreen(_props: Props) {
       setLoading(false);
     }
   }, []);
+
+  const openVideosForPlayer = useCallback(
+    (playerName: string) => {
+      navigation.navigate('Videos', { player: playerName, day: undefined, nonce: Date.now() });
+    },
+    [navigation],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -196,11 +203,18 @@ export function StandingsScreen(_props: Props) {
                         {row.rank}
                       </Text>
                     </View>
-                    <View style={styles.colPlayer}>
+                    <Pressable
+                      style={styles.colPlayer}
+                      onPress={() => openVideosForPlayer(row.name)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Watch ${row.name}'s videos`}
+                    >
                       <Text style={styles.tdName} numberOfLines={2}>
                         {row.name}
                       </Text>
-                    </View>
+                      <Text style={styles.tdVideoHint}>▶ VIDEOS</Text>
+                    </Pressable>
                     <View style={styles.colTeam}>
                       <Text style={styles.td} numberOfLines={1}>
                         {row.teamName}
@@ -750,6 +764,7 @@ const styles = StyleSheet.create({
   rankSilver: { color: '#cbd5e1' },
   rankBronze: { color: '#d97706' },
   tdName: { color: '#f8fafc', fontSize: 12, fontWeight: '800' },
+  tdVideoHint: { color: '#f59e0b', fontSize: 9, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
   gradeBadge: {
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderWidth: 1,

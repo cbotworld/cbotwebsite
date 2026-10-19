@@ -79,13 +79,21 @@ export default function HomeClient({
   const heroPosterUrl = toStorageProxyUrl(withImageCacheBust(rawPoster));
   const heroBannerImage = hero.bannerImage || currentEdition?.bannerImage || null;
 
-  const legacyVideos = React.useMemo(
-    () =>
-      [...legacyCms.videos]
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((v) => ({ id: v.youtubeId, title: v.title, label: v.label })),
-    [legacyCms.videos]
-  );
+  const legacyVideos = React.useMemo(() => {
+    const raw = Array.isArray(legacyCms.videos) ? legacyCms.videos : [];
+    const list = raw
+      .filter((v) => Boolean((v.youtubeId || '').trim()))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((v, idx) => ({
+        id: (v.youtubeId || '').trim(),
+        title: v.title || `Milestone Video ${idx + 1}`,
+        label: v.label || `Video ${idx + 1}`,
+        key: `${v.id || 'vid'}-${idx}-${(v.youtubeId || '').trim()}`,
+      }));
+    return list.length > 0
+      ? list
+      : [{ id: '_VRKmVVM-00', title: '200th Edition Launch Video', label: '200th Launch', key: 'default-0-_VRKmVVM-00' }];
+  }, [legacyCms.videos]);
 
   const [activeVideoIndex, setActiveVideoIndex] = React.useState(0);
 
@@ -96,18 +104,18 @@ export default function HomeClient({
 
   const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
   const [activeSponsorPoster, setActiveSponsorPoster] = React.useState<string | null>(null);
-  const activeVideo = legacyVideos[activeVideoIndex];
+  const activeVideo = legacyVideos[activeVideoIndex] || legacyVideos[0];
 
   const prevIndex = (activeVideoIndex - 1 + legacyVideos.length) % legacyVideos.length;
   const nextIndex = (activeVideoIndex + 1) % legacyVideos.length;
-  const prevVideo = legacyVideos[prevIndex];
-  const nextVideo = legacyVideos[nextIndex];
+  const prevVideo = legacyVideos[prevIndex] || activeVideo;
+  const nextVideo = legacyVideos[nextIndex] || activeVideo;
 
   // Build sequential YouTube playlist loop order starting from active video
   const playlistIds = [
-    ...legacyVideos.slice(activeVideoIndex + 1).map(v => v.id),
-    ...legacyVideos.slice(0, activeVideoIndex).map(v => v.id),
-    activeVideo.id
+    ...legacyVideos.slice(activeVideoIndex + 1).map((v) => v.id),
+    ...legacyVideos.slice(0, activeVideoIndex).map((v) => v.id),
+    activeVideo.id,
   ].join(',');
 
   const iframeSrc = `https://www.youtube.com/embed/${activeVideo.id}?playlist=${playlistIds}&autoplay=1&mute=1&loop=1`;
@@ -281,9 +289,9 @@ export default function HomeClient({
 
           {/* Shared Thank You Banner */}
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {sponsorsCms.specialThanks.map((chip) => (
+            {sponsorsCms.specialThanks.map((chip, idx) => (
               <div
-                key={chip.id}
+                key={chip.id ? `${chip.id}-${idx}` : `thanks-${idx}`}
                 className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/15 to-amber-500/20 border border-amber-400/40 shadow-lg shadow-amber-500/10"
               >
                 <Heart className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
@@ -297,7 +305,7 @@ export default function HomeClient({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-center">
             {[...sponsorsCms.eliteSponsors]
               .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((sponsor) => {
+              .map((sponsor, idx) => {
                 const accent = sponsorAccentClasses(sponsor.accent);
                 const handleClick = () => {
                   if (sponsor.posterUrl) {
@@ -310,7 +318,7 @@ export default function HomeClient({
 
                 return (
                   <motion.div
-                    key={sponsor.id}
+                    key={sponsor.id ? `${sponsor.id}-${idx}` : `elite-${idx}`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleClick}
@@ -359,7 +367,7 @@ export default function HomeClient({
                 const accent = specialSponsorAccentClasses(sponsor.accent);
                 return (
                   <motion.div
-                    key={sponsor.id}
+                    key={sponsor.id ? `${sponsor.id}-${idx}` : `special-${idx}`}
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
@@ -408,7 +416,7 @@ export default function HomeClient({
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((sponsor, idx) => (
                 <motion.div
-                  key={sponsor.id}
+                  key={sponsor.id ? `${sponsor.id}-${idx}` : `gold-${idx}`}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -456,7 +464,7 @@ export default function HomeClient({
             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3">
               {legacyVideos.map((v, idx) => (
                 <button
-                  key={v.id}
+                  key={v.key}
                   onClick={() => setActiveVideoIndex(idx)}
                   className={`flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[11px] sm:text-xs font-extrabold transition-all ${
                     activeVideoIndex === idx
@@ -476,7 +484,7 @@ export default function HomeClient({
               <AnimatePresence>
                 {/* Previous Video Card (Left Behind with Full Title) */}
                 <motion.div
-                  key={`prev-${prevVideo.id}`}
+                  key={`prev-${prevVideo.key}-${prevIndex}`}
                   initial={{ opacity: 0, x: -60, scale: 0.85 }}
                   animate={{ opacity: 0.8, x: 0, scale: 0.95 }}
                   exit={{ opacity: 0, x: -60, scale: 0.85 }}
@@ -508,7 +516,7 @@ export default function HomeClient({
 
                 {/* Active Main Video Frame (Center Front) */}
                 <motion.div
-                  key={`active-${activeVideo.id}`}
+                  key={`active-${activeVideo.key}-${activeVideoIndex}`}
                   initial={{ opacity: 0, scale: 0.92, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.92, y: -10 }}
@@ -526,7 +534,7 @@ export default function HomeClient({
 
                 {/* Next Video Card (Right Behind with Full Title) */}
                 <motion.div
-                  key={`next-${nextVideo.id}`}
+                  key={`next-${nextVideo.key}-${nextIndex}`}
                   initial={{ opacity: 0, x: 60, scale: 0.85 }}
                   animate={{ opacity: 0.8, x: 0, scale: 0.95 }}
                   exit={{ opacity: 0, x: 60, scale: 0.85 }}

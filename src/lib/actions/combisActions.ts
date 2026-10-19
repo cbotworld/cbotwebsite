@@ -104,6 +104,32 @@ async function fetchCurrentEditionCombisData() {
       }
     }
 
+    const streams = editionId
+      ? await prisma.liveStream.findMany({
+          where: {
+            editionId,
+            OR: [
+              { youtubeUrl: { not: null } },
+              { youtubeVideoId: { not: null } },
+            ],
+          },
+          select: {
+            id: true,
+            playerId: true,
+            dayNumber: true,
+            matchId: true,
+            teamId: true,
+            youtubeUrl: true,
+            youtubeVideoId: true,
+            status: true,
+            player: {
+              select: { id: true, name: true, username: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
     return {
       success: true,
       edition,
@@ -112,6 +138,7 @@ async function fetchCurrentEditionCombisData() {
       matches,
       scores,
       userGradeMap,
+      streams,
     };
   } catch (error) {
     console.error('Failed to fetch live edition combis data:', error);
@@ -122,6 +149,7 @@ async function fetchCurrentEditionCombisData() {
       matches: [],
       scores: [],
       userGradeMap: {},
+      streams: [],
     };
   }
 }

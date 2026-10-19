@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { Crown, Search, Users, Target } from 'lucide-react';
+import { Crown, Search, Users, Target, Play } from 'lucide-react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
@@ -197,6 +198,13 @@ function TeamSection({
                             Player
                           </span>
                         )}
+                        <Link
+                          href={`/videos?player=${encodeURIComponent(member.name)}`}
+                          className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/25 hover:bg-violet-500/20 transition-colors"
+                          title={`Watch ${member.name}'s videos`}
+                        >
+                          <Play className="h-2.5 w-2.5 fill-violet-400" /> Watch
+                        </Link>
                       </div>
                     </li>
                   ))}

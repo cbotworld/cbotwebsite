@@ -136,6 +136,7 @@ export function Navbar({
   const isTeamsPlayersActive = isPublicTeamsPlayersPath(pathname);
   const isPlayerScoresActive = isPublicPlayerScoresPath(pathname);
   const isStandingsActive = isPublicStandingsPath(pathname);
+  const isVideosActive = pathname.startsWith('/videos');
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur-md">
@@ -354,6 +355,20 @@ export function Navbar({
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
               )}
             </Link>
+
+            {/* Sub-Tab: Match Videos */}
+            <Link
+              href="/videos"
+              className={`relative py-2.5 px-1.5 flex items-center gap-1.5 sm:gap-2 transition-all ${
+                isVideosActive ? 'text-amber-400 font-black' : 'hover:text-foreground'
+              }`}
+            >
+              <span>▶️</span>
+              <span>Match Videos</span>
+              {isVideosActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.9)] animate-in fade-in duration-200" />
+              )}
+            </Link>
             {/* Sub-Tab 5: Standings */}
             <Link
               href={PUBLIC_STANDINGS_PATH}
@@ -444,6 +459,17 @@ export function Navbar({
                 }`}
               >
                 <span>🎯</span> Scores
+              </Link>
+              <Link
+                href="/videos"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-[11px] font-extrabold transition-all border text-center ${
+                  isVideosActive
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow-md'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <span>▶️</span> Videos
               </Link>
               <Link
                 href={PUBLIC_STANDINGS_PATH}

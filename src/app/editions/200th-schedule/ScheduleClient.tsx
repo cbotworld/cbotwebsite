@@ -2,11 +2,12 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter, Crown, ChevronRight, Info, Lock } from 'lucide-react';
+import { Calendar, Search, Trophy, ArrowRight, Shield, Flame, CheckCircle2, Clock, Sparkles, Filter, Crown, ChevronRight, Info, Lock, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MatchVideoPlayer } from '@/components/video/MatchVideoPlayer';
 import { monumentStatus } from '@/lib/bicentennial-monuments';
 import { getCurrentEditionCombisData } from '@/lib/actions/combisActions';
 import { resolveEffectiveTeamCombi } from '@/lib/combi-fallback';
@@ -383,6 +384,33 @@ export function ScheduleClient({
       revealed: isSelectedMatchRevealed,
     });
   }, [selectedMatch, isSelectedMatchRevealed, dbTeams, dbScores, stages, userGradeMap]);
+
+  const [activeMatchVideoPlayer, setActiveMatchVideoPlayer] = React.useState<string | null>(null);
+
+  const matchPlayers = React.useMemo(() => {
+    const list: string[] = [];
+    if (matchDetails?.events) {
+      matchDetails.events.forEach((ev: any) => {
+        ev.team1PlayerList?.forEach((p: any) => {
+          if (p.name && !list.includes(p.name)) list.push(p.name);
+        });
+        ev.team2PlayerList?.forEach((p: any) => {
+          if (p.name && !list.includes(p.name)) list.push(p.name);
+        });
+      });
+    }
+    if (list.length === 0 && selectedMatch) {
+      const t1 = findTeamByKey(selectedMatch.t1.name, dbTeams);
+      const t2 = findTeamByKey(selectedMatch.t2.name, dbTeams);
+      t1?.players?.forEach((p: any) => {
+        if (p.name && !list.includes(p.name)) list.push(p.name);
+      });
+      t2?.players?.forEach((p: any) => {
+        if (p.name && !list.includes(p.name)) list.push(p.name);
+      });
+    }
+    return list;
+  }, [matchDetails, selectedMatch, dbTeams]);
 
   const liveDayNum = React.useMemo(
     () => scheduleDays.find((d) => monumentStatus(d, nowMs) === 'live')?.dayNumber ?? null,
@@ -827,10 +855,22 @@ export function ScheduleClient({
                         </div>
                       </div>
 
-                      {/* Click helper cue */}
-                      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-bold text-muted-foreground group-hover:text-amber-400 transition-colors">
-                        <span>{hasResult ? 'Click to view combi scores & event breakdown' : 'Click to view match fixture details'}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-amber-400 transition-all" />
+                      {/* Click helper cue and Watch Video link */}
+                      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-bold text-muted-foreground transition-colors">
+                        <span className="group-hover:text-amber-400 transition-colors">
+                          {hasResult ? 'Click to view combi scores & event breakdown' : 'Click to view match fixture details'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/videos?day=${d.dayNumber}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 transition-all shrink-0"
+                            title={`Watch Day ${d.dayNumber} match videos`}
+                          >
+                            <Play className="h-2.5 w-2.5 fill-violet-400" /> Watch Videos
+                          </Link>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-amber-400 transition-all" />
+                        </div>
                       </div>
                     </div>
                   );
@@ -842,7 +882,16 @@ export function ScheduleClient({
       </div>
 
       {/* MATCH DETAIL & COMBI SCORECARD MODAL */}
-      <Dialog open={Boolean(selectedMatch)} onOpenChange={(open) => !open && setSelectedMatch(null)}>
+      <Dialog
+        open={Boolean(selectedMatch)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMatch(null);
+            setActiveMatchVideoPlayer(null);
+          }
+        }}
+        className="max-w-4xl w-[96vw]"
+      >
         {selectedMatch && (
           <div className="space-y-5 text-left">
             <DialogHeader className="border-b border-border/60 pb-3 text-left">
@@ -855,7 +904,14 @@ export function ScheduleClient({
                     {selectedMatch.matchLabel}
                   </Badge>
                 )}
-                <span className="text-xs text-muted-foreground ml-auto">
+                <Link
+                  href={`/videos?day=${selectedMatch.dayNumber}`}
+                  className="inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/30 transition-all ml-auto"
+                  title="Watch match videos"
+                >
+                  <Play className="h-2.5 w-2.5 fill-violet-400" /> Watch Day {selectedMatch.dayNumber} Videos
+                </Link>
+                <span className="text-xs text-muted-foreground">
                   {formatCalendarDate(selectedMatch.calendarDate)}
                 </span>
               </div>
@@ -931,6 +987,22 @@ export function ScheduleClient({
                   </div>
                 </div>
 
+                {/* Embedded Video Player for this match's players */}
+                {matchPlayers.length > 0 && (
+                  <div className="pt-1">
+                    <MatchVideoPlayer
+                      players={matchPlayers}
+                      dayNumber={selectedMatch.dayNumber}
+                      editionNumber={205}
+                      matchTitle={`${selectedMatch.t1.name} vs ${selectedMatch.t2.name}`}
+                      team1Name={selectedMatch.t1.name}
+                      team2Name={selectedMatch.t2.name}
+                      activePlayer={activeMatchVideoPlayer || undefined}
+                      onSelectPlayer={(pName) => setActiveMatchVideoPlayer(pName)}
+                    />
+                  </div>
+                )}
+
                 {/* Winner Explanation Banner */}
                 <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 space-y-1.5">
                   <div className="flex items-center gap-2 text-xs font-black text-emerald-400">
@@ -1001,10 +1073,26 @@ export function ScheduleClient({
                               </div>
                               <div className="space-y-1">
                                 {ev.team1PlayerList.map((p: any, pIdx: number) => (
-                                  <div key={pIdx} className="flex items-center justify-between text-[11px]">
-                                    <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
-                                      {p.name}
-                                    </span>
+                                  <div key={pIdx} className="flex items-center justify-between text-[11px] gap-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
+                                        {p.name}
+                                      </span>
+                                      {p.name && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveMatchVideoPlayer(p.name)}
+                                          className={`inline-flex items-center gap-0.5 text-[8.5px] font-black px-1.5 py-0.5 rounded transition-all shrink-0 ${
+                                            activeMatchVideoPlayer === p.name
+                                              ? 'bg-amber-500 text-slate-950 font-black shadow-xs ring-1 ring-amber-400'
+                                              : 'bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25'
+                                          }`}
+                                          title={`Watch ${p.name}'s video`}
+                                        >
+                                          <Play className={`h-2 w-2 ${activeMatchVideoPlayer === p.name ? 'fill-slate-950 text-slate-950' : 'fill-violet-400'}`} /> Watch
+                                        </button>
+                                      )}
+                                    </div>
                                     {p.isWalkover ? (
                                       <div className="flex items-center gap-1.5">
                                         {p.score != null && (
@@ -1039,10 +1127,26 @@ export function ScheduleClient({
                               </div>
                               <div className="space-y-1">
                                 {ev.team2PlayerList.map((p: any, pIdx: number) => (
-                                  <div key={pIdx} className="flex items-center justify-between text-[11px]">
-                                    <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
-                                      {p.name}
-                                    </span>
+                                  <div key={pIdx} className="flex items-center justify-between text-[11px] gap-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={p.isWalkover ? 'text-amber-400 font-bold' : 'text-foreground font-medium'}>
+                                        {p.name}
+                                      </span>
+                                      {p.name && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveMatchVideoPlayer(p.name)}
+                                          className={`inline-flex items-center gap-0.5 text-[8.5px] font-black px-1.5 py-0.5 rounded transition-all shrink-0 ${
+                                            activeMatchVideoPlayer === p.name
+                                              ? 'bg-amber-500 text-slate-950 font-black shadow-xs ring-1 ring-amber-400'
+                                              : 'bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25'
+                                          }`}
+                                          title={`Watch ${p.name}'s video`}
+                                        >
+                                          <Play className={`h-2 w-2 ${activeMatchVideoPlayer === p.name ? 'fill-slate-950 text-slate-950' : 'fill-violet-400'}`} /> Watch
+                                        </button>
+                                      )}
+                                    </div>
                                     {p.isWalkover ? (
                                       <div className="flex items-center gap-1.5">
                                         {p.score != null && (
@@ -1112,6 +1216,22 @@ export function ScheduleClient({
                     </div>
                   </div>
                 </div>
+
+                {/* Embedded Video Player for this match's players */}
+                {matchPlayers.length > 0 && (
+                  <div className="pt-1">
+                    <MatchVideoPlayer
+                      players={matchPlayers}
+                      dayNumber={selectedMatch.dayNumber}
+                      editionNumber={205}
+                      matchTitle={`${selectedMatch.t1.name} vs ${selectedMatch.t2.name}`}
+                      team1Name={selectedMatch.t1.name}
+                      team2Name={selectedMatch.t2.name}
+                      activePlayer={activeMatchVideoPlayer || undefined}
+                      onSelectPlayer={(pName) => setActiveMatchVideoPlayer(pName)}
+                    />
+                  </div>
+                )}
 
                 {/* Locked Insight Notice Banner */}
                 <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 space-y-3 text-center">

@@ -9,9 +9,10 @@ interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  className?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, className }: DialogProps) {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onOpenChange(false);
@@ -29,20 +30,23 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto touch-scroll-y overscroll-contain rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xl"
+            className={cn(
+              "relative z-50 w-full max-w-2xl max-h-[90vh] overflow-y-auto touch-scroll-y overscroll-contain rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xl",
+              className
+            )}
           >
             <button
               onClick={() => onOpenChange(false)}
@@ -68,4 +72,8 @@ export function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHe
 
 export function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
   return <p className={cn('text-sm text-muted-foreground mt-1.5', className)} {...props} />;
+}
+
+export function DialogContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('relative', className)} {...props}>{children}</div>;
 }

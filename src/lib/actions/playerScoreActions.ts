@@ -1009,6 +1009,7 @@ const emptyScoreboard = {
   days: [] as Array<{ dayNumber: number; published: boolean; calendarDate: string }>,
   teams: [] as any[],
   scores: [] as any[],
+  streams: [] as any[],
   maxDay: 1,
 };
 
@@ -1185,6 +1186,7 @@ async function loadPublicScoreboard() {
     gradingSetting,
     editionParticipants,
     targetLogs,
+    streams,
   ] = await Promise.all([
     prisma.systemSetting.findUnique({ where: { key: stageConfigKey(edition.id) } }),
     prisma.team.findMany({
@@ -1199,6 +1201,24 @@ async function loadPublicScoreboard() {
     prisma.systemSetting.findUnique({ where: { key: gradingSettingKey(edition.id) } }),
     prisma.editionParticipant.findMany({ where: { editionId: edition.id }, select: { userId: true, category: true } }),
     prisma.playerTargetLog.findMany({ where: { editionId: edition.id }, orderBy: { effectiveFrom: 'desc' }, select: { userId: true, target: true } }),
+    prisma.liveStream.findMany({
+      where: {
+        editionId: edition.id,
+        OR: [
+          { youtubeUrl: { not: null } },
+          { youtubeVideoId: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        playerId: true,
+        dayNumber: true,
+        youtubeUrl: true,
+        youtubeVideoId: true,
+        status: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
 
   let stages: any[] = [];
@@ -1247,6 +1267,7 @@ async function loadPublicScoreboard() {
       };
     }),
     scores: allEffectiveScores,
+    streams: streams || [],
   };
 }
 

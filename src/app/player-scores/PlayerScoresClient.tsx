@@ -5,7 +5,8 @@ import * as XLSX from 'xlsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Trophy, Activity, Users, Flame, Download, Info, ChevronDown, ChevronUp, AlertCircle, ShieldAlert, Crown } from 'lucide-react';
+import { Trophy, Activity, Users, Flame, Download, Info, ChevronDown, ChevronUp, AlertCircle, ShieldAlert, Crown, Play } from 'lucide-react';
+import Link from 'next/link';
 
 type ScoreDay = { dayNumber: number; published: boolean; calendarDate: string };
 export type ScorePlayer = { id: string; name: string; grade?: string | null; isCaptain?: boolean };
@@ -382,6 +383,13 @@ export default function PlayerScoresClient({
                                     {row.playerGrade}
                                   </span>
                                 )}
+                                <Link
+                                  href={`/videos?player=${encodeURIComponent(player.name)}&day=${selectedDay}`}
+                                  className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/25 hover:bg-violet-500/20 transition-colors whitespace-nowrap"
+                                  title={`Watch ${player.name}'s videos`}
+                                >
+                                  <Play className="h-2.5 w-2.5 fill-violet-400" /> Watch
+                                </Link>
                               </div>
                             </div>
 
