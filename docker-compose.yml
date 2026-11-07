@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder}
+        DIRECT_URL: ${DIRECT_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder}
+        NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-default-secret-change-in-production}
+        NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3006}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION:-}
+    container_name: cbotwebsite
+    restart: always
+    ports:
+      - "${PORT:-3006}:3006"
+    environment:
+      - NODE_ENV=production
+      - PORT=3006
+      - HOSTNAME=0.0.0.0
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - GOOGLE_CLIENT_ID_2=${GOOGLE_CLIENT_ID_2}
+      - GOOGLE_CLIENT_SECRET_2=${GOOGLE_CLIENT_SECRET_2}
+      - NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=${NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+      - LATEST_IOS_VERSION=${LATEST_IOS_VERSION}
+      - LATEST_IOS_BUILD=${LATEST_IOS_BUILD}
+      - LATEST_ANDROID_VERSION=${LATEST_ANDROID_VERSION}
+      - LATEST_ANDROID_BUILD=${LATEST_ANDROID_BUILD}
+      - IOS_STORE_URL=${IOS_STORE_URL}
+      - ANDROID_STORE_URL=${ANDROID_STORE_URL}
+      - AUTO_DB_PUSH=${AUTO_DB_PUSH:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3006/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
