@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing and coverage
+coverage
+
+# Next.js build output
+.next/
+out/
+
+# Production build artifacts
+build
+dist
+
+# Environment and secrets
+.env
+.env*.local
+.env.development
+.env.test
+.env.production
+
+# Git
+.git
+.github
+.gitignore
+
+# Scratch and debug files
+scratch/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Sub-projects / Mobile App (avoid bloat)
+Cbot/mobile/
+Cbot/backend/node_modules/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+*.pem
+.vscode
+.idea
+*.log
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+
