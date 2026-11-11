@@ -317,6 +317,14 @@ export default function TournamentStageDesigner({
   const [savingCalendar, setSavingCalendar] = React.useState(false);
   const [scheduleMode, setScheduleMode] = React.useState<ScheduleMode>('DIVIDED');
   const [message, setMessage] = React.useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [localStartDate, setLocalStartDate] = React.useState(startDate || dayDates[1] || '');
+
+  React.useEffect(() => {
+    const nextVal = startDate || dayDates[1] || '';
+    if (nextVal) {
+      setLocalStartDate(nextVal);
+    }
+  }, [startDate, dayDates]);
 
   const stages = config.stages;
   const active = stages[activeIndex] || stages[0];
@@ -720,12 +728,42 @@ export default function TournamentStageDesigner({
   // organizer's calendar, so moving the start date moves every fixture with it.
   const dayDatesSignature = JSON.stringify(dayDates || {});
   React.useEffect(() => {
-    if (active?.kind !== 'ROUND_ROBIN' || !rrPairings.length) return;
-    const realigned = rrPairings.map((pair) =>
-      pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
-    );
-    if (realigned.some((p, i) => p.scheduledTime !== rrPairings[i].scheduledTime)) {
-      applyRrPairings(realigned);
+    if (!dayDates || !Object.keys(dayDates).length) return;
+    if (active?.kind === 'ROUND_ROBIN' && rrPairings.length) {
+      const realigned = rrPairings.map((pair) =>
+        pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+      );
+      if (realigned.some((p, i) => p.scheduledTime !== rrPairings[i].scheduledTime)) {
+        applyRrPairings(realigned);
+      }
+    } else if (active?.kind === 'LEAGUE' && leaguePairings.length) {
+      const realigned = leaguePairings.map((pair) =>
+        pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+      );
+      if (realigned.some((p, i) => p.scheduledTime !== leaguePairings[i].scheduledTime)) {
+        applyLeaguePairings(realigned);
+      }
+    } else if (active?.kind === 'QUALIFIER' && qualifierPairings.length) {
+      const realigned = qualifierPairings.map((pair) =>
+        pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+      );
+      if (realigned.some((p, i) => p.scheduledTime !== qualifierPairings[i].scheduledTime)) {
+        applyQualifierPairings(realigned);
+      }
+    } else if (active?.kind === 'FINALS' && finalsPairings.length) {
+      const realigned = finalsPairings.map((pair) =>
+        pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+      );
+      if (realigned.some((p, i) => p.scheduledTime !== finalsPairings[i].scheduledTime)) {
+        applyFinalsPairings(realigned);
+      }
+    } else if (active?.kind === 'SPOC_EXHIBITION' && spocPairings.length) {
+      const realigned = spocPairings.map((pair) =>
+        pair.dayNumber ? retargetPairingDay(pair, pair.dayNumber, dayDates) : pair,
+      );
+      if (realigned.some((p, i) => p.scheduledTime !== spocPairings[i].scheduledTime)) {
+        applySpocPairings(realigned);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayDatesSignature, active?.kind]);
@@ -926,12 +964,15 @@ export default function TournamentStageDesigner({
 
   const persistCalendar = async () => {
     if (!editionId) return { success: false as const, error: 'No edition selected.' };
-    const day1 = startDate || dayDates[1];
+    const day1 = localStartDate || startDate || dayDates[1];
     if (!day1 && stages.length > 0) return { success: false as const, error: 'Pick a start date first.' };
     if (!day1 && stages.length === 0) return { success: true as const };
     const scheduleSpan = stages.length > 0 ? stageSpanDays(stages) : (totalDays || 10);
     const res = await saveEditionCalendar(editionId, day1, scheduleSpan);
-    if (res.success && res.dayDates) onCalendarSaved?.(res.dayDates);
+    if (res.success && res.dayDates) {
+      onCalendarSaved?.(res.dayDates);
+      void loadSnapshot();
+    }
     return res;
   };
 
@@ -1139,8 +1180,11 @@ export default function TournamentStageDesigner({
                 <div className="flex items-center gap-2">
                   <Input
                     type="date"
-                    value={startDate || dayDates[1] || ''}
-                    onChange={(e) => onStartDateChange?.(e.target.value)}
+                    value={localStartDate || startDate || dayDates[1] || ''}
+                    onChange={(e) => {
+                      setLocalStartDate(e.target.value);
+                      onStartDateChange?.(e.target.value);
+                    }}
                     className="h-9 text-xs font-bold font-mono bg-background"
                   />
                   <Button

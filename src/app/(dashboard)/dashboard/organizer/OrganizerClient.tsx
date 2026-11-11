@@ -770,19 +770,8 @@ export default function OrganizerClient({
 
   const handleStartDateChange = React.useCallback((date: string) => {
     setStartDate(date);
-    setDayDatesMap((map) => {
-      // Days already played keep the dates they were played on. A tournament that has
-      // not started has no history to protect, so every day follows the new start date.
-      const preserved: Record<number, string> = {};
-      if (tournamentInProgress) {
-        Object.entries(map).forEach(([k, v]) => {
-          const day = Number(k);
-          if (isCalendarDayCompleted(day, map)) preserved[day] = v;
-        });
-      }
-      return generateDefaultDayDates(date, totalDays, preserved);
-    });
-  }, [totalDays, tournamentInProgress]);
+    setDayDatesMap(generateDefaultDayDates(date, totalDays, {}));
+  }, [totalDays]);
 
   React.useEffect(() => {
     if (selectedEdition) {

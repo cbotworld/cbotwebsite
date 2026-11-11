@@ -12,7 +12,7 @@ import {
   normalizeDayDates,
   toCalendarDate,
 } from '@/lib/combi-cutoff';
-import { isCalendarDayCompleted } from '@/lib/tournament-stages';
+import { isCalendarDayCompleted, retargetPairingDay, stageConfigKey } from '@/lib/tournament-stages';
 import { syncCaptainRole } from '@/lib/captain-role';
 import { filterMainTeams } from '@/lib/spoc-teams';
 import { getWebsiteCmsSite } from '@/lib/website-cms-site';
@@ -402,22 +402,13 @@ export async function saveEditionCalendar(editionId: string, day1: string, total
   try {
     const existing = await prisma.edition.findUnique({
       where: { id: editionId },
-      select: { id: true, status: true, totalDays: true, dayDates: true },
+      select: { id: true, status: true, totalDays: true, dayDates: true, tournamentStartDate: true },
     });
     if (!existing) return { success: false, error: 'Edition not found.' };
 
     const scheduleDays = totalDays ? Math.max(1, totalDays) : Math.max(1, existing.totalDays || 10);
     const previous = normalizeDayDates(existing.dayDates) ?? {};
     const filled = buildDayDatesMap(scheduleDays, start);
-
-    if (String(existing.status || '').toUpperCase() === 'IN_PROGRESS') {
-      for (const [key, date] of Object.entries(previous)) {
-        const day = Number(key);
-        if (day >= 1 && day <= scheduleDays && isCalendarDayCompleted(day, previous)) {
-          filled[day] = date;
-        }
-      }
-    }
 
     const updated = await prisma.edition.update({
       where: { id: editionId },
@@ -428,6 +419,90 @@ export async function saveEditionCalendar(editionId: string, day1: string, total
         tournamentEndDate: calendarDateToUtcDate(filled[scheduleDays] || filled[1]),
       },
     });
+
+    // Adjust all match scheduledTimes to follow the new calendar dates
+    const prevDay1 = previous[1] || (existing.tournamentStartDate ? toCalendarDate(existing.tournamentStartDate) : null);
+    const diffDays = prevDay1 && start && prevDay1 !== start
+      ? Math.round((new Date(`${start}T00:00:00Z`).getTime() - new Date(`${prevDay1}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000))
+      : 0;
+
+    const existingMatches = await prisma.match.findMany({
+      where: { editionId },
+      select: { id: true, scheduledTime: true },
+    });
+
+    for (const match of existingMatches) {
+      if (!match.scheduledTime) continue;
+      const oldTime = new Date(match.scheduledTime);
+      if (Number.isNaN(oldTime.getTime())) continue;
+
+      const isoDate = oldTime.toISOString().slice(0, 10);
+      const istDate = new Date(oldTime.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+
+      let matchedDay: number | null = null;
+      for (const [dayKey, dayVal] of Object.entries(previous)) {
+        if (dayVal === isoDate || dayVal === istDate) {
+          matchedDay = Number(dayKey);
+          break;
+        }
+      }
+
+      let newTime: Date;
+      if (matchedDay && filled[matchedDay]) {
+        const targetDate = filled[matchedDay];
+        const [year, month, day] = targetDate.split('-').map(Number);
+        newTime = new Date(oldTime);
+        newTime.setUTCFullYear(year, month - 1, day);
+      } else if (diffDays !== 0) {
+        newTime = new Date(oldTime.getTime() + diffDays * 24 * 60 * 60 * 1000);
+      } else {
+        const targetDate = filled[1];
+        const [year, month, day] = targetDate.split('-').map(Number);
+        newTime = new Date(oldTime);
+        newTime.setUTCFullYear(year, month - 1, day);
+      }
+
+      await prisma.match.update({
+        where: { id: match.id },
+        data: { scheduledTime: newTime },
+      });
+    }
+
+    // Also update any saved stage pairings in systemSetting for this edition
+    const configKey = stageConfigKey(editionId);
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: configKey },
+    });
+    if (setting?.value) {
+      try {
+        const config = JSON.parse(setting.value);
+        let changed = false;
+        if (Array.isArray(config.stages)) {
+          for (const stg of config.stages) {
+            if (Array.isArray(stg.matchPairings)) {
+              stg.matchPairings = stg.matchPairings.map((p: any) => {
+                if (p.dayNumber && filled[p.dayNumber]) {
+                  const retargeted = retargetPairingDay(p, p.dayNumber, filled);
+                  if (retargeted.scheduledTime !== p.scheduledTime) {
+                    changed = true;
+                    return retargeted;
+                  }
+                }
+                return p;
+              });
+            }
+          }
+        }
+        if (changed) {
+          await prisma.systemSetting.update({
+            where: { key: configKey },
+            data: { value: JSON.stringify(config) },
+          });
+        }
+      } catch (err) {
+        console.warn('[saveEditionCalendar] stage_config retarget error:', err);
+      }
+    }
 
     revalidatePath('/dashboard/organizer');
     revalidatePath('/dashboard/player');
